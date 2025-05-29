@@ -8,6 +8,8 @@ import bodyParser from "body-parser";
 import fileUpload from "express-fileupload";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
+import serviceRoute from "./routes/serviceRoute.js";
+import invoiceRoutes from "./routes/invoiceRoute.js";
 import path from "path";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -18,6 +20,7 @@ import connectDB from "./config/database.js";
 import authRoute from "./routes/authRoute.js";
 import productRoute from "./routes/productRoute.js";
 import userRoute from "./routes/userRoute.js";
+import serviceRoute from "./routes/serviceRoute.js";
 
 //rest object
 const app = express();
@@ -60,6 +63,8 @@ app.get("/", (req, res) => {
 app.use("/api/v1/auth", authRoute);
 app.use("/api/v1/product", productRoute);
 app.use("/api/v1/user", userRoute);
+app.use("/api/v1/service", serviceRoute);
+app.use("/api/v1/invoice", invoiceRoutes);
 
 // app.use("*", function (req, res) {
 //     res.sendFile(path.join(__dirname, "../client/dist/index.html"));
