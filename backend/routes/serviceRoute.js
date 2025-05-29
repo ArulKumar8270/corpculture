@@ -17,7 +17,7 @@ router.post("/create", requireSignIn, createService);
 router.get("/all", requireSignIn, isAdmin, getAllServices);
 
 // Get single service
-router.get("/single/:id", requireSignIn, getServiceById);
+router.get("/get/:id", requireSignIn, getServiceById);
 
 // Update service
 router.put("/update/:id", requireSignIn, isAdmin, updateService);
