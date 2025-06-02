@@ -28,6 +28,13 @@ const userSchema = new mongoose.Schema(
             type: Number,
             default: 0,
         },
+        commission: {
+            type: Number,
+            default: 0,
+            min: 0,
+            get: v => parseFloat(v.toFixed(2)),
+            set: v => parseFloat(v.toFixed(2))
+        },
         pan: {
             number: {
                 type: String,
