@@ -9,6 +9,8 @@ import PriceCard from "./PriceCard";
 import { useAuth } from "../../../context/auth";
 import { loadStripe } from "@stripe/stripe-js";
 import axios from "axios";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 const Cart = () => {
     const { auth } = useAuth();
@@ -17,6 +19,34 @@ const Cart = () => {
     const secretKey = import.meta.env.VITE_STRIPE_SECRET_KEY;
     let frontendURL = window.location.origin; // Get the frontend URL
     const [cartItems, setCartItems, , , saveLaterItems] = useCart();
+    const navigate = useNavigate();
+    // Sample data for existing users
+    const existingUsers = [
+        { id: 1, email: "alice@example.com" },
+        { id: 2, email: "bob@example.com" },
+        { id: 3, email: "charlie@example.com" },
+    ];
+
+    // State for selected users and new emails
+    const [selectedUserIds, setSelectedUserIds] = useState([]);
+    const [newUserEmail, setNewUserEmail] = useState("");
+    const [additionalEmails, setAdditionalEmails] = useState([]);
+
+
+    const handleAddEmail = () => {
+        if (
+            newUserEmail &&
+            !additionalEmails.includes(newUserEmail) &&
+            /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newUserEmail)
+        ) {
+            setAdditionalEmails([...additionalEmails, newUserEmail]);
+            setNewUserEmail("");
+        }
+    };
+
+    const handleRemoveEmail = (email) => {
+        setAdditionalEmails(additionalEmails.filter((e) => e !== email));
+    };
 
     //PAYMENT USING STRIPE
     const handlePayment = async () => {
@@ -52,7 +82,9 @@ const Cart = () => {
     };
 
     const placeOrderHandler = () => {
-        handlePayment();
+        localStorage.setItem("sessionId", "sdfas09df8as7");
+        navigate("/shipping/confirm")
+        // handlePayment();
     };
 
     return (
@@ -81,29 +113,90 @@ const Cart = () => {
                                 ))
                             )}
                             {/* <!-- place order btn --> */}
-                            <div className="flex flex-col gap-2 sticky bottom-0 left-0 bg-white rounded-b-2xl border-t px-4 py-3">
-                                {/* test card details */}
-                                <div
-                                    className={`text-xs p-2 mb-2 ${
-                                        cartItems.length < 1
-                                            ? "hidden"
-                                            : "inline-block"
-                                    } w-full bg-[#f7fafd] rounded-lg border`}
-                                >
-                                    <p className="mb-1 font-semibold text-gray-700">
-                                        For payment purposes, you can use the following test card details:
-                                    </p>
-                                    <ul className="ml-4 list-disc text-gray-600">
-                                        <li>
-                                            <strong>Card Number:</strong> 4242 4242 4242 4242
-                                        </li>
-                                        <li>
-                                            <strong>Expiry Date:</strong> Any future date (e.g., 12/25)
-                                        </li>
-                                        <li>
-                                            <strong>CVV:</strong> Any 3-digit number (e.g., 123)
-                                        </li>
-                                    </ul>
+                            {auth?.user && <div className="flex flex-col gap-4 sticky bottom-0 left-0 bg-white rounded-b-2xl border-t px-4 py-3">
+                                {/* Select existing users */}
+                                <label className="font-semibold text-sm mb-1">Send Invoice To Existing Users:</label>
+                                <div className="flex flex-wrap gap-3 mb-2">
+                                    {existingUsers.map((user) => (
+                                        <label
+                                            key={user.id}
+                                            className="flex items-center gap-2 bg-blue-50 px-3 py-2 rounded-lg border border-blue-200 cursor-pointer"
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                value={String(user.id)}
+                                                checked={selectedUserIds.includes(String(user.id))}
+                                                onChange={(e) => {
+                                                    if (e.target.checked) {
+                                                        setSelectedUserIds([...selectedUserIds, String(user.id)]);
+                                                    } else {
+                                                        setSelectedUserIds(selectedUserIds.filter(id => id !== String(user.id)));
+                                                    }
+                                                }}
+                                                className="accent-primaryBlue"
+                                            />
+                                            <span className="text-gray-700 font-medium">{user.email}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                                {/* Show selected users as chips */}
+                                <div className="flex flex-wrap gap-2 mb-2">
+                                    {selectedUserIds.map((id) => {
+                                        const user = existingUsers.find(u => String(u.id) === id);
+                                        return user ? (
+                                            <span
+                                                key={user.id}
+                                                className="bg-primaryBlue/10 text-primaryBlue px-3 py-1 rounded-full flex items-center gap-2 text-sm font-semibold"
+                                            >
+                                                {user.email}
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        setSelectedUserIds(selectedUserIds.filter(uid => uid !== id))
+                                                    }
+                                                    className="text-red-500 font-bold ml-1 hover:text-red-700"
+                                                >
+                                                    ×
+                                                </button>
+                                            </span>
+                                        ) : null;
+                                    })}
+                                </div>
+                                {/* Add new user emails */}
+                                <label className="font-semibold text-sm mb-1">Add New User Email(s):</label>
+                                <div className="flex gap-2 mb-2">
+                                    <input
+                                        type="email"
+                                        value={newUserEmail}
+                                        onChange={(e) => setNewUserEmail(e.target.value)}
+                                        placeholder="Enter email"
+                                        className="border rounded-lg p-2 flex-1"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={handleAddEmail}
+                                        className="bg-primaryBlue text-white px-4 py-2 rounded-lg font-semibold"
+                                    >
+                                        Add
+                                    </button>
+                                </div>
+                                {/* Show added emails as chips */}
+                                <div className="flex flex-wrap gap-2 mb-2">
+                                    {additionalEmails.map((email) => (
+                                        <span
+                                            key={email}
+                                            className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full flex items-center gap-2"
+                                        >
+                                            {email}
+                                            <button
+                                                type="button"
+                                                onClick={() => handleRemoveEmail(email)}
+                                                className="text-red-500 font-bold ml-1"
+                                            >
+                                                ×
+                                            </button>
+                                        </span>
+                                    ))}
                                 </div>
 
                                 <button
@@ -117,7 +210,7 @@ const Cart = () => {
                                 >
                                     PLACE ORDER
                                 </button>
-                            </div>
+                            </div>}
                             {/* <!-- place order btn --> */}
                         </div>
                         {/* <!-- cart items container --> */}

@@ -42,8 +42,7 @@ const EditProduct = () => {
     const [logo, setLogo] = useState(null);
     const [logoPreview, setLogoPreview] = useState("");
 
-    //for submit state
-    const [isSubmit, setIsSubmit] = useState(false);
+    {{ edit_1 }}
 
     // max image size 500kb
     const MAX_IMAGE_SIZE = 500 * 1024;
@@ -158,6 +157,7 @@ const EditProduct = () => {
             formData.append("brandName", brand);
             formData.append("logo", logo);
             formData.append("oldLogo", JSON.stringify(oldLogo));
+            {{ edit_2 }}
 
             images.forEach((image) => {
                 formData.append("images", image);
@@ -227,6 +227,7 @@ const EditProduct = () => {
                 setBrand(res.data.product.brand.name);
                 setHighlights(res.data.product.highlights || []);
                 setSpecs(res.data.product.specifications || []);
+                {{ edit_3 }}
                 setOldLogo(() => {
                     return {
                         url: res.data.product.brand.logo.url,
@@ -325,6 +326,7 @@ const EditProduct = () => {
                                     }
                                 />
                             </div>
+                            {{ edit_4 }}
                             <div className="flex justify-between gap-4">
                                 <TextField
                                     label="Category"

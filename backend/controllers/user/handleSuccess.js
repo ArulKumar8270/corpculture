@@ -23,9 +23,25 @@ const handleSuccess = async (req, res) => {
         }
 
         // Fetch the payment intent associated with the session
-        const session = await stripeInstance.checkout.sessions.retrieve(
-            sessionId
-        );
+        // const session = await stripeInstance.checkout.sessions.retrieve(
+        //     sessionId
+        // );
+        let session = {
+            payment_intent: "pi_3N7qf3Lw5q2q7Xw5720Y3720",
+            amount_total: 1000,
+            customer_details: {
+                address: {
+                    line1: "123 Main Street",
+                    city: "Anytown",
+                    state: "CA",
+                    country: "USA",
+                    postal_code: "12345",
+                },
+                phone: "1234567890",
+                name: "John Doe",
+                email: "arulkumar8270@gmail.com"
+            },
+        }
         console.log("session: ", session);
 
         // Extract the payment intent ID from the retrieved session

@@ -189,7 +189,7 @@ const Login = () => {
                                     to="/register"
                                     className="text-cyan-700 font-semibold text-sm hover:underline"
                                 >
-                                    New to Flipkart? Create an account
+                                    New to Corp Culture? Create an account
                                 </Link>
                             </div>
                         </div>

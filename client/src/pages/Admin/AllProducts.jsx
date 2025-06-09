@@ -8,6 +8,7 @@ import { DataGrid } from "@mui/x-data-grid";
 import Rating from "@mui/material/Rating";
 import Actions from "./Actions";
 import SeoData from "../../SEO/SeoData";
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField } from "@mui/material";
 
 const AllProducts = () => {
     const { auth } = useAuth();
@@ -186,6 +187,51 @@ const AllProducts = () => {
             rating: item.ratings,
         });
     });
+    const [categoryModalOpen, setCategoryModalOpen] = useState(false);
+    const [categoryForm, setCategoryForm] = useState({ name: "", commission: "" });
+    const [categoryErrors, setCategoryErrors] = useState({});
+    const [categoryLoading, setCategoryLoading] = useState(false);
+
+    const handleCategoryOpen = () => {
+        setCategoryModalOpen(true);
+        setCategoryForm({ name: "", commission: "" });
+        setCategoryErrors({});
+    };
+
+    const handleCategoryClose = () => {
+        setCategoryModalOpen(false);
+    };
+
+    const handleCategoryChange = (e) => {
+        setCategoryForm({ ...categoryForm, [e.target.name]: e.target.value });
+        setCategoryErrors({ ...categoryErrors, [e.target.name]: undefined });
+    };
+
+    const handleCategorySubmit = async (e) => {
+        e.preventDefault();
+        let errors = {};
+        if (!categoryForm.name.trim()) errors.name = "Category name is required";
+        if (!categoryForm.commission || isNaN(categoryForm.commission)) errors.commission = "Commission is required and must be a number";
+        if (Object.keys(errors).length > 0) {
+            setCategoryErrors(errors);
+            return;
+        }
+        setCategoryLoading(true);
+        try {
+            // Replace with your actual API endpoint
+            await axios.post(`${import.meta.env.VITE_SERVER_URL}/api/v1/category`, {
+                name: categoryForm.name.trim(),
+                commission: Number(categoryForm.commission),
+            }, {
+                headers: { Authorization: auth.token }
+            });
+            toast.success("Category added successfully!");
+            setCategoryModalOpen(false);
+        } catch (err) {
+            toast.error(err.response?.data?.message || "Failed to add category");
+        }
+        setCategoryLoading(false);
+    };
     return (
         <div className="relative p-2 w-full min-h-screen bg-gradient-to-br from-[#e6fbff] to-[#f7fafd]">
             <SeoData title="All Products - Flipkart Seller" />
@@ -198,13 +244,57 @@ const AllProducts = () => {
                         <h1 className="text-lg font-bold uppercase text-[#019ee3] tracking-wide">
                             Products
                         </h1>
-                        <Link
-                            to="/admin/dashboard/add-product"
-                            className="py-2 px-5 rounded-xl shadow font-semibold text-white bg-gradient-to-r from-[#019ee3] to-[#afcb09] hover:from-[#afcb09] hover:to-[#019ee3] transition"
-                        >
-                            + New Product
-                        </Link>
+                        <div className="flex gap-2">
+                            <Link
+                                to="/admin/dashboard/add-product"
+                                className="py-2 px-5 rounded-xl shadow font-semibold text-white bg-gradient-to-r from-[#019ee3] to-[#afcb09] hover:from-[#afcb09] hover:to-[#019ee3] transition"
+                            >
+                                + New Product
+                            </Link>
+                            <button
+                                onClick={handleCategoryOpen}
+                                className="py-2 px-5 rounded-xl shadow font-semibold text-white bg-gradient-to-r from-[#afcb09] to-[#019ee3] hover:from-[#019ee3] hover:to-[#afcb09] transition"
+                            >
+                                + New Category
+                            </button>
+                        </div>
                     </div>
+                    {/* Category Modal */}
+                    <Dialog open={categoryModalOpen} onClose={handleCategoryClose}>
+                        <DialogTitle>Add New Category</DialogTitle>
+                        <form onSubmit={handleCategorySubmit}>
+                            <DialogContent className="flex flex-col gap-4 min-w-[320px]">
+                                <TextField
+                                    label="Category Name"
+                                    name="name"
+                                    value={categoryForm.name}
+                                    onChange={handleCategoryChange}
+                                    error={!!categoryErrors.name}
+                                    helperText={categoryErrors.name}
+                                    fullWidth
+                                    required
+                                />
+                                <TextField
+                                    label="Commission (%)"
+                                    name="commission"
+                                    value={categoryForm.commission}
+                                    onChange={handleCategoryChange}
+                                    error={!!categoryErrors.commission}
+                                    helperText={categoryErrors.commission}
+                                    fullWidth
+                                    required
+                                    type="number"
+                                    inputProps={{ min: 0 }}
+                                />
+                            </DialogContent>
+                            <DialogActions>
+                                <Button onClick={handleCategoryClose} disabled={categoryLoading}>Cancel</Button>
+                                <Button type="submit" variant="contained" color="primary" disabled={categoryLoading}>
+                                    {categoryLoading ? "Saving..." : "Add Category"}
+                                </Button>
+                            </DialogActions>
+                        </form>
+                    </Dialog>
                     <div className="w-full h-[80vh] bg-white rounded-2xl shadow-xl border border-[#e6fbff] p-2">
                         <DataGrid
                             rows={rows}

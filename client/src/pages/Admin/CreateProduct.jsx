@@ -39,6 +39,10 @@ const CreateProduct = () => {
     const [logo, setLogo] = useState("");
     const [logoPreview, setLogoPreview] = useState("");
 
+    // New state variables for installation cost and delivery charge
+    const [installationCost, setInstallationCost] = useState(0);
+    const [deliveryCharge, setDeliveryCharge] = useState(0);
+
     //for submit state
     const [isSubmit, setIsSubmit] = useState(false);
 
@@ -152,6 +156,9 @@ const CreateProduct = () => {
             formData.append("warranty", warranty);
             formData.append("brandName", brand);
             formData.append("logo", logo);
+            // Append new fields to formData
+            formData.append("installationCost", installationCost);
+            formData.append("deliveryCharge", deliveryCharge);
 
             images.forEach((image) => {
                 formData.append("images", image);
@@ -254,6 +261,7 @@ const CreateProduct = () => {
                                 }
                             />
                         </div>
+                        
                         <div className="flex justify-between gap-4">
                             <TextField
                                 label="Category"
