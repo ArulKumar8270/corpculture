@@ -11,6 +11,7 @@ import EditProduct from "./EditProduct";
 import SeoData from "../../SEO/SeoData";
 import { useEffect, useState } from "react";
 import { GiHamburgerMenu } from "react-icons/gi";
+import AdminServices from "./AdminServices"; // Import the new component
 
 const AdminDashboard = () => {
     const navigate = useNavigate();
@@ -59,6 +60,8 @@ const AdminDashboard = () => {
                             <Route path="add-product" element={<CreateProduct />} />
                             <Route path="all-products" element={<AllProducts />} />
                             <Route path="users" element={<Users />} />
+                            {/* Add the new route for Service Enquiries */}
+                            <Route path="service-enquiries" element={<AdminServices />} />
                             <Route path="profile/deactivate" element={<Deactivate />} />
                             <Route path="product/:productId" element={<EditProduct />} />
                         </Routes>

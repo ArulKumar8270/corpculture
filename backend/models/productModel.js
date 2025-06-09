@@ -10,6 +10,14 @@ const productSchema = new mongoose.Schema({
         type: String,
         required: [true, "Please enter product description"],
     },
+    installationCose : {
+        type: Number,
+        required: [true, "Please enter installation cost"],
+    },
+    deliveryCharge : {
+        type: Number,
+        required: [true, "Please enter delivery charge"],
+    },
     highlights: [
         {
             type: String,

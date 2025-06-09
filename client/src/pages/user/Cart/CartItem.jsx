@@ -45,12 +45,13 @@ const CartItem = ({ product, inCart }) => {
 
     return (
         <div className="flex flex-col gap-3 py-5 pl-2 sm:pl-6 border-b overflow-hidden bg-white rounded-2xl shadow-sm mb-4">
-            <Link
-                to={`/product/${product?.productId}`}
+            <div
                 className="flex flex-col sm:flex-row gap-5 items-stretch w-full"
             >
+                 <Link
+                to={`/product/${product?.productId}`} >
                 {/* <!-- product image --> */}
-                <div className="w-full sm:w-1/6 h-28 flex-shrink-0 rounded-xl bg-gray-50 flex items-center justify-center shadow">
+                <div className="w-full sm:w-6/6 h-28 flex-shrink-0 rounded-xl bg-gray-50 flex items-center justify-center shadow">
                     <img
                         draggable="false"
                         className="h-full w-full object-contain rounded-xl"
@@ -59,7 +60,7 @@ const CartItem = ({ product, inCart }) => {
                     />
                 </div>
                 {/* <!-- product image --> */}
-
+                </Link>
                 {/* <!-- description --> */}
                 <div className="flex flex-col sm:gap-5 w-full">
                     {/* <!-- product title --> */}
@@ -81,6 +82,23 @@ const CartItem = ({ product, inCart }) => {
                                 <span className="line-through">₹{40}</span>{" "}
                                 <span className="text-primaryGreen">Free</span>
                             </p>
+                            {/* Invoice send option */}
+                            <label className="flex items-center gap-2 mt-2 text-sm font-medium text-gray-700">
+                                <input
+                                    type="checkbox"
+                                    className="accent-primaryBlue w-4 h-4"
+                                    // onChange={...} // Add handler if you want to track selection
+                                />
+                                Send Quotation with this item
+                            </label>
+                            <label className="flex items-center gap-2 mt-2 text-sm font-medium text-gray-700">
+                                <input
+                                    type="checkbox"
+                                    className="accent-primaryBlue w-4 h-4"
+                                    // onChange={...} // Add handler if you want to track selection
+                                />
+                                Installation Required
+                            </label>
                         </div>
                     </div>
                     {/* <!-- product title --> */}
@@ -111,7 +129,7 @@ const CartItem = ({ product, inCart }) => {
                     {/* <!-- price desc --> */}
                 </div>
                 {/* <!-- description --> */}
-            </Link>
+            </div>
 
             {/* <!-- save for later --> */}
             <div className="flex justify-between pr-4 sm:pr-0 sm:justify-start sm:gap-6 items-center">
