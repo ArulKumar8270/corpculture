@@ -1,5 +1,4 @@
 import orderModel from "../../models/orderModel.js";
-import userModel from "../../models/userModel.js";
 
 const updateOrder = async (req, res) => {
     try {

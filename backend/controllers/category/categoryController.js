@@ -1,7 +1,6 @@
-const Category = require('../../models/categoryModel'); // Updated path to reflect new controller location
-
+import Category from "../../models/categoryModel.js";
 // Create Category
-exports.createCategory = async (req, res) => {
+export const createCategory = async (req, res) => {
     try {
         const { name, commission } = req.body;
         if (!name) {
@@ -20,7 +19,7 @@ exports.createCategory = async (req, res) => {
 };
 
 // Get All Categories
-exports.getAllCategories = async (req, res) => {
+export const getAllCategories = async (req, res) => {
     try {
         const categories = await Category.find({});
         res.status(200).send({ success: true, message: 'All categories fetched', categories });
@@ -31,7 +30,7 @@ exports.getAllCategories = async (req, res) => {
 };
 
 // Get Single Category
-exports.getCategoryById = async (req, res) => {
+export const getCategoryById = async (req, res) => {
     try {
         const category = await Category.findById(req.params.id);
         if (!category) {
@@ -45,7 +44,7 @@ exports.getCategoryById = async (req, res) => {
 };
 
 // Update Category
-exports.updateCategory = async (req, res) => {
+export const updateCategory = async (req, res) => {
     try {
         const { name, commission } = req.body;
         const category = await Category.findByIdAndUpdate(
@@ -64,7 +63,7 @@ exports.updateCategory = async (req, res) => {
 };
 
 // Delete Category
-exports.deleteCategory = async (req, res) => {
+export const deleteCategory = async (req, res) => {
     try {
         const category = await Category.findByIdAndDelete(req.params.id);
         if (!category) {

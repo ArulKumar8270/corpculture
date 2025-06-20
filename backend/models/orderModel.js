@@ -26,6 +26,22 @@ const orderSchema = new mongoose.Schema({
                 type: Number,
                 default: 1,
             },
+            sendInvoice: {
+                type: Boolean,
+                default: false,
+            },
+            isInstalation: {
+                type: Boolean,
+                default: false,
+            },
+            installationCost: {
+                type: Number,
+                default: 0,
+            },
+            deliveryCharge: {
+                type: Number,
+                default: 0,
+            },
             productId: {
                 type: String,
                 required: true,
@@ -74,6 +90,10 @@ const orderSchema = new mongoose.Schema({
     orderStatus: {
         type: String,
         default: "Processing",
+    },
+    employeeId: {
+        type: mongoose.Schema.ObjectId,
+        ref: "User",
     },
     amount: {
         type: Number,

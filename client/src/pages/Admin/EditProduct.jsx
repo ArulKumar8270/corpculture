@@ -5,7 +5,6 @@ import MenuItem from "@mui/material/MenuItem";
 import { toast } from "react-toastify";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import ImageIcon from "@mui/icons-material/Image";
-import { categories } from "../../utils/constants";
 import Spinner from "../../components/Spinner";
 import axios from "axios";
 import FormData from "form-data";
@@ -41,12 +40,43 @@ const EditProduct = () => {
     const [removedImages, setRemovedImages] = useState([]);
     const [logo, setLogo] = useState(null);
     const [logoPreview, setLogoPreview] = useState("");
+    const [categories, setCategories] = useState([]);
 
-    {{ edit_1 }}
 
     // max image size 500kb
     const MAX_IMAGE_SIZE = 500 * 1024;
     const MAX_IMAGES_COUNT = 4; // Maximum number of allowed images
+
+
+    useEffect(() => {
+        const fetchCategories = async () => {
+            try {
+                const res = await axios.get(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/category/all`, // Assuming this is your endpoint
+                    {
+                        headers: {
+                            Authorization: auth?.token,
+                        },
+                    }
+                );
+
+                if (res.status === 200) {
+                    setCategories(res.data.categories);
+                }
+                setLoading(false);
+            } catch (error) {
+                console.error("Error fetching categories:", error);
+                toast.error(
+                    error.response?.data?.message ||
+                    "Error fetching categories. Please try again."
+                );
+            }
+        };
+
+        if (auth?.token) {
+            fetchCategories();
+        }
+    }, [auth?.token]);
 
     const handleSpecsChange = (e) => {
         setSpecsInput({ ...specsInput, [e.target.name]: e.target.value });
@@ -127,7 +157,7 @@ const EditProduct = () => {
     const newProductUpdateHandler = async (e) => {
         e.preventDefault();
 
-        setIsSubmit(true);
+        // setIsSubmit(true);
 
         const validationErrors = [];
 
@@ -141,7 +171,6 @@ const EditProduct = () => {
 
         if (validationErrors.length > 0) {
             validationErrors.forEach((error) => toast.warning(error));
-            setIsSubmit(false); // Disable submission due to validation errors
             return;
         }
         try {
@@ -157,7 +186,6 @@ const EditProduct = () => {
             formData.append("brandName", brand);
             formData.append("logo", logo);
             formData.append("oldLogo", JSON.stringify(oldLogo));
-            {{ edit_2 }}
 
             images.forEach((image) => {
                 formData.append("images", image);
@@ -227,7 +255,6 @@ const EditProduct = () => {
                 setBrand(res.data.product.brand.name);
                 setHighlights(res.data.product.highlights || []);
                 setSpecs(res.data.product.specifications || []);
-                {{ edit_3 }}
                 setOldLogo(() => {
                     return {
                         url: res.data.product.brand.logo.url,
@@ -263,7 +290,7 @@ const EditProduct = () => {
             <SeoData title="New/Update Product | Flipkart" />
             <ScrollToTopOnRouteChange />
 
-            {isSubmit || loading ? (
+            {loading ? (
                 <div className="relative h-full">
                     <Spinner />
                 </div>
@@ -326,7 +353,6 @@ const EditProduct = () => {
                                     }
                                 />
                             </div>
-                            {{ edit_4 }}
                             <div className="flex justify-between gap-4">
                                 <TextField
                                     label="Category"
@@ -339,8 +365,8 @@ const EditProduct = () => {
                                     onChange={(e) => setCategory(e.target.value)}
                                 >
                                     {categories.map((el, i) => (
-                                        <MenuItem value={el} key={i}>
-                                            {el}
+                                        <MenuItem value={el.name} key={i}>
+                                            {el.name}
                                         </MenuItem>
                                     ))}
                                 </TextField>

@@ -5,6 +5,7 @@ import AddressComponent from "../AddressComponent";
 import PanCardComponent from "../PanCardComponent";
 import CreateProduct from "./CreateProduct";
 import AllProducts from "./AllProducts";
+import AllCategories from "./AllCategories";
 import Users from "./Users";
 import Deactivate from "../Auth/Deactivate";
 import EditProduct from "./EditProduct";
@@ -59,6 +60,7 @@ const AdminDashboard = () => {
                             <Route path="pan" element={<PanCardComponent />} />
                             <Route path="add-product" element={<CreateProduct />} />
                             <Route path="all-products" element={<AllProducts />} />
+                            <Route path="all-category" element={<AllCategories />} />
                             <Route path="users" element={<Users />} />
                             {/* Add the new route for Service Enquiries */}
                             <Route path="service-enquiries" element={<AdminServices />} />

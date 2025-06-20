@@ -26,11 +26,15 @@ const userSchema = new mongoose.Schema(
         },
         address: {
             type: String,
-            required: true,
+            required: false,
         },
         role: {
             type: Number,
             default: 0,
+        },
+        companyId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Company",
         },
         commission: {
             type: Number,

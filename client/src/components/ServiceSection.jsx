@@ -4,15 +4,51 @@ import axios from "axios";
 const ServiceSection = ({ services }) => {
   const [showModal, setShowModal] = useState(false);
   const [selectedService, setSelectedService] = useState(null);
+  const [fetchedServices, setFetchedServices] = useState([]); // State to store services fetched by phone
+  const [isFetchingServices, setIsFetchingServices] = useState(false); // Loading state for phone lookup
+  const [fetchError, setFetchError] = useState(null); // Error state for phone lookup
+
 
   const handleServiceClick = (service) => {
     setSelectedService(service);
     setShowModal(true);
+    // Reset form and fetched services when opening modal
+    setForm({
+      customerType: "",
+      phone: "",
+      companyName: "",
+      complaint: "",
+      contactPerson: "",
+      email: "",
+      address: "",
+      location: "",
+    });
+    setErrors({});
+    setSubmitStatus(null);
+    setFetchedServices([]);
+    setFetchError(null);
+    setIsFetchingServices(false);
   };
 
   const closeModal = () => {
     setShowModal(false);
     setSelectedService(null);
+    // Reset states when closing modal
+    setForm({
+      customerType: "",
+      phone: "",
+      companyName: "",
+      complaint: "",
+      contactPerson: "",
+      email: "",
+      address: "",
+      location: "",
+    });
+    setErrors({});
+    setSubmitStatus(null);
+    setFetchedServices([]);
+    setFetchError(null);
+    setIsFetchingServices(false);
   };
 
 
@@ -33,6 +69,9 @@ const validate = () => {
   const newErrors = {};
   if (!form.customerType) newErrors.customerType = "Type of customer is required";
   if (!form.phone) newErrors.phone = "Phone is required";
+  // Basic phone number validation (e.g., 10 digits)
+  else if (!/^\d{10}$/.test(form.phone)) newErrors.phone = "Phone number must be 10 digits";
+
   if (!form.companyName) newErrors.companyName = "Company name is required";
   if (!form.contactPerson) newErrors.contactPerson = "Contact person is required";
   if (!form.email) newErrors.email = "Email is required";
@@ -42,9 +81,89 @@ const validate = () => {
   return newErrors;
 };
 
+const fetchServicesByPhone = async (phoneNumber) => { // New function to fetch services by phone
+    if (!phoneNumber || phoneNumber.length !== 10) { // Only fetch if phone is 10 digits
+        setFetchedServices([]); // Clear previous results
+        setFetchError(null); // Clear previous error
+        // Optionally clear form fields related to previous customer if phone number is cleared/invalidated {{ edit_1 }}
+        setForm(prevForm => ({ // {{ edit_1 }}
+            ...prevForm, // {{ edit_1 }}
+            customerType: "", // {{ edit_1 }} Reset customer type
+            companyName: "", // {{ edit_1 }} Reset company name
+            contactPerson: "", // {{ edit_1 }} Reset contact person
+            email: "", // {{ edit_1 }} Reset email
+            address: "", // {{ edit_1 }} Reset address
+            location: "", // {{ edit_1 }} Reset location
+        })); // {{ edit_1 }}
+        return; // {{ edit_1 }}
+    }
+
+    setIsFetchingServices(true); // Set loading state
+    setFetchError(null); // Clear previous error
+
+    try {
+        const response = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/service/phone/${phoneNumber}`);
+        if (response.data.success && response.data.services.length > 0) { // Check for success and if services were returned {{ edit_1 }}
+            setFetchedServices(response.data.services); // Store fetched services
+            const latestService = response.data.services[0]; // Get the most recent service (assuming sorted by createdAt desc) {{ edit_1 }}
+            setForm(prevForm => ({ // {{ edit_1 }} Update form with fetched data
+                ...prevForm, // {{ edit_1 }} Keep the current phone number
+                customerType: "Existing", // {{ edit_1 }} Set customer type to Existing
+                companyName: latestService.companyName || "", // {{ edit_1 }} Pre-fill company name
+                contactPerson: latestService.contactPerson || "", // {{ edit_1 }} Pre-fill contact person
+                email: latestService.email || "", // {{ edit_1 }} Pre-fill email
+                address: latestService.address || "", // {{ edit_1 }} Pre-fill address
+                location: latestService.location || "", // {{ edit_1 }} Pre-fill location
+                // complaint is usually specific to the new request, so don't pre-fill {{ edit_1 }}
+            })); // {{ edit_1 }}
+        } else {
+             // Handle cases where success is false or no services found
+            setFetchedServices([]); // Clear previous results
+            setFetchError(response.data.message || "No services found for this phone number.");
+             // Optionally clear form fields if no previous customer found {{ edit_1 }}
+            setForm(prevForm => ({ // {{ edit_1 }}
+                ...prevForm, // {{ edit_1 }} Keep the current phone number
+                customerType: "", // {{ edit_1 }} Reset customer type
+                companyName: "", // {{ edit_1 }} Reset company name
+                contactPerson: "", // {{ edit_1 }} Reset contact person
+                email: "", // {{ edit_1 }} Reset email
+                address: "", // {{ edit_1 }} Reset address
+                location: "", // {{ edit_1 }} Reset location
+            })); // {{ edit_1 }}
+        }
+    } catch (err) {
+        console.error("Error fetching services by phone:", err);
+        setFetchedServices([]); // Clear results on error
+        // Set a user-friendly error message
+        if (err.response && err.response.status === 404) {
+             setFetchError("No services found for this phone number.");
+        } else {
+             setFetchError("Failed to fetch services. Please try again.");
+        }
+         // Optionally clear form fields on error {{ edit_1 }}
+        setForm(prevForm => ({ // {{ edit_1 }}
+            ...prevForm, // {{ edit_1 }} Keep the current phone number
+            customerType: "", // {{ edit_1 }} Reset customer type
+            companyName: "", // {{ edit_1 }} Reset company name
+            contactPerson: "", // {{ edit_1 }} Reset contact person
+            email: "", // {{ edit_1 }} Reset email
+            address: "", // {{ edit_1 }} Reset address
+            location: "", // {{ edit_1 }} Reset location
+        })); // {{ edit_1 }}
+    } finally {
+        setIsFetchingServices(false); // Clear loading state
+    }
+};
+
+
 const handleChange = (e) => {
-  setForm({ ...form, [e.target.name]: e.target.value });
-  setErrors({ ...errors, [e.target.name]: undefined });
+  const { name, value } = e.target;
+  setForm({ ...form, [name]: value });
+  setErrors({ ...errors, [name]: undefined });
+
+  if (name === 'phone') {
+      fetchServicesByPhone(value); // Trigger the fetch function
+  }
 };
 
 const handleSubmit = async (e) => {
@@ -57,7 +176,7 @@ const handleSubmit = async (e) => {
   }
   try {
     // Replace with your actual API endpoint
-    await axios.post("/api/enquiry", form);
+    await axios.post(`${import.meta.env.VITE_SERVER_URL}/api/v1/service/create`, form);
     setSubmitStatus("success");
     setForm({
       customerType: "",
@@ -70,7 +189,10 @@ const handleSubmit = async (e) => {
       location: "",
     });
     setErrors({});
+    setFetchedServices([]); // Clear fetched services after successful submission
+    setFetchError(null); // Clear fetch error after successful submission
   } catch (err) {
+    console.error("Service submission error:", err); // Log the error
     setSubmitStatus("error");
   }
 };
@@ -90,12 +212,12 @@ const handleSubmit = async (e) => {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8 max-w-7xl mx-auto">
           {services.map((service) => (
-            <div 
-              key={service.id} 
+            <div
+              key={service.id}
               className="bg-white rounded-xl shadow-md overflow-hidden transform transition-all duration-300 hover:-translate-y-2 hover:shadow-xl group cursor-pointer"
               onClick={() => handleServiceClick(service)}
             >
-              <div 
+              <div
                 className={`${service.bgColor} p-6 flex justify-center items-center transition-all duration-300 group-hover:scale-105`}
               >
                 <div className="bg-white/20 p-4 rounded-full">
@@ -154,10 +276,14 @@ const handleSubmit = async (e) => {
                       type="text"
                       name="phone"
                       value={form.phone}
-                      onChange={handleChange}
-                      className={`w-full rounded-lg px-3 py-2 border ${errors.phone ? "border-red-400" : "border-gray-300"} focus:border-sky-500 focus:ring-2 focus:ring-sky-200 transition bg-white`}
+                      onChange={handleChange} // Use the modified handleChange
+                      className={`w-full rounded-lg px-3 py-2 border ${errors.phone || fetchError ? "border-red-400" : "border-gray-300"} focus:border-sky-500 focus:ring-2 focus:ring-sky-200 transition bg-white`} // Add error styling based on fetchError
+                      maxLength="10" // Limit input to 10 digits
                     />
                     {errors.phone && <span className="text-red-500 text-xs">{errors.phone}</span>}
+                    {/* Display loading or error message for phone lookup */}
+                    {isFetchingServices && <span className="text-sky-600 text-xs">Searching for previous services...</span>}
+                    {fetchError && <span className="text-red-500 text-xs">{fetchError}</span>}
                   </div>
                   <div>
                     <label className="block font-semibold mb-1 text-gray-700">Company Name</label>
@@ -229,6 +355,21 @@ const handleSubmit = async (e) => {
                     <button type="button" className="flex-1 bg-lime-500 hover:bg-lime-600 text-white py-3 rounded-xl font-bold shadow transition text-lg">Calls us</button>
                   </div>
                 </form>
+
+                {/* Display fetched services */}
+                {fetchedServices.length > 0 && (
+                    <div className="mt-6 pt-4 border-t border-gray-200">
+                        <h3 className="text-lg font-semibold mb-3 text-gray-700">Previous Service Requests:</h3>
+                        <ul className="list-disc list-inside text-gray-600 text-sm max-h-40 overflow-y-auto pr-2">
+                            {fetchedServices.map(service => (
+                                <li key={service._id} className="mb-1">
+                                    <strong>ID:</strong> {service._id} - <strong>Status:</strong> {service.status || 'Pending'} - <strong>Date:</strong> {new Date(service.createdAt).toLocaleDateString()} {/* Display relevant service info */}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
+
               </div>
             </div>
           </div>

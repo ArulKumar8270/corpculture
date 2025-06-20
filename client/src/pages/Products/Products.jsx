@@ -24,7 +24,7 @@ const Products = () => {
     const [ratings, setRatings] = useState(0);
     const [products, setProducts] = useState([]);
     const [wishlistItems, setWishlistItems] = useState([]);
-
+    const [categories, setCategories] = useState([]);
     // pagination----->
     const [currentPage, setCurrentPage] = useState(1);
     const [productsCount, setProductsCount] = useState(products?.length);
@@ -40,6 +40,34 @@ const Products = () => {
     // Handle page change
     const handlePageChange = (event, page) => {
         setCurrentPage(page);
+    };
+
+    
+    useEffect(() => {
+        fetchCategories();
+    }, []);
+
+    const fetchCategories = async () => {
+        try {
+            const res = await axios.get(
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/category/all`, // Assuming this is your endpoint
+                {
+                    headers: {
+                        Authorization: auth?.token,
+                    },
+                }
+            );
+
+            if (res.status === 200) {
+                setCategories(res.data.categories);
+            }
+        } catch (error) {
+            console.error("Error fetching categories:", error);
+            toast.error(
+                error.response?.data?.message ||
+                "Error fetching categories. Please try again."
+            );
+        }
     };
 
     useEffect(() => {
@@ -137,6 +165,7 @@ const Products = () => {
                         setPrice={setPrice}
                         setCategory={setCategory}
                         setRatings={setRatings}
+                        categories={categories}
                     />
                     {/* <!-- sidebar column  --> */}
 

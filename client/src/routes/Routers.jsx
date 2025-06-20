@@ -18,6 +18,10 @@ import OrderSuccess from "../pages/user/Cart/OrderSuccess";
 import OrderFailed from "../pages/user/Cart/OrderFailed";
 import OrderDetails from "../pages/user/Orders/OrderDetails";
 import AdminOrders from "../pages/Admin/AdminOrders";
+import AdminEmployees from "../pages/Admin/AdminEmployees";
+import AddEmployee from "../pages/Admin/AddEmployee";
+import Users from "../pages/Admin/Users";
+import EmployeeDetails from "../pages/Admin/EmployeeDetails";
 import UpdateOrders from "../pages/Admin/UpdateOrders";
 import DeleteAllOrder from "../pages/DeleteAllOrder.jsx";
 
@@ -49,6 +53,10 @@ const Routers = () => {
             <Route path="/admin" element={<AdminRoute />}>
                 <Route path="dashboard/*" element={<AdminDashboard />} />
                 <Route path="orders" element={<AdminOrders />} />
+                <Route path="AdminEmployees" element={<AdminEmployees />} />
+                <Route path="AddEmployee" element={<AddEmployee />} />
+                <Route path="users" element={<Users />} />
+                <Route path="employee_details/:id" element={<EmployeeDetails />} />
                 <Route
                     path="orders/order_details/:id"
                     element={<UpdateOrders />}

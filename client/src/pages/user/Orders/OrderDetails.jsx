@@ -15,15 +15,14 @@ const OrderDetails = () => {
     const [loading, setLoading] = useState(false);
     const [orderDetails, setOrderDetails] = useState([]);
     const { auth } = useAuth();
-
+    console.log(orderDetails, "orderDetails709")
     useEffect(() => {
         // fetch order detail from server
         const fetchOrders = async () => {
             try {
                 setLoading(true);
                 const response = await axios.get(
-                    `${
-                        import.meta.env.VITE_SERVER_URL
+                    `${import.meta.env.VITE_SERVER_URL
                     }/api/v1/user/order-detail?orderId=${orderId}`,
                     {
                         headers: {
@@ -113,6 +112,10 @@ const OrderDetails = () => {
                                     discountPrice,
                                     quantity,
                                     seller,
+                                    sendInvoice,
+                                    isInstalation,
+                                    deliveryCharge,
+                                    installationCost,
                                 } = item;
 
                                 return (
@@ -133,9 +136,9 @@ const OrderDetails = () => {
                                                 <p className="text-base font-semibold text-gray-800">
                                                     {name.length > 60
                                                         ? `${name.substring(
-                                                              0,
-                                                              60
-                                                          )}...`
+                                                            0,
+                                                            60
+                                                        )}...`
                                                         : name}
                                                 </p>
                                                 <p className="text-sm text-gray-600 mt-2">
@@ -147,12 +150,29 @@ const OrderDetails = () => {
                                                 <span className="font-bold text-[#019ee3] text-lg">
                                                     ₹
                                                     {(
-                                                        quantity * discountPrice
+                                                        quantity * discountPrice + deliveryCharge + installationCost
                                                     ).toLocaleString()}
                                                 </span>
-                                                <span className="text-xs text-gray-500">
-                                                    Payment Id: {paymentId}
-                                                </span>
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-[15px] text-gray-700">
+                                                        Send Invoice : 
+                                                    </span>
+                                                    <span>
+                                                        {sendInvoice
+                                                            ? "Sent"
+                                                            : "Not Sent"}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-[15px] text-gray-700">
+                                                        Instalation :  
+                                                    </span>
+                                                    <span>
+                                                        {isInstalation
+                                                            ? "Requested"
+                                                            : "Not Requested"}
+                                                    </span>
+                                                </div>
                                                 <span className="text-xs text-gray-500">
                                                     Order Date:{" "}
                                                     {new Date(
@@ -169,12 +189,12 @@ const OrderDetails = () => {
                                                     orderStatus === "Delivered"
                                                         ? 3
                                                         : orderStatus ===
-                                                          "Out For Delivery"
-                                                        ? 2
-                                                        : orderStatus ===
-                                                          "Shipped"
-                                                        ? 1
-                                                        : 0
+                                                            "Out For Delivery"
+                                                            ? 2
+                                                            : orderStatus ===
+                                                                "Shipped"
+                                                                ? 1
+                                                                : 0
                                                 }
                                             />
                                         </div>

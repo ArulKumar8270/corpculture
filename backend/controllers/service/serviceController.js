@@ -131,3 +131,40 @@ export const deleteService = async (req, res) => {
         });
     }
 };
+
+// Get Service by Phone Number {{ edit_1 }}
+export const getServiceByPhone = async (req, res) => { // {{ edit_1 }}
+    try { // {{ edit_1 }}
+        const { phone } = req.params; // Assuming phone is passed as a URL parameter {{ edit_1 }}
+
+        if (!phone) { // {{ edit_1 }}
+            return res.status(400).send({ // {{ edit_1 }}
+                success: false, // {{ edit_1 }}
+                message: "Phone number is required", // {{ edit_1 }}
+                errorType: "missingParameter" // {{ edit_1 }}
+            }); // {{ edit_1 }}
+        } // {{ edit_1 }}
+
+        const services = await ServiceModel.find({ phone: phone }).sort({ createdAt: -1 }); // Find services by phone number {{ edit_1 }}
+
+        if (!services || services.length === 0) { // {{ edit_1 }}
+            return res.status(404).send({ // {{ edit_1 }}
+                success: false, // {{ edit_1 }}
+                message: "No services found for this phone number", // {{ edit_1 }}
+                errorType: "servicesNotFound" // {{ edit_1 }}
+            }); // {{ edit_1 }}
+        } // {{ edit_1 }}
+
+        res.status(200).send({ // {{ edit_1 }}
+            success: true, // {{ edit_1 }}
+            services // {{ edit_1 }}
+        }); // {{ edit_1 }}
+    } catch (error) { // {{ edit_1 }}
+        console.error("Error in getting services by phone:", error); // Log the error {{ edit_1 }}
+        res.status(500).send({ // {{ edit_1 }}
+            success: false, // {{ edit_1 }}
+            message: "Error in getting services by phone", // {{ edit_1 }}
+            error // {{ edit_1 }}
+        }); // {{ edit_1 }}
+    } // {{ edit_1 }}
+}; // {{ edit_1 }}

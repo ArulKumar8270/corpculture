@@ -21,7 +21,7 @@ const CartProvider = ({ children }) => {
         }
     }, [reload]);
 
-    const addItems = async (product, quantity = 1) => {
+    const addItems = async (product, quantity = 1, sendInvoice, isInstalation) => {
         const existingItemIndex = cartItems.findIndex(
             (item) => item.productId === product?.productId
         );
@@ -32,7 +32,9 @@ const CartProvider = ({ children }) => {
 
             // Update the quantity of the existing item
             updatedCartItems[existingItemIndex].quantity = quantity;
-
+            updatedCartItems[existingItemIndex].sendInvoice = sendInvoice;
+            updatedCartItems[existingItemIndex].isInstalation = isInstalation;
+            
             // Update the state with the new cart items
             localStorage.setItem("cart", JSON.stringify(updatedCartItems));
             setReload(!reload);
@@ -75,7 +77,7 @@ const CartProvider = ({ children }) => {
         });
     };
     const moveToCart = (product) => {
-        addItems(product, product?.quantity);
+        addItems(product, product?.quantity, product?.sendInvoice, product?.isInstalation);
         removeLater(product);
     };
     const removeLater = (product) => {

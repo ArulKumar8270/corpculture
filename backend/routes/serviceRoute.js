@@ -5,24 +5,28 @@ import {
     getAllServices,
     getServiceById,
     updateService,
-    deleteService
+    deleteService,
+    getServiceByPhone
 } from "../controllers/service/serviceController.js";
 
 const router = express.Router();
 
 // Create service request
-router.post("/create", requireSignIn, createService);
+router.post("/create", createService);
 
 // Get all services
-router.get("/all", requireSignIn, isAdmin, getAllServices);
+router.get("/all", isAdmin, getAllServices);
 
 // Get single service
 router.get("/get/:id", requireSignIn, getServiceById);
 
 // Update service
-router.put("/update/:id", requireSignIn, isAdmin, updateService);
+router.put("/update/:id", isAdmin, updateService);
 
 // Delete service
-router.delete("/delete/:id", requireSignIn, isAdmin, deleteService);
+router.delete("/delete/:id", isAdmin, deleteService);
+
+// GET Service by Phone (example: maybe protected)
+router.get('/phone/:phone', getServiceByPhone); // Add appropriate middleware
 
 export default router;

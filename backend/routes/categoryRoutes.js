@@ -1,17 +1,17 @@
-const express = require('express');
-const { requireSignIn, isAdmin } = require('../middleware/authMiddleware');
-const {
+import express from "express";
+import { isAdmin, requireSignIn } from "../middleware/authMiddleware.js";
+import {
     createCategory,
     getAllCategories,
     getCategoryById,
     updateCategory,
     deleteCategory,
-} = require('../controllers/categoryController');
+} from '../controllers/category/categoryController.js';
 
 const router = express.Router();
 
 // Create Category || POST
-router.post('/create', requireSignIn, isAdmin, createCategory);
+router.post('/create', isAdmin, createCategory);
 
 // Get All Categories || GET
 router.get('/all', getAllCategories);
@@ -20,9 +20,9 @@ router.get('/all', getAllCategories);
 router.get('/get/:id', getCategoryById);
 
 // Update Category || PUT
-router.put('/update/:id', requireSignIn, isAdmin, updateCategory);
+router.put('/update/:id', isAdmin, updateCategory);
 
 // Delete Category || DELETE
-router.delete('/delete/:id', requireSignIn, isAdmin, deleteCategory);
+router.delete('/delete/:id', isAdmin, deleteCategory);
 
-module.exports = router;
+export default router;

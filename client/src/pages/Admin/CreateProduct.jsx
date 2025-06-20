@@ -1,11 +1,10 @@
 import TextField from "@mui/material/TextField";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import DeleteIcon from "@mui/icons-material/Delete";
 import MenuItem from "@mui/material/MenuItem";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
 import ImageIcon from "@mui/icons-material/Image";
-import { categories } from "../../utils/constants";
 import Spinner from "../../components/Spinner";
 import axios from "axios";
 import FormData from "form-data";
@@ -35,13 +34,13 @@ const CreateProduct = () => {
     const [brand, setBrand] = useState("");
     const [images, setImages] = useState([]);
     const [imagesPreview, setImagesPreview] = useState([]);
-
     const [logo, setLogo] = useState("");
     const [logoPreview, setLogoPreview] = useState("");
 
     // New state variables for installation cost and delivery charge
-    const [installationCost, setInstallationCost] = useState(0);
-    const [deliveryCharge, setDeliveryCharge] = useState(0);
+    const [installationCost, setInstallationCost] = useState();
+    const [deliveryCharge, setDeliveryCharge] = useState();
+    const [categories, setCategories] = useState([]);
 
     //for submit state
     const [isSubmit, setIsSubmit] = useState(false);
@@ -49,6 +48,39 @@ const CreateProduct = () => {
     // max image size 500kb
     const MAX_IMAGE_SIZE = 500 * 1024;
     const MAX_IMAGES_COUNT = 4; // Maximum number of allowed images
+
+
+
+    useEffect(() => {
+        const fetchCategories = async () => {
+            try {
+                const res = await axios.get(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/category/all`, // Assuming this is your endpoint
+                    {
+                        headers: {
+                            Authorization: auth?.token,
+                        },
+                    }
+                );
+
+                if (res.status === 200) {
+                    setCategories(res.data.categories);
+                }
+                setLoading(false);
+            } catch (error) {
+                console.error("Error fetching categories:", error);
+                toast.error(
+                    error.response?.data?.message ||
+                    "Error fetching categories. Please try again."
+                );
+            }
+        };
+
+        if (auth?.token) {
+            fetchCategories();
+        }
+    }, [auth?.token]);
+
 
     const handleSpecsChange = (e) => {
         setSpecsInput({ ...specsInput, [e.target.name]: e.target.value });
@@ -136,10 +168,10 @@ const CreateProduct = () => {
                 toast.warning("Please Add Brand Logo");
                 return;
             }
-            if (specs.length <= 1) {
-                toast.warning("Please Add Minimum 2 Specifications");
-                return;
-            }
+            // if (specs.length <= 1) {
+            //     toast.warning("Please Add Minimum 2 Specifications");
+            //     return;
+            // }
             if (images.length <= 0) {
                 toast.warning("Please Add Product Images");
                 return;
@@ -245,6 +277,34 @@ const CreateProduct = () => {
                                 onChange={(e) => setPrice(e.target.value)}
                             />
                             <TextField
+                                label="deliveryCharge"
+                                type="number"
+                                variant="outlined"
+                                size="small"
+                                InputProps={{
+                                    inputProps: {
+                                        min: 0,
+                                    },
+                                }}
+                                required
+                                value={deliveryCharge}
+                                onChange={(e) => setDeliveryCharge(e.target.value)}
+                            />
+                            <TextField
+                                label="installationCose"
+                                type="number"
+                                variant="outlined"
+                                size="small"
+                                InputProps={{
+                                    inputProps: {
+                                        min: 0,
+                                    },
+                                }}
+                                required
+                                value={installationCost}
+                                onChange={(e) => setInstallationCost(e.target.value)}
+                            />
+                            <TextField
                                 label="Discount Price"
                                 type="number"
                                 variant="outlined"
@@ -274,8 +334,8 @@ const CreateProduct = () => {
                                 onChange={(e) => setCategory(e.target.value)}
                             >
                                 {categories.map((el, i) => (
-                                    <MenuItem value={el} key={i}>
-                                        {el}
+                                    <MenuItem value={el.name} key={i}>
+                                        {el.name}
                                     </MenuItem>
                                 ))}
                             </TextField>
