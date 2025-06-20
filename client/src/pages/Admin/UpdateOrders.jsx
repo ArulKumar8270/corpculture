@@ -25,8 +25,7 @@ const UpdateOrders = () => {
             try {
                 setLoading(true);
                 const response = await axios.get(
-                    `${
-                        import.meta.env.VITE_SERVER_URL
+                    `${import.meta.env.VITE_SERVER_URL
                     }/api/v1/user/admin-order-detail?orderId=${orderId}`,
                     {
                         headers: {
@@ -58,8 +57,7 @@ const UpdateOrders = () => {
         try {
             e.preventDefault();
             const res = await axios.patch(
-                `${
-                    import.meta.env.VITE_SERVER_URL
+                `${import.meta.env.VITE_SERVER_URL
                 }/api/v1/user/update/order-status`,
                 { status, orderId },
                 {
@@ -200,6 +198,10 @@ const UpdateOrders = () => {
                                     discountPrice,
                                     quantity,
                                     seller,
+                                    deliveryCharge,
+                                    installationCost,
+                                    sendInvoice,
+                                    isInstalation,
                                 } = item;
 
                                 return (
@@ -220,9 +222,9 @@ const UpdateOrders = () => {
                                                 <p className="text-sm">
                                                     {name.length > 60
                                                         ? `${name.substring(
-                                                              0,
-                                                              60
-                                                          )}...`
+                                                            0,
+                                                            60
+                                                        )}...`
                                                         : name}
                                                 </p>
                                                 <p className="text-xs text-gray-600 mt-2">
@@ -231,10 +233,22 @@ const UpdateOrders = () => {
                                                 <p className="text-xs text-gray-600">
                                                     Seller: {seller?.name}
                                                 </p>
+                                                <p className="text-xs text-gray-600">
+                                                    Send Invoice :  {sendInvoice
+                                                        ? "Sent"
+                                                        : "Not Sent"}
+                                                </p>
+                                                <p className="text-xs text-gray-600">
+                                                    Instalation :  {isInstalation
+                                                        ? "Requested"
+                                                        : "Not Requested"}
+                                                </p>
                                                 <span className="font-medium">
                                                     ₹
                                                     {(
-                                                        quantity * discountPrice
+                                                        quantity * discountPrice +
+                                                        deliveryCharge +
+                                                        installationCost
                                                     ).toLocaleString()}
                                                 </span>
                                                 <span className="text-xs text-gray-600">
@@ -250,12 +264,12 @@ const UpdateOrders = () => {
                                                     orderStatus === "Delivered"
                                                         ? 3
                                                         : orderStatus ===
-                                                          "Out For Delivery"
-                                                        ? 2
-                                                        : orderStatus ===
-                                                          "Shipped"
-                                                        ? 1
-                                                        : 0
+                                                            "Out For Delivery"
+                                                            ? 2
+                                                            : orderStatus ===
+                                                                "Shipped"
+                                                                ? 1
+                                                                : 0
                                                 }
                                             />
                                         </div>

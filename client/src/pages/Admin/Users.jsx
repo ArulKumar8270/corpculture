@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import { useAuth } from '../../context/auth';
 
 const Users = () => {
+  const { auth } = useAuth();
   const [users, setUsers] = useState([
     {
       _id: "1",
@@ -64,7 +66,11 @@ const Users = () => {
 
   useEffect(() => {
     // Replace with your actual API endpoint
-    axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/admin/users`)
+    axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/auth/all-users`, {
+      headers: {
+        Authorization: auth.token,
+      },
+    })
       .then(res => {
         let fetchedUsers = res.data.users || [];
         setUsers(fetchedUsers);
@@ -116,7 +122,7 @@ const Users = () => {
 
     // For now, just update the state locally (remove this block when backend is ready)
     setUsers(users.map(user =>
-        user._id === userId ? { ...user, isCommissionEnabled: newStatus } : user
+      user._id === userId ? { ...user, isCommissionEnabled: newStatus } : user
     ));
     alert(`Commission ${newStatus ? 'enabled' : 'disabled'} locally. Implement backend save.`); // Or use toast
   };
@@ -141,7 +147,6 @@ const Users = () => {
                 <th className="py-2 px-3">Is Commission</th>
                 <th className="py-2 px-3">PAN Number</th>
                 <th className="py-2 px-3">PAN Name</th>
-                <th className="py-2 px-3">Wishlist Count</th>
                 <th className="py-2 px-3">Created</th>
               </tr>
             </thead>
@@ -195,7 +200,6 @@ const Users = () => {
                         </td>
                         <td className="py-2 px-3">{parent.pan?.number || "-"}</td>
                         <td className="py-2 px-3">{parent.pan?.name || "-"}</td>
-                        <td className="py-2 px-3">{parent.wishlist?.length || 0}</td>
                         <td className="py-2 px-3">{parent.createdAt ? new Date(parent.createdAt).toLocaleDateString() : "-"}</td>
                       </tr>
                       {/* Render child users conditionally */}

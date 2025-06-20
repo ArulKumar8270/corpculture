@@ -1,9 +1,15 @@
 import mongoose from "mongoose";
 
-const serviceSchema = new mongoose.Schema({
+const companySchema = new mongoose.Schema({
     customerType: {
         type: String,
         required: true,
+        enum: ['Mode Of Customer'] // You can add more customer types here
+    },
+    userId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User', // Reference to the User model
+        required: true
     },
     phone: {
         type: String,
@@ -27,15 +33,11 @@ const serviceSchema = new mongoose.Schema({
     },
     addressDetail: {
         type: String,
-        required: false
+        required: true
     },
-    employeeId : {
+    locationDetail: {
         type: String,
-        required: false
-    },
-    location: {
-        type: String,
-        required: false
+        required: true
     },
     createdAt: {
         type: Date,
@@ -43,4 +45,4 @@ const serviceSchema = new mongoose.Schema({
     }
 });
 
-export default mongoose.model("Service", serviceSchema);
+export default mongoose.model("Company", companySchema);

@@ -219,11 +219,11 @@ const AllProducts = () => {
         setCategoryLoading(true);
         try {
             // Replace with your actual API endpoint
-            await axios.post(`${import.meta.env.VITE_SERVER_URL}/api/v1/category`, {
+            await axios.post(`${import.meta.env.VITE_SERVER_URL}/api/v1/category/create`, {
                 name: categoryForm.name.trim(),
                 commission: Number(categoryForm.commission),
             }, {
-                headers: { Authorization: auth.token }
+                headers: { Authorization: auth.token } 
             });
             toast.success("Category added successfully!");
             setCategoryModalOpen(false);

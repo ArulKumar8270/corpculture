@@ -1,5 +1,5 @@
 import express from "express";
-import { registerController } from "../controllers/auth/registerController.js";
+import { registerController, getAllUsersController } from "../controllers/auth/registerController.js";
 import { loginController } from "../controllers/auth/loginController.js";
 import { userCheckController } from "../controllers/auth/userExist.js";
 import { forgotPasswordController } from "../controllers/auth/forgotPassword.js";
@@ -46,5 +46,8 @@ router.post("/update-details", updateDetailsController);
 
 // deactivate account
 router.post("/deactivate", deactivateController);
+
+// Get all users route (example: protected for admin)
+router.get('/all-users', isAdmin, getAllUsersController); // Add appropriate middleware
 
 export default router;

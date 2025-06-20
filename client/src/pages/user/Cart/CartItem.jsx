@@ -4,12 +4,18 @@ import { toast } from "react-toastify";
 import { getDeliveryDate, getDiscount } from "../../../utils/functions";
 import { Link } from "react-router-dom";
 import { useCart } from "../../../context/cart";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const CartItem = ({ product, inCart }) => {
     const [, , addItems, removeItems, , addLater] = useCart();
     // console.log(product);
-    const [quantity, setQuantity] = useState(product?.quantity);
+    const [quantity, setQuantity] = useState(0);
+    const [sendInvoice, setSendInvoice] = useState(false);
+    const [isInstalation, setIsInstalation] = useState(false);
+
+    useEffect(() => {
+        addItems(product, quantity, sendInvoice, isInstalation);
+    }, [sendInvoice, isInstalation])
 
     const increaseQuantity = (product) => {
         const newQty = quantity + 1;
@@ -22,14 +28,14 @@ const CartItem = ({ product, inCart }) => {
             return;
         }
         setQuantity(newQty);
-        addItems(product, newQty);
+        addItems(product, newQty, sendInvoice, isInstalation);
     };
 
     const decreaseQuantity = (product) => {
         const newQty = quantity - 1;
         if (newQty < 1) return;
         setQuantity(newQty);
-        addItems(product, newQty);
+        addItems(product, newQty, sendInvoice, isInstalation);
     };
 
     const removeCartItem = (product) => {
@@ -48,18 +54,18 @@ const CartItem = ({ product, inCart }) => {
             <div
                 className="flex flex-col sm:flex-row gap-5 items-stretch w-full"
             >
-                 <Link
-                to={`/product/${product?.productId}`} >
-                {/* <!-- product image --> */}
-                <div className="w-full sm:w-6/6 h-28 flex-shrink-0 rounded-xl bg-gray-50 flex items-center justify-center shadow">
-                    <img
-                        draggable="false"
-                        className="h-full w-full object-contain rounded-xl"
-                        src={product?.image}
-                        alt={product?.name}
-                    />
-                </div>
-                {/* <!-- product image --> */}
+                <Link
+                    to={`/product/${product?.productId}`} >
+                    {/* <!-- product image --> */}
+                    <div className="w-full sm:w-6/6 h-28 flex-shrink-0 rounded-xl bg-gray-50 flex items-center justify-center shadow">
+                        <img
+                            draggable="false"
+                            className="h-full w-full object-contain rounded-xl"
+                            src={product?.image}
+                            alt={product?.name}
+                        />
+                    </div>
+                    {/* <!-- product image --> */}
                 </Link>
                 {/* <!-- description --> */}
                 <div className="flex flex-col sm:gap-5 w-full">
@@ -86,16 +92,18 @@ const CartItem = ({ product, inCart }) => {
                             <label className="flex items-center gap-2 mt-2 text-sm font-medium text-gray-700">
                                 <input
                                     type="checkbox"
+                                    value={sendInvoice}
                                     className="accent-primaryBlue w-4 h-4"
-                                    // onChange={...} // Add handler if you want to track selection
+                                    onChange={() => setSendInvoice((prev) => !prev)} // Add handler if you want to track selection
                                 />
                                 Send Quotation with this item
                             </label>
                             <label className="flex items-center gap-2 mt-2 text-sm font-medium text-gray-700">
                                 <input
                                     type="checkbox"
+                                    value={isInstalation}
                                     className="accent-primaryBlue w-4 h-4"
-                                    // onChange={...} // Add handler if you want to track selection
+                                    onChange={() => setIsInstalation((prev) => !prev)} // Add handler if you want to track selection
                                 />
                                 Installation Required
                             </label>

@@ -10,7 +10,7 @@ const productSchema = new mongoose.Schema({
         type: String,
         required: [true, "Please enter product description"],
     },
-    installationCose : {
+    installationCost : {
         type: Number,
         required: [true, "Please enter installation cost"],
     },
@@ -93,6 +93,14 @@ const productSchema = new mongoose.Schema({
     numOfReviews: {
         type: Number,
         default: 0,
+    },
+    sendInvoice: {
+        type: Boolean,
+        default: false,
+    },
+    isInstalation: {
+        type: Boolean,
+        default: false,
     },
     reviews: [
         {

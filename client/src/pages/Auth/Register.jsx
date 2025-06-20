@@ -51,8 +51,6 @@ const Register = () => {
                     isSeller,
                 }
             );
-            console.log(response);
-
             // Registration successful
             response.status === 201 &&
                 toast.success(

@@ -10,8 +10,8 @@ const SaveForLaterItem = ({ product }) => {
         removeLater(product);
     };
 
-    const moveToCartHandler = (product,quantity) => {
-        moveToCart(product,quantity);
+    const moveToCartHandler = (product,quantity, sendInvoice, isInstalation) => {
+        moveToCart(product,quantity, sendInvoice, isInstalation);
     };
 
     return (
@@ -101,7 +101,7 @@ const SaveForLaterItem = ({ product }) => {
                 {/* <!-- quantity --> */}
                 <button
                     onClick={() =>
-                        moveToCartHandler(product, product?.quantity)
+                        moveToCartHandler(product, product?.quantity, product?.sendInvoice, product?.isInstalation)
                     }
                     className="sm:ml-4 font-semibold px-4 py-2 rounded-xl bg-gradient-to-r from-[#019ee3] to-[#afcb09] text-white shadow hover:from-[#017bbd] hover:to-[#8fae07] transition"
                 >

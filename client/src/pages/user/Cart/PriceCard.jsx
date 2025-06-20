@@ -1,8 +1,8 @@
 /* eslint-disable react/prop-types */
 import VerifiedUserIcon from "@mui/icons-material/VerifiedUser";
+import { useEffect, useState } from "react";
 
 const PriceCard = ({ cartItems }) => {
-    // console.log(cartItems);
     return (
         <div className="flex sticky top-16 sm:h-screen flex-col sm:w-4/12 sm:px-1">
             {/* <!-- nav tiles --> */}
@@ -10,7 +10,7 @@ const PriceCard = ({ cartItems }) => {
                 <h1 className="px-8 py-5 border-b font-bold text-gray-800 text-xl rounded-t-2xl bg-gradient-to-r from-[#019ee3] to-[#afcb09] text-white">
                     PRICE DETAILS
                 </h1>
- 
+
                 <div className="flex flex-col gap-4 p-8 pb-5">
                     <p className="flex justify-between text-base">
                         Price ({cartItems?.length} item)
@@ -43,9 +43,34 @@ const PriceCard = ({ cartItems }) => {
                     </p>
                     <p className="flex justify-between text-base">
                         Delivery Charges
-                        <span className="text-primaryGreen font-semibold">FREE</span>
+                        <span className="text-primaryGreen font-semibold">
+                            {/* Calculate sum of delivery charges */} {/* {{ edit_1 }} */}
+                            ₹ {/* {{ edit_1 }} */}
+                            {cartItems // {{ edit_1 }}
+                                .reduce( // {{ edit_1 }}
+                                    (sum, item) => // {{ edit_1 }}
+                                        sum + // {{ edit_1 }}
+                                        (item?.deliveryCharge || 0) * item?.quantity, // Sum item.deliveryCharge, default to 0 if undefined // {{ edit_1 }}
+                                    0 // {{ edit_1 }}
+                                ) // {{ edit_1 }}
+                                .toLocaleString()} {/* {{ edit_1 }} */}
+                        </span>
                     </p>
-
+                    <p className="flex justify-between text-base">
+                        Instalation Charges
+                        <span className="text-primaryGreen font-semibold">
+                            {/* Calculate sum of installation charges */} {/* {{ edit_1 }} */}
+                            ₹ {/* {{ edit_1 }} */}
+                            {cartItems // {{ edit_1 }}
+                                .reduce( // {{ edit_1 }}
+                                    (sum, item) => // {{ edit_1 }}
+                                        sum + // {{ edit_1 }}
+                                        (item?.installationCost || 0) * item?.quantity, // Sum item.deliveryCharge, default to 0 if undefined // {{ edit_1 }}
+                                    0 // {{ edit_1 }}
+                                ) // {{ edit_1 }}
+                                .toLocaleString()} {/* {{ edit_1 }} */}
+                        </span>
+                    </p>
                     <div className="border border-dashed"></div>
                     <p className="flex justify-between text-lg font-bold text-gray-900">
                         Total Amount
@@ -55,7 +80,9 @@ const PriceCard = ({ cartItems }) => {
                                 .reduce(
                                     (sum, item) =>
                                         sum +
-                                        item.discountPrice * item.quantity,
+                                        item.discountPrice * item.quantity +
+                                        (item.quantity ? item.deliveryCharge || 0 : 0) +
+                                        (item.isInstalation ? item.installationCost || 0 : 0),
                                     0
                                 )
                                 .toLocaleString()}

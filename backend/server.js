@@ -11,6 +11,8 @@ import { dirname } from "path";
 import serviceRoute from "./routes/serviceRoute.js";
 import invoiceRoutes from "./routes/invoiceRoute.js";
 import categoryRoutes from "./routes/categoryRoutes.js";
+import companyRoutes from "./routes/companyRoute.js";
+import employeeRoutes from "./routes/employeeRoute.js";
 import path from "path";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -21,8 +23,6 @@ import connectDB from "./config/database.js";
 import authRoute from "./routes/authRoute.js";
 import productRoute from "./routes/productRoute.js";
 import userRoute from "./routes/userRoute.js";
-import serviceRoute from "./routes/serviceRoute.js";
-import categoryRoutes from "./routes/categoryRoutes.js";
 
 //rest object
 const app = express();
@@ -68,6 +68,8 @@ app.use("/api/v1/user", userRoute);
 app.use("/api/v1/service", serviceRoute);
 app.use("/api/v1/invoice", invoiceRoutes);
 app.use('/api/v1/category', categoryRoutes);
+app.use('/api/v1/company', companyRoutes);
+app.use('/api/v1/employee', employeeRoutes);
 
 // app.use("*", function (req, res) {
 //     res.sendFile(path.join(__dirname, "../client/dist/index.html"));

@@ -7,7 +7,6 @@ import Slider from "@mui/material/Slider";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import StarIcon from "@mui/icons-material/Star";
-import { categories } from "../../utils/constants";
 import { useState, useRef, useEffect } from "react";
 
 const SideFilter = ({
@@ -17,11 +16,14 @@ const SideFilter = ({
     setPrice,
     setCategory,
     setRatings,
+    categories
 }) => {
     const [categoryToggle, setCategoryToggle] = useState(true);
     const [ratingsToggle, setRatingsToggle] = useState(true);
 
     const debounceTimeout = useRef(null);
+
+
 
     // Debounce priceHandler to prevent multiple API calls on slider change
     const priceHandler = (_, newPrice) => {
@@ -119,7 +121,7 @@ const SideFilter = ({
                                     >
                                         {categories.map((el, i) => (
                                             <FormControlLabel
-                                                value={el}
+                                                value={el.name}
                                                 key={i}
                                                 control={<Radio size="small" />}
                                                 label={
@@ -127,7 +129,7 @@ const SideFilter = ({
                                                         className="text-sm"
                                                         key={i}
                                                     >
-                                                        {el}
+                                                        {el.name}
                                                     </span>
                                                 }
                                             />

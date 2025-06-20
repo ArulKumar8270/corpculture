@@ -28,7 +28,13 @@ const handleSuccess = async (req, res) => {
         // );
         let session = {
             payment_intent: "pi_3N7qf3Lw5q2q7Xw5720Y3720",
-            amount_total: 1000,
+            // Calculate total amount from order items
+            amount_total: orderItems.reduce((total, item) => { // {{ edit_1 }}
+                const itemTotal = (item.discountPrice * item.quantity) + // {{ edit_1 }}
+                    (item.deliveryCharge || 0) * item.quantity + // {{ edit_1 }}
+                    (item.installationCost || 0) * item.quantity; // {{ edit_1 }}
+                return total + itemTotal; // {{ edit_1 }}
+            }, 0), // {{ edit_1 }}
             customer_details: {
                 address: {
                     line1: "123 Main Street",
@@ -52,9 +58,13 @@ const handleSuccess = async (req, res) => {
         const orderObject = orderItems?.map((product) => ({
             name: product.name,
             image: product.image,
+            sendInvoice: product.sendInvoice,
+            isInstalation: product.isInstalation,
             brandName: product.brandName,
             price: product.price,
             discountPrice: product.discountPrice,
+            deliveryCharge: product.deliveryCharge,
+            installationCost: product.installationCost,
             quantity: product.quantity,
             productId: new mongoose.Types.ObjectId(product.productId),
             seller: new mongoose.Types.ObjectId(product.seller),

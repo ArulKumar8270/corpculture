@@ -43,6 +43,8 @@ const ProductDetails = () => {
     const [loading, setLoading] = useState(true);
     const [product, setProduct] = useState({});
 
+    console.log(product, "product96876")
+
     const settings = {
         autoplay: true,
         autoplaySpeed: 3000,
@@ -74,7 +76,6 @@ const ProductDetails = () => {
 
         setOpen(false);
     };
-
     const addToCartHandler = () => {
         const item = {
             productId: product._id,
@@ -85,6 +86,10 @@ const ProductDetails = () => {
             price: product.price,
             discountPrice: product.discountPrice,
             seller: product.seller,
+            sendInvoice: product.sendInvoice,
+            isInstalation: product.isInstalation,
+            deliveryCharge: product.deliveryCharge,
+            installationCost : product.installationCost,
         };
         addItems(item, 1);
     };

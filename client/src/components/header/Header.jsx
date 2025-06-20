@@ -10,15 +10,21 @@ import { MdLogin, MdLogout } from "react-icons/md";
 import { useAuth } from "../../context/auth";
 import SearchBar from "./SearchBar";
 import { useCart } from "../../context/cart";
-// import { toast } from "react-toastify";
-// import LogOut from "../../pages/Auth/LogOut";
+import InputLabel from '@mui/material/InputLabel';
+import MenuItem from '@mui/material/MenuItem';
+import FormControl from '@mui/material/FormControl';
+import Select from '@mui/material/Select';
 
 const Header = () => {
     const [isDropdownOpen, setDropdownOpen] = useState(false);
     const headerRef = useRef(null);
 
-    const { auth, setAuth, LogOut } = useAuth();
+    const { auth, setAuth, LogOut, setIsCompanyEnabled, isCompanyEnabled, companyDetails, setSelectedCompany, selectedCompany } = useAuth();
     const [cartItems, setCartItems] = useCart();
+
+    const handleChange = (event) => {
+        setSelectedCompany(event.target.value);
+    };
 
     let closeTimeout;
     const toggleDropdown = () => {
@@ -81,6 +87,81 @@ const Header = () => {
                         <BiLogoProductHunt className="text-2xl" />
                         <span className="text-lg hidden md:block">Products</span>
                     </NavLink>
+                    {/* Cart */}
+                    {auth?.user?.role !== 1 && (
+                        <NavLink
+                            to="/cart"
+                            className="relative flex items-center gap-1 text-white hover:text-cyan-300 transition"
+                        >
+                            <span className="absolute -top-2 -right-3 w-5 h-5 text-xs text-center font-bold bg-red-500 text-white rounded-full flex items-center justify-center">
+                                {cartItems?.length}
+                            </span>
+                            <BsCart2 className="text-2xl" />
+                            <span className="hidden md:block text-lg">Cart</span>
+                        </NavLink>
+                    )}
+                    {auth?.user?.role !== 1 && (
+                        <>
+                            {/* Container for Credit, Company Select, and Checkbox */} {/* {{ edit_1 }} */}
+                            <div className="flex items-center gap-4"> {/* Use flexbox to align items horizontally with spacing */} {/* {{ edit_1 }} */}
+                                {/* Credit Display */} {/* {{ edit_1 }} */}
+                                <div className="flex items-center gap-1 text-white"> {/* Style the credit display */} {/* {{ edit_1 }} */}
+                                    <span className="text-lg">Credit:</span> {/* Label for credit */} {/* {{ edit_1 }} */}
+                                    <span className="font-semibold text-xl text-green-400"> {/* Style the credit value */} {/* {{ edit_1 }} */}
+                                        {auth?.user?.credit || 0} {/* Display actual user credit */} {/* {{ edit_1 }} */}
+                                    </span> {/* {{ edit_1 }} */}
+                                </div> {/* {{ edit_1 }} */}
+
+                                {/* Company Select */} {/* {{ edit_1 }} */}
+                                {/* You might need to adjust the styling of the MUI Select component itself */} {/* {{ edit_1 }} */}
+                                {isCompanyEnabled && <FormControl sx={{ m: 1, minWidth: 120 }} size="small"> {/* Adjusted FormControl styling */} {/* {{ edit_1 }} */}
+                                    <InputLabel id="company-select-label" sx={{ color: 'white' }}>Companies</InputLabel> {/* Styled label */} {/* {{ edit_1 }} */}
+                                    <Select
+                                        labelId="company-select-label" // Use the correct labelId
+                                        id="company-select" // Use a more specific ID
+                                        value={selectedCompany} // Assuming 'age' state is used for company selection
+                                        onChange={handleChange} // Keep the change handler
+                                        autoWidth
+                                        label="Companies"
+                                        sx={{ // Add styling for the Select component
+                                            color: 'white',
+                                            '.MuiOutlinedInput-notchedOutline': {
+                                                borderColor: 'rgba(255, 255, 255, 0.5)', // White border
+                                            },
+                                            '&:hover .MuiOutlinedInput-notchedOutline': {
+                                                borderColor: 'white', // White border on hover
+                                            },
+                                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                                borderColor: 'white', // White border when focused
+                                            },
+                                            '.MuiSvgIcon-root': { // Style the dropdown arrow
+                                                color: 'white',
+                                            },
+                                        }} // {{ edit_1 }}
+                                    >
+                                        <MenuItem value="">
+                                            <em>New Company</em>
+                                        </MenuItem>
+                                        {companyDetails?.map((res) =>
+                                            <MenuItem key={res?._id} value={res?._id}> {res?.companyName}</MenuItem> // {{ edit_1 }} Corrected value and added key
+                                        )}
+
+                                    </Select>
+                                </FormControl>}
+
+                                {/* Enable Company Account Checkbox */} {/* {{ edit_1 }} */}
+                                <label className="flex items-center gap-1 text-white text-sm font-medium cursor-pointer"> {/* Styled label */} {/* {{ edit_1 }} */}
+                                    <input
+                                        type="checkbox"
+                                        value={null} // You might want to use a boolean state here
+                                        className="accent-cyan-300 w-4 h-4" // Styled checkbox
+                                        onChange={() => setIsCompanyEnabled(!isCompanyEnabled)} // Add handler if you want to track selection
+                                    />
+                                    Enable Company account
+                                </label> {/* {{ edit_1 }} */}
+                            </div> {/* {{ edit_1 }} */}
+                        </>
+                    )}
                     {/* Account */}
                     <div
                         className={`relative group`}
@@ -120,11 +201,10 @@ const Header = () => {
                                     )}
                                     <li className="p-2 hover:bg-cyan-50 rounded">
                                         <Link
-                                            to={`${
-                                                auth?.user?.role === 1
-                                                    ? "/admin"
-                                                    : "/user"
-                                            }/dashboard`}
+                                            to={`${auth?.user?.role === 1
+                                                ? "/admin"
+                                                : "/user"
+                                                }/dashboard`}
                                             className="flex items-center gap-2 text-gray-700"
                                         >
                                             <AiOutlineUser className="text-base" />
@@ -141,11 +221,10 @@ const Header = () => {
                                     )}
                                     <li className="p-2 hover:bg-cyan-50 rounded">
                                         <Link
-                                            to={`${
-                                                auth?.user?.role === 1
-                                                    ? "/admin"
-                                                    : "/user"
-                                            }/orders`}
+                                            to={`${auth?.user?.role === 1
+                                                ? "/admin"
+                                                : "/user"
+                                                }/orders`}
                                             className="flex items-center gap-2 text-gray-700"
                                         >
                                             <BsBox className="text-base" />
@@ -168,22 +247,9 @@ const Header = () => {
                             </div>
                         )}
                     </div>
-                    {/* Cart */}
-                    {auth?.user?.role !== 1 && (
-                        <NavLink
-                            to="/cart"
-                            className="relative flex items-center gap-1 text-white hover:text-cyan-300 transition"
-                        >
-                            <span className="absolute -top-2 -right-3 w-5 h-5 text-xs text-center font-bold bg-red-500 text-white rounded-full flex items-center justify-center">
-                                {cartItems?.length}
-                            </span>
-                            <BsCart2 className="text-2xl" />
-                            <span className="hidden md:block text-lg">Cart</span>
-                        </NavLink>
-                    )}
                 </div>
             </nav>
-        </header>
+        </header >
     );
 };
 
