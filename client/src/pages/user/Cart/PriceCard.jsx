@@ -50,7 +50,7 @@ const PriceCard = ({ cartItems }) => {
                                 .reduce( // {{ edit_1 }}
                                     (sum, item) => // {{ edit_1 }}
                                         sum + // {{ edit_1 }}
-                                        (item?.deliveryCharge || 0) * item?.quantity, // Sum item.deliveryCharge, default to 0 if undefined // {{ edit_1 }}
+                                        (item?.deliveryCharge || 0), // Sum item.deliveryCharge, default to 0 if undefined // {{ edit_1 }}
                                     0 // {{ edit_1 }}
                                 ) // {{ edit_1 }}
                                 .toLocaleString()} {/* {{ edit_1 }} */}
@@ -65,7 +65,7 @@ const PriceCard = ({ cartItems }) => {
                                 .reduce( // {{ edit_1 }}
                                     (sum, item) => // {{ edit_1 }}
                                         sum + // {{ edit_1 }}
-                                        (item?.installationCost || 0) * item?.quantity, // Sum item.deliveryCharge, default to 0 if undefined // {{ edit_1 }}
+                                        (item?.installationCost || 0), // Sum item.deliveryCharge, default to 0 if undefined // {{ edit_1 }}
                                     0 // {{ edit_1 }}
                                 ) // {{ edit_1 }}
                                 .toLocaleString()} {/* {{ edit_1 }} */}
@@ -77,15 +77,24 @@ const PriceCard = ({ cartItems }) => {
                         <span>
                             ₹
                             {cartItems
-                                .reduce(
-                                    (sum, item) =>
-                                        sum +
-                                        item.discountPrice * item.quantity +
-                                        (item.quantity ? item.deliveryCharge || 0 : 0) +
-                                        (item.isInstalation ? item.installationCost || 0 : 0),
-                                    0
-                                )
+                                .reduce((sum, item) => {
+                                    const quantity = item.quantity || 0;
+                                    // Find matching price range
+                                    const rangePrice = item?.priceRange.find(
+                                        (range) =>
+                                            quantity >= parseInt(range.from) &&
+                                            quantity <= parseInt(range.to)
+                                    );
+
+                                    const rangeCost = rangePrice ? quantity * parseFloat(rangePrice.price) : 0;
+
+                                    const deliveryCost = quantity ? item.deliveryCharge || 0 : 0;
+                                    const installationCost = item.isInstalation ? item.installationCost || 0 : 0;
+
+                                    return sum + rangeCost + deliveryCost + installationCost;
+                                }, 0)
                                 .toLocaleString()}
+
                         </span>
                     </p>
                     <div className="border border-dashed"></div>

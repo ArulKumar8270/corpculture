@@ -4,10 +4,10 @@ import bcrypt from "bcryptjs"; // Assuming you use bcrypt for password hashing
 // Create a new employee
 export const createEmployeeController = async (req, res) => {
     try {
-        const { name, email, password, phone, address, employeeType } = req.body;
+        const { name, email, password, phone, address, employeeType, userId } = req.body;
 
         // Validation
-        if (!name || !email || !password || !phone || !address || !employeeType) {
+        if (!name || !email || !password || !phone || !address || !employeeType || !userId) {
             return res.status(400).send({
                 success: false,
                 message: "All fields are required",
@@ -35,6 +35,7 @@ export const createEmployeeController = async (req, res) => {
             phone,
             address,
             employeeType,
+            userId
         });
 
         await employee.save();

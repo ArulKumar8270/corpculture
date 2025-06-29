@@ -16,6 +16,7 @@ const OrderSuccess = () => {
     const [loading, setLoading] = useState(true);
     const [hasSavedPayment, setHasSavedPayment] = useState(false); // Add a flag to prevent multiple API calls
 
+
     // Fetch sessionId from localStorage once on mount
     useEffect(() => {
         const storedSessionId = localStorage.getItem("sessionId");
@@ -28,8 +29,7 @@ const OrderSuccess = () => {
             try {
                 setLoading(true);
                 const payment = await axios.post(
-                    `${
-                        import.meta.env.VITE_SERVER_URL
+                    `${import.meta.env.VITE_SERVER_URL
                     }/api/v1/user/payment-success`,
                     {
                         sessionId: sessionId,
@@ -43,12 +43,16 @@ const OrderSuccess = () => {
                 );
 
                 if (payment.status === 200) {
+                    if (auth?.user?.isCommissionEnabled) {
+                        afterPaymentSuccess(payment?.data?.order, cartItems);
+                    }
+                    setCartItems([]);
                     localStorage.removeItem("cart");
                     localStorage.removeItem("sessionId");
-                    setCartItems([]); // Clear cart items
                     setLoading(false);
                     setHasSavedPayment(true); // Mark the payment as saved to prevent further API calls
                 }
+
             } catch (error) {
                 console.log(error);
             }
@@ -58,6 +62,55 @@ const OrderSuccess = () => {
             savePayment(); // Ensure the API call is only triggered once
         }
     }, [sessionId, auth?.token, cartItems, hasSavedPayment, setCartItems]);
+
+    const commissionCalculation = (cartItems, amount) => {
+        const totalCommission = cartItems.reduce((sum, item) => {
+            const quantity = item.quantity || 0;
+            // Find matching commission range
+            const commissionRange = item.commissionRange?.find(
+                (range) => quantity >= parseInt(range.from) && quantity <= parseInt(range.to)
+            );
+            console.log(commissionRange, "itemAmount3542452345", amount);
+            const commissionPercent = commissionRange ? parseFloat(commissionRange.commission) : 0;
+
+            const commissionAmount = (amount * commissionPercent) / 100;
+
+            return sum + commissionAmount;
+        }, 0);
+
+        return Number(totalCommission.toFixed(2));
+    };
+
+    const afterPaymentSuccess = async (data, cartItems) => {
+        try {
+            setLoading(true);
+            const apiParams = {
+                userId: auth?.user?.parentId || auth?.user?._id,
+                orderId: data?._id,
+                commissionAmount: commissionCalculation(cartItems, data?.amount),
+                percentageRate: data?.percentageRate,
+            }
+            const payment = await axios.post(
+                `${import.meta.env.VITE_SERVER_URL
+                }/api/v1/commissions`,
+                apiParams,
+                {
+                    headers: {
+                        Authorization: auth?.token,
+                    },
+                }
+            );
+
+            if (payment.status === 201) {
+                setCartItems([]); // Clear cart items
+                setLoading(false);
+                setHasSavedPayment(true); // Mark the payment as saved to prevent further API calls
+            }
+
+        } catch (error) {
+            console.log(error);
+        }
+    }
 
     // Timer to redirect after 3 sec
     let intervalId = useRef(null);

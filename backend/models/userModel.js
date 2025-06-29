@@ -43,6 +43,13 @@ const userSchema = new mongoose.Schema(
             get: v => parseFloat(v.toFixed(2)),
             set: v => parseFloat(v.toFixed(2))
         },
+        isCommissionEnabled: {
+            type: Number,
+            default: 0,
+            min: 0,
+            get: v => parseFloat(v.toFixed(2)),
+            set: v => parseFloat(v.toFixed(2))
+        },
         pan: {
             number: {
                 type: String,
@@ -52,8 +59,8 @@ const userSchema = new mongoose.Schema(
             },
         },
         wishlist: [{ type: mongoose.Schema.ObjectId, ref: "Product" }],
-       
-        
+
+
     },
     { timestamps: true }
 );

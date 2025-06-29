@@ -1,6 +1,7 @@
 /* eslint-disable no-unused-vars */
 import { useState, useRef, useEffect } from "react";
 import { NavLink, Link } from "react-router-dom";
+import axios from "axios";
 import logo from "../../assets/images/logo.png";
 import { BiHomeSmile, BiLogoProductHunt } from "react-icons/bi";
 import { AiOutlineUser, AiOutlineHeart } from "react-icons/ai";
@@ -18,9 +19,19 @@ import Select from '@mui/material/Select';
 const Header = () => {
     const [isDropdownOpen, setDropdownOpen] = useState(false);
     const headerRef = useRef(null);
-
+    const [commissions, setCommissions] = useState([]);
     const { auth, setAuth, LogOut, setIsCompanyEnabled, isCompanyEnabled, companyDetails, setSelectedCompany, selectedCompany } = useAuth();
     const [cartItems, setCartItems] = useCart();
+
+
+    console.log("commissions3245234", commissions);
+
+
+    useEffect(() => {
+        if (auth?.token) {
+            getCommisionDetails();
+        }
+    }, [auth?.token]);
 
     const handleChange = (event) => {
         setSelectedCompany(event.target.value);
@@ -52,11 +63,31 @@ const Header = () => {
         }
     };
 
+    const getCommisionDetails = async () => {
+        try {
+            const response = await axios.get(
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/commissions/user/${auth?.user?._id}`, // *** IMPORTANT: You need to implement this backend API endpoint ***
+                {
+                    headers: {
+                        Authorization: auth?.token,
+                    },
+                }
+            );
+            if (response?.data?.commissions) { // Assuming the backend returns an array of commission objects
+                setCommissions(response.data.commissions);
+            } else {
+                setCommissions([]); // Ensure commissions is an array even if response is empty
+            }
+        } catch (error) {
+            console.error("Error fetching commissions:", error);
+        }
+    }
     useEffect(() => {
         window.addEventListener("scroll", handleStickyHeader);
         return () => {
             window.removeEventListener("scroll", handleStickyHeader);
         };
+
     }, []);
 
     return (
@@ -106,10 +137,13 @@ const Header = () => {
                             <div className="flex items-center gap-4"> {/* Use flexbox to align items horizontally with spacing */} {/* {{ edit_1 }} */}
                                 {/* Credit Display */} {/* {{ edit_1 }} */}
                                 <div className="flex items-center gap-1 text-white"> {/* Style the credit display */} {/* {{ edit_1 }} */}
-                                    <span className="text-lg">Credit:</span> {/* Label for credit */} {/* {{ edit_1 }} */}
-                                    <span className="font-semibold text-xl text-green-400"> {/* Style the credit value */} {/* {{ edit_1 }} */}
-                                        {auth?.user?.credit || 0} {/* Display actual user credit */} {/* {{ edit_1 }} */}
-                                    </span> {/* {{ edit_1 }} */}
+                                    <span className="text-lg">Commission:</span> {/* Label for credit */} {/* {{ edit_1 }} */}
+                                    <span className="font-semibold text-xl text-green-400">
+                                        ₹
+                                        {commissions
+                                            .reduce((sum, item) => sum + (item.commissionAmount || 0), 0)
+                                            .toFixed(2)}
+                                    </span>{/* {{ edit_1 }} */}
                                 </div> {/* {{ edit_1 }} */}
 
                                 {/* Company Select */} {/* {{ edit_1 }} */}

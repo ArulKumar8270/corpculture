@@ -32,7 +32,8 @@ const AdminDashboard = () => {
         <>
             <SeoData title="Admin Dashboard" />
             <div className="min-h-screen bg-gradient-to-br from-[#e6fbff] to-[#f7fafd] py-8">
-                <div className="flex flex-col sm:flex-row items-start justify-center gap-6  mx-auto px-2 sm:px-8">
+                <div className="flex  mx-auto px-2 sm:px-8 overflow-x-hidden">
+                    {/*sm:flex-row items-start justify-center gap-6  */}
                     {/* Sidebar */}
                     <div
                         className={`w-full sm:w-[260px] mb-4 sm:mb-0 ${

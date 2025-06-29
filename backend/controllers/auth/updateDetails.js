@@ -3,7 +3,7 @@ import userModel from "../../models/userModel.js";
 // Update Details controller
 export const updateDetailsController = async (req, res) => {
     try {
-        const { newName, newEmail, newPhone, email, newCommission } = req.body;
+        const { newName, newEmail, newPhone, email, newCommission, isCommissionEnabled } = req.body;
         const user = await userModel.findOne({ email });
         if (!user) {
             return res.status(401).send({
@@ -58,6 +58,18 @@ export const updateDetailsController = async (req, res) => {
                 success: true,
                 message: "Commission Updated Successfully!",
                 commission: response.commission
+            });
+        }
+        if (isCommissionEnabled !== undefined) {
+            const response = await userModel.findOneAndUpdate(
+                { email: email },
+                { isCommissionEnabled: isCommissionEnabled },
+                { new: true }
+            );
+            res.status(200).send({
+                success: true,
+                message: "isCommissionEnabled Updated Successfully!",
+                isCommissionEnabled: response.isCommissionEnabled
             });
         }
 

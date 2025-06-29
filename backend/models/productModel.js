@@ -36,6 +36,38 @@ const productSchema = new mongoose.Schema({
             },
         },
     ],
+    commission: [
+        {
+            from: {
+                type: String,
+                required: true,
+            },
+            to: {
+                type: String,
+                required: true,
+            },
+            commission: {
+                type: String,
+                required: true,
+            },
+        },
+    ],
+    priceRange: [
+        {
+            from: {
+                type: String,
+                required: true,
+            },
+            to: {
+                type: String,
+                required: true,
+            },
+            price: {
+                type: String,
+                required: true,
+            },
+        },
+    ],
     price: {
         type: Number,
         required: [true, "Please enter product price"],

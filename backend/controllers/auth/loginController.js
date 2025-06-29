@@ -55,6 +55,8 @@ export const loginController = async (req, res) => {
                 phone: user.phone,
                 address: user.address,
                 role: user.role,
+                parentId: user.parentId || null,
+                isCommissionEnabled: user.isCommissionEnabled,
             },
             token,
         });

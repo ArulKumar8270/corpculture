@@ -13,7 +13,8 @@ import invoiceRoutes from "./routes/invoiceRoute.js";
 import categoryRoutes from "./routes/categoryRoutes.js";
 import companyRoutes from "./routes/companyRoute.js";
 import employeeRoutes from "./routes/employeeRoute.js";
-import path from "path";
+import commissionRoutes from "./routes/commissionRoutes.js";
+
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -70,7 +71,7 @@ app.use("/api/v1/invoice", invoiceRoutes);
 app.use('/api/v1/category', categoryRoutes);
 app.use('/api/v1/company', companyRoutes);
 app.use('/api/v1/employee', employeeRoutes);
-
+app.use("/api/v1/commissions", commissionRoutes);
 // app.use("*", function (req, res) {
 //     res.sendFile(path.join(__dirname, "../client/dist/index.html"));
 // });

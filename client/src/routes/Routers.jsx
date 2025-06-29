@@ -18,6 +18,7 @@ import OrderSuccess from "../pages/user/Cart/OrderSuccess";
 import OrderFailed from "../pages/user/Cart/OrderFailed";
 import OrderDetails from "../pages/user/Orders/OrderDetails";
 import AdminOrders from "../pages/Admin/AdminOrders";
+import AdminCommission from "../pages/Admin/AdminCommission";
 import AdminEmployees from "../pages/Admin/AdminEmployees";
 import AddEmployee from "../pages/Admin/AddEmployee";
 import Users from "../pages/Admin/Users";
@@ -53,6 +54,7 @@ const Routers = () => {
             <Route path="/admin" element={<AdminRoute />}>
                 <Route path="dashboard/*" element={<AdminDashboard />} />
                 <Route path="orders" element={<AdminOrders />} />
+                <Route path="commission" element={<AdminCommission />} />
                 <Route path="AdminEmployees" element={<AdminEmployees />} />
                 <Route path="AddEmployee" element={<AddEmployee />} />
                 <Route path="users" element={<Users />} />
