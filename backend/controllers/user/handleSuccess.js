@@ -10,7 +10,6 @@ const handleSuccess = async (req, res) => {
     try {
         // Retrieve the session ID from the request body
         const { sessionId, orderItems } = req.body;
-        console.log("sessionId, orderItems: ", sessionId, orderItems);
 
         // Validate order items and session ID
         if (!orderItems.length) {
@@ -29,12 +28,24 @@ const handleSuccess = async (req, res) => {
         let session = {
             payment_intent: "pi_3N7qf3Lw5q2q7Xw5720Y3720",
             // Calculate total amount from order items
-            amount_total: orderItems.reduce((total, item) => { // {{ edit_1 }}
-                const itemTotal = (item.discountPrice * item.quantity) + // {{ edit_1 }}
-                    (item.deliveryCharge || 0) * item.quantity + // {{ edit_1 }}
-                    (item.installationCost || 0) * item.quantity; // {{ edit_1 }}
-                return total + itemTotal; // {{ edit_1 }}
-            }, 0), // {{ edit_1 }}
+            amount_total: orderItems.reduce((sum, item) => {
+                const quantity = item.quantity || 0;
+                // Find matching price range
+                const rangePrice = item?.priceRange.find(
+                    (range) =>
+                        quantity >= parseInt(range.from) &&
+                        quantity <= parseInt(range.to)
+                );
+
+                const rangeCost = rangePrice ? quantity * parseFloat(rangePrice.price) : 0;
+
+                const deliveryCost = quantity ? item.deliveryCharge || 0 : 0;
+                const installationCost = item.isInstalation ? item.installationCost || 0 : 0;
+
+                return sum + rangeCost + deliveryCost + installationCost;
+            }, 0)
+                .toLocaleString(),
+
             customer_details: {
                 address: {
                     line1: "123 Main Street",
@@ -88,7 +99,7 @@ const handleSuccess = async (req, res) => {
             products: orderObject,
             buyer: req.user._id,
             shippingInfo: shippingObject,
-            amount: amount / 100,
+            amount: amount,
         };
         const order = new orderModel(combinedOrder);
         await order.save();
@@ -103,9 +114,8 @@ const handleSuccess = async (req, res) => {
                 throw new Error(`Product with ID ${item.productId} not found`);
             }
         }
-
         // Send success response
-        return res.status(200).send({ success: true });
+        return res.status(200).send({ success: true, order: order });
     } catch (error) {
         console.error("Error in handling payment success:", error);
         // Ensure you only send one response

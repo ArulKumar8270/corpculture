@@ -8,7 +8,6 @@ const getOrders = async (req, res) => {
             .find({ _id: orderId })
             .populate({ path: "buyer", model: userModel })
             .populate({ path: "products.seller", model: userModel });
-        console.log(orderDetails);
 
         res.status(200).send({
             success: true,

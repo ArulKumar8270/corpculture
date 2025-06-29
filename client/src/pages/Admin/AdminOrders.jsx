@@ -278,9 +278,7 @@ const AdminOrders = () => {
                                                     </td>
                                                     <td className="py-2 px-3">{order.buyer?.name || 'N/A'}</td>
                                                     <td className="py-2 px-3">
-                                                    ₹ {Number(order.amount) > 0
-                                                            ? `${(Number(order.amount).toFixed(2).split('.')[1])}`
-                                                            : '0'}
+                                                    ₹ {order.amount || '0'}
                                                     </td>
                                                     <td className="py-2 px-3">
                                                         {/* Display product count or list */}

@@ -55,22 +55,35 @@ const AddEmployee = () => {
             toast.warning("Please fill in all required fields correctly.");
             return;
         }
-
-        setLoading(true);
+        let registerUser;
         try {
+            setLoading(true)
             const response = await axios.post(
-                `${import.meta.env.VITE_SERVER_URL}/api/v1/employee/create`, // *** Update with your actual API endpoint ***
-                {...formData, password: formData?.phone},
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/auth/register`,
                 {
-                    headers: {
-                        Authorization: auth?.token,
-                    },
+                    ...formData, password: formData?.phone, role: 3
                 }
             );
-
-            if (response.status === 201) {
-                toast.success("Employee added successfully!");
-                navigate('/admin/AdminEmployees'); // *** Update with your actual employees list route ***
+            registerUser = response?.data?.user;
+            try {
+                const response = await axios.post(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/employee/create`, // *** Update with your actual API endpoint ***
+                    { ...formData, password: formData?.phone, userId: registerUser?._id },
+                    {
+                        headers: {
+                            Authorization: auth?.token,
+                        },
+                    }
+                );
+                if (response.status === 201) {
+                    toast.success("Employee added successfully!");
+                    navigate('/admin/AdminEmployees'); // *** Update with your actual employees list route ***
+                }
+            } catch (error) {
+                console.error("Error adding employee:", error);
+                toast.error(error.response?.data?.message || "Failed to add employee. Please try again.");
+            } finally {
+                setLoading(false);
             }
         } catch (error) {
             console.error("Error adding employee:", error);
@@ -124,7 +137,7 @@ const AddEmployee = () => {
                         error={!!errors.phone}
                         helperText={errors.phone}
                     />
-                     <TextField
+                    <TextField
                         label="Address"
                         name="address"
                         value={formData.address}

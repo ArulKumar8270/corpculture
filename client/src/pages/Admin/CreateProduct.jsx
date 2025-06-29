@@ -24,6 +24,20 @@ const CreateProduct = () => {
         description: "",
     });
 
+    const [priceRange, setPriceRange] = useState([]);
+    const [priceRangeInput, setPriceRangeInput] = useState({
+        from: "",
+        to: "",
+        price: "",
+    });
+
+    const [commission, setCommission] = useState([]);
+    const [commissionInput, setCommissionInput] = useState({
+        from: "",
+        to: "",
+        commission: "",
+    });
+
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
     const [price, setPrice] = useState();
@@ -92,6 +106,26 @@ const CreateProduct = () => {
         setSpecsInput({ title: "", description: "" });
     };
 
+    const handleCommissionChange = (e) => {
+        setCommissionInput({ ...commissionInput, [e.target.name]: e.target.value });
+    };
+
+    const addCommission = () => {
+        if (!commissionInput.from.trim() && !commissionInput.to.trim() && !commissionInput.commission.trim()) return;
+        setCommission([...commission, commissionInput]);
+        setCommissionInput({ from: "", to: "", commission: "" });
+    };
+
+    const handlerpiceRange = (e) => {
+        setPriceRangeInput({ ...priceRangeInput, [e.target.name]: e.target.value });
+    };
+
+    const addPriceRange = () => {
+        if (!priceRangeInput.from.trim() && !priceRangeInput.to.trim() && !priceRangeInput.price.trim()) return;
+        setPriceRange([...priceRange, priceRangeInput]);
+        setPriceRangeInput({ from: "", to: "", price: "" });
+    };
+
     const addHighlight = () => {
         if (!highlightInput.trim()) return;
         setHighlights([...highlights, highlightInput]);
@@ -104,6 +138,12 @@ const CreateProduct = () => {
 
     const deleteSpec = (index) => {
         setSpecs(specs.filter((s, i) => i !== index));
+    };
+    const deleteCommission = (index) => {
+        setCommission(commission.filter((s, i) => i !== index));
+    };
+    const deletePriceRange = (index) => {
+        setPriceRange(priceRange.filter((s, i) => i !== index));
     };
 
     const handleLogoChange = (e) => {
@@ -202,6 +242,12 @@ const CreateProduct = () => {
 
             specs.forEach((s) => {
                 formData.append("specifications", JSON.stringify(s));
+            });
+            commission.forEach((s) => {
+                formData.append("commission", JSON.stringify(s));
+            });
+            priceRange.forEach((s) => {
+                formData.append("priceRange", JSON.stringify(s));
             });
             const response = await axios.post(
                 `${import.meta.env.VITE_SERVER_URL}/api/v1/product/new-product`,
@@ -321,7 +367,7 @@ const CreateProduct = () => {
                                 }
                             />
                         </div>
-                        
+
                         <div className="flex justify-between gap-4">
                             <TextField
                                 label="Category"
@@ -493,6 +539,123 @@ const CreateProduct = () => {
                                     <p>{spec.description}</p>
                                     <span
                                         onClick={() => deleteSpec(i)}
+                                        className="text-red-600 hover:bg-red-200 bg-red-100 p-1 rounded-full cursor-pointer"
+                                    >
+                                        <DeleteIcon />
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+
+                        <h2 className="font-medium">
+                            Set Commission Range
+                        </h2>
+                        <div className="flex justify-between gap-2 items-center">
+                            <TextField
+                                value={commissionInput.from}
+                                onChange={handleCommissionChange}
+                                name="from"
+                                label="from"
+                                placeholder="from"
+                                variant="outlined"
+                                size="small"
+                            />
+                            <TextField
+                                value={commissionInput.to}
+                                onChange={handleCommissionChange}
+                                name="to"
+                                label="To"
+                                placeholder="WJDK42DF5"
+                                variant="outlined"
+                                size="small"
+                            />
+                            <TextField
+                                value={commissionInput.commission}
+                                onChange={handleCommissionChange}
+                                name="commission"
+                                label="Commission"
+                                placeholder="WJDK42DF5"
+                                variant="outlined"
+                                size="small"
+                            />
+                            <span
+                                onClick={() => addCommission()}
+                                className="py-2 px-6 bg-gradient-to-r from-[#019ee3] to-[#afcb09] text-white rounded-2xl hover:shadow-lg cursor-pointer font-semibold transition"
+                            >
+                                Add
+                            </span>
+                        </div>
+                        <div className="flex flex-col gap-2">
+                            {commission?.map((commisson, i) => (
+                                <div
+                                    key={i}
+                                    className="flex justify-between gap-2 sm:gap-5 items-center text-sm rounded-xl bg-[#e6fbff] py-1 px-3"
+                                >
+                                    <p className="text-[#019ee3] font-medium">
+                                        {commisson.from}
+                                    </p>
+                                    <p>{commisson.to}</p>
+                                    <p>{commisson.commission}</p>
+                                    <span
+                                        onClick={() => deleteCommission(i)}
+                                        className="text-red-600 hover:bg-red-200 bg-red-100 p-1 rounded-full cursor-pointer"
+                                    >
+                                        <DeleteIcon />
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                        <h2 className="font-medium">
+                            Set Product Price Range
+                        </h2>
+                        <div className="flex justify-between gap-2 items-center">
+                            <TextField
+                                value={priceRangeInput.title}
+                                onChange={handlerpiceRange}
+                                name="from"
+                                label="from"
+                                placeholder="from"
+                                variant="outlined"
+                                size="small"
+                            />
+                            <TextField
+                                value={priceRangeInput.to}
+                                onChange={handlerpiceRange}
+                                name="to"
+                                label="To"
+                                placeholder="WJDK42DF5"
+                                variant="outlined"
+                                size="small"
+                            />
+                            <TextField
+                                value={priceRangeInput.price}
+                                onChange={handlerpiceRange}
+                                name="price"
+                                label="Price"
+                                placeholder="WJDK42DF5"
+                                variant="outlined"
+                                size="small"
+                            />
+                            <span
+                                onClick={() => addPriceRange()}
+                                className="py-2 px-6 bg-gradient-to-r from-[#019ee3] to-[#afcb09] text-white rounded-2xl hover:shadow-lg cursor-pointer font-semibold transition"
+                            >
+                                Add
+                            </span>
+                        </div>
+                        <div className="flex flex-col gap-2">
+                            {priceRange.map((priceRange, i) => (
+                                <div
+                                    key={i}
+                                    className="flex justify-between gap-2 sm:gap-5 items-center text-sm rounded-xl bg-[#e6fbff] py-1 px-3"
+                                >
+                                    <p className="text-[#019ee3] font-medium">
+                                        {priceRange.from}
+                                    </p>
+                                    <p>{priceRange.to}</p>
+                                    <p>{priceRange.price}</p>
+                                    <span
+                                        onClick={() => deletePriceRange(i)}
                                         className="text-red-600 hover:bg-red-200 bg-red-100 p-1 rounded-full cursor-pointer"
                                     >
                                         <DeleteIcon />

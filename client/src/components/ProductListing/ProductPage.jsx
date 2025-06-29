@@ -90,6 +90,8 @@ const ProductDetails = () => {
             isInstalation: product.isInstalation,
             deliveryCharge: product.deliveryCharge,
             installationCost : product.installationCost,
+            priceRange: product.priceRange,
+            commissionRange: product.commission,
         };
         addItems(item, 1);
     };

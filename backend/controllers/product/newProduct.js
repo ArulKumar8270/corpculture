@@ -45,6 +45,18 @@ const newProduct = async (req, res) => {
         });
         req.body.specifications = specs;
 
+        let commission = [];
+        req.body.commission.forEach((s) => {
+            commission.push(JSON.parse(s));
+        });
+        req.body.commission = commission;
+
+        let priceRange = [];
+        req.body.priceRange.forEach((s) => {
+            priceRange.push(JSON.parse(s));
+        });
+        req.body.priceRange = priceRange;
+
         const product = await productModel.create(req.body);
 
         res.status(201).send({

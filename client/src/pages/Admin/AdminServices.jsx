@@ -3,6 +3,7 @@ import axios from 'axios';
 import Spinner from "../../components/Spinner";
 import { useAuth } from "../../context/auth";
 import SeoData from "../../SEO/SeoData";
+import { Link } from "react-router-dom"; // Import Link for navigation
 
 const AdminServices = () => {
   const { auth } = useAuth();
@@ -105,8 +106,8 @@ const AdminServices = () => {
       {loading ? (
         <Spinner />
       ) : (
-        <div className="overflow-x-auto bg-white rounded-xl shadow p-4">
-          <table className="min-w-full text-sm">
+        <div className="overflow-x-auto bg-white rounded-xl shadow p-4 w-[83%]">
+          <table className="w-[80%] text-sm">
             <thead>
               <tr className="bg-gradient-to-r from-[#019ee3] to-[#afcb09] text-white">
                 <th className="py-2 px-3 text-left">Customer Type</th>
@@ -118,6 +119,7 @@ const AdminServices = () => {
                 <th className="py-2 px-3 text-left">Location Detail</th>
                 <th className="py-2 px-3 text-left">Complaint (Optional)</th>
                 <th className="py-2 px-3 text-left">Submitted At</th>
+                <th className="py-2 px-3 text-left">Assigned To</th>
                 <th className="py-2 px-3 text-left">Assigned Employee</th> {/* {{ edit_2 }} New column header */}
               </tr>
             </thead>
@@ -138,6 +140,14 @@ const AdminServices = () => {
                     <td className="py-2 px-3">{enquiry.location}</td>
                     <td className="py-2 px-3">{enquiry.customerComplaint || "-"}</td>
                     <td className="py-2 px-3">{enquiry.createdAt ? new Date(enquiry.createdAt).toLocaleDateString() : "-"}</td>
+                    <td className="py-2 px-3">
+                      <Link // {{ edit_2 }}
+                        to={`/admin/employee_details/${enquiry.employeeId}`} // Link to employee details page // {{ edit_2 }}
+                        className="text-blue-600 hover:underline" // Add styling to make it look like a link // {{ edit_2 }}
+                      > {/* {{ edit_2 }} */}
+                        {enquiry.employeeId} {/* {{ edit_2 }} */}
+                      </Link>
+                    </td>
                     <td className="py-2 px-3"> {/* {{ edit_2 }} New table data cell for assignment */}
                       {updatingServiceId === enquiry._id ? ( // {{ edit_2 }} Show spinner if updating this service
                         <Spinner size="sm" /> // {{ edit_2 }} Assuming you have a small spinner component
@@ -149,11 +159,11 @@ const AdminServices = () => {
                         > {/* {{ edit_2 }} */}
                           <option value="">-- Select Employee --</option> {/* {{ edit_2 }} Option to unassign */}
                           {employees?.filter(employee => employee.employeeType === 'Sales') // {{ edit_1 }} Filter employees by type 'Service'
-                                        .map(employee => ( // {{ edit_2 }} Map through employees to create options
-                            <option key={employee._id} value={employee._id}> {/* {{ edit_2 }} Option value is employee ID */}
-                              {employee.name} {/* {{ edit_2 }} Display employee name */}
-                            </option> // {{ edit_2 }}
-                          ))} {/* {{ edit_2 }} */}
+                            .map(employee => ( // {{ edit_2 }} Map through employees to create options
+                              <option key={employee._id} value={employee._id}> {/* {{ edit_2 }} Option value is employee ID */}
+                                {employee.name} {/* {{ edit_2 }} Display employee name */}
+                              </option> // {{ edit_2 }}
+                            ))} {/* {{ edit_2 }} */}
                         </select> // {{ edit_2 }}
                       )} {/* {{ edit_2 }} */}
                     </td> {/* {{ edit_2 }} */}

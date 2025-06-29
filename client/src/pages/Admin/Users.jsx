@@ -4,66 +4,10 @@ import { useAuth } from '../../context/auth';
 
 const Users = () => {
   const { auth } = useAuth();
-  const [users, setUsers] = useState([
-    {
-      _id: "1",
-      name: "Alice Parent",
-      email: "alice@example.com",
-      phone: "1234567890",
-      address: "123 Main St",
-      role: 1,
-      commission: 5.5,
-      pan: { number: "ABCDE1234F", name: "Alice P" },
-      wishlist: [1, 2],
-      createdAt: new Date().toISOString(),
-      parentId: null,
-    },
-    {
-      _id: "2",
-      name: "Bob Child",
-      email: "bob@example.com",
-      phone: "9876543210",
-      address: "456 Side St",
-      role: 0,
-      commission: 2.0,
-      pan: { number: "XYZAB5678K", name: "Bob C" },
-      wishlist: [],
-      createdAt: new Date().toISOString(),
-      parentId: "1",
-    },
-    {
-      _id: "3",
-      name: "Charlie Parent",
-      email: "charlie@example.com",
-      phone: "5555555555",
-      address: "789 Another Rd",
-      role: 0,
-      commission: 0,
-      pan: { number: "", name: "" },
-      wishlist: [3],
-      createdAt: new Date().toISOString(),
-      parentId: null,
-    },
-    {
-      _id: "4",
-      name: "Daisy Child",
-      email: "daisy@example.com",
-      phone: "4444444444",
-      address: "321 Lane",
-      role: 0,
-      commission: 1.25,
-      pan: { number: "LMNOP1234Q", name: "Daisy D" },
-      wishlist: [],
-      createdAt: new Date().toISOString(),
-      parentId: "3",
-    },
-  ]);
+  const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   // State to track expanded parent IDs
   const [expandedParents, setExpandedParents] = useState(new Set());
-
-  console.log(users);
-
   useEffect(() => {
     // Replace with your actual API endpoint
     axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/auth/all-users`, {
@@ -96,35 +40,34 @@ const Users = () => {
   };
 
   // Function to toggle commission status
-  const handleToggleCommission = async (userId, currentStatus) => {
+  const handleToggleCommission = async (userId, currentStatus, email) => {
     const newStatus = !currentStatus;
     // --- Backend API Call ---
     // You need to implement a backend endpoint to update the user's commission enabled status.
     // Example (replace with your actual endpoint and method):
-    // try {
-    //   const response = await axios.put(
-    //     `${import.meta.env.VITE_SERVER_URL}/api/v1/admin/users/${userId}/commission-status`,
-    //     { isCommissionEnabled: newStatus },
-    //     { headers: { Authorization: 'YOUR_AUTH_TOKEN' } } // Add authentication if required
-    //   );
-    //   if (response.status === 200) {
-    //     // Update the user list in state with the new status
-    //     setUsers(users.map(user =>
-    //       user._id === userId ? { ...user, isCommissionEnabled: newStatus } : user
-    //     ));
-    //     alert(`Commission ${newStatus ? 'enabled' : 'disabled'} successfully!`); // Or use toast
-    //   }
-    // } catch (error) {
-    //   console.error("Error updating commission status:", error);
-    //   alert("Failed to update commission status."); // Or use toast
-    // }
+    try {
+      const response = await axios.post(
+        `${import.meta.env.VITE_SERVER_URL}/api/v1/auth/update-details`,
+        {
+          isCommissionEnabled: newStatus ? 1 : 0,
+          email: email,
+        },
+      );
+      if (response.status === 200) {
+        // Update the user list in state with the new status
+        setUsers(users.map(user =>
+          user._id === userId ? { ...user, isCommissionEnabled: newStatus } : user
+        ));
+      }
+    } catch (error) {
+      console.error("Error updating commission status:", error);
+    }
     // --- End Backend API Call ---
 
     // For now, just update the state locally (remove this block when backend is ready)
     setUsers(users.map(user =>
       user._id === userId ? { ...user, isCommissionEnabled: newStatus } : user
     ));
-    alert(`Commission ${newStatus ? 'enabled' : 'disabled'} locally. Implement backend save.`); // Or use toast
   };
 
 
@@ -158,7 +101,7 @@ const Users = () => {
               ) : (
                 // Group users by parentId
                 users
-                  .filter(user => !user.parentId) // Only top-level users
+                  .filter(user => !user.parentId && user?.role !== 3 && user?.role !== 1) // Only top-level users
                   .map(parent => (
                     <React.Fragment key={parent._id}>
                       {/* Parent Row - Clickable */}
@@ -193,7 +136,7 @@ const Users = () => {
                             <input
                               type="checkbox"
                               checked={parent.isCommissionEnabled || false} // Use the new field
-                              onChange={() => handleToggleCommission(parent._id, parent.isCommissionEnabled)}
+                              onChange={() => handleToggleCommission(parent._id, parent.isCommissionEnabled, parent.email)}
                               className="form-checkbox h-4 w-4 text-blue-600 transition duration-150 ease-in-out"
                             />
                           )}
