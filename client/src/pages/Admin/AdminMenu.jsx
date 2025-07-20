@@ -6,9 +6,15 @@ import PowerSettingsNewIcon from "@mui/icons-material/PowerSettingsNew";
 import { GiCrossMark } from "react-icons/gi";
 import SupportAgentIcon from '@mui/icons-material/SupportAgent'; // Import an icon for services
 import ShoppingBagIcon from '@mui/icons-material/ShoppingBag'; // Import icon for Orders
-import MenuBookIcon from '@mui/icons-material/MenuBook'; // Import icon for Menu
-import FlagIcon from '@mui/icons-material/Flag'; // Import icon for Mission
+import MenuBookIcon from '@mui/icons-material/MenuBook'; // Import icon for Menu (not used in new structure, but kept if needed elsewhere)
+import FlagIcon from '@mui/icons-material/Flag'; // Import icon for Mission (not used in new structure, but kept if needed elsewhere)
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown'; // Import icon for expand/collapse
+import HomeWorkIcon from '@mui/icons-material/HomeWork'; // {{ edit_1 }} Import icon for Rental
+import ReceiptIcon from '@mui/icons-material/Receipt'; // {{ edit_1 }} Import icon for Invoice
+import UploadFileIcon from '@mui/icons-material/UploadFile'; // {{ edit_1 }} Import icon for Upload Invoice
+import AssessmentIcon from '@mui/icons-material/Assessment'; // {{ edit_1 }} Import icon for Reports
+import StoreIcon from '@mui/icons-material/Store'; // {{ edit_1 }} Import icon for Vendor
+import SettingsIcon from '@mui/icons-material/Settings'; // {{ edit_1 }} Import icon for Other Settings
 import { useState } from 'react';
 
 const AdminMenu = ({ toggleMenu }) => {
@@ -28,8 +34,14 @@ const AdminMenu = ({ toggleMenu }) => {
 
     // State to manage expanded sections
     const [expandedSections, setExpandedSections] = useState({
-        account: true, // Start with Account Settings expanded
-        dashboard: true, // Start with Admin Dashboard expanded
+        account: false, // Start with Account Settings expanded
+        dashboard: false, // Start with Admin Dashboard expanded
+        sales: false, // {{ edit_1 }} New section, default to collapsed
+        service: false, // {{ edit_1 }} New section, default to collapsed
+        rental: false, // {{ edit_1 }} New section, default to collapsed
+        reports: false, // {{ edit_1 }} New section, default to collapsed
+        vendor: false, // {{ edit_1 }} New section, default to collapsed
+        otherSettings: true, // {{ edit_1 }} New section, default to collapsed
     });
 
     // Function to toggle section expansion
@@ -87,10 +99,9 @@ const AdminMenu = ({ toggleMenu }) => {
                                 to="./profile"
                                 onClick={scrollToTop}
                                 className={({ isActive }) =>
-                                    `rounded-lg mx-2 my-1 transition-all ${
-                                        isActive
-                                            ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
-                                            : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
+                                    `rounded-lg mx-2 my-1 transition-all ${isActive
+                                        ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
+                                        : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
                                     }`
                                 }
                             >
@@ -98,36 +109,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                     Profile Information
                                 </div>
                             </NavLink>
-                            <NavLink
-                                to="./address"
-                                onClick={scrollToTop}
-                                className={({ isActive }) =>
-                                    `rounded-lg mx-2 my-1 transition-all ${
-                                        isActive
-                                            ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
-                                            : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
-                                    }`
-                                }
-                            >
-                                <div className="h-10 px-8 flex items-center">
-                                    Manage Addresses
-                                </div>
-                            </NavLink>
-                            <NavLink
-                                to="./pan"
-                                onClick={scrollToTop}
-                                className={({ isActive }) =>
-                                    `rounded-lg mx-2 my-1 transition-all ${
-                                        isActive
-                                            ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
-                                            : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
-                                    }`
-                                }
-                            >
-                                <div className="h-10 px-8 flex items-center">
-                                    Pan Card
-                                </div>
-                            </NavLink>
+                            {/* Removed Manage Addresses and Pan Card as per new structure */}
                         </div>
                     )}
                 </div>
@@ -152,59 +134,427 @@ const AdminMenu = ({ toggleMenu }) => {
                     {/* Links conditionally rendered */}
                     {expandedSections.dashboard && (
                         <div className="flex flex-col text-black font-light text-sm mb-2">
+                            {/* Sales Section */}
+                            <div className="flex flex-col justify-center">
+                                <button
+                                    className="flex flex-row items-center justify-between w-full gap-3 pl-4 pr-3 py-3 cursor-pointer hover:bg-gray-100 transition-colors"
+                                    onClick={() => toggleSection('sales')}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <ShoppingBagIcon className="text-[#019ee3]" />
+                                        <div className="font-semibold text-sm text-gray-600 tracking-wide">
+                                            Sales
+                                        </div>
+                                    </div>
+                                    <KeyboardArrowDownIcon
+                                        className={`text-gray-600 transition-transform ${expandedSections.sales ? 'rotate-180' : 'rotate-0'}`}
+                                    />
+                                </button>
+                                {expandedSections.sales && (
+                                    <div className="flex flex-col text-black font-light text-sm mb-2">
+                                        <NavLink
+                                            to="./all-products"
+                                            onClick={scrollToTop}
+                                            className={({ isActive }) =>
+                                                `rounded-lg mx-2 my-1 transition-all ${isActive
+                                                    ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
+                                                    : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
+                                                }`
+                                            }
+                                        >
+                                            <div className="h-10 px-8 flex items-center">
+                                                All Products
+                                            </div>
+                                        </NavLink>
+                                        <NavLink
+                                            to="./all-category"
+                                            onClick={scrollToTop}
+                                            className={({ isActive }) =>
+                                                `rounded-lg mx-2 my-1 transition-all ${isActive
+                                                    ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
+                                                    : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
+                                                }`
+                                            }
+                                        >
+                                            <div className="h-10 px-8 flex items-center">
+                                                All Category
+                                            </div>
+                                        </NavLink>
+
+                                        {/* Orders Link */}
+                                        <NavLink
+                                            to="/admin/orders"
+                                            onClick={scrollToTop}
+                                            className={({ isActive }) =>
+                                                `rounded-lg mx-2 my-1 transition-all ${isActive
+                                                    ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
+                                                    : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
+                                                }`
+                                            }
+                                        >
+                                            <div className="h-10 px-8 flex items-center gap-3">
+                                                <ShoppingBagIcon sx={{ fontSize: "20px" }} />
+                                                Orders
+                                            </div>
+                                        </NavLink>
+
+                                        {/* Commission Link (Direct) */}
+                                        <NavLink
+                                            to="/admin/commission"
+                                            onClick={scrollToTop}
+                                            className={({ isActive }) =>
+                                                `rounded-lg mx-2 my-1 transition-all ${isActive
+                                                    ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
+                                                    : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
+                                                }`
+                                            }
+                                        >
+                                            <div className="h-10 px-8 flex items-center gap-3">
+                                                <BarChartIcon sx={{ fontSize: "20px" }} /> {/* Reusing BarChartIcon for Commission */}
+                                                Commission
+                                            </div>
+                                        </NavLink>
+
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Service Section */}
+                            <div className="flex flex-col justify-center">
+                                <button
+                                    className="flex flex-row items-center justify-between w-full gap-3 pl-4 pr-3 py-3 cursor-pointer hover:bg-gray-100 transition-colors"
+                                    onClick={() => toggleSection('service')}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <SupportAgentIcon className="text-[#019ee3]" />
+                                        <div className="font-semibold text-sm text-gray-600 tracking-wide">
+                                            Service
+                                        </div>
+                                    </div>
+                                    <KeyboardArrowDownIcon
+                                        className={`text-gray-600 transition-transform ${expandedSections.service ? 'rotate-180' : 'rotate-0'}`}
+                                    />
+                                </button>
+                                {expandedSections.service && (
+                                    <div className="flex flex-col text-black font-light text-sm mb-2">
+                                        <NavLink
+                                            to="./service-enquiries"
+                                            onClick={scrollToTop}
+                                            className={({ isActive }) =>
+                                                `rounded-lg mx-2 my-1 transition-all ${isActive
+                                                    ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
+                                                    : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
+                                                }`
+                                            }
+                                        >
+                                            <div className="h-10 px-8 flex items-center">
+                                                Service Enquiries
+                                            </div>
+                                        </NavLink>
+                                        {/* Commission under Service */}
+                                        <NavLink
+                                            to="/admin/commission"
+                                            onClick={scrollToTop}
+                                            className={({ isActive }) =>
+                                                `rounded-lg mx-2 my-1 transition-all ${isActive
+                                                    ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
+                                                    : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
+                                                }`
+                                            }
+                                        >
+                                            <div className="h-10 px-8 flex items-center">
+                                                Commission
+                                            </div>
+                                        </NavLink>
+                                        {/* All Products under Service */}
+                                        <NavLink
+                                            to="./serviceProductList"
+                                            onClick={scrollToTop}
+                                            className={({ isActive }) =>
+                                                `rounded-lg mx-2 my-1 transition-all ${isActive
+                                                    ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
+                                                    : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
+                                                }`
+                                            }
+                                        >
+                                            <div className="h-10 px-8 flex items-center">
+                                                All Products
+                                            </div>
+                                        </NavLink>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Rental Section */}
+                            <div className="flex flex-col justify-center">
+                                <button
+                                    className="flex flex-row items-center justify-between w-full gap-3 pl-4 pr-3 py-3 cursor-pointer hover:bg-gray-100 transition-colors"
+                                    onClick={() => toggleSection('rental')}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <HomeWorkIcon className="text-[#019ee3]" />
+                                        <div className="font-semibold text-sm text-gray-600 tracking-wide">
+                                            Rental
+                                        </div>
+                                    </div>
+                                    <KeyboardArrowDownIcon
+                                        className={`text-gray-600 transition-transform ${expandedSections.rental ? 'rotate-180' : 'rotate-0'}`}
+                                    />
+                                </button>
+                                {expandedSections.rental && (
+                                    <div className="flex flex-col text-black font-light text-sm mb-2">
+                                        {/* Commission under Rental */}
+                                        <NavLink
+                                            to="/admin/commission"
+                                            onClick={scrollToTop}
+                                            className={({ isActive }) =>
+                                                `rounded-lg mx-2 my-1 transition-all ${isActive
+                                                    ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
+                                                    : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
+                                                }`
+                                            }
+                                        >
+                                            <div className="h-10 px-8 flex items-center">
+                                                Commission
+                                            </div>
+                                        </NavLink>
+                                        {/* All Products under Rental */}
+                                        <NavLink
+                                            to="./rentalProductList"
+                                            onClick={scrollToTop}
+                                            className={({ isActive }) =>
+                                                `rounded-lg mx-2 my-1 transition-all ${isActive
+                                                    ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
+                                                    : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
+                                                }`
+                                            }
+                                        >
+                                            <div className="h-10 px-8 flex items-center">
+                                                All Products
+                                            </div>
+                                        </NavLink>
+                                        {/* Invoice Link */}
+                                        <NavLink
+                                            to="/admin/invoice"
+                                            onClick={scrollToTop}
+                                            className={({ isActive }) =>
+                                                `rounded-lg mx-2 my-1 transition-all ${isActive
+                                                    ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
+                                                    : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
+                                                }`
+                                            }
+                                        >
+                                            <div className="h-10 px-8 flex items-center gap-3">
+                                                <ReceiptIcon sx={{ fontSize: "20px" }} />
+                                                Invoice
+                                            </div>
+                                        </NavLink>
+
+                                        {/* Upload Invoice Link */}
+                                        <NavLink
+                                            to="/admin/upload-invoice"
+                                            onClick={scrollToTop}
+                                            className={({ isActive }) =>
+                                                `rounded-lg mx-2 my-1 transition-all ${isActive
+                                                    ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
+                                                    : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
+                                                }`
+                                            }
+                                        >
+                                            <div className="h-10 px-8 flex items-center gap-3">
+                                                <UploadFileIcon sx={{ fontSize: "20px" }} />
+                                                Upload invoice
+                                            </div>
+                                        </NavLink>
+                                    </div>
+                                )}
+                            </div>
+                            {/* Vendor Section */}
+                            <div className="flex flex-col justify-center">
+                                <button
+                                    className="flex flex-row items-center justify-between w-full gap-3 pl-4 pr-3 py-3 cursor-pointer hover:bg-gray-100 transition-colors"
+                                    onClick={() => toggleSection('vendor')}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <StoreIcon className="text-[#019ee3]" />
+                                        <div className="font-semibold text-sm text-gray-600 tracking-wide">
+                                            Vendor
+                                        </div>
+                                    </div>
+                                    <KeyboardArrowDownIcon
+                                        className={`text-gray-600 transition-transform ${expandedSections.vendor ? 'rotate-180' : 'rotate-0'}`}
+                                    />
+                                </button>
+                                {expandedSections.vendor && (
+                                    <div className="flex flex-col text-black font-light text-sm mb-2">
+                                        <NavLink
+                                            to="./vendorList"
+                                            onClick={scrollToTop}
+                                            className={({ isActive }) =>
+                                                `rounded-lg mx-2 my-1 transition-all ${isActive
+                                                    ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
+                                                    : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
+                                                }`
+                                            }
+                                        >
+                                            <div className="h-10 px-8 flex items-center">
+                                                All Vendor
+                                            </div>
+                                        </NavLink>
+                                        <NavLink
+                                            to="./vendorProductList"
+                                            onClick={scrollToTop}
+                                            className={({ isActive }) =>
+                                                `rounded-lg mx-2 my-1 transition-all ${isActive
+                                                    ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
+                                                    : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
+                                                }`
+                                            }
+                                        >
+                                            <div className="h-10 px-8 flex items-center">
+                                                Vendor Products
+                                            </div>
+                                        </NavLink>
+                                        <NavLink
+                                            to="./purchaseList"
+                                            onClick={scrollToTop}
+                                            className={({ isActive }) =>
+                                                `rounded-lg mx-2 my-1 transition-all ${isActive
+                                                    ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
+                                                    : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
+                                                }`
+                                            }
+                                        >
+                                            <div className="h-10 px-8 flex items-center">
+                                                Purchase List
+                                            </div>
+                                        </NavLink>
+                                    </div>
+                                )}
+                            </div>
+
+
+                            {/* Reports Section */
+                                <div className="flex flex-col justify-center">
+                                    <button
+                                        className="flex flex-row items-center justify-between w-full gap-3 pl-4 pr-3 py-3 cursor-pointer hover:bg-gray-100 transition-colors"
+                                        onClick={() => toggleSection('reports')}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <AssessmentIcon className="text-[#019ee3]" />
+                                            <div className="font-semibold text-sm text-gray-600 tracking-wide">
+                                                Reports
+                                            </div>
+                                        </div>
+                                        <KeyboardArrowDownIcon
+                                            className={`text-gray-600 transition-transform ${expandedSections.reports ? 'rotate-180' : 'rotate-0'}`}
+                                        />
+                                    </button>
+                                    {expandedSections.reports && (
+                                        <div className="flex flex-col text-black font-light text-sm mb-2">
+                                            <NavLink
+                                                to="/admin/reports/company-list"
+                                                onClick={scrollToTop}
+                                                className={({ isActive }) =>
+                                                    `rounded-lg mx-2 my-1 transition-all ${isActive
+                                                        ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
+                                                        : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
+                                                    }`
+                                                }
+                                            >
+                                                <div className="h-10 px-8 flex items-center">
+                                                    Company list
+                                                </div>
+                                            </NavLink>
+                                            <NavLink
+                                                to="/admin/reports/service-reports"
+                                                onClick={scrollToTop}
+                                                className={({ isActive }) =>
+                                                    `rounded-lg mx-2 my-1 transition-all ${isActive
+                                                        ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
+                                                        : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
+                                                    }`
+                                                }
+                                            >
+                                                <div className="h-10 px-8 flex items-center">
+                                                    Service
+                                                </div>
+                                            </NavLink>
+                                            <NavLink
+                                                to="/admin/reports/sales-reports"
+                                                onClick={scrollToTop}
+                                                className={({ isActive }) =>
+                                                    `rounded-lg mx-2 my-1 transition-all ${isActive
+                                                        ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
+                                                        : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
+                                                    }`
+                                                }
+                                            >
+                                                <div className="h-10 px-8 flex items-center">
+                                                    Sales
+                                                </div>
+                                            </NavLink>
+                                            <NavLink
+                                                to="./employee"
+                                                onClick={scrollToTop}
+                                                className={({ isActive }) =>
+                                                    `rounded-lg mx-2 my-1 transition-all ${isActive
+                                                        ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
+                                                        : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
+                                                    }`
+                                                }
+                                            >
+                                                <div className="h-10 px-8 flex items-center">
+                                                    Employee list
+                                                </div>
+                                            </NavLink>
+                                        </div>
+                                    )}
+                                </div>
+                            }
+                            {/* Removed Users and Employee links as they are not in the new structure */}
+                        </div>
+                    )}
+                </div>
+
+                <div className="flex flex-col justify-center border-b">
+                    <button
+                        className="flex flex-row items-center justify-between w-full gap-3 pl-4 pr-3 py-3 cursor-pointer hover:bg-gray-100 transition-colors"
+                        onClick={() => toggleSection('otherSettings')}
+                    >
+                        <div className="flex items-center gap-3">
+                            <SettingsIcon className="text-[#019ee3]" />
+                            <div className="font-semibold text-sm text-gray-600 tracking-wide">
+                                OTHER SETTINGS
+                            </div>
+                        </div>
+                        <KeyboardArrowDownIcon
+                            className={`text-gray-600 transition-transform ${expandedSections.otherSettings ? 'rotate-180' : 'rotate-0'}`}
+                        />
+                    </button>
+                    {expandedSections.otherSettings && (
+                        <div className="flex flex-col text-black font-light text-sm mb-2">
                             <NavLink
-                                to="./all-products"
+                                to="./gst"
                                 onClick={scrollToTop}
                                 className={({ isActive }) =>
-                                    `rounded-lg mx-2 my-1 transition-all ${
-                                        isActive
-                                            ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
-                                            : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
+                                    `rounded-lg mx-2 my-1 transition-all ${isActive
+                                        ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
+                                        : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
                                     }`
                                 }
                             >
                                 <div className="h-10 px-8 flex items-center">
-                                    All Products
+                                    GST
                                 </div>
                             </NavLink>
                             <NavLink
-                                to="./all-category"
+                                to="./employee"
                                 onClick={scrollToTop}
                                 className={({ isActive }) =>
-                                    `rounded-lg mx-2 my-1 transition-all ${
-                                        isActive
-                                            ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
-                                            : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
-                                    }`
-                                }
-                            >
-                                <div className="h-10 px-8 flex items-center">
-                                    All Category
-                                </div>
-                            </NavLink>
-                            <NavLink
-                                to="/admin/users"
-                                onClick={scrollToTop}
-                                className={({ isActive }) =>
-                                    `rounded-lg mx-2 my-1 transition-all ${
-                                        isActive
-                                            ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
-                                            : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
-                                    }`
-                                }
-                            >
-                                <div className="h-10 px-8 flex items-center">
-                                    Users
-                                </div>
-                            </NavLink>
-                            <NavLink
-                                to="/admin/AdminEmployees"
-                                onClick={scrollToTop}
-                                className={({ isActive }) =>
-                                    `rounded-lg mx-2 my-1 transition-all ${
-                                        isActive
-                                            ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
-                                            : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
+                                    `rounded-lg mx-2 my-1 transition-all ${isActive
+                                        ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
+                                        : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
                                     }`
                                 }
                             >
@@ -212,60 +562,52 @@ const AdminMenu = ({ toggleMenu }) => {
                                     Employee
                                 </div>
                             </NavLink>
-                             {/* Add the new links for Orders, Menu, and Mission */}
                             <NavLink
-                                to="/admin/orders"
+                                to="./menuSetting"
                                 onClick={scrollToTop}
                                 className={({ isActive }) =>
-                                    `rounded-lg mx-2 my-1 transition-all ${
-                                        isActive
-                                            ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
-                                            : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
+                                    `rounded-lg mx-2 my-1 transition-all ${isActive
+                                        ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
+                                        : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
                                     }`
                                 }
                             >
-                                <div className="h-10 px-8 flex items-center gap-3">
-                                    <ShoppingBagIcon sx={{ fontSize: "20px" }} />
-                                    Orders
+                                <div className="h-10 px-8 flex items-center">
+                                    Menu setting
                                 </div>
                             </NavLink>
                             <NavLink
-                                to="/admin/commission"
+                                to="/admin/settings/credit"
                                 onClick={scrollToTop}
                                 className={({ isActive }) =>
-                                    `rounded-lg mx-2 my-1 transition-all ${
-                                        isActive
-                                            ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
-                                            : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
+                                    `rounded-lg mx-2 my-1 transition-all ${isActive
+                                        ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
+                                        : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
                                     }`
                                 }
                             >
-                                <div className="h-10 px-8 flex items-center gap-3">
-                                    <ShoppingBagIcon sx={{ fontSize: "20px" }} />
-                                    Commission
+                                <div className="h-10 px-8 flex items-center">
+                                    Credit
                                 </div>
                             </NavLink>
                             <NavLink
-                                to="./service-enquiries"
+                                to="/admin/settings/gift"
                                 onClick={scrollToTop}
                                 className={({ isActive }) =>
-                                    `rounded-lg mx-2 my-1 transition-all ${
-                                        isActive
-                                            ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
-                                            : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
+                                    `rounded-lg mx-2 my-1 transition-all ${isActive
+                                        ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
+                                        : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
                                     }`
                                 }
                             >
-                                <div className="h-10 px-8 flex items-center gap-3">
-                                    <SupportAgentIcon sx={{ fontSize: "20px" }} />
-                                    Service Enquiries
+                                <div className="h-10 px-8 flex items-center">
+                                    Gift
                                 </div>
                             </NavLink>
                         </div>
                     )}
                 </div>
 
-                {/* Logout */}
                 <div className="flex flex-col justify-center border-b">
                     <div className="flex flex-row items-center gap-3 pl-4 py-3 group">
                         <PowerSettingsNewIcon className="text-[#019ee3]" />
@@ -278,7 +620,6 @@ const AdminMenu = ({ toggleMenu }) => {
                     </div>
                 </div>
 
-                {/* Frequently Visited */}
                 <div className="flex flex-col items-start gap-2 p-4 bg-[#f7fafd] rounded-2xl shadow mt-3">
                     <span className="text-xs font-medium text-gray-600">
                         Frequently Visited:
