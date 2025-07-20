@@ -13,7 +13,7 @@ import updateOrder from "../controllers/user/updateOrder.js";
 import assignOrder from "../controllers/user/assignOrder.js";
 import getAllUserOrder from "../controllers/user/getAllUserOrder.js";
 import getUsersByCompany from "../controllers/user/getUsersByCompany.js";
-
+import { updateUserPermissions } from "../controllers/user/userController.js";
 //router object
 const router = express.Router();
 
@@ -47,4 +47,7 @@ router.patch("/update/aassign-orders", isAdmin, assignOrder);
 
 //get all order and delete if possible
 router.get("/get-all-order", requireSignIn, getAllUserOrder);
+
+// update user permissions
+router.patch("/:userId/permissions", isAdmin, updateUserPermissions);
 export default router;

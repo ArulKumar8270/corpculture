@@ -1,0 +1,418 @@
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import toast from 'react-hot-toast';
+import { useNavigate } from 'react-router-dom';
+import {
+    TextField, Button, Select, MenuItem, FormControl, InputLabel, Paper, Typography, InputAdornment
+} from '@mui/material';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import dayjs from 'dayjs';
+
+// Icons based on the image
+import CalendarTodayIcon from '@mui/icons-material/CalendarToday'; // For date pickers
+import DescriptionIcon from '@mui/icons-material/Description'; // For product name, narration
+import ReceiptIcon from '@mui/icons-material/Receipt'; // For invoice number
+import LockIcon from '@mui/icons-material/Lock'; // For GSTIN/UN
+import ShoppingCartIcon from '@mui/icons-material/ShoppingCart'; // For quantity
+import AttachMoneyIcon from '@mui/icons-material/AttachMoney'; // For rate, price, freight, gross total, round off
+import CategoryIcon from '@mui/icons-material/Category'; // For voucher type
+
+const PurchaseRegister = () => {
+    const navigate = useNavigate();
+
+    // Form states
+    const [vendorCompanyName, setVendorCompanyName] = useState('');
+    const [productName, setProductName] = useState('');
+    const [voucherType, setVoucherType] = useState('Purchase'); // Default as per image
+    const [purchaseInvoiceNumber, setPurchaseInvoiceNumber] = useState('');
+    const [gstinUn, setGstinUn] = useState('');
+    const [narration, setNarration] = useState('');
+    const [gstType, setGstType] = useState('');
+    const [purchaseDate, setPurchaseDate] = useState(dayjs()); // Default to current date
+    const [quantity, setQuantity] = useState('');
+    const [rate, setRate] = useState('');
+    const [freightCharges, setFreightCharges] = useState('');
+    const [price, setPrice] = useState('');
+    const [grossTotal, setGrossTotal] = useState('');
+    const [roundOff, setRoundOff] = useState('');
+
+    // Dropdown options (mock data for now, replace with actual API calls)
+    const [vendorCompanies, setVendorCompanies] = useState([]);
+    const [products, setProducts] = useState([]);
+    const [gstOptions, setGstOptions] = useState([]);
+    const voucherTypes = ['Purchase', 'Return', 'Other']; // Example voucher types
+
+    useEffect(() => {
+        // Fetch data for dropdowns
+        const fetchData = async () => {
+            try {
+                // Fetch Vendor Companies
+                const vendorsRes = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/vendors`);
+                if (vendorsRes.data?.success) {
+                    setVendorCompanies(vendorsRes.data.vendors);
+                } else {
+                    toast.error(vendorsRes.data?.message || 'Failed to fetch vendor companies.');
+                }
+
+                // Fetch Products (assuming vendor products or general products)
+                const productsRes = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/vendor-products`); // Or /api/v1/vendor-products
+                if (productsRes.data?.success) {
+                    setProducts(productsRes.data.vendorProducts);
+                } else {
+                    toast.error(productsRes.data?.message || 'Failed to fetch products.');
+                }
+
+                // Fetch GST Options
+                const gstRes = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/gst`);
+                if (gstRes.data?.success) {
+                    setGstOptions(gstRes.data.gst);
+                } else {
+                    toast.error(gstRes.data?.message || 'Failed to fetch GST options.');
+                }
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                toast.error('Something went wrong while fetching data.');
+                // Mock data for development if API calls fail
+                setVendorCompanies([]);
+                setProducts([]);
+                setGstOptions([]);
+            }
+        };
+        fetchData();
+    }, []);
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+
+        // Basic validation
+        if (!vendorCompanyName || !productName || !voucherType || !purchaseInvoiceNumber || !gstinUn || !narration || !gstType || !purchaseDate || !quantity || !rate || !freightCharges || !price || !grossTotal || !roundOff) {
+            toast.error('Please fill in all required fields.');
+            return;
+        }
+
+        const purchaseData = {
+            vendorCompanyName,
+            productName,
+            voucherType,
+            purchaseInvoiceNumber,
+            gstinUn,
+            narration,
+            gstType,
+            purchaseDate: purchaseDate ? purchaseDate.toISOString() : null,
+            quantity: parseFloat(quantity),
+            rate: parseFloat(rate),
+            freightCharges: parseFloat(freightCharges),
+            price: parseFloat(price),
+            grossTotal: parseFloat(grossTotal),
+            roundOff: parseFloat(roundOff),
+        };
+
+        try {
+            // Replace with your actual API endpoint for adding purchases
+            const { data } = await axios.post(`${import.meta.env.VITE_SERVER_URL}/api/v1/purchases`, purchaseData);
+            if (data?.success) {
+                toast.success(data.message || 'Purchase registered successfully!');
+                // Clear form fields after successful submission
+                setVendorCompanyName('');
+                setProductName('');
+                setVoucherType('Purchase');
+                setPurchaseInvoiceNumber('');
+                setGstinUn('');
+                setNarration('');
+                setGstType('');
+                setPurchaseDate(dayjs());
+                setQuantity('');
+                setRate('');
+                setFreightCharges('');
+                setPrice('');
+                setGrossTotal('');
+                setRoundOff('');
+            } else {
+                toast.error(data?.message || 'Failed to register purchase.');
+            }
+        } catch (error) {
+            console.error('Error registering purchase:', error);
+            toast.error('Something went wrong while registering purchase.');
+        }
+    };
+
+    const handleViewPurchases = () => {
+        navigate('../purchaseList');
+    };
+
+    return (
+        <div className="p-6 bg-gray-100 min-h-screen">
+            <Paper className="p-0 shadow-md mb-6">
+                <div className="flex justify-between items-center bg-blue-600 text-white p-4 rounded-t-lg">
+                    <Typography variant="h6" className="font-semibold">
+                        Purchase Register
+                    </Typography>
+                    <Button
+                        variant="contained"
+                        className="bg-yellow-500 hover:bg-yellow-600 text-white px-6 py-2 rounded-md"
+                        onClick={handleViewPurchases}
+                    >
+                        View Purchases
+                    </Button>
+                </div>
+
+                <div className="p-6">
+                    <form onSubmit={handleSubmit} className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <FormControl fullWidth variant="outlined" size="small">
+                                <InputLabel>Vendor Company Name</InputLabel>
+                                <Select
+                                    value={vendorCompanyName}
+                                    onChange={(e) => setVendorCompanyName(e.target.value)}
+                                    label="Vendor Company Name"
+                                    endAdornment={
+                                        <InputAdornment position="end">
+                                            <CalendarTodayIcon /> {/* Icon as per image */}
+                                        </InputAdornment>
+                                    }
+                                >
+                                    <MenuItem value="">
+                                        <em>--select Company Name--</em>
+                                    </MenuItem>
+                                    {vendorCompanies.map((vendor) => (
+                                        <MenuItem key={vendor._id} value={vendor._id}>{vendor.companyName}</MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                            <FormControl fullWidth variant="outlined" size="small">
+                                <InputLabel>Product Name</InputLabel>
+                                <Select
+                                    value={productName}
+                                    onChange={(e) => setProductName(e.target.value)}
+                                    label="Product Name"
+                                    endAdornment={
+                                        <InputAdornment position="end">
+                                            <DescriptionIcon /> {/* Icon as per image */}
+                                        </InputAdornment>
+                                    }
+                                >
+                                    <MenuItem value="">
+                                        <em>--select Company Name--</em>
+                                    </MenuItem>
+                                    {products.map((product) => (
+                                        <MenuItem key={product._id} value={product._id}>{product.productName}</MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+
+                            <FormControl fullWidth variant="outlined" size="small">
+                                <InputLabel>Voucher Type</InputLabel>
+                                <Select
+                                    value={voucherType}
+                                    onChange={(e) => setVoucherType(e.target.value)}
+                                    label="Voucher Type"
+                                    endAdornment={
+                                        <InputAdornment position="end">
+                                            <CategoryIcon /> {/* Icon as per image */}
+                                        </InputAdornment>
+                                    }
+                                >
+                                    {voucherTypes.map((type) => (
+                                        <MenuItem key={type} value={type}>{type}</MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                            <div className="col-span-1"></div> {/* Empty div for layout */}
+
+                            <TextField
+                                label="Purchase Invoice Number"
+                                value={purchaseInvoiceNumber}
+                                onChange={(e) => setPurchaseInvoiceNumber(e.target.value)}
+                                fullWidth
+                                variant="outlined"
+                                size="small"
+                                InputProps={{
+                                    endAdornment: (
+                                        <InputAdornment position="end">
+                                            <ReceiptIcon /> {/* Icon as per image */}
+                                        </InputAdornment>
+                                    ),
+                                }}
+                            />
+                            <TextField
+                                label="GSTIN/UN"
+                                value={gstinUn}
+                                onChange={(e) => setGstinUn(e.target.value)}
+                                fullWidth
+                                variant="outlined"
+                                size="small"
+                                InputProps={{
+                                    endAdornment: (
+                                        <InputAdornment position="end">
+                                            <LockIcon /> {/* Icon as per image */}
+                                        </InputAdornment>
+                                    ),
+                                }}
+                            />
+
+                            <TextField
+                                label="Narration"
+                                value={narration}
+                                onChange={(e) => setNarration(e.target.value)}
+                                fullWidth
+                                variant="outlined"
+                                size="small"
+                                InputProps={{
+                                    endAdornment: (
+                                        <InputAdornment position="end">
+                                            <DescriptionIcon /> {/* Icon as per image */}
+                                        </InputAdornment>
+                                    ),
+                                }}
+                            />
+                            <div className="col-span-1"></div> {/* Empty div for layout */}
+
+                            <FormControl fullWidth variant="outlined" size="small">
+                                <InputLabel>GST Type</InputLabel>
+                                <Select
+                                    value={gstType}
+                                    onChange={(e) => setGstType(e.target.value)}
+                                    label="GST Type"
+                                    endAdornment={
+                                        <InputAdornment position="end">
+                                            <AttachMoneyIcon /> {/* Using money icon for GST Type */}
+                                        </InputAdornment>
+                                    }
+                                >
+                                    <MenuItem value="">
+                                        <em>Select GST Type</em>
+                                    </MenuItem>
+                                    {gstOptions.map((gst) => (
+                                        <MenuItem key={gst._id} value={gst._id}>{gst.gstType}</MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                            <LocalizationProvider dateAdapter={AdapterDayjs}>
+                                <DatePicker
+                                    label="Purchase Date"
+                                    value={purchaseDate}
+                                    onChange={(newValue) => setPurchaseDate(newValue)}
+                                    renderInput={(params) => (
+                                        <TextField
+                                            {...params}
+                                            fullWidth
+                                            size="small"
+                                            variant="outlined"
+                                            InputProps={{
+                                                ...params.InputProps,
+                                                endAdornment: (
+                                                    <InputAdornment position="end">
+                                                        <CalendarTodayIcon />
+                                                    </InputAdornment>
+                                                ),
+                                            }}
+                                        />
+                                    )}
+                                />
+                            </LocalizationProvider>
+
+                            <TextField
+                                label="Quantity"
+                                type="number"
+                                value={quantity}
+                                onChange={(e) => setQuantity(e.target.value)}
+                                fullWidth
+                                variant="outlined"
+                                size="small"
+                                InputProps={{
+                                    endAdornment: (
+                                        <InputAdornment position="end">
+                                            <ShoppingCartIcon /> {/* Icon as per image */}
+                                        </InputAdornment>
+                                    ),
+                                    inputProps: { min: 0 }
+                                }}
+                            />
+                            <TextField
+                                label="Rate"
+                                type="number"
+                                value={rate}
+                                onChange={(e) => setRate(e.target.value)}
+                                fullWidth
+                                variant="outlined"
+                                size="small"
+                                InputProps={{
+                                    startAdornment: <InputAdornment position="start">₹</InputAdornment>,
+                                    inputProps: { min: 0, step: "0.01" }
+                                }}
+                            />
+
+                            <TextField
+                                label="Freight Charges"
+                                type="number"
+                                value={freightCharges}
+                                onChange={(e) => setFreightCharges(e.target.value)}
+                                fullWidth
+                                variant="outlined"
+                                size="small"
+                                InputProps={{
+                                    startAdornment: <InputAdornment position="start">₹</InputAdornment>,
+                                    inputProps: { min: 0, step: "0.01" }
+                                }}
+                            />
+                            <TextField
+                                label="Price"
+                                type="number"
+                                value={price}
+                                onChange={(e) => setPrice(e.target.value)}
+                                fullWidth
+                                variant="outlined"
+                                size="small"
+                                InputProps={{
+                                    startAdornment: <InputAdornment position="start">₹</InputAdornment>,
+                                    inputProps: { min: 0, step: "0.01" }
+                                }}
+                            />
+
+                            <TextField
+                                label="Gross Total"
+                                type="number"
+                                value={grossTotal}
+                                onChange={(e) => setGrossTotal(e.target.value)}
+                                fullWidth
+                                variant="outlined"
+                                size="small"
+                                InputProps={{
+                                    startAdornment: <InputAdornment position="start">₹</InputAdornment>,
+                                    inputProps: { min: 0, step: "0.01" }
+                                }}
+                            />
+                            <TextField
+                                label="Round Off"
+                                type="number"
+                                value={roundOff}
+                                onChange={(e) => setRoundOff(e.target.value)}
+                                fullWidth
+                                variant="outlined"
+                                size="small"
+                                InputProps={{
+                                    startAdornment: <InputAdornment position="start">₹</InputAdornment>,
+                                    inputProps: { step: "0.01" } // Can be negative for rounding down
+                                }}
+                            />
+                        </div>
+
+                        <div className="flex justify-start mt-6">
+                            <Button
+                                type="submit"
+                                variant="contained"
+                                className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-2 rounded-md"
+                            >
+                                Register
+                            </Button>
+                        </div>
+                    </form>
+                </div>
+            </Paper>
+        </div>
+    );
+};
+
+export default PurchaseRegister;

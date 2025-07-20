@@ -15,7 +15,7 @@ const router = express.Router();
 router.post("/create", requireSignIn, createCompany);
 
 // Get all companys
-router.get("/all", requireSignIn, isAdmin, getAllCompanies);
+router.get("/all", isAdmin, getAllCompanies);
 
 // Get single company
 router.get("/get/:id", requireSignIn, getCompanyById);

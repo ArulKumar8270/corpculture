@@ -13,6 +13,19 @@ import SeoData from "../../SEO/SeoData";
 import { useEffect, useState } from "react";
 import { GiHamburgerMenu } from "react-icons/gi";
 import AdminServices from "./AdminServices"; // Import the new component
+import GST from "./OtherSettings/GST";
+import AdminEmployees from "./adminemployees";
+import MenuSetting from "./OtherSettings/MenuSetting";
+import AddServiceProduct from "./Service/AddServiceProduct";
+import ServiceProductList from "./Service/ServiceProductList";
+import RentalProductList from "./Rental/RentalProductList";
+import AddRentalProduct from "./Rental/AddRentalProduct";
+import VendorList from "./Vendor/VendorList";
+import AddVendor from "./Vendor/AddVendor";
+import VendorProductList from "./Vendor/VendorProductList";
+import AddVendorProduct from "./Vendor/AddVendorProduct";
+import PurchaseList from "./Purchase/PurchaseList";
+import PurchaseRegister from "./Purchase/PurchaseRegister";
 
 const AdminDashboard = () => {
     const navigate = useNavigate();
@@ -61,6 +74,19 @@ const AdminDashboard = () => {
                             <Route path="pan" element={<PanCardComponent />} />
                             <Route path="add-product" element={<CreateProduct />} />
                             <Route path="all-products" element={<AllProducts />} />
+                            <Route path="gst" element={<GST />} />
+                            <Route path="employee" element={<AdminEmployees />} />
+                            <Route path="menuSetting" element={<MenuSetting />} />
+                            <Route path="addServiceProduct" element={<AddServiceProduct />} />
+                            <Route path="serviceProductList" element={<ServiceProductList />} />
+                            <Route path="rentalProductList" element={<RentalProductList />} />
+                            <Route path="addRentalProduct" element={<AddRentalProduct />} />
+                            <Route path="vendorList" element={<VendorList />} />
+                            <Route path="addVendor" element={<AddVendor />} />
+                            <Route path="vendorProductList" element={<VendorProductList />} />
+                            <Route path="addVendorProduct" element={<AddVendorProduct />} />
+                            <Route path="purchaseList" element={<PurchaseList />} />
+                            <Route path="purchaseRegister" element={<PurchaseRegister />} />
                             <Route path="all-category" element={<AllCategories />} />
                             <Route path="users" element={<Users />} />
                             {/* Add the new route for Service Enquiries */}

@@ -14,7 +14,13 @@ import categoryRoutes from "./routes/categoryRoutes.js";
 import companyRoutes from "./routes/companyRoute.js";
 import employeeRoutes from "./routes/employeeRoute.js";
 import commissionRoutes from "./routes/commissionRoutes.js";
-
+import gstRoutes from "./routes/gstRoutes.js";
+import permissionRoutes from "./routes/permissionRoutes.js";
+import serviceProductRoutes from "./routes/serviceProductRoutes.js";
+import rentalProductRoutes from "./routes/rentalProductRoutes.js";
+import vendorRoutes from "./routes/vendorRoutes.js"; // New import
+import vendorProductRoutes from "./routes/vendorProductRoutes.js"; // New import
+import purchaseRoutes from "./routes/purchaseRoutes.js"; // New import
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -72,10 +78,24 @@ app.use('/api/v1/category', categoryRoutes);
 app.use('/api/v1/company', companyRoutes);
 app.use('/api/v1/employee', employeeRoutes);
 app.use("/api/v1/commissions", commissionRoutes);
+app.use("/api/v1/gst", gstRoutes);
+app.use("/api/v1/service-products", serviceProductRoutes);
+app.use("/api/v1/permissions", permissionRoutes);
+// Rental Product routes
+app.use("/api/v1/rental-products", rentalProductRoutes);
+
+// Vendor routes
+app.use("/api/v1/vendors", vendorRoutes); // New route registration
+
+// Vendor Product routes
+app.use("/api/v1/vendor-products", vendorProductRoutes); // New route registration
+
+// Purchase routes
+app.use("/api/v1/purchases", purchaseRoutes); // New route registration
+
 // app.use("*", function (req, res) {
 //     res.sendFile(path.join(__dirname, "../client/dist/index.html"));
 // });
-
 app.listen(PORT, () => {
     console.log(`SERVER RUNNING ON PORT ${PORT}`);
 });
