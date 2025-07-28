@@ -20,6 +20,7 @@ import toast from 'react-hot-toast';
 import axios from 'axios';
 import { useAuth } from '../../context/auth';
 import { useNavigate } from 'react-router-dom'; // Import useNavigate
+import UploadFileIcon from '@mui/icons-material/UploadFile';
 
 // Row component for each quotation, allowing expansion to show products
 function QuotationRow(props) {
@@ -28,6 +29,11 @@ function QuotationRow(props) {
 
     const handleEdit = () => {
         navigate(`../addServiceQuotation/${quotation._id}`); // Navigate to edit page
+    };
+
+    const handleUploadSignedQuotation = () => {
+        // Implement file upload logic
+        toast.info('Upload Signed quotation (placeholder)!');
     };
 
     return (
@@ -53,6 +59,16 @@ function QuotationRow(props) {
                 <TableCell>{new Date(quotation.invoiceDate).toLocaleDateString()}</TableCell>
                 <TableCell>
                     <Button variant="outlined" size="small" sx={{ mr: 1 }} onClick={handleEdit}>Edit</Button>
+                    <Button variant="outlined" size="small" sx={{ my: 1 }} onClick={() => { }}>Send Quotation</Button>
+
+                    <Button
+                        variant="contained"
+                        sx={{ bgcolor: '#28a745', '&:hover': { bgcolor: '#218838' } }}
+                        startIcon={<UploadFileIcon />}
+                        onClick={handleUploadSignedQuotation}
+                    >
+                        Upload Signed Quotation
+                    </Button>
                 </TableCell>
             </TableRow>
             <TableRow>
@@ -165,7 +181,7 @@ const ServiceQuotationList = () => {
                                 </TableRow>
                             ) : (
                                 quotations?.map((quotation) => (
-                                    <QuotationRow key={quotation._id} quotation={quotation} navigate={navigate} /> 
+                                    <QuotationRow key={quotation._id} quotation={quotation} navigate={navigate} />
                                 ))
                             )}
                         </TableBody>

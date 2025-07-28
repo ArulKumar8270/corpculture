@@ -1,7 +1,7 @@
 import ServiceInvoice from "../../models/serviceInvoiceModel.js";
 import Company from "../../models/companyModel.js"; // Assuming Company model path
 import ServiceProduct from "../../models/serviceProductModel.js"; // Assuming ServiceProduct model path
-
+import cloudinary from "cloudinary";
 // Helper function to calculate totals
 const calculateInvoiceTotals = (products) => {
     let subtotal = 0;
@@ -154,6 +154,7 @@ export const updateServiceInvoice = async (req, res) => {
             tax,
             status,
             invoiceDate,
+            invoiceLink, // <-- Add invoiceLink here
         } = req.body;
 
         // Find the invoice to update
@@ -179,12 +180,14 @@ export const updateServiceInvoice = async (req, res) => {
             }
             serviceInvoice.companyId = companyId;
         }
+
         if (modeOfPayment) serviceInvoice.modeOfPayment = modeOfPayment;
         if (deliveryAddress) serviceInvoice.deliveryAddress = deliveryAddress;
         if (reference) serviceInvoice.reference = reference;
         if (description) serviceInvoice.description = description;
         if (status) serviceInvoice.status = status;
         if (invoiceDate) serviceInvoice.invoiceDate = invoiceDate;
+        if (invoiceLink) serviceInvoice.invoiceLink = invoiceLink; // <-- Add this line to save the link
 
         // Handle products update and recalculate totals
         if (products && products.length > 0) {

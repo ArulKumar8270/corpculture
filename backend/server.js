@@ -43,13 +43,13 @@ dotenv.config();
 cloudinary.config({
     cloud_name: process.env.CLOUD_NAME,
     api_key: process.env.CLOUD_API_KEY,
-    api_secret: process.env.CLOUD_SECRET,  
+    api_secret: process.env.CLOUD_SECRET,
 });
 
 //middleware
 app.use(cors());
 app.use(express.json());
-app.use(morgan("dev")); 
+app.use(morgan("dev"));
 // to send large files
 app.use(
     fileUpload({
@@ -57,8 +57,9 @@ app.use(
     })
 );
 // use body-parser
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json({ limit: '10mb' }));
+app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
+
 // app.use(express.static(path.join(__dirname, "../client/dist")));
 //connect DB
 connectDB();

@@ -20,15 +20,59 @@ import toast from 'react-hot-toast';
 import axios from 'axios';
 import { useAuth } from '../../context/auth';
 import { useNavigate } from 'react-router-dom'; // Import useNavigate
+import UploadFileIcon from '@mui/icons-material/UploadFile';
 
 // Row component for each invoice, allowing expansion to show products
 function InvoiceRow(props) {
-    const { invoice, navigate } = props; // Destructure navigate from props
+    const { invoice, navigate } = props;
+    const { auth } = useAuth();
     const [open, setOpen] = useState(false);
 
     const handleEdit = () => {
-        navigate(`../addServiceInvoice/${invoice._id}`); // Navigate to edit page
+        navigate(`../addServiceInvoice/${invoice._id}`);
     };
+
+    // Equivalent curl for Cloudflare R2 bucket API:
+    // curl https://api.cloudflare.com/client/v4/accounts/bafab67d24307bcd1b12f474605a4f15/r2/buckets \
+    //   -H 'Content-Type: application/json' \
+    //   -H "Authorization: Bearer $CLOUDFLARE_TOKEN" \
+    //   -d '{ 
+    //         "name": "my-bucket", 
+    //         "locationHint": "enam" 
+    //       }'
+    const handleUploadSignedInvoice = async (invoiceId) => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.pdf,.jpg,.jpeg,.png';
+    
+        input.onchange = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+    
+            const formData = new FormData();
+            formData.append("file", file);
+    
+            try {
+                const res = await axios.put(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/update/${invoiceId}`,
+                    formData,
+                    {
+                        headers: {
+                            "Content-Type": "multipart/form-data",
+                            Authorization: auth.token,
+                        },
+                    }
+                );
+                console.log("Uploaded:", res.data);
+            } catch (err) {
+                console.error("Upload failed", err);
+            }
+        };
+    
+        input.click();
+    };
+    
+      
 
     return (
         <>
@@ -53,7 +97,15 @@ function InvoiceRow(props) {
                 <TableCell>{new Date(invoice.invoiceDate).toLocaleDateString()}</TableCell>
                 <TableCell ca>
                     <Button variant="outlined" size="small" sx={{ mr: 1 }} onClick={handleEdit}>Edit</Button>
-                    <Button variant="outlined" size="small" sx={{ my: 1 }} onClick={() => {}}>Send InVoice</Button>
+                    <Button variant="outlined" size="small" sx={{ my: 1 }} onClick={() => { }}>Send InVoice</Button>
+                    <Button
+                        variant="contained"
+                        sx={{ bgcolor: '#28a745', '&:hover': { bgcolor: '#218838' } }}
+                        startIcon={<UploadFileIcon />}
+                        onClick={() => handleUploadSignedInvoice(invoice?._id)}
+                    >
+                        Upload Signed Quotation
+                    </Button>
                 </TableCell>
             </TableRow>
             <TableRow>
@@ -166,7 +218,7 @@ const ServiceInvoiceList = () => {
                                 </TableRow>
                             ) : (
                                 invoices.map((invoice) => (
-                                    <InvoiceRow key={invoice._id} invoice={invoice} navigate={navigate} /> 
+                                    <InvoiceRow key={invoice._id} invoice={invoice} navigate={navigate} />
                                 ))
                             )}
                         </TableBody>

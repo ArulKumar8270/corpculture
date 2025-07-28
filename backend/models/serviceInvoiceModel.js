@@ -82,6 +82,10 @@ const serviceInvoiceSchema = new mongoose.Schema({
         type: Date,
         default: Date.now,
     },
+    invoiceLink: {
+        type: String,
+        trim: true,
+    },
 }, { timestamps: true });
 
 export default mongoose.model('ServiceInvoice', serviceInvoiceSchema);
