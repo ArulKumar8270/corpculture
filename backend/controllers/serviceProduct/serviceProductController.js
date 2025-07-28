@@ -91,6 +91,31 @@ export const getServiceProductById = async (req, res) => {
     }
 };
 
+// Get Service Products by Company ID
+export const getServiceProductsByCompany = async (req, res) => {
+    try {
+        const { companyId } = req.params; // Assuming companyId is passed as a URL parameter
+
+        if (!companyId) {
+            return res.status(400).send({ success: false, message: 'Company ID is required.' });
+        }
+
+        const serviceProducts = await ServiceProduct.find({ company: companyId })
+            .populate('company', 'name') // Populate company name
+            .populate('gstType', 'gstType gstPercentage') // Populate GST details
+            .sort({ createdAt: -1 });
+
+        if (!serviceProducts || serviceProducts.length === 0) {
+            return res.status(404).send({ success: false, message: 'No service products found for this company.' });
+        }
+
+        res.status(200).send({ success: true, message: 'Service Products fetched by company successfully', serviceProducts });
+    } catch (error) {
+        console.error("Error in getServiceProductsByCompany:", error);
+        res.status(500).send({ success: false, message: 'Error in getting service products by company', error });
+    }
+};
+
 // Update Service Product
 export const updateServiceProduct = async (req, res) => {
     try {

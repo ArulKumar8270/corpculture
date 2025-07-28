@@ -12,12 +12,13 @@ const userSchema = new mongoose.Schema({
     isCommissionEnabled: { type: Number, default: 0, min: 0 },
     pan: { number: { type: String }, name: { type: String } },
     wishlist: [{ type: mongoose.Schema.ObjectId, ref: "Product" }],
-
+    
     // New field to store user-specific permissions
     userPermissions: {
         type: Object, // This will store the entire permissions object from your payload
         default: {}   // Default to an empty object if no permissions are set
     },
+    commissionCategorys: [{ type: String }], // Added commissionCategorys field
 }, { timestamps: true });
 
 export default mongoose.model('User', userSchema);

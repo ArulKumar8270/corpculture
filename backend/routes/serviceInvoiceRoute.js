@@ -1,0 +1,28 @@
+import express from "express";
+import { isAdmin } from "../middleware/authMiddleware.js";
+import {
+    createServiceInvoice,
+    getAllServiceInvoices,
+    getServiceInvoiceById,
+    updateServiceInvoice,
+    deleteServiceInvoice
+} from "../controllers/serviceInvoice/serviceInvoiceController.js";
+
+const router = express.Router();
+
+// Create service invoice
+router.post("/create", isAdmin, createServiceInvoice);
+
+// Get all service invoices
+router.get("/all", isAdmin, getAllServiceInvoices);
+
+// Get single service invoice
+router.get("/get/:id", getServiceInvoiceById);
+
+// Update service invoice
+router.put("/update/:id", isAdmin, updateServiceInvoice);
+
+// Delete service invoice
+router.delete("/delete/:id", isAdmin, deleteServiceInvoice);
+
+export default router;

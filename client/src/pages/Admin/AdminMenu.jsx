@@ -251,6 +251,35 @@ const AdminMenu = ({ toggleMenu }) => {
                                                 Service Enquiries
                                             </div>
                                         </NavLink>
+                                        
+                                        <NavLink
+                                                to="./serviceInvoiceList"
+                                                onClick={scrollToTop}
+                                                className={({ isActive }) =>
+                                                    `rounded-lg mx-2 my-1 transition-all ${isActive
+                                                        ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
+                                                        : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
+                                                    }`
+                                                }
+                                            >
+                                                <div className="h-10 px-8 flex items-center">
+                                                    Service Invoice List
+                                                </div>
+                                            </NavLink>
+                                        <NavLink
+                                                to="./ServiceQuotationList"
+                                                onClick={scrollToTop}
+                                                className={({ isActive }) =>
+                                                    `rounded-lg mx-2 my-1 transition-all ${isActive
+                                                        ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
+                                                        : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
+                                                    }`
+                                                }
+                                            >
+                                                <div className="h-10 px-8 flex items-center">
+                                                    Service Quotation List
+                                                </div>
+                                            </NavLink>
                                         {/* Commission under Service */}
                                         <NavLink
                                             to="/admin/commission"
@@ -453,7 +482,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                     {expandedSections.reports && (
                                         <div className="flex flex-col text-black font-light text-sm mb-2">
                                             <NavLink
-                                                to="/admin/reports/company-list"
+                                                to="./companyList"
                                                 onClick={scrollToTop}
                                                 className={({ isActive }) =>
                                                     `rounded-lg mx-2 my-1 transition-all ${isActive
@@ -467,7 +496,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                                 </div>
                                             </NavLink>
                                             <NavLink
-                                                to="/admin/reports/service-reports"
+                                                to="./serviceReports"
                                                 onClick={scrollToTop}
                                                 className={({ isActive }) =>
                                                     `rounded-lg mx-2 my-1 transition-all ${isActive
@@ -506,6 +535,20 @@ const AdminMenu = ({ toggleMenu }) => {
                                             >
                                                 <div className="h-10 px-8 flex items-center">
                                                     Employee list
+                                                </div>
+                                            </NavLink>
+                                            <NavLink
+                                                to="./Users"
+                                                onClick={scrollToTop}
+                                                className={({ isActive }) =>
+                                                    `rounded-lg mx-2 my-1 transition-all ${isActive
+                                                        ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
+                                                        : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
+                                                    }`
+                                                }
+                                            >
+                                                <div className="h-10 px-8 flex items-center">
+                                                    Users list
                                                 </div>
                                             </NavLink>
                                         </div>

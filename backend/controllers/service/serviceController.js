@@ -132,39 +132,77 @@ export const deleteService = async (req, res) => {
     }
 };
 
-// Get Service by Phone Number {{ edit_1 }}
-export const getServiceByPhone = async (req, res) => { // {{ edit_1 }}
-    try { // {{ edit_1 }}
-        const { phone } = req.params; // Assuming phone is passed as a URL parameter {{ edit_1 }}
+// Get Service by Phone Number
+export const getServiceByPhone = async (req, res) => {
+    try {
+        const { phone } = req.params; // Assuming phone is passed as a URL parameter
 
-        if (!phone) { // {{ edit_1 }}
-            return res.status(400).send({ // {{ edit_1 }}
-                success: false, // {{ edit_1 }}
-                message: "Phone number is required", // {{ edit_1 }}
-                errorType: "missingParameter" // {{ edit_1 }}
-            }); // {{ edit_1 }}
-        } // {{ edit_1 }}
+        if (!phone) {
+            return res.status(400).send({
+                success: false,
+                message: "Phone number is required",
+                errorType: "missingParameter"
+            });
+        }
 
-        const services = await ServiceModel.find({ phone: phone }).sort({ createdAt: -1 }); // Find services by phone number {{ edit_1 }}
+        const services = await ServiceModel.find({ phone: phone }).sort({ createdAt: -1 }); // Find services by phone number
 
-        if (!services || services.length === 0) { // {{ edit_1 }}
-            return res.status(404).send({ // {{ edit_1 }}
-                success: false, // {{ edit_1 }}
-                message: "No services found for this phone number", // {{ edit_1 }}
-                errorType: "servicesNotFound" // {{ edit_1 }}
-            }); // {{ edit_1 }}
-        } // {{ edit_1 }}
+        if (!services || services.length === 0) {
+            return res.status(404).send({
+                success: false,
+                message: "No services found for this phone number",
+                errorType: "servicesNotFound"
+            });
+        }
 
-        res.status(200).send({ // {{ edit_1 }}
-            success: true, // {{ edit_1 }}
-            services // {{ edit_1 }}
-        }); // {{ edit_1 }}
-    } catch (error) { // {{ edit_1 }}
-        console.error("Error in getting services by phone:", error); // Log the error {{ edit_1 }}
-        res.status(500).send({ // {{ edit_1 }}
-            success: false, // {{ edit_1 }}
-            message: "Error in getting services by phone", // {{ edit_1 }}
-            error // {{ edit_1 }}
-        }); // {{ edit_1 }}
-    } // {{ edit_1 }}
-}; // {{ edit_1 }}
+        res.status(200).send({
+            success: true,
+            services
+        });
+    } catch (error) {
+        console.error("Error in getting services by phone:", error); // Log the error
+        res.status(500).send({
+            success: false,
+            message: "Error in getting services by phone",
+            error
+        });
+    }
+};
+
+// Get Service by Service Type
+export const getServiceByType = async (req, res) => {
+    try {
+        const { serviceType } = req.params; // Assuming serviceType is passed as a URL parameter
+
+        if (!serviceType) {
+            return res.status(400).send({
+                success: false,
+                message: "Service type is required",
+                errorType: "missingParameter"
+            });
+        }
+
+        const services = await ServiceModel.find({ serviceType: serviceType }).sort({ createdAt: -1 });
+
+        if (!services || services.length === 0) {
+            return res.status(404).send({
+                success: false,
+                message: "No services found for this service type",
+                errorType: "servicesNotFound"
+            });
+        }
+
+        res.status(200).send({
+            success: true,
+            services
+        });
+    } catch (error) {
+        console.error("Error in getting services by service type:", error);
+        res.status(500).send({
+            success: false,
+            message: "Error in getting services by service type",
+            error
+        });
+    }
+};
+

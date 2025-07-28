@@ -26,6 +26,13 @@ import VendorProductList from "./Vendor/VendorProductList";
 import AddVendorProduct from "./Vendor/AddVendorProduct";
 import PurchaseList from "./Purchase/PurchaseList";
 import PurchaseRegister from "./Purchase/PurchaseRegister";
+import CompanyList from "./reports/CompanyList";
+import ServiceReports from "./reports/ServiceReports";
+import AddServiceQuotation from "./AddServiceQuotation";
+import AddServiceInvoice from "./AddServiceInvoice";
+import AddServiceReport from "./AddServiceReport";
+import ServiceInvoiceList from "./ServiceInvoiceList";
+import ServiceQuotationList from "./ServiceQuotationList";
 
 const AdminDashboard = () => {
     const navigate = useNavigate();
@@ -88,6 +95,13 @@ const AdminDashboard = () => {
                             <Route path="purchaseList" element={<PurchaseList />} />
                             <Route path="purchaseRegister" element={<PurchaseRegister />} />
                             <Route path="all-category" element={<AllCategories />} />
+                            <Route path="companyList" element={<CompanyList />} />
+                            <Route path="serviceReports" element={<ServiceReports />} />
+                            <Route path="addServiceQuotation/:quotationId?" element={<AddServiceQuotation />} />
+                            <Route path="addServiceInvoice/:invoiceId?" element={<AddServiceInvoice />} />
+                            <Route path="serviceInvoiceList" element={<ServiceInvoiceList />} />
+                            <Route path="serviceQuotationList" element={<ServiceQuotationList />} />
+                            <Route path="addServiceReport" element={<AddServiceReport />} />
                             <Route path="users" element={<Users />} />
                             {/* Add the new route for Service Enquiries */}
                             <Route path="service-enquiries" element={<AdminServices />} />

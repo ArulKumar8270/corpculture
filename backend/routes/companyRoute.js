@@ -12,21 +12,21 @@ import {
 const router = express.Router();
 
 // Create company request
-router.post("/create", requireSignIn, createCompany);
+router.post("/create", createCompany);
 
 // Get all companys
 router.get("/all", isAdmin, getAllCompanies);
 
 // Get single company
-router.get("/get/:id", requireSignIn, getCompanyById);
+router.get("/get/:id", getCompanyById);
 
 // GET user's company details (Protected route)
-router.get('/user-company/:id', requireSignIn, getCompanyByUser); 
+router.get('/user-company/:id', getCompanyByUser); 
 
 // Update company
-router.put("/update/:id", requireSignIn, isAdmin, updateCompany);
+router.put("/update/:id", isAdmin, updateCompany);
 
 // Delete company
-router.delete("/delete/:id", requireSignIn, isAdmin, deleteCompany);
+router.delete("/delete/:id", isAdmin, deleteCompany);
 
 export default router;

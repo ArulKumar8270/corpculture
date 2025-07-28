@@ -3,8 +3,8 @@ import mongoose from "mongoose";
 const companySchema = new mongoose.Schema({
     customerType: {
         type: String,
-        required: true,
-        enum: ['Mode Of Customer'] // You can add more customer types here
+        required: false,
+        enum: ['New', "Existing"] // You can add more customer types here
     },
     userId: {
         type: mongoose.Schema.Types.ObjectId,

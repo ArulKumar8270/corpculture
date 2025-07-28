@@ -21,6 +21,8 @@ import rentalProductRoutes from "./routes/rentalProductRoutes.js";
 import vendorRoutes from "./routes/vendorRoutes.js"; // New import
 import vendorProductRoutes from "./routes/vendorProductRoutes.js"; // New import
 import purchaseRoutes from "./routes/purchaseRoutes.js"; // New import
+import serviceInvoiceRoutes from "./routes/serviceInvoiceRoute.js"; // New import
+import serviceQuotationRoutes from "./routes/serviceQuotationRoute.js"; // New import
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -92,7 +94,10 @@ app.use("/api/v1/vendor-products", vendorProductRoutes); // New route registrati
 
 // Purchase routes
 app.use("/api/v1/purchases", purchaseRoutes); // New route registration
-
+// Service Invoice routes
+app.use("/api/v1/service-invoice", serviceInvoiceRoutes);
+// Service Quotation routes
+app.use("/api/v1/service-quotation", serviceQuotationRoutes);
 // app.use("*", function (req, res) {
 //     res.sendFile(path.join(__dirname, "../client/dist/index.html"));
 // });
