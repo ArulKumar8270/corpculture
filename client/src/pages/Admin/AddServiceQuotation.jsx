@@ -19,7 +19,6 @@ import {
     IconButton,
     CircularProgress // Import CircularProgress
 } from '@mui/material';
-import UploadFileIcon from '@mui/icons-material/UploadFile';
 import DeleteIcon from '@mui/icons-material/Delete';
 // Removed EditIcon import as it's no longer needed
 import { useNavigate, useParams } from 'react-router-dom'; // <-- add useParams
@@ -42,6 +41,7 @@ const AddServiceQuotation = () => {
         deliveryAddress: '',
         reference: '',
         description: '',
+        status: 'draft'
     });
 
     // State for products added to the table (these are the line items for the Quotation)
@@ -177,6 +177,7 @@ const AddServiceQuotation = () => {
                             deliveryAddress: quotation.deliveryAddress || '',
                             reference: quotation.reference || '',
                             description: quotation.description || '',
+                            status: quotation.status || '',
                         });
                         // Map products to table format with unique id
                         setProductsInTable(
@@ -207,7 +208,7 @@ const AddServiceQuotation = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        const { quotationNumber, companyId, modeOfPayment, deliveryAddress, reference, description } = quotationData;
+        const { quotationNumber, companyId, modeOfPayment, deliveryAddress, reference, description, status } = quotationData;
 
         if (!quotationNumber || !companyId || !modeOfPayment || !deliveryAddress || productsInTable.length === 0) {
             toast.error('Please fill all required fields and add at least one product.');
@@ -236,6 +237,7 @@ const AddServiceQuotation = () => {
             subtotal,
             tax,
             grandTotal,
+            status
         };
 
         try {
@@ -279,15 +281,11 @@ const AddServiceQuotation = () => {
             deliveryAddress: '',
             reference: '',
             description: '',
+            status: 'draft'
         });
         setProductsInTable([]);
         setAvailableProducts([]); // Clear available products
         toast.info('Form cancelled and reset.');
-    };
-
-    const handleUploadSignedQuotation = () => {
-        // Implement file upload logic
-        toast.info('Upload Signed quotation (placeholder)!');
     };
 
     if (loading) {
@@ -390,13 +388,21 @@ const AddServiceQuotation = () => {
                         </FormControl>
                     </Grid>
                     <Grid item xs={12} sm={6}>
-                        <FormControl fullWidth margin="normal" size="small" required>
-                            <InputLabel id="delivery-address-label">Service / Delivery Address</InputLabel>
-                            <Select
+                        <TextField
+                            fullWidth
+                            margin="normal"
+                            name="deliveryAddress"
+                            label="Delivery Address"
+                            value={quotationData.deliveryAddress}
+                            onChange={handleChange}
+                            placeholder="Delivery Address"
+                            size="small"
+                        />
+                        {/* <Select
                                 labelId="delivery-address-label"
                                 id="deliveryAddress"
                                 name="deliveryAddress"
-                                value={quotationData.deliveryAddress}
+                                value={invoiceData.deliveryAddress}
                                 onChange={handleChange}
                                 label="Service / Delivery Address"
                             >
@@ -404,8 +410,7 @@ const AddServiceQuotation = () => {
                                 <MenuItem value="Address 1">Address 1</MenuItem>
                                 <MenuItem value="Address 2">Address 2</MenuItem>
                                 <MenuItem value="Address 3">Address 3</MenuItem>
-                            </Select>
-                        </FormControl>
+                            </Select> */}
                     </Grid>
                     <Grid item xs={12} sm={6}>
                         <TextField
@@ -418,6 +423,26 @@ const AddServiceQuotation = () => {
                             placeholder="Reference"
                             size="small"
                         />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                        <FormControl fullWidth margin="normal" size="small" required>
+                            <InputLabel id="payment-status-label">Payment Status</InputLabel>
+                            <Select
+                                labelId="payment-status-label"
+                                id="status"
+                                name="status"
+                                value={quotationData.status}
+                                label="Payment Status"
+                                onChange={handleChange}
+                            >
+                                <MenuItem value="InvoiceSent">Invoice Sent</MenuItem>
+                                <MenuItem value="Unpaid">Unpaid</MenuItem>
+                                <MenuItem value="Paid">Paid</MenuItem>
+                                <MenuItem value="Pending">Pending</MenuItem>
+                                <MenuItem value="TDS">TDS</MenuItem>
+                                <MenuItem value="Cancelled">Cancelled</MenuItem>
+                            </Select>
+                        </FormControl>
                     </Grid>
                     <Grid item xs={12}>
                         <TextField
@@ -441,14 +466,6 @@ const AddServiceQuotation = () => {
                     </Button>
                     <Button variant="contained" sx={{ bgcolor: '#dc3545', '&:hover': { bgcolor: '#c82333' } }} onClick={handleCancel}>
                         Cancel
-                    </Button>
-                    <Button
-                        variant="contained"
-                        sx={{ bgcolor: '#28a745', '&:hover': { bgcolor: '#218838' } }}
-                        startIcon={<UploadFileIcon />}
-                        onClick={handleUploadSignedQuotation}
-                    >
-                        Upload Signed Quotation
                     </Button>
                     <Button
                         variant="outlined"

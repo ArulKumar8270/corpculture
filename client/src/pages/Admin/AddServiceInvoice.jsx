@@ -474,14 +474,6 @@ const AddServiceInvoice = () => {
                         Cancel
                     </Button>
                     <Button
-                        variant="contained"
-                        sx={{ bgcolor: '#28a745', '&:hover': { bgcolor: '#218838' } }}
-                        startIcon={<UploadFileIcon />}
-                        onClick={handleUploadSignedInvoice}
-                    >
-                        Upload Signed Invoice
-                    </Button>
-                    <Button
                         variant="outlined"
                         onClick={handleAddProduct}
                         disabled={!invoiceData.productId || !invoiceData.quantity || invoiceData.quantity <= 0}
