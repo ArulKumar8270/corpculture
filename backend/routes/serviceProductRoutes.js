@@ -17,6 +17,8 @@ router.post("/", createServiceProduct); // Consider adding isAdmin middleware he
 // Get all Service Products
 router.get("/", getAllServiceProducts);
 
+router.get("/getServiceProductsByCompany/:companyId", getAllServiceProducts);
+
 // Get Service Product by ID
 router.get("/:id", getServiceProductById);
 

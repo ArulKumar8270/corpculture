@@ -6,7 +6,8 @@ import {
     getServiceById,
     updateService,
     deleteService,
-    getServiceByPhone
+    getServiceByPhone,
+    getServiceByType
 } from "../controllers/service/serviceController.js";
 
 const router = express.Router();
@@ -19,6 +20,9 @@ router.get("/all", isAdmin, getAllServices);
 
 // Get single service
 router.get("/get/:id", requireSignIn, getServiceById);
+
+// Get type service
+router.get("/serviceType/:serviceType", getServiceByType);
 
 // Update service
 router.put("/update/:id", isAdmin, updateService);

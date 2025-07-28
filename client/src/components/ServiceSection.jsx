@@ -61,6 +61,8 @@ const [form, setForm] = useState({
   email: "",
   address: "",
   location: "",
+  serviceType : selectedService?.id, 
+  serviceTitle: selectedService?.title // Set the serviceType based on the selected service
 });
 const [errors, setErrors] = useState({});
 const [submitStatus, setSubmitStatus] = useState(null);
@@ -94,6 +96,8 @@ const fetchServicesByPhone = async (phoneNumber) => { // New function to fetch s
             email: "", // {{ edit_1 }} Reset email
             address: "", // {{ edit_1 }} Reset address
             location: "", // {{ edit_1 }} Reset location
+            serviceType : selectedService?.id, 
+            serviceTitle: selectedService?.title // Set the serviceType based on the selected service
         })); // {{ edit_1 }}
         return; // {{ edit_1 }}
     }
@@ -114,6 +118,8 @@ const fetchServicesByPhone = async (phoneNumber) => { // New function to fetch s
                 email: latestService.email || "", // {{ edit_1 }} Pre-fill email
                 address: latestService.address || "", // {{ edit_1 }} Pre-fill address
                 location: latestService.location || "", // {{ edit_1 }} Pre-fill location
+                serviceType : selectedService?.id, 
+                serviceTitle: selectedService?.title
                 // complaint is usually specific to the new request, so don't pre-fill {{ edit_1 }}
             })); // {{ edit_1 }}
         } else {
@@ -187,6 +193,8 @@ const handleSubmit = async (e) => {
       email: "",
       address: "",
       location: "",
+      serviceType : selectedService?.id, 
+      serviceTitle: selectedService?.title // Set the serviceType based on the selected service
     });
     setErrors({});
     setFetchedServices([]); // Clear fetched services after successful submission

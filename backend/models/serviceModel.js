@@ -37,6 +37,19 @@ const serviceSchema = new mongoose.Schema({
         type: String,
         required: false
     },
+    serviceType: {
+        type: String,
+        required: true
+    },
+    serviceTitle : {
+        type: String,
+        required: false
+    },
+    status: {
+        type: String,
+        enum: ["Pending", "In Progress", "Completed", "Cancelled"],
+        default: "Pending"
+    },
     createdAt: {
         type: Date,
         default: Date.now
