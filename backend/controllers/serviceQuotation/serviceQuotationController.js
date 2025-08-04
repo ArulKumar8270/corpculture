@@ -23,11 +23,18 @@ export const createServiceQuotation = async (req, res) => {
             companyId,
             products, // Array of { productId, quantity, rate }
             modeOfPayment,
+            bankName, // New field
+            transactionDetails, // New field
+            chequeDate, // New field
+            transferDate, // New field
+            companyNamePayment, // New field
+            otherPaymentMode, // New field
             deliveryAddress,
             reference,
             description,
             tax, // Optional tax from frontend, or calculated here
-            quotationDate
+            quotationDate,
+            assignedTo
         } = req.body;
 
         // Basic Validation
@@ -65,40 +72,42 @@ export const createServiceQuotation = async (req, res) => {
                 return res.status(404).send({ success: false, message: `Product with ID ${item.productId} not found.` });
             }
 
-            const totalAmount = item.quantity * item.rate;
             processedProducts.push({
                 productId: item.productId,
                 productName: serviceProduct.productName, // Use name from the ServiceProduct model
                 quantity: item.quantity,
                 rate: item.rate,
-                totalAmount: totalAmount,
+                totalAmount: item.quantity * item.rate,
             });
         }
 
         // Calculate overall Quotation totals
-        const { subtotal, tax: calculatedTax, grandTotal } = calculateQuotationTotals(processedProducts);
-
+        const { subtotal, grandTotal } = calculateInvoiceTotals(processedProducts);
         const newServiceQuotation = new ServiceQuotation({
             quotationNumber,
             companyId,
             products: processedProducts,
             modeOfPayment,
+            bankName, // Save new field
+            transactionDetails, // Save new field
+            chequeDate, // Save new field
+            transferDate, // Save new field
+            companyNamePayment, // Save new field
+            otherPaymentMode, // Save new field
             deliveryAddress,
             reference,
             description,
             subtotal,
-            tax: tax !== undefined ? tax : calculatedTax, // Use provided tax or calculated one
+            tax: tax || 0, // Use provided tax or default to 0 // Use provided tax or calculated one
             grandTotal,
             quotationDate: quotationDate || Date.now(),
+            assignedTo
         });
 
         await newServiceQuotation.save();
 
-        res.status(201).send({
-            success: true,
-            message: 'Service quotation created successfully',
-            serviceQuotation: newServiceQuotation
-        });
+        res.status(201).send({ success: true, message: 'Service quotation created successfully', serviceQuotation: newServiceQuotation });
+
 
     } catch (error) {
         console.error("Error in createServiceQuotation:", error);
@@ -148,12 +157,20 @@ export const updateServiceQuotation = async (req, res) => {
             companyId,
             products,
             modeOfPayment,
+            bankName, // New field
+            transactionDetails, // New field
+            chequeDate, // New field
+            transferDate, // New field
+            companyNamePayment, // New field
+            otherPaymentMode, // New field
             deliveryAddress,
             reference,
             description,
             tax,
             status,
-            quotationDate
+            quotationDate,
+            quotationLink,
+            assignedTo
         } = req.body;
 
         // Find the Quotation to update
@@ -179,12 +196,7 @@ export const updateServiceQuotation = async (req, res) => {
             }
             serviceQuotation.companyId = companyId;
         }
-        if (modeOfPayment) serviceQuotation.modeOfPayment = modeOfPayment;
-        if (deliveryAddress) serviceQuotation.deliveryAddress = deliveryAddress;
-        if (reference) serviceQuotation.reference = reference;
-        if (description) serviceQuotation.description = description;
-        if (status) serviceQuotation.status = status;
-        if (quotationDate) serviceQuotation.QuotationDate = quotationDate;
+
 
         // Handle products update and recalculate totals
         if (products && products.length > 0) {
@@ -205,28 +217,35 @@ export const updateServiceQuotation = async (req, res) => {
                     return res.status(404).send({ success: false, message: `Product with ID ${item.productId} not found.` });
                 }
 
-                const totalAmount = item.quantity * item.rate;
                 processedProducts.push({
                     productId: item.productId,
                     productName: serviceProduct.productName,
                     quantity: item.quantity,
                     rate: item.rate,
-                    totalAmount: totalAmount,
+                    totalAmount: item.quantity * item.rate,
                 });
             }
             serviceQuotation.products = processedProducts;
-            const { subtotal, tax: calculatedTax, grandTotal } = calculateQuotationTotals(processedProducts);
+            const { subtotal, grandTotal } = calculateInvoiceTotals(processedProducts);
             serviceQuotation.subtotal = subtotal;
-            serviceQuotation.tax = tax !== undefined ? tax : calculatedTax;
             serviceQuotation.grandTotal = grandTotal;
-        } else if (products && products.length === 0) {
-            // If products array is explicitly sent as empty, clear it and reset totals
-            serviceQuotation.products = [];
-            serviceQuotation.subtotal = 0;
-            serviceQuotation.tax = 0;
-            serviceQuotation.grandTotal = 0;
         }
 
+        if (modeOfPayment) serviceQuotation.modeOfPayment = modeOfPayment;
+        if (bankName !== undefined) serviceQuotation.bankName = bankName; // Update new field
+        if (transactionDetails !== undefined) serviceQuotation.transactionDetails = transactionDetails; // Update new field
+        if (chequeDate !== undefined) serviceQuotation.chequeDate = chequeDate; // Update new field
+        if (transferDate !== undefined) serviceQuotation.transferDate = transferDate; // Update new field
+        if (companyNamePayment !== undefined) serviceQuotation.companyNamePayment = companyNamePayment; // Update new field
+        if (otherPaymentMode !== undefined) serviceQuotation.otherPaymentMode = otherPaymentMode; // Update new field
+        if (deliveryAddress) serviceQuotation.deliveryAddress = deliveryAddress;
+        if (reference) serviceQuotation.reference = reference;
+        if (description) serviceQuotation.description = description;
+        if (tax !== undefined) serviceQuotation.tax = tax;
+        if (status) serviceQuotation.status = status;
+        if (quotationDate) serviceQuotation.quotationDate = quotationDate;
+        if (assignedTo) serviceQuotation.assignedTo = assignedTo;
+        if (quotationLink !== undefined) serviceQuotation.quotationLink = quotationLink; // Update invoiceLink
         await serviceQuotation.save();
 
         res.status(200).send({

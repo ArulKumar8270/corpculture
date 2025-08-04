@@ -45,6 +45,28 @@ const serviceInvoiceSchema = new mongoose.Schema({
         required: true,
         trim: true,
     },
+    bankName: { // New field
+        type: String,
+        trim: true,
+    },
+    transactionDetails: { // New field (e.g., Cheque Number, UPI ID, Transaction ID)
+        type: String,
+        trim: true,
+    },
+    chequeDate: { // New field for Cheque payment
+        type: Date,
+    },
+    transferDate: { // New field for Bank Transfer/UPI
+        type: Date,
+    },
+    companyNamePayment: { // New field for payment from company
+        type: String,
+        trim: true,
+    },
+    otherPaymentMode: { // New field for 'OTHERS' payment mode
+        type: String,
+        trim: true,
+    },
     deliveryAddress: {
         type: String,
         required: true,
@@ -83,6 +105,10 @@ const serviceInvoiceSchema = new mongoose.Schema({
         default: Date.now,
     },
     invoiceLink: {
+        type: String,
+        trim: true,
+    },
+    assignedTo: {
         type: String,
         trim: true,
     },
