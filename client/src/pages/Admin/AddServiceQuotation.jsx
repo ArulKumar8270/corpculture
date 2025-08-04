@@ -21,7 +21,7 @@ import {
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 // Removed EditIcon import as it's no longer needed
-import { useNavigate, useParams } from 'react-router-dom'; // <-- add useParams
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'; // <-- add useParams
 import toast from 'react-hot-toast';
 import axios from 'axios'; // Import axios
 import { useAuth } from '../../context/auth';
@@ -30,7 +30,8 @@ const AddServiceQuotation = () => {
     const navigate = useNavigate();
     const { auth } = useAuth();
     const { quotationId } = useParams(); // <-- get QuotationId from URL
-
+    const [searchParams] = useSearchParams();
+    const employeeName = searchParams.get("employeeName");
     // State for form fields
     const [quotationData, setQuotationData] = useState({
         quotationNumber: '', // New field for Quotation number
@@ -44,6 +45,7 @@ const AddServiceQuotation = () => {
         status: 'draft'
     });
 
+    const [companyData, setCompanyData] = useState(null)
     // State for products added to the table (these are the line items for the Quotation)
     const [productsInTable, setProductsInTable] = useState([]);
     // States for dropdown data
@@ -51,6 +53,38 @@ const AddServiceQuotation = () => {
     const [availableProducts, setAvailableProducts] = useState([]);
     const [loading, setLoading] = useState(true); // Loading state for initial data
 
+
+    useEffect(() => {
+        const fetchCompanyData = async () => {
+            if (invoiceData?.companyId) {
+                try {
+                    const { data } = await axios.get(
+                        `${import.meta.env.VITE_SERVER_URL}/api/v1/company/get/${invoiceData?.companyId}`,
+                        {
+                            headers: {
+                                Authorization: auth.token,
+                            },
+                        }
+                    );
+                    if (data?.success && data.company) {
+                        const company = data.company;
+                        setCompanyData(company);
+
+                    } else {
+                        toast.error(data?.message || 'Failed to fetch company details.');
+                    }
+                } catch (error) {
+                    console.error('Error fetching company details:', error);
+                    toast.error(error.response?.data?.message || 'Something went wrong while fetching company details.');
+                }
+            }
+        };
+
+        if (auth?.token) {
+            fetchCompanyData();
+        }
+    }, [invoiceData?.companyId, auth?.token]);
+    
     // Fetch companies on component mount
     useEffect(() => {
         const fetchCompanies = async () => {
@@ -237,7 +271,8 @@ const AddServiceQuotation = () => {
             subtotal,
             tax,
             grandTotal,
-            status
+            status,
+            assignedTo : employeeNam
         };
 
         try {
@@ -327,6 +362,7 @@ const AddServiceQuotation = () => {
                                 value={quotationData.companyId}
                                 onChange={handleChange}
                                 label="Company"
+                                disabled={!!quotationId} // only disable in edit mode
                             >
                                 <MenuItem value="">Select a Company</MenuItem>
                                 {companies.map(comp => (
@@ -388,7 +424,7 @@ const AddServiceQuotation = () => {
                         </FormControl>
                     </Grid>
                     <Grid item xs={12} sm={6}>
-                        <TextField
+                        {/* <TextField
                             fullWidth
                             margin="normal"
                             name="deliveryAddress"
@@ -397,20 +433,27 @@ const AddServiceQuotation = () => {
                             onChange={handleChange}
                             placeholder="Delivery Address"
                             size="small"
-                        />
-                        {/* <Select
-                                labelId="delivery-address-label"
-                                id="deliveryAddress"
-                                name="deliveryAddress"
-                                value={invoiceData.deliveryAddress}
-                                onChange={handleChange}
-                                label="Service / Delivery Address"
-                            >
-                                <MenuItem value="">Select Delivery Address</MenuItem>
-                                <MenuItem value="Address 1">Address 1</MenuItem>
-                                <MenuItem value="Address 2">Address 2</MenuItem>
-                                <MenuItem value="Address 3">Address 3</MenuItem>
-                            </Select> */}
+                        /> */}
+                        <InputLabel id="delivery-address-label">Service / Delivery Address</InputLabel>
+                        <Select
+                            fullWidth
+                            labelId="delivery-address-label"
+                            id="deliveryAddress"
+                            name="deliveryAddress"
+                            value={invoiceData.deliveryAddress}
+                            onChange={handleChange}
+                            label="Service / Delivery Address"
+                        >
+                            <MenuItem value="">Select Delivery Address</MenuItem>
+                            {companyData?.serviceDeliveryAddresses?.map((result, index) => {
+                                return (
+                                    <MenuItem key={index} value={result}>
+                                        {result}
+                                    </MenuItem>
+                                )
+                            })}
+
+                        </Select>
                     </Grid>
                     <Grid item xs={12} sm={6}>
                         <TextField

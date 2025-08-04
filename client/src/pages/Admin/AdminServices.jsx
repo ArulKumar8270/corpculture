@@ -244,18 +244,18 @@ const AdminServices = () => {
     handleClose();
   };
 
-  const handleInvoice = (serviceId) => {
-    navigate(`../addServiceInvoice`);
+  const handleInvoice = (serviceId, employeeName) => {
+    navigate(`../addServiceInvoice?employeeName=${employeeName}`);
     handleClose();
   };
 
-  const handleQuotation = (serviceId) => {
-    navigate(`../AddServiceQuotation`);
+  const handleQuotation = (serviceId, employeeName) => {
+    navigate(`../AddServiceQuotation?employeeName=${employeeName}`);
     handleClose();
   };
 
-  const handleReport = (serviceId) => {
-    navigate(`../addServiceReport`);
+  const handleReport = (serviceId, employeeName) => {
+    navigate(`../addServiceReport?employeeName=${employeeName}`);
     handleClose();
   };
 
@@ -400,13 +400,13 @@ const AdminServices = () => {
                       {/* <MenuItem onClick={() => handleEdit(currentServiceIdForMenu)}>
                         <EditIcon sx={{ mr: 1 }} /> Edit
                       </MenuItem> */}
-                      <MenuItem onClick={() => handleInvoice(currentServiceIdForMenu)}>
+                      <MenuItem onClick={() => handleInvoice(currentServiceIdForMenu, employees.find(emp => emp._id === enquiry.employeeId)?.name || enquiry.employeeId)}>
                         <ReceiptIcon sx={{ mr: 1 }} /> Invoice
                       </MenuItem>
-                      <MenuItem onClick={() => handleQuotation(currentServiceIdForMenu)}>
+                      <MenuItem onClick={() => handleQuotation(currentServiceIdForMenu, employees.find(emp => emp._id === enquiry.employeeId)?.name || enquiry.employeeId)}>
                         <DescriptionIcon sx={{ mr: 1 }} /> Quotation
                       </MenuItem>
-                      <MenuItem onClick={() => handleReport(currentServiceIdForMenu)}>
+                      <MenuItem onClick={() => handleReport(currentServiceIdForMenu, employees.find(emp => emp._id === enquiry.employeeId)?.name || enquiry.employeeId)}>
                         <BarChartIcon sx={{ mr: 1 }} /> Report
                       </MenuItem>
                       <MenuItem onClick={() => handleMoveStatus(currentServiceIdForMenu, "Cancelled")}>

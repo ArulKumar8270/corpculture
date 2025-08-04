@@ -364,7 +364,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                         </NavLink>
                                         {/* Invoice Link */}
                                         <NavLink
-                                            to="/admin/invoice"
+                                            to="./addRentalInvoice"
                                             onClick={scrollToTop}
                                             className={({ isActive }) =>
                                                 `rounded-lg mx-2 my-1 transition-all ${isActive
