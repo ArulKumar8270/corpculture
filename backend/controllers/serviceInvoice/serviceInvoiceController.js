@@ -23,11 +23,18 @@ export const createServiceInvoice = async (req, res) => {
             companyId,
             products, // Array of { productId, quantity, rate }
             modeOfPayment,
+            bankName, // New field
+            transactionDetails, // New field
+            chequeDate, // New field
+            transferDate, // New field
+            companyNamePayment, // New field
+            otherPaymentMode, // New field
             deliveryAddress,
             reference,
             description,
             tax, // Optional tax from frontend, or calculated here
-            invoiceDate
+            invoiceDate,
+            assignedTo
         } = req.body;
 
         // Basic Validation
@@ -49,6 +56,7 @@ export const createServiceInvoice = async (req, res) => {
 
         // Validate Products and calculate line item totals
         const processedProducts = [];
+
         for (const item of products) {
             if (!item.productId || !item.quantity || item.rate === undefined) {
                 return res.status(400).send({ success: false, message: 'Each product must have productId, quantity, and rate.' });
@@ -65,40 +73,40 @@ export const createServiceInvoice = async (req, res) => {
                 return res.status(404).send({ success: false, message: `Product with ID ${item.productId} not found.` });
             }
 
-            const totalAmount = item.quantity * item.rate;
             processedProducts.push({
                 productId: item.productId,
-                productName: serviceProduct.productName, // Use name from the ServiceProduct model
+                productName: serviceProduct.productName, // Store product name from fetched product
                 quantity: item.quantity,
                 rate: item.rate,
-                totalAmount: totalAmount,
+                totalAmount: item.quantity * item.rate,
             });
         }
 
-        // Calculate overall invoice totals
-        const { subtotal, tax: calculatedTax, grandTotal } = calculateInvoiceTotals(processedProducts);
+        const { subtotal, grandTotal } = calculateInvoiceTotals(processedProducts);
 
         const newServiceInvoice = new ServiceInvoice({
             invoiceNumber,
             companyId,
             products: processedProducts,
             modeOfPayment,
+            bankName, // Save new field
+            transactionDetails, // Save new field
+            chequeDate, // Save new field
+            transferDate, // Save new field
+            companyNamePayment, // Save new field
+            otherPaymentMode, // Save new field
             deliveryAddress,
             reference,
             description,
             subtotal,
-            tax: tax !== undefined ? tax : calculatedTax, // Use provided tax or calculated one
+            tax: tax || 0, // Use provided tax or default to 0
             grandTotal,
             invoiceDate: invoiceDate || Date.now(),
+            assignedTo
         });
 
         await newServiceInvoice.save();
-
-        res.status(201).send({
-            success: true,
-            message: 'Service Invoice created successfully',
-            serviceInvoice: newServiceInvoice
-        });
+        res.status(201).send({ success: true, message: 'Service Invoice created successfully', serviceInvoice: newServiceInvoice });
 
     } catch (error) {
         console.error("Error in createServiceInvoice:", error);
@@ -113,11 +121,10 @@ export const getAllServiceInvoices = async (req, res) => {
             .populate('companyId', 'companyName') // Populate company name
             .populate('products.productId', 'productName sku hsn') // Populate product details
             .sort({ createdAt: -1 });
-
-        res.status(200).send({ success: true, message: 'All Service Invoices fetched', serviceInvoices });
+        res.status(200).send({ success: true, message: 'All service invoices fetched', serviceInvoices });
     } catch (error) {
         console.error("Error in getAllServiceInvoices:", error);
-        res.status(500).send({ success: false, message: 'Error in getting service invoices', error });
+        res.status(500).send({ success: false, message: 'Error in getting all service invoices', error });
     }
 };
 
@@ -128,11 +135,10 @@ export const getServiceInvoiceById = async (req, res) => {
         const serviceInvoice = await ServiceInvoice.findById(id)
             .populate('companyId', 'companyName')
             .populate('products.productId', 'productName sku hsn');
-
         if (!serviceInvoice) {
-            return res.status(404).send({ success: false, message: 'Service Invoice not found' });
+            return res.status(404).send({ success: false, message: 'Service Invoice not found.' });
         }
-        res.status(200).send({ success: true, message: 'Service Invoice fetched successfully', serviceInvoice });
+        res.status(200).send({ success: true, message: 'Service Invoice fetched', serviceInvoice });
     } catch (error) {
         console.error("Error in getServiceInvoiceById:", error);
         res.status(500).send({ success: false, message: 'Error in getting service invoice', error });
@@ -148,6 +154,12 @@ export const updateServiceInvoice = async (req, res) => {
             companyId,
             products,
             modeOfPayment,
+            bankName, // New field
+            transactionDetails, // New field
+            chequeDate, // New field
+            transferDate, // New field
+            companyNamePayment, // New field
+            otherPaymentMode, // New field
             deliveryAddress,
             reference,
             description,
@@ -155,6 +167,7 @@ export const updateServiceInvoice = async (req, res) => {
             status,
             invoiceDate,
             invoiceLink, // <-- Add invoiceLink here
+            assignedTo
         } = req.body;
 
         // Find the invoice to update
@@ -181,15 +194,7 @@ export const updateServiceInvoice = async (req, res) => {
             serviceInvoice.companyId = companyId;
         }
 
-        if (modeOfPayment) serviceInvoice.modeOfPayment = modeOfPayment;
-        if (deliveryAddress) serviceInvoice.deliveryAddress = deliveryAddress;
-        if (reference) serviceInvoice.reference = reference;
-        if (description) serviceInvoice.description = description;
-        if (status) serviceInvoice.status = status;
-        if (invoiceDate) serviceInvoice.invoiceDate = invoiceDate;
-        if (invoiceLink) serviceInvoice.invoiceLink = invoiceLink; // <-- Add this line to save the link
-
-        // Handle products update and recalculate totals
+        // Handle products update
         if (products && products.length > 0) {
             const processedProducts = [];
             for (const item of products) {
@@ -208,35 +213,38 @@ export const updateServiceInvoice = async (req, res) => {
                     return res.status(404).send({ success: false, message: `Product with ID ${item.productId} not found.` });
                 }
 
-                const totalAmount = item.quantity * item.rate;
                 processedProducts.push({
                     productId: item.productId,
                     productName: serviceProduct.productName,
                     quantity: item.quantity,
                     rate: item.rate,
-                    totalAmount: totalAmount,
+                    totalAmount: item.quantity * item.rate,
                 });
             }
             serviceInvoice.products = processedProducts;
-            const { subtotal, tax: calculatedTax, grandTotal } = calculateInvoiceTotals(processedProducts);
+            const { subtotal, grandTotal } = calculateInvoiceTotals(processedProducts);
             serviceInvoice.subtotal = subtotal;
-            serviceInvoice.tax = tax !== undefined ? tax : calculatedTax;
             serviceInvoice.grandTotal = grandTotal;
-        } else if (products && products.length === 0) {
-            // If products array is explicitly sent as empty, clear it and reset totals
-            serviceInvoice.products = [];
-            serviceInvoice.subtotal = 0;
-            serviceInvoice.tax = 0;
-            serviceInvoice.grandTotal = 0;
         }
 
-        await serviceInvoice.save();
+        if (modeOfPayment) serviceInvoice.modeOfPayment = modeOfPayment;
+        if (bankName !== undefined) serviceInvoice.bankName = bankName; // Update new field
+        if (transactionDetails !== undefined) serviceInvoice.transactionDetails = transactionDetails; // Update new field
+        if (chequeDate !== undefined) serviceInvoice.chequeDate = chequeDate; // Update new field
+        if (transferDate !== undefined) serviceInvoice.transferDate = transferDate; // Update new field
+        if (companyNamePayment !== undefined) serviceInvoice.companyNamePayment = companyNamePayment; // Update new field
+        if (otherPaymentMode !== undefined) serviceInvoice.otherPaymentMode = otherPaymentMode; // Update new field
+        if (deliveryAddress) serviceInvoice.deliveryAddress = deliveryAddress;
+        if (reference) serviceInvoice.reference = reference;
+        if (description) serviceInvoice.description = description;
+        if (tax !== undefined) serviceInvoice.tax = tax;
+        if (status) serviceInvoice.status = status;
+        if (invoiceDate) serviceInvoice.invoiceDate = invoiceDate;
+        if (assignedTo) serviceInvoice.assignedTo = assignedTo;
+        if (invoiceLink !== undefined) serviceInvoice.invoiceLink = invoiceLink; // Update invoiceLink
 
-        res.status(200).send({
-            success: true,
-            message: 'Service Invoice updated successfully',
-            serviceInvoice
-        });
+        await serviceInvoice.save();
+        res.status(200).send({ success: true, message: 'Service Invoice updated successfully', serviceInvoice });
 
     } catch (error) {
         console.error("Error in updateServiceInvoice:", error);
@@ -249,11 +257,9 @@ export const deleteServiceInvoice = async (req, res) => {
     try {
         const { id } = req.params;
         const serviceInvoice = await ServiceInvoice.findByIdAndDelete(id);
-
         if (!serviceInvoice) {
             return res.status(404).send({ success: false, message: 'Service Invoice not found.' });
         }
-
         res.status(200).send({ success: true, message: 'Service Invoice deleted successfully' });
     } catch (error) {
         console.error("Error in deleteServiceInvoice:", error);

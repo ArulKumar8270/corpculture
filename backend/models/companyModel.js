@@ -1,5 +1,11 @@
 import mongoose from "mongoose";
 
+const contactPersonSchema = new mongoose.Schema({
+    name: { type: String, required: true },
+    mobile: { type: String, required: true },
+    email: { type: String, required: true },
+}, { _id: false }); // _id: false to prevent Mongoose from adding _id to subdocuments
+
 const companySchema = new mongoose.Schema({
     customerType: {
         type: String,
@@ -11,33 +17,43 @@ const companySchema = new mongoose.Schema({
         ref: 'User', // Reference to the User model
         required: true
     },
-    phone: {
-        type: String,
-        required: true
-    },
     companyName: {
         type: String,
         required: true
     },
+    billingAddress: {
+        type: String,
+        required: true
+    },
+    serviceDeliveryAddresses: [{ // Array of strings
+        type: String,
+        required: true
+    }],
+    invoiceType: {
+        type: String,
+        required: true,
+        default: 'Corpculture Invoice'
+    },
+    city: {
+        type: String,
+        required: true
+    },
+    state: {
+        type: String,
+        required: true
+    },
+    pincode: {
+        type: String,
+        required: true
+    },
+    gstNo: {
+        type: String,
+        required: false // GST No can be optional
+    },
+    contactPersons: [contactPersonSchema], // Array of embedded contact person objects
     customerComplaint: {
         type: String,
         required: false // Optional as marked in the form
-    },
-    contactPerson: {
-        type: String,
-        required: true
-    },
-    email: {
-        type: String,
-        required: true
-    },
-    addressDetail: {
-        type: String,
-        required: true
-    },
-    locationDetail: {
-        type: String,
-        required: true
     },
     createdAt: {
         type: Date,
