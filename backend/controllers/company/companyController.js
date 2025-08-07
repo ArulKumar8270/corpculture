@@ -133,32 +133,70 @@ export const deleteCompany = async (req, res) => {
 };
 
 // Get Company by User ID
-export const getCompanyByUser = async (req, res) => { // {{ edit_1 }}
-    try { // {{ edit_1 }}
-        // Assuming user ID is available in req.user._id from authentication middleware // {{ edit_1 }}
-        const userId = req.params.id; // {{ edit_1 }}
-        const company = await companyModel.find({ userId: userId }); // Find company by user ID // {{ edit_1 }}
+export const getCompanyByUser = async (req, res) => {
+    try {
+        // Assuming user ID is available in req.user._id from authentication middleware
+        const userId = req.params.id;
+        const company = await companyModel.find({ userId: userId }); // Find company by user ID
 
-        if (!company) { // {{ edit_1 }}
-            return res.status(404).send({ // {{ edit_1 }}
-                success: false, // {{ edit_1 }}
-                message: "Company not found for this user", // {{ edit_1 }}
-                errorType: "companyNotFound" // {{ edit_1 }}
-            }); // {{ edit_1 }}
-        } // {{ edit_1 }}
+        if (!company) {
+            return res.status(404).send({
+                success: false,
+                message: "Company not found for this user",
+                errorType: "companyNotFound"
+            });
+        }
 
-        res.status(200).send({ // {{ edit_1 }}
-            success: true, // {{ edit_1 }}
-            message: "Company fetched successfully", // {{ edit_1 }}
-            company // {{ edit_1 }}
-        }); // {{ edit_1 }}
+        res.status(200).send({
+            success: true,
+            message: "Company fetched successfully",
+            company
+        });
 
-    } catch (error) { // {{ edit_1 }}
-        console.error("Error in getting user company:", error); // {{ edit_1 }}
-        res.status(500).send({ // {{ edit_1 }}
-            success: false, // {{ edit_1 }}
-            message: "Error in getting user company", // {{ edit_1 }}
-            error // {{ edit_1 }}
-        }); // {{ edit_1 }}
-    } // {{ edit_1 }}
-}; // {{ edit_1 }}
+    } catch (error) {
+        console.error("Error in getting user company:", error);
+        res.status(500).send({
+            success: false,
+            message: "Error in getting user company",
+            error
+        });
+    }
+};
+
+// Get Company by Phone Number
+export const getCompanyByPhone = async (req, res) => {
+    try {
+        const { phone } = req.params; // Assuming phone number is passed as a URL parameter
+
+        if (!phone) {
+            return res.status(400).send({
+                success: false,
+                message: "Phone number is required",
+            });
+        }
+
+        const company = await companyModel.findOne({ phone: phone });
+
+        if (!company) {
+            return res.status(404).send({
+                success: false,
+                message: "Company not found with this phone number",
+                errorType: "companyNotFound"
+            });
+        }
+
+        res.status(200).send({
+            success: true,
+            message: "Company fetched successfully by phone number",
+            company
+        });
+
+    } catch (error) {
+        console.error("Error in getting company by phone:", error);
+        res.status(500).send({
+            success: false,
+            message: "Error in getting company by phone",
+            error
+        });
+    }
+};

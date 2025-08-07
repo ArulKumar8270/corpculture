@@ -56,10 +56,10 @@ const AddServiceQuotation = () => {
 
     useEffect(() => {
         const fetchCompanyData = async () => {
-            if (invoiceData?.companyId) {
+            if (quotationData?.companyId) {
                 try {
                     const { data } = await axios.get(
-                        `${import.meta.env.VITE_SERVER_URL}/api/v1/company/get/${invoiceData?.companyId}`,
+                        `${import.meta.env.VITE_SERVER_URL}/api/v1/company/get/${quotationData?.companyId}`,
                         {
                             headers: {
                                 Authorization: auth.token,
@@ -83,7 +83,7 @@ const AddServiceQuotation = () => {
         if (auth?.token) {
             fetchCompanyData();
         }
-    }, [invoiceData?.companyId, auth?.token]);
+    }, [quotationData?.companyId, auth?.token]);
     
     // Fetch companies on component mount
     useEffect(() => {
@@ -440,7 +440,7 @@ const AddServiceQuotation = () => {
                             labelId="delivery-address-label"
                             id="deliveryAddress"
                             name="deliveryAddress"
-                            value={invoiceData.deliveryAddress}
+                            value={quotationData.deliveryAddress}
                             onChange={handleChange}
                             label="Service / Delivery Address"
                         >

@@ -1,9 +1,20 @@
 import mongoose from "mongoose";
 
+// {{ edit_1 }}
+const configSchema = new mongoose.Schema({
+    bwOldCount: { type: Number, default: 0 },
+    bwNewCount: { type: Number, default: 0 },
+    colorOldCount: { type: Number, default: 0 }, // New field
+    colorNewCount: { type: Number, default: 0 }, // New field
+    colorScanningOldCount: { type: Number, default: 0 }, // New field
+    colorScanningNewCount: { type: Number, default: 0 }, // New field
+}, { _id: false }); // _id: false to prevent Mongoose from creating _id for subdocuments
+// {{ edit_1 }}
+
 const rentalPaymentEntrySchema = new mongoose.Schema({
     machineId: { // Reference to the Machine model for serial number and company
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Machine',
+        ref: 'RentalProduct',
         required: true,
     },
     companyId: { // Storing companyId directly for easier access/populating
@@ -17,24 +28,60 @@ const rentalPaymentEntrySchema = new mongoose.Schema({
         trim: true,
     },
     countImageUpload: {
-        type: String, // URL of the uploaded image
-        trim: true,
+        public_id: {
+            type: String,
+            required: true,
+        },
+        url: {
+            type: String,
+            required: true,
+        },
     },
     remarks: {
         type: String,
         trim: true,
     },
-    a4BwOldCount: {
-        type: Number,
-        required: true,
+    a3Config: {
+        type: configSchema,
+        default: () => ({}), // Default to an empty object if not provided
     },
-    a4BwNewCount: {
-        type: Number,
-        required: true,
+    a4Config: {
+        type: configSchema,
+        default: () => ({}),
+    },
+    a5Config: {
+        type: configSchema,
+        default: () => ({}),
     },
     entryDate: {
         type: Date,
         default: Date.now,
+    },
+    modeOfPayment: {
+        type: String,
+        trim: true,
+    },
+    bankName: { // New field
+        type: String,
+        trim: true,
+    },
+    transactionDetails: { // New field (e.g., Cheque Number, UPI ID, Transaction ID)
+        type: String,
+        trim: true,
+    },
+    chequeDate: { // New field for Cheque payment
+        type: Date,
+    },
+    transferDate: { // New field for Bank Transfer/UPI
+        type: Date,
+    },
+    companyNamePayment: { // New field for payment from company
+        type: String,
+        trim: true,
+    },
+    otherPaymentMode: { // New field for 'OTHERS' payment mode
+        type: String,
+        trim: true,
     },
 }, { timestamps: true });
 

@@ -35,6 +35,8 @@ import ServiceInvoiceList from "./ServiceInvoiceList";
 import ServiceQuotationList from "./ServiceQuotationList";
 import AddCompany from "./AddCompany";
 import AddRentalInvoice from "./addRentalInvoice";
+import AdminRental from "./AdminRental";
+import RentalInvoiceList from "./RentalInvoiceList";
 
 const AdminDashboard = () => {
     const navigate = useNavigate();
@@ -105,10 +107,12 @@ const AdminDashboard = () => {
                             <Route path="serviceInvoiceList" element={<ServiceInvoiceList />} />
                             <Route path="serviceQuotationList" element={<ServiceQuotationList />} />
                             <Route path="addServiceReport" element={<AddServiceReport />} />
-                            <Route path="addRentalInvoice" element={<AddRentalInvoice />} />
+                            <Route path="addRentalInvoice/:id?" element={<AddRentalInvoice />} />
+                            <Route path="rentalInvoiceList" element={<RentalInvoiceList />} />
                             <Route path="users" element={<Users />} />
                             {/* Add the new route for Service Enquiries */}
                             <Route path="service-enquiries" element={<AdminServices />} />
+                            <Route path="rental-enquiries" element={<AdminRental />} />
                             <Route path="profile/deactivate" element={<Deactivate />} />
                             <Route path="product/:productId" element={<EditProduct />} />
                         </Routes>

@@ -1,10 +1,11 @@
 import express from 'express';
 import {
     createRentalPaymentEntry,
-    getAllMachines,
-    getMachineDetails,
-    getSendDetailsToOptions
-} from '../controllers/rentalPaymentEntryController.js';
+    getSendDetailsToOptions,
+    getAllRentalPaymentEntries,
+    getRentalPaymentEntryById,
+    updateRentalPaymentEntry // {{ edit_1 }}
+} from '../controllers/rental/rentalPaymentEntryController.js';
 import { isAdmin } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
@@ -12,11 +13,14 @@ const router = express.Router();
 // Create Rental Payment Entry || POST
 router.post('/create-rental-entry', isAdmin, createRentalPaymentEntry);
 
-// Get all machines (for serial number dropdown) || GET
-router.get('/machines', isAdmin, getAllMachines);
+// Get all Rental Payment Entries || GET
+router.get('/all', isAdmin, getAllRentalPaymentEntries);
 
-// Get machine details by ID || GET
-router.get('/machine-details/:machineId', isAdmin, getMachineDetails);
+// Get single Rental Payment Entry by ID || GET
+router.get('/:id', isAdmin, getRentalPaymentEntryById);
+
+// Update Rental Payment Entry || PUT // {{ edit_2 }}
+router.put('/:id', isAdmin, updateRentalPaymentEntry); // {{ edit_2 }}
 
 // Get send details to options || GET
 router.get('/send-details-options', isAdmin, getSendDetailsToOptions);

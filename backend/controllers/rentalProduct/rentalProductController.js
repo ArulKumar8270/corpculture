@@ -83,7 +83,7 @@ export const createRentalProduct = async (req, res) => {
 export const getAllRentalProducts = async (req, res) => {
     try {
         const rentalProducts = await RentalProduct.find({})
-            .populate('company', 'name') // Populate company name
+            .populate('company', "companyName") // Populate company name
             .populate('gstType', 'gstType gstPercentage') // Populate GST details
             .sort({ createdAt: -1 });
 
@@ -109,6 +109,31 @@ export const getRentalProductById = async (req, res) => {
     } catch (error) {
         console.error("Error in getRentalProductById:", error);
         res.status(500).send({ success: false, message: 'Error in getting rental product', error });
+    }
+};
+
+// Get Rental Products by Company ID
+export const getRentalProductsByCompany = async (req, res) => {
+    try {
+        const { companyId } = req.params; // Assuming companyId is passed as a URL parameter
+
+        if (!companyId) {
+            return res.status(400).send({ success: false, message: 'Company ID is required.' });
+        }
+
+        const rentalProducts = await RentalProduct.find({ company: companyId })
+            .populate('company', "companyName") // Populate company name
+            .populate('gstType', 'gstType gstPercentage') // Populate GST details
+            .sort({ createdAt: -1 });
+
+        if (rentalProducts.length === 0) {
+            return res.status(404).send({ success: false, message: 'No rental products found for this company.' });
+        }
+
+        res.status(200).send({ success: true, message: 'Rental Products fetched successfully for the company', rentalProducts });
+    } catch (error) {
+        console.error("Error in getRentalProductsByCompany:", error);
+        res.status(500).send({ success: false, message: 'Error in getting rental products by company', error });
     }
 };
 

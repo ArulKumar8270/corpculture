@@ -47,7 +47,7 @@ const AddCompany = () => {
 
     // Effect to fetch company data if in edit mode
     useEffect(() => {
-        const fetchCompanyData = async () => {
+        const fetchCompanyData = async () => { 
             if (companyId) {
                 setInitialLoading(true);
                 try {

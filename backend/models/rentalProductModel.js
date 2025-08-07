@@ -30,7 +30,7 @@ const rentalProductSchema = new mongoose.Schema({
     employeeId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Employee', // Assuming you have an Employee model
-        required: true,
+        required: false,
     },
     department: {
         type: String, // Assuming department is a string ID or name

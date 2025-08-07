@@ -4,7 +4,6 @@ import axios from "axios";
 const ServiceSection = ({ services }) => {
   const [showModal, setShowModal] = useState(false);
   const [selectedService, setSelectedService] = useState(null);
-  const [fetchedServices, setFetchedServices] = useState([]); // State to store services fetched by phone
   const [isFetchingServices, setIsFetchingServices] = useState(false); // Loading state for phone lookup
   const [fetchError, setFetchError] = useState(null); // Error state for phone lookup
 
@@ -85,8 +84,7 @@ const validate = () => {
 
 const fetchServicesByPhone = async (phoneNumber) => { // New function to fetch services by phone
     if (!phoneNumber || phoneNumber.length !== 10) { // Only fetch if phone is 10 digits
-        setFetchedServices([]); // Clear previous results
-        setFetchError(null); // Clear previous error
+       setFetchError(null); // Clear previous error
         // Optionally clear form fields related to previous customer if phone number is cleared/invalidated {{ edit_1 }}
         setForm(prevForm => ({ // {{ edit_1 }}
             ...prevForm, // {{ edit_1 }}
@@ -106,25 +104,22 @@ const fetchServicesByPhone = async (phoneNumber) => { // New function to fetch s
     setFetchError(null); // Clear previous error
 
     try {
-        const response = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/service/phone/${phoneNumber}`);
-        if (response.data.success && response.data.services.length > 0) { // Check for success and if services were returned {{ edit_1 }}
-            setFetchedServices(response.data.services); // Store fetched services
-            const latestService = response.data.services[0]; // Get the most recent service (assuming sorted by createdAt desc) {{ edit_1 }}
+        const response = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/company/getByPhone/${phoneNumber}`);
+        if (response.data.success) { // Check for success and if services were returned {{ edit_1 }}
             setForm(prevForm => ({ // {{ edit_1 }} Update form with fetched data
                 ...prevForm, // {{ edit_1 }} Keep the current phone number
                 customerType: "Existing", // {{ edit_1 }} Set customer type to Existing
-                companyName: latestService.companyName || "", // {{ edit_1 }} Pre-fill company name
-                contactPerson: latestService.contactPerson || "", // {{ edit_1 }} Pre-fill contact person
-                email: latestService.email || "", // {{ edit_1 }} Pre-fill email
-                address: latestService.address || "", // {{ edit_1 }} Pre-fill address
-                location: latestService.location || "", // {{ edit_1 }} Pre-fill location
-                serviceType : selectedService?.id, 
-                serviceTitle: selectedService?.title
+                companyName: response.data.company?.companyName || "", // {{ edit_1 }} Pre-fill company name
+                contactPerson: response.data.company.contactPerson || "", // {{ edit_1 }} Pre-fill contact person
+                email: response.data.company.email || "", // {{ edit_1 }} Pre-fill email
+                address: response.data.company.addressDetail || "", // {{ edit_1 }} Pre-fill address
+                location: response.data.company.locationDetail || "", // {{ edit_1 }} Pre-fill location
+                serviceType : response.data.company?.id, 
+                serviceTitle: response.data.company?.title
                 // complaint is usually specific to the new request, so don't pre-fill {{ edit_1 }}
             })); // {{ edit_1 }}
         } else {
              // Handle cases where success is false or no services found
-            setFetchedServices([]); // Clear previous results
             setFetchError(response.data.message || "No services found for this phone number.");
              // Optionally clear form fields if no previous customer found {{ edit_1 }}
             setForm(prevForm => ({ // {{ edit_1 }}
@@ -160,7 +155,7 @@ const fetchServicesByPhone = async (phoneNumber) => { // New function to fetch s
         setIsFetchingServices(false); // Clear loading state
     }
 };
-
+ 
 
 const handleChange = (e) => {
   const { name, value } = e.target;
@@ -363,21 +358,6 @@ const handleSubmit = async (e) => {
                     <button type="button" className="flex-1 bg-lime-500 hover:bg-lime-600 text-white py-3 rounded-xl font-bold shadow transition text-lg">Calls us</button>
                   </div>
                 </form>
-
-                {/* Display fetched services */}
-                {fetchedServices.length > 0 && (
-                    <div className="mt-6 pt-4 border-t border-gray-200">
-                        <h3 className="text-lg font-semibold mb-3 text-gray-700">Previous Service Requests:</h3>
-                        <ul className="list-disc list-inside text-gray-600 text-sm max-h-40 overflow-y-auto pr-2">
-                            {fetchedServices.map(service => (
-                                <li key={service._id} className="mb-1">
-                                    <strong>ID:</strong> {service._id} - <strong>Status:</strong> {service.status || 'Pending'} - <strong>Date:</strong> {new Date(service.createdAt).toLocaleDateString()} {/* Display relevant service info */}
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
-                )}
-
               </div>
             </div>
           </div>
