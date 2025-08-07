@@ -6,7 +6,8 @@ import {
     getCompanyById,
     deleteCompany,
     getAllCompanies,
-    getCompanyByUser
+    getCompanyByUser,
+    getCompanyByPhone
 } from "../controllers/company/companyController.js";
 
 const router = express.Router();
@@ -19,6 +20,8 @@ router.get("/all", isAdmin, getAllCompanies);
 
 // Get single company
 router.get("/get/:id", getCompanyById);
+
+router.get("/getByPhone/:phone", getCompanyByPhone);
 
 // GET user's company details (Protected route)
 router.get('/user-company/:id', getCompanyByUser); 

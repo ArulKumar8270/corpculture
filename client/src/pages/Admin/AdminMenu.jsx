@@ -163,7 +163,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                             }
                                         >
                                             <div className="h-10 px-8 flex items-center">
-                                                All Products
+                                                Products
                                             </div>
                                         </NavLink>
                                         <NavLink
@@ -177,7 +177,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                             }
                                         >
                                             <div className="h-10 px-8 flex items-center">
-                                                All Category
+                                                Category
                                             </div>
                                         </NavLink>
 
@@ -248,7 +248,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                             }
                                         >
                                             <div className="h-10 px-8 flex items-center">
-                                                Service Enquiries
+                                                Enquiries
                                             </div>
                                         </NavLink>
                                         
@@ -263,7 +263,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                                 }
                                             >
                                                 <div className="h-10 px-8 flex items-center">
-                                                    Service Invoice List
+                                                     Invoices
                                                 </div>
                                             </NavLink>
                                         <NavLink
@@ -277,7 +277,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                                 }
                                             >
                                                 <div className="h-10 px-8 flex items-center">
-                                                    Service Quotation List
+                                                    Quotations
                                                 </div>
                                             </NavLink>
                                         {/* Commission under Service */}
@@ -292,7 +292,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                             }
                                         >
                                             <div className="h-10 px-8 flex items-center">
-                                                Commission
+                                                Commissions
                                             </div>
                                         </NavLink>
                                         {/* All Products under Service */}
@@ -307,7 +307,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                             }
                                         >
                                             <div className="h-10 px-8 flex items-center">
-                                                All Products
+                                                 Products
                                             </div>
                                         </NavLink>
                                     </div>
@@ -334,6 +334,20 @@ const AdminMenu = ({ toggleMenu }) => {
                                     <div className="flex flex-col text-black font-light text-sm mb-2">
                                         {/* Commission under Rental */}
                                         <NavLink
+                                            to="./rental-enquiries"
+                                            onClick={scrollToTop}
+                                            className={({ isActive }) =>
+                                                `rounded-lg mx-2 my-1 transition-all ${isActive
+                                                    ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
+                                                    : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
+                                                }`
+                                            }
+                                        >
+                                            <div className="h-10 px-8 flex items-center">
+                                                Enquiries
+                                            </div>
+                                        </NavLink>
+                                        <NavLink
                                             to="/admin/commission"
                                             onClick={scrollToTop}
                                             className={({ isActive }) =>
@@ -344,7 +358,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                             }
                                         >
                                             <div className="h-10 px-8 flex items-center">
-                                                Commission
+                                                Commissions
                                             </div>
                                         </NavLink>
                                         {/* All Products under Rental */}
@@ -359,12 +373,12 @@ const AdminMenu = ({ toggleMenu }) => {
                                             }
                                         >
                                             <div className="h-10 px-8 flex items-center">
-                                                All Products
+                                              Products
                                             </div>
                                         </NavLink>
                                         {/* Invoice Link */}
                                         <NavLink
-                                            to="./addRentalInvoice"
+                                            to="./rentalInvoiceList"
                                             onClick={scrollToTop}
                                             className={({ isActive }) =>
                                                 `rounded-lg mx-2 my-1 transition-all ${isActive
@@ -375,24 +389,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                         >
                                             <div className="h-10 px-8 flex items-center gap-3">
                                                 <ReceiptIcon sx={{ fontSize: "20px" }} />
-                                                Invoice
-                                            </div>
-                                        </NavLink>
-
-                                        {/* Upload Invoice Link */}
-                                        <NavLink
-                                            to="/admin/upload-invoice"
-                                            onClick={scrollToTop}
-                                            className={({ isActive }) =>
-                                                `rounded-lg mx-2 my-1 transition-all ${isActive
-                                                    ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
-                                                    : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
-                                                }`
-                                            }
-                                        >
-                                            <div className="h-10 px-8 flex items-center gap-3">
-                                                <UploadFileIcon sx={{ fontSize: "20px" }} />
-                                                Upload invoice
+                                                Invoices
                                             </div>
                                         </NavLink>
                                     </div>
@@ -407,7 +404,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                     <div className="flex items-center gap-3">
                                         <StoreIcon className="text-[#019ee3]" />
                                         <div className="font-semibold text-sm text-gray-600 tracking-wide">
-                                            Vendor
+                                            Vendors
                                         </div>
                                     </div>
                                     <KeyboardArrowDownIcon

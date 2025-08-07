@@ -239,7 +239,7 @@ const ProductDetails = () => {
                             {/* <!-- image wrapper --> */}
                             <div className="w-full lg:w-2/5 lg:sticky top-16 lg:h-screen">
                                 {/* <!-- imgBox --> */}
-                                <div className="flex flex-col gap-3 m-3 ">
+                                <div className="flex flex-col gap-3 m-3">
                                     <div className="w-full h-full pb-6 border rounded-2xl shadow relative">
                                         <Slider {...settings}>
                                             {product?.images.length > 1 ? (
