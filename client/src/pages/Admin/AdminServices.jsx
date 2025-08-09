@@ -32,7 +32,7 @@ const AdminServices = () => {
     inProgress: 0,
     completed: 0,
   });
-  const { auth } = useAuth();
+  const { auth, userPermissions } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
@@ -41,6 +41,11 @@ const AdminServices = () => {
   const [anchorEl, setAnchorEl] = useState(null);
   const [currentServiceIdForMenu, setCurrentServiceIdForMenu] = useState(null);
   const open = Boolean(anchorEl);
+
+
+  const hasPermission = (key) => {
+    return userPermissions.some(p => p.key === key && p.actions.includes('edit')) || auth?.user?.role === 1;
+  };
 
   const handleClick = (event, serviceId) => {
     setAnchorEl(event.currentTarget);
@@ -347,7 +352,7 @@ const AdminServices = () => {
         <table className="w-[80%] text-sm">
           <thead>
             <tr className="bg-gradient-to-r from-[#019ee3] to-[#afcb09] text-white">
-              <th className="py-2 px-3 text-left">Action</th>
+              {hasPermission("serviceEnquiries") ? <th className="py-2 px-3 text-left">Action</th> : null}
               <th className="py-2 px-3 text-left">Assigned To</th>
               <th className="py-2 px-3 text-left">Assigned Employee</th>
               <th className="py-2 px-3 text-left">Customer Type</th>
@@ -371,7 +376,7 @@ const AdminServices = () => {
             ) : (
               filteredEnquiries.map(enquiry => (
                 <tr key={enquiry._id} className="border-b last:border-b-0 hover:bg-blue-50">
-                  <td className="py-2 px-3">
+                  {hasPermission("serviceEnquiries") ? <td className="py-2 px-3">
                     <IconButton
                       aria-label="more"
                       aria-controls={open ? 'long-menu' : undefined}
@@ -422,7 +427,7 @@ const AdminServices = () => {
                         <ArrowForwardIcon sx={{ mr: 1 }} /> Move To Completed
                       </MenuItem>
                     </Menu>
-                  </td>
+                  </td> : null}
                   <td className="py-2 px-3">
                     {enquiry.employeeId ? (
                       <Link
@@ -443,6 +448,7 @@ const AdminServices = () => {
                         value={enquiry.employeeId || ""}
                         onChange={(e) => assignEmployeeToService(enquiry._id, e.target.value)}
                         className="rounded-md border border-gray-300 px-2 py-1 text-sm focus:border-sky-500 focus:ring-1 focus:ring-sky-200 bg-white"
+                        disabled={auth?.user?.role === 1 ? false : true}
                       >
                         <option value="">-- Select Employee --</option>
                         {employees?.filter(employee => employee.employeeType === 'Sales')

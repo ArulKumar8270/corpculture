@@ -5,16 +5,22 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import toast from 'react-hot-toast'; // Assuming you have react-hot-toast for notifications
 import axios from 'axios';
+import { useAuth } from '../../../context/auth';
 
 const VendorList = () => {
     const navigate = useNavigate();
     const [vendors, setVendors] = useState([]);
+    const { auth, userPermissions } = useAuth();
 
     useEffect(() => {
         // In a real application, you would fetch data from an API here.
         // For now, we'll use sample data.
         fetchVendors();
     }, []);
+
+    const hasPermission = (key) => {
+        return userPermissions.some(p => p.key === key && p.actions.includes('edit')) || auth?.user?.role === 1;
+    };
 
     const fetchVendors = async () => {
         try {
@@ -69,13 +75,13 @@ const VendorList = () => {
                 <Typography variant="h5" className="font-semibold text-blue-600">
                     Vendor List
                 </Typography>
-                <Button
+                {hasPermission("vendorList") ? <Button
                     variant="contained"
                     className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md"
                     onClick={handleAddVendor}
                 >
                     Add New Vendor
-                </Button>
+                </Button> : null}
             </div>
 
             <Paper className="p-6 shadow-md">
@@ -90,7 +96,7 @@ const VendorList = () => {
                                 <TableCell className="font-semibold">Mobile Number</TableCell>
                                 <TableCell className="font-semibold">Mail Id</TableCell>
                                 <TableCell className="font-semibold">Person Name</TableCell>
-                                <TableCell className="font-semibold">Action</TableCell>
+                                {hasPermission("vendorList") ? <TableCell className="font-semibold">Action</TableCell> : null}
                             </TableRow>
                         </TableHead>
                         <TableBody>
@@ -104,7 +110,7 @@ const VendorList = () => {
                                         <TableCell>{vendor.mobileNumber}</TableCell>
                                         <TableCell>{vendor.mailId}</TableCell>
                                         <TableCell>{vendor.personName}</TableCell>
-                                        <TableCell>
+                                        {hasPermission("vendorList") ? <TableCell>
                                             <Button
                                                 variant="contained"
                                                 color="primary"
@@ -125,7 +131,7 @@ const VendorList = () => {
                                             >
                                                 Delete
                                             </Button>
-                                        </TableCell>
+                                        </TableCell> : null}
                                     </TableRow>
                                 ))
                             ) : (

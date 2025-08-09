@@ -6,7 +6,7 @@ import SeoData from "../../SEO/SeoData"; // Assuming you have an SeoData compone
 import { Link } from 'react-router-dom'; // Import Link for navigation
 import { useNavigate } from 'react-router-dom'; // Import useNavigate for navigation
 const AdminEmployees = () => {
-  const { auth } = useAuth();
+  const { auth, userPermissions } = useAuth();
   const navigate = useNavigate();
   // Sample data for demonstration
   const [employees, setEmployees] = useState([]);
@@ -42,18 +42,22 @@ const AdminEmployees = () => {
     setLoading(false); // Ensure loading is false after component mounts if not fetching
   }, [auth?.token]); // Re-run effect if auth token changes
 
+  const hasPermission = (key) => {
+    return userPermissions.some(p => p.key === key && p.actions.includes('edit')) || auth?.user?.role === 1;
+  };
+
   return (
     <div className="p-6 bg-gradient-to-br from-[#e6fbff] to-[#f7fafd] min-h-screen">
       <div className="flex justify-between items-center p-4 bg-white rounded-2xl shadow mb-4">
         <h1 className="text-lg font-bold uppercase text-[#019ee3] tracking-wide">
           Employees
         </h1>
-        <button
+        {hasPermission("reportsEmployeeList") ? <button
           onClick={() => navigate('/admin/AddEmployee')} // Assuming this is the route for adding an employee
           className="py-2 px-5 rounded-xl shadow font-semibold text-white bg-gradient-to-r from-[#afcb09] to-[#019ee3] hover:from-[#019ee3] hover:to-[#afcb09] transition"
         >
           + New Employees
-        </button>
+        </button> : null}
       </div>
       {loading ? (
         <div className="text-center py-10 text-lg text-gray-500">
@@ -80,12 +84,12 @@ const AdminEmployees = () => {
                 employees.map(employee => (
                   <tr key={employee._id} className="border-b last:border-b-0 hover:bg-gray-50">
                     <td className="py-2 px-3"> {/* Wrap employee name in Link */} {/* {{ edit_2 }} */}
-                        <Link // {{ edit_2 }}
-                            to={`/admin/employee_details/${employee._id}`} // Link to employee details page // {{ edit_2 }}
-                            className="text-blue-600 hover:underline" // Add styling to make it look like a link // {{ edit_2 }}
-                        > {/* {{ edit_2 }} */}
-                            {employee.name} {/* {{ edit_2 }} */}
-                        </Link> {/* {{ edit_2 }} */}
+                      <Link // {{ edit_2 }}
+                        to={`/admin/employee_details/${employee._id}`} // Link to employee details page // {{ edit_2 }}
+                        className="text-blue-600 hover:underline" // Add styling to make it look like a link // {{ edit_2 }}
+                      > {/* {{ edit_2 }} */}
+                        {employee.name} {/* {{ edit_2 }} */}
+                      </Link> {/* {{ edit_2 }} */}
                     </td> {/* {{ edit_2 }} */}
                     <td className="py-2 px-3">{employee.email}</td>
                     <td className="py-2 px-3">{employee.phone}</td>

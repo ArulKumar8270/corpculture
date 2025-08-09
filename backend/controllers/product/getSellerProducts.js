@@ -1,7 +1,7 @@
 import productModel from "../../models/productModel.js";
 const getSellerProducts = async (req, res) => {
     try {
-        const products = await productModel.find({ seller: req.user._id });
+        const products = await productModel.find();
         if (!products) {
             return res.status(401).send({
                 success: false,

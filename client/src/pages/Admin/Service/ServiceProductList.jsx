@@ -5,14 +5,20 @@ import { useNavigate } from 'react-router-dom';
 import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Button, Typography } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import { useAuth } from '../../../context/auth';
 
 const ServiceProductList = () => {
+    const { auth, userPermissions } = useAuth();
     const navigate = useNavigate();
     const [serviceProducts, setServiceProducts] = useState([]);
 
     useEffect(() => {
         fetchServiceProducts();
     }, []);
+
+    const hasPermission = (key) => {
+        return userPermissions.some(p => p.key === key && p.actions.includes('edit')) || auth?.user?.role === 1;
+    };
 
     const fetchServiceProducts = async () => {
         try {
@@ -57,14 +63,14 @@ const ServiceProductList = () => {
         <div className="p-4">
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-semibold">Service Product List</h1>
-                <Button
+                {hasPermission("serviceProductList") ? <Button
                     variant="contained"
                     color="primary"
                     onClick={() => navigate('../addServiceProduct')}
                     className="bg-blue-500 hover:bg-blue-600"
                 >
                     Add New Product
-                </Button>
+                </Button> : null}
             </div>
 
             <Paper className="p-6 shadow-md">
@@ -81,7 +87,7 @@ const ServiceProductList = () => {
                                 <TableCell className="font-semibold">Rate</TableCell>
                                 <TableCell className="font-semibold">GST Type</TableCell>
                                 <TableCell className="font-semibold">Total Amount</TableCell>
-                                <TableCell className="font-semibold">Action</TableCell>
+                                {hasPermission("serviceProductList") ? <TableCell className="font-semibold">Action</TableCell> : null}
                             </TableRow>
                         </TableHead>
                         <TableBody>
@@ -89,7 +95,7 @@ const ServiceProductList = () => {
                                 serviceProducts.map((product, index) => (
                                     <TableRow key={product._id}>
                                         <TableCell>{index + 1}</TableCell>
-                                        <TableCell>{product.company?.name || 'N/A'}</TableCell>
+                                        <TableCell>{product.company?.companyName || 'N/A'}</TableCell>
                                         <TableCell>{product.productName}</TableCell>
                                         <TableCell>{product.sku}</TableCell>
                                         <TableCell>{product.hsn}</TableCell>
@@ -97,7 +103,7 @@ const ServiceProductList = () => {
                                         <TableCell>{product.rate}</TableCell>
                                         <TableCell>{product.gstType?.gstType || 'N/A'} ({product.gstType?.gstPercentage || 0}%)</TableCell>
                                         <TableCell>{product.totalAmount}</TableCell>
-                                        <TableCell>
+                                        {hasPermission("serviceProductList") ? <TableCell>
                                             <Button
                                                 variant="contained"
                                                 color="primary"
@@ -118,7 +124,7 @@ const ServiceProductList = () => {
                                             >
                                                 Delete
                                             </Button>
-                                        </TableCell>
+                                        </TableCell> : null}
                                     </TableRow>
                                 ))
                             ) : (

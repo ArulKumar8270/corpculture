@@ -35,7 +35,7 @@ import UploadFileIcon from '@mui/icons-material/UploadFile';
 function QuotationRow(props) {
     const { quotation, navigate } = props; // Destructure navigate from props
     const [open, setOpen] = useState(false);
-    const { auth } = useAuth();
+    const { auth, userPermissions } = useAuth();
     const [openPaymentModal, setOpenPaymentModal] = useState(false); // State for payment modal
     const [paymentForm, setPaymentForm] = useState({ // State for payment form data
         modeOfPayment: quotation.modeOfPayment || '',
@@ -46,6 +46,12 @@ function QuotationRow(props) {
         companyNamePayment: quotation.companyNamePayment || '', // New field for Cheque/Bank Transfer/UPI
         otherPaymentMode: quotation.otherPaymentMode || '', // New field for OTHERS
     });
+
+
+    const hasPermission = (key) => {
+        return userPermissions.some(p => p.key === key && p.actions.includes('edit')) || auth?.user?.role === 1;
+    };
+
     const handleEdit = () => {
         navigate(`../addServiceQuotation/${quotation._id}`); // Navigate to edit page
     };
@@ -138,7 +144,7 @@ function QuotationRow(props) {
                 <TableCell>{quotation.status}</TableCell>
                 <TableCell>{new Date(quotation.quotationDate).toLocaleDateString()}</TableCell>
                 <TableCell>
-                    <Button variant="outlined" size="small" sx={{ mr: 1 }} onClick={handleEdit}>Edit</Button>
+                    {hasPermission("serviceQuotation") ? <Button variant="outlined" size="small" sx={{ mr: 1 }} onClick={handleEdit}>Edit</Button> : null}
                     <Button variant="outlined" size="small" sx={{ my: 1 }} onClick={() => { }}>Send Quotation</Button>
                     <Button variant="outlined" size="small" sx={{ my: 1 }} onClick={handleOpenPaymentDetailsModal}>Update Payment Details</Button>
 
@@ -360,7 +366,12 @@ function QuotationRow(props) {
 const ServiceQuotationList = () => {
     const [quotations, setQuotations] = useState([]);
     const [loading, setLoading] = useState(true);
-    const { auth } = useAuth();
+    const { auth, userPermissions } = useAuth();
+
+    const hasPermission = (key) => {
+        return userPermissions.some(p => p.key === key && p.actions.includes('edit')) || auth?.user?.role === 1;
+    };
+
     const navigate = useNavigate(); // Initialize useNavigate
     const [searchTerm, setSearchTerm] = useState('');
     const fetchQuotations = async () => {
@@ -412,14 +423,14 @@ const ServiceQuotationList = () => {
     return (
         <Box sx={{ p: 3, bgcolor: 'background.default', minHeight: '100vh' }}>
             <div className='flex justify-between'>
-            <Typography variant="h5" component="h1" gutterBottom sx={{ mb: 3, color: '#019ee3', fontWeight: 'bold' }}>
-                Service Quotations
-            </Typography>
-            <Typography variant="h5" component="h1" gutterBottom sx={{ mb: 3, color: '#019ee3', fontWeight: 'bold' }}>
-            <Button onClick={() => navigate("../addServiceQuotation")} color="primary">
+                <Typography variant="h5" component="h1" gutterBottom sx={{ mb: 3, color: '#019ee3', fontWeight: 'bold' }}>
+                    Service Quotations
+                </Typography>
+                {hasPermission("serviceQuotation") ? <Typography variant="h5" component="h1" gutterBottom sx={{ mb: 3, color: '#019ee3', fontWeight: 'bold' }}>
+                    <Button onClick={() => navigate("../addServiceQuotation")} color="primary">
                         Create New Quotation
                     </Button>
-            </Typography>
+                </Typography> : null}
             </div>
             {/* Search Input Field */}
             <TextField
@@ -456,7 +467,7 @@ const ServiceQuotationList = () => {
                                 </TableRow>
                             ) : (
                                 filteredQuotaion?.map((quotation) => (
-                                    <QuotationRow key={quotation._id} quotation={quotation} navigate={navigate}  onQuotationUpdate={() => fetchQuotations()}/>
+                                    <QuotationRow key={quotation._id} quotation={quotation} navigate={navigate} onQuotationUpdate={() => fetchQuotations()} />
                                 ))
                             )}
                         </TableBody>

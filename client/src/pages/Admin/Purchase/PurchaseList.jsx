@@ -10,15 +10,22 @@ import toast from 'react-hot-toast';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import SearchIcon from '@mui/icons-material/Search';
+import { useAuth } from '../../../context/auth';
 
 const PurchaseList = () => {
     const navigate = useNavigate();
+    const { auth, userPermissions } = useAuth();
     const [purchases, setPurchases] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [searchTerm, setSearchTerm] = useState('');
+
+
+    const hasPermission = (key) => {
+        return userPermissions.some(p => p.key === key && p.actions.includes('edit')) || auth?.user?.role === 1;
+    };
 
     const fetchPurchases = async () => {
         try {
@@ -105,13 +112,13 @@ const PurchaseList = () => {
                 <Typography variant="h5" className="font-semibold text-blue-600">
                     Purchase List
                 </Typography>
-                <Button
+                {hasPermission("vendorPurchaseList") ? <Button
                     variant="contained"
                     className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md"
                     onClick={handleAddPurchase}
                 >
                     Add New Purchase
-                </Button>
+                </Button> : null}
             </div>
 
             <Paper className="p-6 shadow-md w-[95%]" elevation={3}> {/* Increased elevation for a modern look */}
@@ -151,7 +158,7 @@ const PurchaseList = () => {
                                     <TableCell align="right" sx={{ fontWeight: 'bold', backgroundColor: '#f0f0f0' }}>Rate</TableCell>
                                     <TableCell align="right" sx={{ fontWeight: 'bold', backgroundColor: '#f0f0f0' }}>Price</TableCell>
                                     <TableCell align="right" sx={{ fontWeight: 'bold', backgroundColor: '#f0f0f0' }}>Gross Total</TableCell>
-                                    <TableCell align="center" sx={{ fontWeight: 'bold', backgroundColor: '#f0f0f0' }}>Actions</TableCell>
+                                    {hasPermission("vendorPurchaseList") ? <TableCell align="center" sx={{ fontWeight: 'bold', backgroundColor: '#f0f0f0' }}>Actions</TableCell> : null}
                                 </TableRow>
                             </TableHead>
                             <TableBody>
@@ -168,7 +175,7 @@ const PurchaseList = () => {
                                             <TableCell align="right">{purchase.rate.toFixed(2)}</TableCell>
                                             <TableCell align="right">{purchase.price.toFixed(2)}</TableCell>
                                             <TableCell align="right">{purchase.grossTotal.toFixed(2)}</TableCell>
-                                            <TableCell align="center">
+                                           {hasPermission("vendorPurchaseList") ? <TableCell align="center">
                                                 <div className="flex justify-center space-x-2">
                                                     <Button
                                                         variant="contained"
@@ -187,7 +194,7 @@ const PurchaseList = () => {
                                                         DELETE
                                                     </Button>
                                                 </div>
-                                            </TableCell>
+                                            </TableCell> : null}
                                         </TableRow>
                                     ))}
                             </TableBody>

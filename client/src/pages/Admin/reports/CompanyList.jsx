@@ -9,7 +9,7 @@ import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 
 const CompanyList = () => {
-    const { auth } = useAuth();
+    const { auth, userPermissions } = useAuth();
     const navigate = useNavigate();
     const [companies, setCompanies] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -45,6 +45,11 @@ const CompanyList = () => {
         }
     }, [auth?.token]);
 
+
+    const hasPermission = (key) => {
+        return userPermissions.some(p => p.key === key && p.actions.includes('edit')) || auth?.user?.role === 1;
+    };
+
     if (loading) {
         return (
             <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
@@ -62,17 +67,17 @@ const CompanyList = () => {
     }
 
     return (
-        <div className="p-6 bg-gradient-to-br from-[#e6fbff] to-[#f7fafd] min-h-screen">
+        <div className="p-6 bg-gradient-to-br from-[#e6fbff] to-[#f7fafd] min-h-screen w-[95%]">
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-bold text-[#019ee3]">Company List</h1>
-                <Button
+               {hasPermission("reportsCompanyList") ? <Button
                     variant="contained"
                     color="primary"
                     onClick={() => navigate("../addCompany")}
                     className="bg-[#019ee3] hover:bg-[#017bb3] text-white px-4 py-2 rounded"
                 >
                     Add New Company
-                </Button>
+                </Button> : null}
             </div>
             <Paper className="p-4 shadow-md rounded-xl">
                 {companies.length === 0 ? (
@@ -95,7 +100,7 @@ const CompanyList = () => {
                                     <TableCell sx={{ color: 'white' }}>Contact Mobile (Primary)</TableCell>
                                     <TableCell sx={{ color: 'white' }}>Customer Type</TableCell>
                                     <TableCell sx={{ color: 'white' }}>Created At</TableCell>
-                                    <TableCell sx={{ color: 'white' }}>Action</TableCell>
+                                    {hasPermission("reportsCompanyList") ? <TableCell sx={{ color: 'white' }}>Action</TableCell> : null}
                                 </TableRow>
                             </TableHead>
                             <TableBody>
@@ -112,7 +117,7 @@ const CompanyList = () => {
                                         <TableCell>{company.contactPersons?.[0]?.mobile || company.phone || 'N/A'}</TableCell>
                                         <TableCell>{company.customerType || 'N/A'}</TableCell>
                                         <TableCell>{new Date(company.createdAt).toLocaleDateString()}</TableCell>
-                                        <TableCell>
+                                        {hasPermission("reportsCompanyList") ? <TableCell>
                                             <Button
                                                 variant="contained"
                                                 size="small"
@@ -121,7 +126,7 @@ const CompanyList = () => {
                                             >
                                                 Edit
                                             </Button>
-                                        </TableCell>
+                                        </TableCell> : null}
                                     </TableRow>
                                 ))}
                             </TableBody>

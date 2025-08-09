@@ -32,13 +32,13 @@ import moment from 'moment';
 function RentalInvoiceList() {
     const [loading, setLoading] = useState(true);
     const [rentalEntries, setRentalEntries] = useState([]);
-    const { auth } = useAuth();
+    const { auth, userPermissions } = useAuth();
     const navigate = useNavigate();
     const [openPaymentModal, setOpenPaymentModal] = useState(false); // State for payment modal
     const [paymentForm, setPaymentForm] = useState({ // State for payment form data
         modeOfPayment: '',
         bankName: '',
-        transactionDetails:  '', // e.g., cheque number, UPI ID
+        transactionDetails: '', // e.g., cheque number, UPI ID
         chequeDate: '', // New field for Cheque
         transferDate: '', // New field for Bank Transfer/UPI
         companyNamePayment: '', // New field for Cheque/Bank Transfer/UPI
@@ -68,6 +68,11 @@ function RentalInvoiceList() {
         };
         fetchRentalEntries();
     }, [auth.token]);
+
+
+    const hasPermission = (key) => {
+        return userPermissions.some(p => p.key === key && p.actions.includes('edit')) || auth?.user?.role === 1;
+    };
 
     // {{ edit_2 }}
     const handleEdit = (id) => {
@@ -164,11 +169,11 @@ function RentalInvoiceList() {
                 <Typography variant="h5" component="h1" gutterBottom sx={{ mb: 3, color: '#019ee3', fontWeight: 'bold' }}>
                     Rental Invoice List
                 </Typography>
-                <Typography variant="h5" component="h1" gutterBottom sx={{ mb: 3, color: '#019ee3', fontWeight: 'bold' }}>
+                {hasPermission("rentalInvoice") ? <Typography variant="h5" component="h1" gutterBottom sx={{ mb: 3, color: '#019ee3', fontWeight: 'bold' }}>
                     <Button onClick={() => navigate("../addRentalInvoice")} color="primary">
                         Create New Invoice
                     </Button>
-                </Typography>
+                </Typography> : null}
             </div>
             <Paper elevation={3} sx={{ p: 2, borderRadius: '8px' }}>
                 {rentalEntries.length === 0 ? (
@@ -207,9 +212,9 @@ function RentalInvoiceList() {
                                         </TableCell>
                                         <TableCell>
                                             <Stack spacing={1}>
-                                                <Button variant="outlined" size="small" onClick={() => handleEdit(entry._id)}>
+                                                {hasPermission("rentalInvoice") ? <Button variant="outlined" size="small" onClick={() => handleEdit(entry._id)}>
                                                     Edit
-                                                </Button>
+                                                </Button> : null}
                                                 <Button variant="outlined" size="small" onClick={() => handleSendInvoice(entry._id)}>
                                                     Send Invoice
                                                 </Button>

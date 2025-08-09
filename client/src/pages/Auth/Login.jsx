@@ -19,6 +19,8 @@ const Login = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const location = useLocation();
 
+    console.log(isAdmin, "asdf07a9s345")
+
     const handlePasswordToggle = () => {
         setShowPassword(!showPassword);
     };

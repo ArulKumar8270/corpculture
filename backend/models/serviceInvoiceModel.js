@@ -105,7 +105,7 @@ const serviceInvoiceSchema = new mongoose.Schema({
         default: Date.now,
     },
     invoiceLink: {
-        type: String,
+        type: [String], // Changed to an array of strings to allow multiple URLs
         trim: true,
     },
     assignedTo: {
