@@ -15,12 +15,17 @@ const RentalProductList = () => {
     const navigate = useNavigate();
     const [rentalProducts, setRentalProducts] = useState([]);
     const [employees, setEmployees] = useState([]); // New state for storing employee list
-    const { auth } = useAuth();
+    const { auth, userPermissions } = useAuth();
 
     useEffect(() => {
         fetchRentalProducts();
         fetchEmployees(); // Fetch employees when component mounts
     }, []);
+
+
+    const hasPermission = (key) => {
+        return userPermissions.some(p => p.key === key && p.actions.includes('edit')) || auth?.user?.role === 1;
+    };
 
     const fetchRentalProducts = async () => {
         try {
@@ -110,14 +115,14 @@ const RentalProductList = () => {
         <div className="p-4">
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-semibold">Rental Product List</h1>
-                <Button
+                {hasPermission("rentalAllProducts") ? <Button
                     variant="contained"
                     color="primary"
                     onClick={() => navigate('../addRentalProduct')}
                     className="bg-blue-500 hover:bg-blue-600"
                 >
                     Add New Rental Product
-                </Button>
+                </Button> : null}
             </div>
 
             <Paper className="p-6 shadow-md">
@@ -134,7 +139,7 @@ const RentalProductList = () => {
                                 <TableCell className="font-semibold">GST Type</TableCell>
                                 <TableCell className="font-semibold">Payment Date</TableCell>
                                 <TableCell className="font-semibold">Assigned Employee</TableCell> {/* New Table Header */}
-                                <TableCell className="font-semibold">Action</TableCell>
+                                {hasPermission("rentalAllProducts") ? <TableCell className="font-semibold">Action</TableCell> : null}
                             </TableRow>
                         </TableHead>
                         <TableBody>
@@ -156,6 +161,7 @@ const RentalProductList = () => {
                                                     value={product.employeeId || ''} // Set selected value based on product's assigned employee ID
                                                     onChange={(e) => handleAssignEmployee(product._id, e.target.value, product)}
                                                     label="Employee"
+                                                    disabled={auth?.user?.role === 1 ? false : true}
                                                 >
                                                     <MenuItem value="">
                                                         <em>None</em>
@@ -168,7 +174,7 @@ const RentalProductList = () => {
                                                 </Select>
                                             </FormControl>
                                         </TableCell>
-                                        <TableCell>
+                                        {hasPermission("rentalAllProducts") ? <TableCell>
                                             <Button
                                                 variant="contained"
                                                 color="primary"
@@ -189,7 +195,7 @@ const RentalProductList = () => {
                                             >
                                                 Delete
                                             </Button>
-                                        </TableCell>
+                                        </TableCell> : null}
                                     </TableRow>
                                 ))
                             ) : (

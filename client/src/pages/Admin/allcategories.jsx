@@ -11,13 +11,17 @@ import { IconButton } from "@mui/material"; // {{ edit_1 }}
 import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField } from "@mui/material";
 
 const AllCategories = () => {
-    const { auth } = useAuth();
+    const { auth, userPermissions } = useAuth();
     const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(true);
     const [categoryModalOpen, setCategoryModalOpen] = useState(false);
-    const [categoryForm, setCategoryForm] = useState({ name: "", commission: "" });
+    const [categoryForm, setCategoryForm] = useState({ name: "", commission: "0" });
     const [categoryErrors, setCategoryErrors] = useState({});
     const [categoryLoading, setCategoryLoading] = useState(false);
+
+    const hasPermission = (key) => {
+        return userPermissions.some(p => p.key === key && p.actions.includes('edit')) || auth?.user?.role === 1;
+    };
 
     const handleCategoryOpen = () => {
         setCategoryModalOpen(true);
@@ -132,15 +136,15 @@ const AllCategories = () => {
             minWidth: 200,
             flex: 1,
         },
-        {
-            field: "commission",
-            headerName: "Commission (%)",
-            type: "number",
-            minWidth: 150,
-            flex: 0.5,
-            headerAlign: "left",
-            align: "left",
-        },
+        // {
+        //     field: "commission",
+        //     headerName: "Commission (%)",
+        //     type: "number",
+        //     minWidth: 150,
+        //     flex: 0.5,
+        //     headerAlign: "left",
+        //     align: "left",
+        // },
         // You can add actions here if needed (e.g., Edit, Delete)
         // {
         //     field: "actions",
@@ -156,7 +160,7 @@ const AllCategories = () => {
         //         );
         //     },
         // },
-        { // {{ edit_3 }}
+        (hasPermission("salesAllProducts") ? [{ // {{ edit_3 }}
             field: "actions", // {{ edit_3 }}
             headerName: "Actions", // {{ edit_3 }}
             minWidth: 100, // {{ edit_3 }}
@@ -173,7 +177,7 @@ const AllCategories = () => {
                     </IconButton> // {{ edit_3 }}
                 ); // {{ edit_3 }}
             }, // {{ edit_3 }}
-        }, // {{ edit_3 }}
+        }] : []) // {{ edit_3 }}
     ];
 
     const rows = [];
@@ -198,12 +202,12 @@ const AllCategories = () => {
                         <h1 className="text-lg font-bold uppercase text-[#019ee3] tracking-wide">
                             Categories
                         </h1>
-                        <button
+                        {hasPermission("salesAllProducts")  ? <button
                                 onClick={handleCategoryOpen}
                                 className="py-2 px-5 rounded-xl shadow font-semibold text-white bg-gradient-to-r from-[#afcb09] to-[#019ee3] hover:from-[#019ee3] hover:to-[#afcb09] transition"
                             >
                                 + New Category
-                            </button>
+                            </button> : null}
                     </div>
 
                     <div className="w-full h-[80vh] bg-white rounded-2xl shadow-xl border border-[#e6fbff] p-2">
@@ -259,7 +263,7 @@ const AllCategories = () => {
                             fullWidth
                             required
                         />
-                        <TextField
+                        {/* <TextField
                             label="Commission (%)"
                             name="commission"
                             value={categoryForm.commission}
@@ -270,7 +274,7 @@ const AllCategories = () => {
                             required
                             type="number"
                             inputProps={{ min: 0 }}
-                        />
+                        /> */}
                     </DialogContent>
                     <DialogActions>
                         <Button onClick={handleCategoryClose} disabled={categoryLoading}>Cancel</Button>

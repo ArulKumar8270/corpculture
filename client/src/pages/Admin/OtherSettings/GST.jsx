@@ -4,8 +4,10 @@ import toast from 'react-hot-toast';
 import { Select, MenuItem, TextField, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import { useAuth } from '../../../context/auth';
 
 const GST = () => {
+    const { auth, userPermissions } = useAuth();
     const [gstType, setGstType] = useState('');
     const [gstPercentage, setGstPercentage] = useState('');
     const [gstList, setGstList] = useState([]);
@@ -17,6 +19,10 @@ const GST = () => {
     useEffect(() => {
         fetchGstList();
     }, []);
+
+    const hasPermission = (key) => {
+        return userPermissions.some(p => p.key === key && p.actions.includes('edit')) || auth?.user?.role === 1;
+    };
 
     const fetchGstList = async () => {
         try {
@@ -107,7 +113,7 @@ const GST = () => {
             <h1 className="text-2xl font-semibold mb-6">GST Management</h1>
 
             {/* GST Create/Edit Form */}
-            <Paper className="p-6 mb-8 shadow-md">
+            {hasPermission("otherSettingsGst") ? <Paper className="p-6 mb-8 shadow-md">
                 <h2 className="text-xl font-medium mb-4">{editingGst ? 'Edit GST Entry' : 'Add New GST Entry'}</h2>
                 <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
@@ -163,7 +169,7 @@ const GST = () => {
                         )}
                     </div>
                 </form>
-            </Paper>
+            </Paper> : null}
 
             {/* GST List Table */}
             <Paper className="p-6 shadow-md">
@@ -175,7 +181,7 @@ const GST = () => {
                                 <TableCell className="font-semibold">S.No</TableCell>
                                 <TableCell className="font-semibold">GST Type</TableCell>
                                 <TableCell className="font-semibold">GST Percentage</TableCell>
-                                <TableCell className="font-semibold">Action</TableCell>
+                                {hasPermission("otherSettingsGst") ? <TableCell className="font-semibold">Action</TableCell> : null}
                             </TableRow>
                         </TableHead>
                         <TableBody>
@@ -185,7 +191,7 @@ const GST = () => {
                                         <TableCell>{index + 1}</TableCell>
                                         <TableCell>{gst.gstType}</TableCell>
                                         <TableCell>{gst.gstPercentage}</TableCell>
-                                        <TableCell>
+                                        {hasPermission("otherSettingsGst") ? <TableCell>
                                             <Button
                                                 variant="contained"
                                                 color="primary"
@@ -206,7 +212,7 @@ const GST = () => {
                                             >
                                                 Delete
                                             </Button>
-                                        </TableCell>
+                                        </TableCell> : null}
                                     </TableRow>
                                 ))
                             ) : (

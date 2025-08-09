@@ -9,7 +9,7 @@ import {
 import toast from 'react-hot-toast';
 
 const Users = () => {
-  const { auth } = useAuth();
+  const { auth, userPermissions } = useAuth();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedParents, setExpandedParents] = useState(new Set());
@@ -24,6 +24,10 @@ const Users = () => {
     fetchUsers();
     fetchCategories(); // Fetch categories when component mounts
   }, []);
+
+  const hasPermission = (key) => {
+    return userPermissions.some(p => p.key === key && p.actions.includes('edit')) || auth?.user?.role === 1;
+  };
 
   const fetchUsers = async () => {
     try {
@@ -196,7 +200,7 @@ const Users = () => {
                 <th className="py-2 px-3">PAN Number</th>
                 <th className="py-2 px-3">PAN Name</th>
                 <th className="py-2 px-3">Created</th>
-                <th className="py-2 px-3">Action</th>
+                {hasPermission("reportsUserList") ? <th className="py-2 px-3">Action</th> : null}
               </tr>
             </thead>
             <tbody>
@@ -239,13 +243,14 @@ const Users = () => {
                               checked={parent.isCommissionEnabled || false}
                               onChange={() => handleToggleCommission(parent._id, parent.isCommissionEnabled, parent.email)}
                               className="form-checkbox h-4 w-4 text-blue-600 transition duration-150 ease-in-out"
+                              disabled={hasPermission("reportsUserList") ? false : true}
                             />
                           )}
                         </td>
                         <td className="py-2 px-3">{parent.pan?.number || "-"}</td>
                         <td className="py-2 px-3">{parent.pan?.name || "-"}</td>
                         <td className="py-2 px-3">{parent.createdAt ? new Date(parent.createdAt).toLocaleDateString() : "-"}</td>
-                        <td className="py-2 px-3">
+                        {hasPermission("reportsUserList") ? <td className="py-2 px-3">
                           <Button
                             variant="contained"
                             size="small"
@@ -254,7 +259,7 @@ const Users = () => {
                           >
                             Edit
                           </Button>
-                        </td>
+                        </td> : null}
                       </tr>
                       {expandedParents.has(parent._id) && (
                         users
@@ -274,7 +279,7 @@ const Users = () => {
                               <td className="py-2 px-3">{child.pan?.number || "-"}</td>
                               <td className="py-2 px-3">{child.pan?.name || "-"}</td>
                               <td className="py-2 px-3">{child.createdAt ? new Date(child.createdAt).toLocaleDateString() : "-"}</td>
-                              <td className="py-2 px-3">
+                              {hasPermission("reportsUserList") ? <td className="py-2 px-3">
                                 <Button
                                   variant="contained"
                                   size="small"
@@ -283,7 +288,7 @@ const Users = () => {
                                 >
                                   Edit
                                 </Button>
-                              </td>
+                              </td> : null}
                             </tr>
                           ))
                       )}

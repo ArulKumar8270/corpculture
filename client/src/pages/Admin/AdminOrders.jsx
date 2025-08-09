@@ -8,7 +8,7 @@ import SeoData from "../../SEO/SeoData";
 import { Link } from "react-router-dom"; // Import Link for navigation
 
 const AdminOrders = () => {
-    const { auth } = useAuth();
+    const { auth, userPermissions } = useAuth();
     const [search, setSearch] = useState("");
     const [loading, setLoading] = useState(false);
     const [orders, setOrders] = useState([]);
@@ -17,6 +17,11 @@ const AdminOrders = () => {
     const [employees, setEmployees] = useState([]); // State to store employees
     const [selectedEmployeeId, setSelectedEmployeeId] = useState(""); // State for selected employee
     const [refetchOrders, setRefetchOrders] = useState(false);
+
+    const hasPermission = (key) => {
+        return userPermissions.some(p => p.key === key && p.actions.includes('edit')) || auth?.user?.role === 1;
+    };
+
     useEffect(() => {
         if (auth?.token) {
             fetchOrders();
@@ -175,7 +180,7 @@ const AdminOrders = () => {
                             {/* <!-- search bar --> */}
 
                             {/* Assignment Controls */}
-                            <div className="flex flex-col sm:flex-row items-center gap-4 mb-4 p-4 bg-white rounded-xl shadow">
+                            {hasPermission("salesOrders") ? <div className="flex flex-col sm:flex-row items-center gap-4 mb-4 p-4 bg-white rounded-xl shadow">
                                 <span className="font-semibold text-gray-700">Assign Selected Orders:</span>
                                 <select
                                     value={selectedEmployeeId}
@@ -202,7 +207,7 @@ const AdminOrders = () => {
                                 >
                                     Assign
                                 </button>
-                            </div>
+                            </div> : null}
 
 
                             {filteredOrders?.length === 0 && (
@@ -226,7 +231,7 @@ const AdminOrders = () => {
                                     <table className="min-w-full text-sm">
                                         <thead>
                                             <tr className="bg-gradient-to-r from-[#019ee3] to-[#afcb09] text-white">
-                                                <th className="py-2 px-3 text-left">
+                                                {hasPermission("salesOrders") ? <th className="py-2 px-3 text-left">
                                                     {/* Select All Checkbox (Optional) */}
                                                     {/* <input
                                                         type="checkbox"
@@ -240,7 +245,7 @@ const AdminOrders = () => {
                                                             }
                                                         }}
                                                     /> */}
-                                                </th>
+                                                </th> : null}
                                                 <th className="py-2 px-3 text-left">Order ID</th>
                                                 <th className="py-2 px-3 text-left">Status</th>
                                                 <th className="py-2 px-3 text-left">Assigned Users</th>
@@ -254,14 +259,14 @@ const AdminOrders = () => {
                                         <tbody>
                                             {filteredOrders.map(order => (
                                                 <tr key={order._id} className="border-b last:border-b-0 hover:bg-gray-50">
-                                                    <td className="py-2 px-3">
+                                                    {hasPermission("salesOrders") ? <td className="py-2 px-3">
                                                         <input
                                                             type="checkbox"
                                                             className="form-checkbox h-4 w-4 text-blue-600"
                                                             checked={selectedOrderIds.includes(order._id)}
                                                             onChange={() => handleOrderSelect(order._id)}
                                                         />
-                                                    </td>
+                                                    </td> : null}
                                                     <td className="py-2 px-3">
                                                         <Link to={`./order_details/${order._id}`} className="text-blue-600 hover:underline">
                                                             {order._id}

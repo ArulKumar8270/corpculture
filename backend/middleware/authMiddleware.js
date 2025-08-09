@@ -15,7 +15,7 @@ const requireSignIn = asyncHandler(async (req, res, next) => {
         // Attach user information to the request
         req.user = await UserModel.findById(decoded._id);
 
-        if (!req.user || req.user.role !== 0) {
+        if (!req.user || !req.user.role) {
             return res.status(401).json({ message: "Unauthorised User" });
         }
 
@@ -40,7 +40,7 @@ const isAdmin = asyncHandler(async (req, res, next) => {
         // Attach user information to the request
         req.user = await UserModel.findById(decoded._id);
         // console.log(req.user);
-        if (!req.user || req.user.role !== 1) {
+        if (!req.user || !req.user.role) {
             return res
                 .status(403)
                 .json({ message: "Access denied. Admin privileges required." });

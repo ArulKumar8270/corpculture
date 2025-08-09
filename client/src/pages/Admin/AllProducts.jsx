@@ -11,15 +11,19 @@ import SeoData from "../../SEO/SeoData";
 import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField } from "@mui/material";
 
 const AllProducts = () => {
-    const { auth } = useAuth();
+    const { auth, userPermissions } = useAuth();
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
+
+    const hasPermission = (key) => {
+        return userPermissions.some(p => p.key === key && p.actions.includes('edit')) || auth?.user?.role === 1;
+    };
+
     useEffect(() => {
         const fetchData = async () => {
             try {
                 const res = await axios.get(
-                    `${
-                        import.meta.env.VITE_SERVER_URL
+                    `${import.meta.env.VITE_SERVER_URL
                     }/api/v1/product/seller-product`,
                     {
                         headers: {
@@ -154,7 +158,7 @@ const AllProducts = () => {
                 );
             },
         },
-        {
+        ...(hasPermission("salesAllProducts") ? [{
             field: "actions",
             headerName: "Actions",
             minWidth: 100,
@@ -170,7 +174,7 @@ const AllProducts = () => {
                     />
                 );
             },
-        },
+        }] : [])
     ];
 
     const rows = [];
@@ -223,7 +227,7 @@ const AllProducts = () => {
                 name: categoryForm.name.trim(),
                 commission: Number(categoryForm.commission),
             }, {
-                headers: { Authorization: auth.token } 
+                headers: { Authorization: auth.token }
             });
             toast.success("Category added successfully!");
             setCategoryModalOpen(false);
@@ -244,7 +248,7 @@ const AllProducts = () => {
                         <h1 className="text-lg font-bold uppercase text-[#019ee3] tracking-wide">
                             Products
                         </h1>
-                        <div className="flex gap-2">
+                       {hasPermission("salesAllProducts")  ?  <div className="flex gap-2">
                             <Link
                                 to="/admin/dashboard/add-product"
                                 className="py-2 px-5 rounded-xl shadow font-semibold text-white bg-gradient-to-r from-[#019ee3] to-[#afcb09] hover:from-[#afcb09] hover:to-[#019ee3] transition"
@@ -257,7 +261,7 @@ const AllProducts = () => {
                             >
                                 + New Category
                             </button>
-                        </div>
+                        </div> : null}
                     </div>
                     {/* Category Modal */}
                     <Dialog open={categoryModalOpen} onClose={handleCategoryClose}>

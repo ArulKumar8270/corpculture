@@ -3,9 +3,7 @@ import userModel from "../../models/userModel.js";
 
 const getAdminOrders = async (req, res) => {
     try {
-        const order = await orderModel.find({
-            "products.seller": req.user._id,
-        });
+        const order = await orderModel.find();
 
         res.status(200).send({
             success: true,

@@ -5,16 +5,21 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import toast from 'react-hot-toast'; // Assuming you have react-hot-toast for notifications
 import axios from 'axios';
+import { useAuth } from '../../../context/auth';
 
 const VendorProductList = () => {
     const navigate = useNavigate();
     const [vendorProducts, setVendorProducts] = useState([]);
-
+    const { auth, userPermissions } = useAuth();
     useEffect(() => {
         // In a real application, you would fetch data from an API here.
         // For now, we'll use sample data.
         fetchVendorProducts();
     }, []);
+
+    const hasPermission = (key) => {
+        return userPermissions.some(p => p.key === key && p.actions.includes('edit')) || auth?.user?.role === 1;
+    };
 
     const fetchVendorProducts = async () => {
         try {
@@ -69,13 +74,13 @@ const VendorProductList = () => {
                 <Typography variant="h5" className="font-semibold text-blue-600">
                     Vendor Product List
                 </Typography>
-                <Button
+                {hasPermission("vendorProducts") ? <Button
                     variant="contained"
                     className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md"
                     onClick={handleAddVendorProduct}
                 >
                     Add New Vendor Product
-                </Button>
+                </Button> : null}
             </div>
 
             <Paper className="p-6 shadow-md">
@@ -88,7 +93,7 @@ const VendorProductList = () => {
                                 <TableCell className="font-semibold">Product Name</TableCell>
                                 <TableCell className="font-semibold">GST Type</TableCell>
                                 <TableCell className="font-semibold">Price Per Quantity</TableCell>
-                                <TableCell className="font-semibold">Action</TableCell>
+                                {hasPermission("vendorProducts") ? <TableCell className="font-semibold">Action</TableCell> : null}
                             </TableRow>
                         </TableHead>
                         <TableBody>
@@ -100,7 +105,7 @@ const VendorProductList = () => {
                                         <TableCell>{product.productName}</TableCell>
                                         <TableCell>{product.gstType?.gstType || 'N/A'} ({product.gstType?.gstPercentage || 0}%)</TableCell>
                                         <TableCell>{product.pricePerQuantity}</TableCell>
-                                        <TableCell>
+                                        {hasPermission("vendorProducts") ? <TableCell>
                                             <Button
                                                 variant="contained"
                                                 color="primary"
@@ -121,7 +126,7 @@ const VendorProductList = () => {
                                             >
                                                 Delete
                                             </Button>
-                                        </TableCell>
+                                        </TableCell> : null}
                                     </TableRow>
                                 ))
                             ) : (

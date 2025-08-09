@@ -23,10 +23,6 @@ const Header = () => {
     const { auth, setAuth, LogOut, setIsCompanyEnabled, isCompanyEnabled, companyDetails, setSelectedCompany, selectedCompany } = useAuth();
     const [cartItems, setCartItems] = useCart();
 
-
-    console.log("commissions3245234", commissions);
-
-
     useEffect(() => {
         if (auth?.token) {
             getCommisionDetails();
@@ -131,7 +127,7 @@ const Header = () => {
                             <span className="hidden md:block text-lg">Cart</span>
                         </NavLink>
                     )}
-                    {auth?.user?.role !== 1 && (
+                    {auth?.user?.isCommissionEnabled ? (
                         <>
                             {/* Container for Credit, Company Select, and Checkbox */} {/* {{ edit_1 }} */}
                             <div className="flex items-center gap-4"> {/* Use flexbox to align items horizontally with spacing */} {/* {{ edit_1 }} */}
@@ -195,7 +191,7 @@ const Header = () => {
                                 </label> {/* {{ edit_1 }} */}
                             </div> {/* {{ edit_1 }} */}
                         </>
-                    )}
+                    ) : null}
                     {/* Account */}
                     <div
                         className={`relative group`}
@@ -235,7 +231,7 @@ const Header = () => {
                                     )}
                                     <li className="p-2 hover:bg-cyan-50 rounded">
                                         <Link
-                                            to={`${auth?.user?.role === 1
+                                            to={`${auth?.user?.role === 1 || auth?.user?.role === 3
                                                 ? "/admin"
                                                 : "/user"
                                                 }/dashboard`}

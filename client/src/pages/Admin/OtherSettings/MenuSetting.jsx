@@ -38,6 +38,8 @@ const menuStructure = [
                     { name: "Service Enquiries", key: "serviceEnquiries", permissions: ['view', 'edit'] },
                     { name: "Commission", key: "serviceCommission", permissions: ['view'] },
                     { name: "All Products", key: "serviceAllProducts", permissions: ['view', 'add', 'edit', 'delete'] },
+                    { name: "Invoice", key: "serviceInvoice", permissions: ['view', 'add', 'edit', 'delete'] },
+                    { name: "Quotation", key: "serviceQuotation", permissions: ['view', 'add', 'edit', 'delete'] },
                 ]
             },
             {
@@ -45,10 +47,21 @@ const menuStructure = [
                 key: "rental",
                 permissions: ['view', 'add', 'edit', 'delete'],
                 subItems: [
-                    { name: "Commission", key: "rentalCommission", permissions: ['view'] },
+                    { name: "Rental Enquiries", key: "rentalEnquiries", permissions: ['view'] },
                     { name: "All Products", key: "rentalAllProducts", permissions: ['view', 'add', 'edit', 'delete'] },
                     { name: "Invoice", key: "rentalInvoice", permissions: ['view', 'add', 'edit', 'delete'] },
-                    { name: "Upload Invoice", key: "rentalUploadInvoice", permissions: ['view', 'add', 'edit', 'delete'] },
+                    { name: "Quotation", key: "rentalQuotation", permissions: ['view', 'add', 'edit', 'delete'] },
+                    { name: "Commission", key: "rentalCommission", permissions: ['view'] },
+                ]
+            },
+            {
+                name: "Vendor",
+                key: "vendor",
+                permissions: ['view', 'add', 'edit', 'delete'],
+                subItems: [
+                    { name: "Vendors", key: "vendorList", permissions: ['view', 'add', 'edit', 'delete'] },
+                    { name: "Products", key: "vendorProducts", permissions: ['view', 'add', 'edit', 'delete'] },
+                    { name: "Purchase List", key: "vendorPurchaseList", permissions: ['view', 'add', 'edit', 'delete'] },
                 ]
             },
             {
@@ -60,17 +73,9 @@ const menuStructure = [
                     { name: "Service", key: "reportsService", permissions: ['view'] },
                     { name: "Sales", key: "reportsSales", permissions: ['view'] },
                     { name: "Employee list", key: "reportsEmployeeList", permissions: ['view'] },
+                    { name: "User list", key: "reportsUserList", permissions: ['view'] },
                 ]
-            },
-            {
-                name: "Vendor",
-                key: "vendor",
-                permissions: ['view', 'add', 'edit', 'delete'],
-                subItems: [
-                    { name: "All Vendor", key: "vendorAllVendor", permissions: ['view', 'add', 'edit', 'delete'] },
-                    { name: "Vendor Products", key: "vendorVendorProducts", permissions: ['view', 'add', 'edit', 'delete'] },
-                ]
-            },
+            }
         ]
     },
     {
@@ -88,9 +93,9 @@ const menuStructure = [
 ];
 
 const MenuSetting = () => {
-    const { auth } = useAuth();
+    const { auth, userPermissions } = useAuth();
     const [roles, setRoles] = useState([]);
-    const [selectedRole, setSelectedRole] = useState('');
+    const [selectedRole, setSelectedRole] = useState(auth?.user?._id); // Replace with your role selection logic (e.g., dropdown, radio buttons, etc);
     const [permissions, setPermissions] = useState({}); // Stores permissions for the selected role
 
     useEffect(() => {
@@ -105,6 +110,10 @@ const MenuSetting = () => {
             setPermissions({});
         }
     }, [selectedRole]);
+
+    const hasPermission = (key) => {
+        return userPermissions.some(p => p.key === key && p.actions.includes('edit')) || auth?.user?.role === 1;
+    };
 
     const fetchRoles = async () => {
         try {
@@ -237,7 +246,7 @@ const MenuSetting = () => {
                                 <Checkbox
                                     checked={permissions[item.key]?.[perm] || false}
                                     onChange={handlePermissionChange(item.key, perm)}
-                                    disabled={!selectedRole}
+                                    disabled={!selectedRole || hasPermission("otherSettingsGst") ? false : true}
                                 />
                             }
                             label={perm.charAt(0).toUpperCase() + perm.slice(1)} // Capitalize first letter
@@ -266,12 +275,13 @@ const MenuSetting = () => {
                         value={selectedRole}
                         label="Select Role"
                         onChange={(e) => setSelectedRole(e.target.value)}
+                        disabled={hasPermission("otherSettingsGst")? false : true}
                     >
                         <MenuItem value="">
                             <em>None</em>
                         </MenuItem>
                         {roles.map((role) => (
-                            <MenuItem key={role._id} value={role._id}>
+                            <MenuItem key={role.userId} value={role.userId}>
                                 {role.name}
                             </MenuItem>
                         ))}
@@ -284,14 +294,14 @@ const MenuSetting = () => {
                             Permissions for {roles.find(r => r._id === selectedRole)?.name}
                         </Typography>
                         {renderPermissions(menuStructure)}
-                        <Button
+                        {hasPermission("otherSettingsGst") ? <Button
                             variant="contained"
                             color="primary"
                             onClick={handleSubmit}
                             className="mt-6 bg-blue-500 hover:bg-blue-600"
                         >
                             Save Permissions
-                        </Button>
+                        </Button> : null}
                     </div>
                 )}
                 {!selectedRole && (

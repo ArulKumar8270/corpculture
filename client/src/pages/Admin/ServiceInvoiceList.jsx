@@ -34,7 +34,7 @@ import UploadFileIcon from '@mui/icons-material/UploadFile';
 // Row component for each invoice, allowing expansion to show products
 function InvoiceRow(props) {
     const { invoice, navigate } = props;
-    const { auth } = useAuth();
+    const { auth, userPermissions } = useAuth();
     const [open, setOpen] = useState(false);
     const [openPaymentModal, setOpenPaymentModal] = useState(false); // State for payment modal
     const [paymentForm, setPaymentForm] = useState({ // State for payment form data
@@ -47,6 +47,10 @@ function InvoiceRow(props) {
         otherPaymentMode: invoice.otherPaymentMode || '', // New field for OTHERS
     });
 
+    const hasPermission = (key) => {
+        return userPermissions.some(p => p.key === key && p.actions.includes('edit')) || auth?.user?.role === 1;
+    };
+
     const handleEdit = () => {
         navigate(`../addServiceInvoice/${invoice._id}`);
     };
@@ -55,14 +59,14 @@ function InvoiceRow(props) {
         const input = document.createElement('input');
         input.type = 'file';
         input.accept = '.pdf,.jpg,.jpeg,.png';
-    
+
         input.onchange = async (e) => {
             const file = e.target.files[0];
             if (!file) return;
-    
+
             const formData = new FormData();
             formData.append("file", file);
-    
+
             try {
                 const res = await axios.put(
                     `${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/update/${invoiceId}`,
@@ -82,7 +86,7 @@ function InvoiceRow(props) {
                 toast.error(err.response?.data?.message || "Failed to upload signed invoice.");
             }
         };
-    
+
         input.click();
     };
 
@@ -146,8 +150,8 @@ function InvoiceRow(props) {
             toast.error(error.response?.data?.message || 'Something went wrong while updating payment details.');
         }
     };
-    
-      
+
+
 
     return (
         <>
@@ -171,7 +175,7 @@ function InvoiceRow(props) {
                 <TableCell>{invoice.status}</TableCell>
                 <TableCell>{new Date(invoice.invoiceDate).toLocaleDateString()}</TableCell>
                 <TableCell>
-                    <Button variant="outlined" size="small" sx={{ mr: 1 }} onClick={handleEdit}>Edit</Button>
+                    {hasPermission("serviceInvoice") ? <Button variant="outlined" size="small" sx={{ mr: 1 }} onClick={handleEdit}>Edit</Button> : null}
                     <Button variant="outlined" size="small" sx={{ my: 1 }} onClick={() => { }}>Send InVoice</Button>
                     <Button variant="outlined" size="small" sx={{ my: 1 }} onClick={handleOpenPaymentDetailsModal}>Update Payment Details</Button>
                     <Button
@@ -393,9 +397,11 @@ const ServiceInvoiceList = () => {
     const [invoices, setInvoices] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState(''); // New state for search term
-    const { auth } = useAuth();
+    const { auth, userPermissions } = useAuth();
     const navigate = useNavigate(); // Initialize useNavigate
-
+    const hasPermission = (key) => {
+        return userPermissions.some(p => p.key === key && p.actions.includes('edit')) || auth?.user?.role === 1;
+    };
     const fetchInvoices = async () => {
         try {
             setLoading(true);
@@ -444,14 +450,14 @@ const ServiceInvoiceList = () => {
     return (
         <Box sx={{ p: 3, bgcolor: 'background.default', minHeight: '100vh' }}>
             <div className='flex justify-between'>
-            <Typography variant="h5" component="h1" gutterBottom sx={{ mb: 3, color: '#019ee3', fontWeight: 'bold' }}>
-                Service Invoices
-            </Typography>
-            <Typography variant="h5" component="h1" gutterBottom sx={{ mb: 3, color: '#019ee3', fontWeight: 'bold' }}>
-            <Button onClick={() => navigate("../addServiceInvoice")} color="primary">
+                <Typography variant="h5" component="h1" gutterBottom sx={{ mb: 3, color: '#019ee3', fontWeight: 'bold' }}>
+                    Service Invoices
+                </Typography>
+               {hasPermission("serviceInvoice") ?  <Typography variant="h5" component="h1" gutterBottom sx={{ mb: 3, color: '#019ee3', fontWeight: 'bold' }}>
+                    <Button onClick={() => navigate("../addServiceInvoice")} color="primary">
                         Create New Invoice
                     </Button>
-            </Typography>
+                </Typography> : null}
             </div>
             {/* Search Input Field */}
             <TextField

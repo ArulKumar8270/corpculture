@@ -62,7 +62,7 @@ export const createServiceProduct = async (req, res) => {
 export const getAllServiceProducts = async (req, res) => {
     try {
         const serviceProducts = await ServiceProduct.find({})
-            .populate('company', 'name') // Populate company name
+            .populate('company') // Populate company name
             .populate('gstType', 'gstType gstPercentage') // Populate GST details
             .sort({ createdAt: -1 });
 
