@@ -30,6 +30,9 @@ import axios from 'axios';
 import { useAuth } from '../../context/auth';
 import { useNavigate } from 'react-router-dom'; // Import useNavigate
 import UploadFileIcon from '@mui/icons-material/UploadFile';
+import LinkIcon from '@mui/icons-material/Link'; // Import LinkIcon
+import Stack from '@mui/material/Stack'; // Import Stack for layout
+import Chip from '@mui/material/Chip'; // Import Chip for assignedTo UI
 
 // Row component for each invoice, allowing expansion to show products
 function InvoiceRow(props) {
@@ -37,6 +40,7 @@ function InvoiceRow(props) {
     const { auth, userPermissions } = useAuth();
     const [open, setOpen] = useState(false);
     const [openPaymentModal, setOpenPaymentModal] = useState(false); // State for payment modal
+    const [loading, setLoading] = useState(false);
     const [paymentForm, setPaymentForm] = useState({ // State for payment form data
         modeOfPayment: invoice.modeOfPayment || '',
         bankName: invoice.bankName || '',
@@ -55,7 +59,7 @@ function InvoiceRow(props) {
         navigate(`../addServiceInvoice/${invoice._id}`);
     };
 
-    const handleUploadSignedInvoice = async (invoiceId) => {
+    const handleUploadSignedInvoice = async (invoiceId, oldInvoicLink) => {
         const input = document.createElement('input');
         input.type = 'file';
         input.accept = '.pdf,.jpg,.jpeg,.png';
@@ -66,25 +70,40 @@ function InvoiceRow(props) {
 
             const formData = new FormData();
             formData.append("file", file);
-
             try {
-                const res = await axios.put(
-                    `${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/update/${invoiceId}`,
-                    formData,
+                setLoading(true)
+                const res = await axios.post(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/auth/upload-file`, formData,
                     {
                         headers: {
-                            "Content-Type": "multipart/form-data",
-                            Authorization: auth.token,
+                            Authorization: auth?.token
                         },
                     }
                 );
-                console.log("Uploaded:", res.data);
-                toast.success("Signed invoice uploaded successfully!");
-                // Optionally, refresh the list or update the specific invoice in state
-            } catch (err) {
-                console.error("Upload failed", err);
-                toast.error(err.response?.data?.message || "Failed to upload signed invoice.");
+                try {
+                    const serviceRes = await axios.put(
+                        `${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/update/${invoiceId}`,
+                        {
+                            invoiceLink: [...oldInvoicLink, res.data?.fileUrl],
+                            status: "InvoiceSent"
+                        },
+                        {
+                            headers: {
+                                Authorization: auth.token,
+                            },
+                        }
+                    );
+                    toast.success("Signed invoice uploaded successfully!");
+                    // Optionally, refresh the list or update the specific invoice in state
+                } catch (err) {
+                    console.error("Upload failed", err);
+                    toast.error(err.response?.data?.message || "Failed to upload signed invoice.");
+                }
+            } catch (error) {
+                console.log(error, "Api error");
             }
+            setLoading(false)
+            props.onInvoiceUpdate();
         };
 
         input.click();
@@ -175,6 +194,13 @@ function InvoiceRow(props) {
                 <TableCell>{invoice.status}</TableCell>
                 <TableCell>{new Date(invoice.invoiceDate).toLocaleDateString()}</TableCell>
                 <TableCell>
+                    {invoice?.assignedTo ? (
+                        <Chip label={invoice.assignedTo} size="small" color="primary" variant="outlined" />
+                    ) : (
+                        'N/A'
+                    )}
+                </TableCell>
+                <TableCell>
                     {hasPermission("serviceInvoice") ? <Button variant="outlined" size="small" sx={{ mr: 1 }} onClick={handleEdit}>Edit</Button> : null}
                     <Button variant="outlined" size="small" sx={{ my: 1 }} onClick={() => { }}>Send InVoice</Button>
                     <Button variant="outlined" size="small" sx={{ my: 1 }} onClick={handleOpenPaymentDetailsModal}>Update Payment Details</Button>
@@ -182,10 +208,40 @@ function InvoiceRow(props) {
                         variant="contained"
                         sx={{ bgcolor: '#28a745', '&:hover': { bgcolor: '#218838' } }}
                         startIcon={<UploadFileIcon />}
-                        onClick={() => handleUploadSignedInvoice(invoice?._id)}
+                        onClick={() => handleUploadSignedInvoice(invoice?._id, invoice?.invoiceLink)}
+                        disabled={loading}
                     >
-                        Upload Signed Quotation
+                        {loading ? <CircularProgress size={24} /> : 'Upload Signed Copy'}
                     </Button>
+                </TableCell>
+            </TableRow>
+            <TableRow>
+                <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={9}>
+                    <Collapse in={open} timeout="auto" unmountOnExit>
+                        <Box sx={{ margin: 1 }}>
+                            <Typography variant="h6" gutterBottom component="div">
+                                Invoice Links
+                            </Typography>
+                            <Stack direction="row" spacing={1} flexWrap="wrap"> {/* Use Stack for layout */}
+                                {
+                                    invoice.invoiceLink?.map((link, index) => (
+                                        <Button
+                                            key={index}
+                                            variant="outlined"
+                                            size="small"
+                                            startIcon={<LinkIcon />}
+                                            href={link}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            sx={{ my: 0.5 }} // Add some vertical margin for wrapping
+                                        >
+                                            Invoice {index + 1}
+                                        </Button>
+                                    ))
+                                }
+                            </Stack>
+                        </Box>
+                    </Collapse>
                 </TableCell>
             </TableRow>
             <TableRow>
@@ -405,7 +461,7 @@ const ServiceInvoiceList = () => {
     const fetchInvoices = async () => {
         try {
             setLoading(true);
-            const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/all`, {
+            const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/${auth?.user?.role === 3 ? `assignedTo/${auth?.user?._id}` : "all"}`, {
                 headers: {
                     Authorization: auth.token,
                 },
@@ -428,7 +484,7 @@ const ServiceInvoiceList = () => {
     }, [auth.token]);
 
     // Filter invoices based on search term
-    const filteredInvoices = invoices.filter(invoice => {
+    const filteredInvoices = invoices?.filter(invoice => {
         const lowerCaseSearchTerm = searchTerm.toLowerCase();
         return (
             invoice.invoiceNumber.toLowerCase().includes(lowerCaseSearchTerm) ||
@@ -448,12 +504,12 @@ const ServiceInvoiceList = () => {
     }
 
     return (
-        <Box sx={{ p: 3, bgcolor: 'background.default', minHeight: '100vh' }}>
+        <Box sx={{ p: 3, bgcolor: 'background.default', minHeight: '100vh' }}  className='w-[95%]'>
             <div className='flex justify-between'>
                 <Typography variant="h5" component="h1" gutterBottom sx={{ mb: 3, color: '#019ee3', fontWeight: 'bold' }}>
                     Service Invoices
                 </Typography>
-               {hasPermission("serviceInvoice") ?  <Typography variant="h5" component="h1" gutterBottom sx={{ mb: 3, color: '#019ee3', fontWeight: 'bold' }}>
+                {hasPermission("serviceInvoice") ? <Typography variant="h5" component="h1" gutterBottom sx={{ mb: 3, color: '#019ee3', fontWeight: 'bold' }}>
                     <Button onClick={() => navigate("../addServiceInvoice")} color="primary">
                         Create New Invoice
                     </Button>
@@ -482,18 +538,19 @@ const ServiceInvoiceList = () => {
                                 <TableCell align="right">Grand Total</TableCell>
                                 <TableCell>Status</TableCell>
                                 <TableCell>Invoice Date</TableCell>
+                                <TableCell>Assign To</TableCell>
                                 <TableCell>Actions</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {filteredInvoices.length === 0 ? (
+                            {filteredInvoices?.length === 0 ? (
                                 <TableRow>
                                     <TableCell colSpan={9} align="center" sx={{ py: 3, color: 'text.secondary' }}>
                                         No service invoices found.
                                     </TableCell>
                                 </TableRow>
                             ) : (
-                                filteredInvoices.map((invoice) => (
+                                filteredInvoices?.map((invoice) => (
                                     <InvoiceRow key={invoice._id} invoice={invoice} navigate={navigate} onInvoiceUpdate={fetchInvoices} />
                                 ))
                             )}

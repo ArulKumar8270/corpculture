@@ -87,7 +87,7 @@ const AdminRental
       const fetchAllRentals = async () => {
         try {
           setLoading(true);
-          const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/rental/all`, {
+          const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/rental/${auth?.user?.role === 3 ? `assignedTo/${auth?.user?._id}` : "all"}`, {
             headers: {
               Authorization: auth.token,
             },
@@ -405,13 +405,13 @@ const AdminRental
                         {/* <MenuItem onClick={() => handleEdit(currentRentalIdForMenu)}>
                         <EditIcon sx={{ mr: 1 }} /> Edit
                       </MenuItem> */}
-                        <MenuItem onClick={() => handleInvoice(currentRentalIdForMenu, employees.find(emp => emp._id === enquiry.employeeId)?.name || enquiry.employeeId)}>
+                        <MenuItem onClick={() => handleInvoice(currentRentalIdForMenu, enquiry.employeeId)}>
                           <ReceiptIcon sx={{ mr: 1 }} /> Invoice
                         </MenuItem>
-                        <MenuItem onClick={() => handleQuotation(currentRentalIdForMenu, employees.find(emp => emp._id === enquiry.employeeId)?.name || enquiry.employeeId)}>
+                        <MenuItem onClick={() => handleQuotation(currentRentalIdForMenu, enquiry.employeeId)}>
                           <DescriptionIcon sx={{ mr: 1 }} /> Quotation
                         </MenuItem>
-                        <MenuItem onClick={() => handleReport(currentRentalIdForMenu, employees.find(emp => emp._id === enquiry.employeeId)?.name || enquiry.employeeId)}>
+                        <MenuItem onClick={() => handleReport(currentRentalIdForMenu, enquiry.employeeId)}>
                           <BarChartIcon sx={{ mr: 1 }} /> Report
                         </MenuItem>
                         <MenuItem onClick={() => handleMoveStatus(currentRentalIdForMenu, "Cancelled")}>
@@ -451,9 +451,9 @@ const AdminRental
                           disabled={auth?.user?.role === 1 ? false : true}
                         >
                           <option value="">-- Select Employee --</option>
-                          {employees?.filter(employee => employee.employeeType === 'Sales')
+                          {employees?.filter(employee => employee.employeeType === 'Rentals')
                             .map(employee => (
-                              <option key={employee._id} value={employee._id}>
+                              <option key={employee.userId} value={employee.userId}>
                                 {employee.name}
                               </option>
                             ))}

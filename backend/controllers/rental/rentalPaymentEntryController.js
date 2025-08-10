@@ -9,7 +9,8 @@ export const createRentalPaymentEntry = async (req, res) => {
             sendDetailsTo,
             remarks,
             companyId,
-            countImageUpload
+            countImageUpload,
+            assignedTo
         } = req.body;
 
         // {{ edit_1 }}
@@ -43,6 +44,7 @@ export const createRentalPaymentEntry = async (req, res) => {
             companyId: companyId, // Get companyId from the machine
             sendDetailsTo,
             countImageUpload: countImageUploadUrl,
+            assignedTo,
             remarks,
             // {{ edit_3 }}
             a3Config, // These now include the new fields due to JSON.parse
@@ -121,6 +123,44 @@ export const getRentalPaymentEntryById = async (req, res) => {
     }
 };
 
+
+// Get Service rental by assignedTo
+export const getRentalInvoiceAssignedTo = async (req, res) => {
+    try {
+        const { assignedTo } = req.params; // Assuming phone is passed as a URL parameter
+
+        if (!assignedTo) {
+            return res.status(400).send({
+                success: false,
+                message: "assigned to is required",
+                errorType: "missingParameter"
+            });
+        }
+
+        const entries = await RentalPaymentEntry.find({ assignedTo: assignedTo }).sort({ createdAt: -1 }); // Find services by phone number
+
+        if (!entries || entries.length === 0) {
+            return res.status(404).send({
+                success: false,
+                message: "No entries found for this assigned to",
+                errorType: "entriesNotFound"
+            });
+        }
+
+        res.status(200).send({
+            success: true,
+            entries
+        });
+    } catch (error) {
+        console.error("Error in getting entries by phone:", error); // Log the error
+        res.status(500).send({
+            success: false,
+            message: "Error in getting entries by phone",
+            error
+        });
+    }
+};
+
 // Update a rental payment entry
 export const updateRentalPaymentEntry = async (req, res) => {
     try {
@@ -138,7 +178,8 @@ export const updateRentalPaymentEntry = async (req, res) => {
             chequeDate,
             transferDate,
             companyNamePayment,
-            otherPaymentMode
+            otherPaymentMode,
+            invoiceLink
             // {{ edit_1 }}
         } = req.body;
 
@@ -200,6 +241,7 @@ export const updateRentalPaymentEntry = async (req, res) => {
             entry.a5Config.colorScanningNewCount = a5Config.colorScanningNewCount !== undefined ? a5Config.colorScanningNewCount : entry.a5Config.colorScanningNewCount;
         }
         entry.companyId = companyId || entry.companyId;
+        entry.invoiceLink = invoiceLink || entry.invoiceLink;
         entry.countImageUpload = countImageUploadUrl;
         // {{ edit_2 }}
         entry.modeOfPayment = modeOfPayment !== undefined ? modeOfPayment : entry.modeOfPayment;

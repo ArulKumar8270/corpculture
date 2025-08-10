@@ -169,6 +169,43 @@ export const getServiceByPhone = async (req, res) => {
     }
 };
 
+// Get Service by assignedTo
+export const getServiceAssignedTo = async (req, res) => {
+    try {
+        const { assignedTo } = req.params; // Assuming phone is passed as a URL parameter
+
+        if (!assignedTo) {
+            return res.status(400).send({
+                success: false,
+                message: "assignedTo is required",
+                errorType: "missingParameter"
+            });
+        }
+
+        const services = await ServiceModel.find({ employeeId: assignedTo }).sort({ createdAt: -1 }); // Find services by phone number
+
+        if (!services || services.length === 0) {
+            return res.status(404).send({
+                success: false,
+                message: "No services found for this phone number",
+                errorType: "servicesNotFound"
+            });
+        }
+
+        res.status(200).send({
+            success: true,
+            services
+        });
+    } catch (error) {
+        console.error("Error in getting services by phone:", error); // Log the error
+        res.status(500).send({
+            success: false,
+            message: "Error in getting services by phone",
+            error
+        });
+    }
+};
+
 // Get Service by Service Type
 export const getServiceByType = async (req, res) => {
     try {

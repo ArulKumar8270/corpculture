@@ -15,11 +15,13 @@ import {
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../context/auth';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import ImageIcon from "@mui/icons-material/Image";
 const MAX_IMAGE_SIZE = 500 * 1024;
 
 const RentalInvoiceForm = () => {
+    const [searchParams] = useSearchParams();
+    const employeeName = searchParams.get("employeeName");
     const [loading, setLoading] = useState(true);
     const [companies, setCompanies] = useState([]);
     const [availableProducts, setAvailableProducts] = useState([]);
@@ -326,7 +328,7 @@ const RentalInvoiceForm = () => {
             data.append('companyId', formData.companyId);
             data.append('sendDetailsTo', formData.sendDetailsTo);
             data.append('remarks', formData.remarks);
-
+            data.append('assignedTo', employeeName);
             // Append nested config objects as JSON strings
             data.append('a3Config', JSON.stringify(formData.a3Config));
             data.append('a4Config', JSON.stringify(formData.a4Config));
@@ -372,7 +374,7 @@ const RentalInvoiceForm = () => {
                 });
                 // {{ edit_1 }}
                 setLogoPreview(""); // Clear image preview
-                navigate('/admin/rental-invoices'); // Navigate to the list page
+                navigate('../rentalInvoiceList'); // Navigate to the list page
             } else {
                 toast.error(res.data?.message || `Failed to ${id ? 'update' : 'create'} rental payment entry.`);
             }
@@ -383,14 +385,6 @@ const RentalInvoiceForm = () => {
             setLoading(false);
         }
     };
-
-    if (loading && (!id || (id && !formData.companyId))) {
-        return (
-            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
-                <CircularProgress />
-            </Box>
-        );
-    }
 
     return (
         <Box sx={{ p: 3, bgcolor: 'background.default', minHeight: '100vh' }}>

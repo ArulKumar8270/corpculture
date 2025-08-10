@@ -6,7 +6,7 @@ import { forgotPasswordController } from "../controllers/auth/forgotPassword.js"
 import { updateDetailsController } from "../controllers/auth/updateDetails.js";
 import { deactivateController } from "../controllers/auth/deactivateAccount.js";
 import { isAdmin, requireSignIn } from "../middleware/authMiddleware.js";
-
+import { uploadFileController } from "../controllers/auth/uploadController.js";
 //router object
 const router = express.Router();
 
@@ -49,5 +49,10 @@ router.post("/deactivate", deactivateController);
 
 // Get all users route (example: protected for admin)
 router.get('/all-users', isAdmin, getAllUsersController); // Add appropriate middleware
+
+router.post(
+    "/upload-file", // 'file' is the name of the field in your form data
+    uploadFileController
+);
 
 export default router;

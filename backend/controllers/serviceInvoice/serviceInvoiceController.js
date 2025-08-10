@@ -128,6 +128,44 @@ export const getAllServiceInvoices = async (req, res) => {
     }
 };
 
+
+// Get Service Invoices by assignedTo
+export const getServiceInvoicesAssignedTo = async (req, res) => {
+    try {
+        const { assignedTo } = req.params; // Assuming phone is passed as a URL parameter
+
+        if (!assignedTo) {
+            return res.status(400).send({
+                success: false,
+                message: "assignedTo is required",
+                errorType: "missingParameter"
+            });
+        }
+
+        const serviceInvoices = await ServiceInvoice.find({ assignedTo: assignedTo }).sort({ createdAt: -1 }); // Find services by phone number
+
+        if (!serviceInvoices || serviceInvoices.length === 0) {
+            return res.status(404).send({
+                success: false,
+                message: "No ServiceInvoice found for this phone number",
+                errorType: "servicesNotFound"
+            });
+        }
+
+        res.status(200).send({
+            success: true,
+            serviceInvoices
+        });
+    } catch (error) {
+        console.error("Error in getting ServiceInvoice by phone:", error); // Log the error
+        res.status(500).send({
+            success: false,
+            message: "Error in getting services by phone",
+            error
+        });
+    }
+};
+
 // Get Single Service Invoice by ID
 export const getServiceInvoiceById = async (req, res) => {
     try {

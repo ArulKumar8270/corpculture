@@ -27,7 +27,7 @@ const employeeSchema = new mongoose.Schema(
         employeeType: {
             type: String,
             required: true,
-            enum: ['Service', 'Sales'], // Restrict values to 'Service' or 'Sales'
+            enum: ['Service', 'Sales', "Rentals", "Admin"], // Restrict values to 'Service' or 'Sales'
         },
         hireDate: {
             type: Date,

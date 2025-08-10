@@ -4,7 +4,8 @@ import {
     getSendDetailsToOptions,
     getAllRentalPaymentEntries,
     getRentalPaymentEntryById,
-    updateRentalPaymentEntry // {{ edit_1 }}
+    updateRentalPaymentEntry,
+    getRentalInvoiceAssignedTo // {{ edit_1 }}
 } from '../controllers/rental/rentalPaymentEntryController.js';
 import { isAdmin } from "../middleware/authMiddleware.js";
 
@@ -21,6 +22,9 @@ router.get('/:id', isAdmin, getRentalPaymentEntryById);
 
 // Update Rental Payment Entry || PUT // {{ edit_2 }}
 router.put('/:id', isAdmin, updateRentalPaymentEntry); // {{ edit_2 }}
+
+// Get single Rental invoice
+router.get("/assignedTo/:assignedTo", getRentalInvoiceAssignedTo);
 
 // Get send details to options || GET
 router.get('/send-details-options', isAdmin, getSendDetailsToOptions);

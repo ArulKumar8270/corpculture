@@ -100,9 +100,13 @@ const serviceQuotationSchema = new mongoose.Schema({
         enum: ['draft', 'InvoiceSent', 'Cancelled', "Unpaid", "Paid", "Pending", "TDS"],
         default: 'draft',
     },
-    invoiceDate: {
+    quotationDate: {
         type: Date,
         default: Date.now,
+    },
+    quotationLink: {
+        type: [String], // Changed to an array of strings to allow multiple URLs
+        trim: true,
     },
     assignedTo: {
         type: String,

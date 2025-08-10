@@ -73,6 +73,7 @@ const ConfigurationSection = ({ size, config, handleConfigChange, modelSpecs }) 
 const AddRentalProduct = () => {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
+    const employeeName = searchParams.get("employeeName");
     const id = searchParams.get('product_id');
     const { auth } = useAuth();
     // Main form states
@@ -223,6 +224,7 @@ const AddRentalProduct = () => {
             a3Config: modelSpecs.isA3Selected ? a3Config : {},
             a4Config: modelSpecs.isA4Selected ? a4Config : {},
             a5Config: modelSpecs.isA5Selected ? a5Config : {},
+            assignedTo : employeeName
         };
         try {
             if (id) {
