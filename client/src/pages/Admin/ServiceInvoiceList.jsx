@@ -170,7 +170,9 @@ function InvoiceRow(props) {
         }
     };
 
-
+   const onSendInvoice = async (invoice) => {
+    console.log(invoice, "invoice79037254093")
+   }
 
     return (
         <>
@@ -195,14 +197,14 @@ function InvoiceRow(props) {
                 <TableCell>{new Date(invoice.invoiceDate).toLocaleDateString()}</TableCell>
                 <TableCell>
                     {invoice?.assignedTo ? (
-                        <Chip label={invoice.assignedTo} size="small" color="primary" variant="outlined" />
+                        <Chip label={invoice.assignedTo?.name} size="small" color="primary" variant="outlined" />
                     ) : (
                         'N/A'
                     )}
                 </TableCell>
                 <TableCell>
                     {hasPermission("serviceInvoice") ? <Button variant="outlined" size="small" sx={{ mr: 1 }} onClick={handleEdit}>Edit</Button> : null}
-                    <Button variant="outlined" size="small" sx={{ my: 1 }} onClick={() => { }}>Send InVoice</Button>
+                    <Button variant="outlined" size="small" sx={{ my: 1 }} onClick={() => onSendInvoice(invoice)}>Send InVoice</Button>
                     <Button variant="outlined" size="small" sx={{ my: 1 }} onClick={handleOpenPaymentDetailsModal}>Update Payment Details</Button>
                     <Button
                         variant="contained"

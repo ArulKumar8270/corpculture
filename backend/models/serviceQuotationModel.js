@@ -109,7 +109,8 @@ const serviceQuotationSchema = new mongoose.Schema({
         trim: true,
     },
     assignedTo: {
-        type: String,
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User', // Reference to the User model
         trim: true,
     },
 }, { timestamps: true });

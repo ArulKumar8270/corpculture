@@ -119,8 +119,14 @@ export const createServiceQuotation = async (req, res) => {
 export const getAllServiceQuotations = async (req, res) => {
     try {
         const serviceQuotations = await ServiceQuotation.find({})
-            .populate('companyId', 'companyName') // Populate company name
-            .populate('products.productId', 'productName sku hsn') // Populate product details
+            .populate('companyId') // Populate company name
+            .populate({
+                path: 'products.productId', // First populate productId
+                populate: {
+                    path: 'gstType',        // Then populate gstType inside the product
+                }
+            })// Populate product details
+            .populate('assignedTo') // Populate product details
             .sort({ createdAt: -1 });
 
         res.status(200).send({ success: true, message: 'All Service Quotations fetched', serviceQuotations });
@@ -135,9 +141,14 @@ export const getServiceQuotationById = async (req, res) => {
     try {
         const { id } = req.params;
         const serviceQuotation = await ServiceQuotation.findById(id)
-            .populate('companyId', 'companyName')
-            .populate('products.productId', 'productName sku hsn');
-
+            .populate('companyId') // Populate company name
+            .populate({
+                path: 'products.productId', // First populate productId
+                populate: {
+                    path: 'gstType',        // Then populate gstType inside the product
+                }
+            })// Populate product details
+            .populate('assignedTo') // Populate product details
         if (!serviceQuotation) {
             return res.status(404).send({ success: false, message: 'Service Quotation not found' });
         }
@@ -162,7 +173,16 @@ export const getServiceQuotationAssignedTo = async (req, res) => {
             });
         }
 
-        const serviceQuotations = await ServiceQuotation.find({ assignedTo: assignedTo }).sort({ createdAt: -1 }); // Find services by phone number
+        const serviceQuotations = await ServiceQuotation.find({ assignedTo: assignedTo })
+            .populate('companyId') // Populate company name
+            .populate({
+                path: 'products.productId', // First populate productId
+                populate: {
+                    path: 'gstType',        // Then populate gstType inside the product
+                }
+            })// Populate product details
+            .populate('assignedTo') // Populate product details
+            .sort({ createdAt: -1 }); // Find services by phone number
 
         if (!serviceQuotations || serviceQuotations.length === 0) {
             return res.status(404).send({

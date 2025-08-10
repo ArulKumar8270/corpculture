@@ -48,7 +48,7 @@ function QuotationRow(props) {
         companyNamePayment: quotation.companyNamePayment || '', // New field for Cheque/Bank Transfer/UPI
         otherPaymentMode: quotation.otherPaymentMode || '', // New field for OTHERS
     });
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
 
 
     const hasPermission = (key) => {
@@ -170,6 +170,10 @@ function QuotationRow(props) {
         }
     };
 
+    const onSendQuotation = async (quotation) => {
+        console.log(quotation, "invoice79037254093")
+    }
+
     return (
         <>
             <TableRow sx={{ '& > *': { borderBottom: 'unset' } }}>
@@ -193,14 +197,14 @@ function QuotationRow(props) {
                 <TableCell>{new Date(quotation.quotationDate).toLocaleDateString()}</TableCell>
                 <TableCell>
                     {quotation?.assignedTo ? (
-                        <Chip label={quotation.assignedTo} size="small" color="primary" variant="outlined" />
+                        <Chip label={quotation.assignedTo.name} size="small" color="primary" variant="outlined" />
                     ) : (
                         'N/A'
                     )}
                 </TableCell>
                 <TableCell>
                     {hasPermission("serviceQuotation") ? <Button variant="outlined" size="small" sx={{ mr: 1 }} onClick={handleEdit}>Edit</Button> : null}
-                    <Button variant="outlined" size="small" sx={{ my: 1 }} onClick={() => { }}>Send Quotation</Button>
+                    <Button variant="outlined" size="small" sx={{ my: 1 }} onClick={() => onSendQuotation(quotation)}>Send Quotation</Button>
                     <Button variant="outlined" size="small" sx={{ my: 1 }} onClick={handleOpenPaymentDetailsModal}>Update Payment Details</Button>
 
                     <Button
