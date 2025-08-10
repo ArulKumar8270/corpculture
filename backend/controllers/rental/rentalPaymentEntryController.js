@@ -67,11 +67,13 @@ export const getAllRentalPaymentEntries = async (req, res) => {
     try {
         const entries = await RentalPaymentEntry.find({})
             .populate({
-                path: 'machineId',
-                model: 'RentalProduct',
-                select: 'serialNo modelName'
-            })
-            .populate('companyId', 'companyName') // Populate company details
+                path: 'machineId', // First populate productId
+                populate: {
+                    path: 'gstType',        // Then populate gstType inside the product
+                }
+            })// Populate product details
+            .populate('companyId') // Populate company name
+            .populate('assignedTo') // Populate product details // Populate company details
             .sort({ createdAt: -1 });
 
         res.status(200).send({
@@ -95,11 +97,13 @@ export const getRentalPaymentEntryById = async (req, res) => {
         const { id } = req.params;
         const entry = await RentalPaymentEntry.findById(id)
             .populate({
-                path: 'machineId',
-                model: 'RentalProduct',
-                select: 'serialNo modelName'
-            })
-            .populate('companyId', 'companyName'); // Populate company details
+                path: 'machineId', // First populate productId
+                populate: {
+                    path: 'gstType',        // Then populate gstType inside the product
+                }
+            })// Populate product details
+            .populate('companyId') // Populate company name
+            .populate('assignedTo') // Populate company details
 
         if (!entry) {
             return res.status(404).send({
@@ -137,7 +141,15 @@ export const getRentalInvoiceAssignedTo = async (req, res) => {
             });
         }
 
-        const entries = await RentalPaymentEntry.find({ assignedTo: assignedTo }).sort({ createdAt: -1 }); // Find services by phone number
+        const entries = await RentalPaymentEntry.find({ assignedTo: assignedTo }).populate({
+            path: 'machineId', // First populate productId
+            populate: {
+                path: 'gstType',        // Then populate gstType inside the product
+            }
+        })// Populate product details
+            .populate('companyId') // Populate company name
+            .populate('assignedTo')
+            .sort({ createdAt: -1 }); // Find services by phone number
 
         if (!entries || entries.length === 0) {
             return res.status(404).send({

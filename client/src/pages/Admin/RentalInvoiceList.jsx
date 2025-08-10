@@ -84,10 +84,8 @@ function RentalInvoiceList() {
         console.log('Edit:', id);
     };
 
-    const handleSendInvoice = (id) => {
-        // Implement logic to send invoice
-        toast.success(`Sending invoice for ${id}`);
-        console.log('Send Invoice:', id);
+    const handleSendInvoice = (invoice) => {
+        console.log('Send Invoice:', invoice);
     };
 
     const handleUploadSignedInvoice = async (invoiceId, oldInvoicLink) => {
@@ -261,7 +259,7 @@ function RentalInvoiceList() {
                                                 ) : 'No Image'}
                                             </TableCell>
                                             <TableCell>{entry?.assignedTo ? (
-                                                <Chip label={entry.assignedTo} size="small" color="primary" variant="outlined" />
+                                                <Chip label={entry.assignedTo?.name} size="small" color="primary" variant="outlined" />
                                             ) : (
                                                 'N/A'
                                             )}</TableCell>
@@ -270,7 +268,7 @@ function RentalInvoiceList() {
                                                     {hasPermission("rentalInvoice") ? <Button variant="outlined" size="small" onClick={() => handleEdit(entry._id)}>
                                                         Edit
                                                     </Button> : null}
-                                                    <Button variant="outlined" size="small" onClick={() => handleSendInvoice(entry._id)}>
+                                                    <Button variant="outlined" size="small" onClick={() => handleSendInvoice(entry)}>
                                                         Send Invoice
                                                     </Button>
                                                     <Button variant="outlined" size="small" onClick={() => {

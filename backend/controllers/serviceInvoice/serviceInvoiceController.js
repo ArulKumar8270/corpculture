@@ -118,8 +118,14 @@ export const createServiceInvoice = async (req, res) => {
 export const getAllServiceInvoices = async (req, res) => {
     try {
         const serviceInvoices = await ServiceInvoice.find({})
-            .populate('companyId', 'companyName') // Populate company name
-            .populate('products.productId', 'productName sku hsn') // Populate product details
+            .populate('companyId') // Populate company name
+            .populate({
+                path: 'products.productId', // First populate productId
+                populate: {
+                    path: 'gstType',        // Then populate gstType inside the product
+                }
+            })// Populate product details
+            .populate('assignedTo') // Populate product details
             .sort({ createdAt: -1 });
         res.status(200).send({ success: true, message: 'All service invoices fetched', serviceInvoices });
     } catch (error) {
@@ -142,7 +148,16 @@ export const getServiceInvoicesAssignedTo = async (req, res) => {
             });
         }
 
-        const serviceInvoices = await ServiceInvoice.find({ assignedTo: assignedTo }).sort({ createdAt: -1 }); // Find services by phone number
+        const serviceInvoices = await ServiceInvoice.find({ assignedTo: assignedTo })
+            .populate('companyId') // Populate company name
+            .populate({
+                path: 'products.productId', // First populate productId
+                populate: {
+                    path: 'gstType',        // Then populate gstType inside the product
+                }
+            })// Populate product details
+            .populate('assignedTo') // Populate product details
+            .sort({ createdAt: -1 }); // Find services by phone number
 
         if (!serviceInvoices || serviceInvoices.length === 0) {
             return res.status(404).send({
@@ -171,8 +186,14 @@ export const getServiceInvoiceById = async (req, res) => {
     try {
         const { id } = req.params;
         const serviceInvoice = await ServiceInvoice.findById(id)
-            .populate('companyId', 'companyName')
-            .populate('products.productId', 'productName sku hsn');
+            .populate('companyId') // Populate company name
+            .populate({
+                path: 'products.productId', // First populate productId
+                populate: {
+                    path: 'gstType',        // Then populate gstType inside the product
+                }
+            })// Populate product details
+            .populate('assignedTo') // Populate product details
         if (!serviceInvoice) {
             return res.status(404).send({ success: false, message: 'Service Invoice not found.' });
         }
