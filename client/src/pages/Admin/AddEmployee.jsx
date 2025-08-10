@@ -24,7 +24,7 @@ const AddEmployee = () => {
     const [errors, setErrors] = useState({});
     const [loading, setLoading] = useState(false);
 
-    const employeeTypes = ['Service', 'Sales', 'Admin', 'Other']; // Define your employee types
+    const employeeTypes = ['Service', 'Sales', 'Admin', "Rentals"]; // Define your employee types
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
@@ -61,10 +61,11 @@ const AddEmployee = () => {
             const response = await axios.post(
                 `${import.meta.env.VITE_SERVER_URL}/api/v1/auth/register`,
                 {
-                    ...formData, password: formData?.phone, role: 3
+                    ...formData, password: formData?.phone, role: 3,
                 }
             );
             registerUser = response?.data?.user;
+            console.log("registerUser234523", registerUser);
             try {
                 const response = await axios.post(
                     `${import.meta.env.VITE_SERVER_URL}/api/v1/employee/create`, // *** Update with your actual API endpoint ***

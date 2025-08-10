@@ -7,7 +7,8 @@ import {
     updateService,
     deleteService,
     getServiceByPhone,
-    getServiceByType
+    getServiceByType,
+    getServiceAssignedTo
 } from "../controllers/service/serviceController.js";
 
 const router = express.Router();
@@ -32,5 +33,8 @@ router.delete("/delete/:id", isAdmin, deleteService);
 
 // GET Service by Phone (example: maybe protected)
 router.get('/phone/:phone', getServiceByPhone); // Add appropriate middleware
+
+// GET Service by Phone (example: maybe protected)
+router.get('/assignedTo/:assignedTo', getServiceAssignedTo); // Add appropriate middleware
 
 export default router;

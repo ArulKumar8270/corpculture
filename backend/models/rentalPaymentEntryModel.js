@@ -79,6 +79,15 @@ const rentalPaymentEntrySchema = new mongoose.Schema({
         type: String,
         trim: true,
     },
+    assignedTo: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: true,
+    },
+    invoiceLink: {
+        type: [String], // Changed to an array of strings to allow multiple URLs
+        trim: true,
+    },
     otherPaymentMode: { // New field for 'OTHERS' payment mode
         type: String,
         trim: true,

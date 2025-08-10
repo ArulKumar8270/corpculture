@@ -7,7 +7,8 @@ import {
     updateRental,
     deleteRental,
     getRentalByPhone,
-    getRentalByType
+    getRentalByType,
+    getRentalAssignedTo
 } from "../controllers/rental/rentalController.js";
 
 const router = express.Router();
@@ -23,6 +24,9 @@ router.get("/get/:id", requireSignIn, getRentalById);
 
 // Get type service
 router.get("/serviceType/:serviceType", getRentalByType);
+
+// Get single service invoice
+router.get("/assignedTo/:assignedTo", getRentalAssignedTo);
 
 // Update service
 router.put("/update/:id", isAdmin, updateRental);

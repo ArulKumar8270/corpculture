@@ -15,19 +15,21 @@ import {
     DialogTitle, // Added DialogTitle
     DialogContent, // Added DialogContent
     DialogActions, // Added DialogActions
-    Stack, // {{ edit_1 }}
     FormControl, // Added FormControl
     InputLabel, // Added InputLabel
     Select, // Added Select
     MenuItem, // Added MenuItem
-    TextField
+    TextField,
+    Collapse
 } from '@mui/material';
 import { Visibility as VisibilityIcon, UploadFile as UploadFileIcon } from '@mui/icons-material'; // {{ edit_1 }}
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../context/auth';
 import { useNavigate } from 'react-router-dom';
-import moment from 'moment';
+import LinkIcon from '@mui/icons-material/Link'; // Import LinkIcon
+import Stack from '@mui/material/Stack'; // Import Stack for layout
+import Chip from '@mui/material/Chip';
 
 function RentalInvoiceList() {
     const [loading, setLoading] = useState(true);
@@ -42,14 +44,15 @@ function RentalInvoiceList() {
         chequeDate: '', // New field for Cheque
         transferDate: '', // New field for Bank Transfer/UPI
         companyNamePayment: '', // New field for Cheque/Bank Transfer/UPI
-        otherPaymentMode: '', // New field for OTHERS
+        otherPaymentMode: '', // New field for OTHERS,
+        invoiceId: ''
     });
 
     useEffect(() => {
         const fetchRentalEntries = async () => {
             try {
                 setLoading(true);
-                const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/all`, {
+                const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/${auth?.user?.role === 3 ? `assignedTo/${auth?.user?._id}` : "all"}`, {
                     headers: {
                         Authorization: auth.token,
                     },
@@ -87,11 +90,55 @@ function RentalInvoiceList() {
         console.log('Send Invoice:', id);
     };
 
-    const handleUploadSignedQuotation = (id) => {
-        // Implement file upload logic
-        console.log('Upload Signed Quotation for:', id);
+    const handleUploadSignedInvoice = async (invoiceId, oldInvoicLink) => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.pdf,.jpg,.jpeg,.png';
+
+        input.onchange = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append("file", file);
+            try {
+                setLoading(true)
+                const res = await axios.post(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/auth/upload-file`, formData,
+                    {
+                        headers: {
+                            Authorization: auth?.token
+                        },
+                    }
+                );
+                try {
+                    const serviceRes = await axios.put(
+                        `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/${invoiceId}`,
+                        {
+                            invoiceLink: [...oldInvoicLink, res.data?.fileUrl],
+                            status: "InvoiceSent"
+                        },
+                        {
+                            headers: {
+                                Authorization: auth.token,
+                            },
+                        }
+                    );
+                    toast.success("Signed invoice uploaded successfully!");
+                    // Optionally, refresh the list or update the specific invoice in state
+                } catch (err) {
+                    console.error("Upload failed", err);
+                    toast.error(err.response?.data?.message || "Failed to upload signed invoice.");
+                }
+            } catch (error) {
+                console.log(error, "Api error");
+            }
+            setLoading(false)
+            props.onInvoiceUpdate();
+        };
+
+        input.click();
     };
-    // {{ edit_2 }}
 
 
     const handleOpenPaymentDetailsModal = (invoice) => {
@@ -103,6 +150,7 @@ function RentalInvoiceList() {
             transferDate: invoice?.transferDate ? new Date(invoice?.transferDate).toISOString().split('T')[0] : '',
             companyNamePayment: invoice?.companyNamePayment || '',
             otherPaymentMode: invoice?.otherPaymentMode || '',
+            invoiceId: invoice?._id
         });
         setOpenPaymentModal(true);
     };
@@ -130,7 +178,7 @@ function RentalInvoiceList() {
             };
 
             const res = await axios.put(
-                `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/${invoice?._id}`,
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/${paymentForm?.invoiceId}`,
                 payload,
                 {
                     headers: {
@@ -145,7 +193,7 @@ function RentalInvoiceList() {
                 // You might want to trigger a re-fetch of invoices in the parent component
                 // or update the specific invoice in the `invoices` state.
                 // For simplicity, we'll just close the modal and show success.
-                props.onInvoiceUpdate(); // Call the prop to trigger re-fetch in parent
+                fetchRentalEntries(); // Call the prop to trigger re-fetch in parent
             } else {
                 toast.error(res.data?.message || 'Failed to update payment details.');
             }
@@ -192,49 +240,86 @@ function RentalInvoiceList() {
                                     <TableCell>Send Details To</TableCell>
                                     <TableCell>Remarks</TableCell>
                                     <TableCell>Image</TableCell>
+                                    <TableCell>Assinged To</TableCell>
                                     <TableCell>Actions</TableCell>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
                                 {rentalEntries.map((entry) => (
-                                    <TableRow key={entry._id}>
-                                        <TableCell>{entry.companyId?.companyName || 'N/A'}</TableCell>
-                                        <TableCell>{entry.machineId?.serialNo || 'N/A'}</TableCell>
-                                        <TableCell>{entry.machineId?.modelName || 'N/A'}</TableCell>
-                                        <TableCell>{entry.sendDetailsTo}</TableCell>
-                                        <TableCell>{entry.remarks}</TableCell>
-                                        <TableCell>
-                                            {entry.countImageUpload?.url ? (
-                                                <a href={entry.countImageUpload.url} target="_blank" rel="noopener noreferrer">
-                                                    <img src={entry.countImageUpload.url} alt="Count" style={{ width: '50px', height: '50px', objectFit: 'cover' }} />
-                                                </a>
-                                            ) : 'No Image'}
-                                        </TableCell>
-                                        <TableCell>
-                                            <Stack spacing={1}>
-                                                {hasPermission("rentalInvoice") ? <Button variant="outlined" size="small" onClick={() => handleEdit(entry._id)}>
-                                                    Edit
-                                                </Button> : null}
-                                                <Button variant="outlined" size="small" onClick={() => handleSendInvoice(entry._id)}>
-                                                    Send Invoice
-                                                </Button>
-                                                <Button variant="outlined" size="small" onClick={() => {
-                                                    handleOpenPaymentDetailsModal(entry)
-                                                }}>
-                                                    Update Payment Details
-                                                </Button>
-                                                <Button
-                                                    variant="contained"
-                                                    color="success"
-                                                    size="small"
-                                                    startIcon={<UploadFileIcon />}
-                                                    onClick={() => handleUploadSignedQuotation(entry._id)}
-                                                >
-                                                    Upload Signed Quotation
-                                                </Button>
-                                            </Stack>
-                                        </TableCell>
-                                    </TableRow>
+                                    <>
+                                        <TableRow key={entry._id}>
+                                            <TableCell>{entry.companyId?.companyName || 'N/A'}</TableCell>
+                                            <TableCell>{entry.machineId?.serialNo || 'N/A'}</TableCell>
+                                            <TableCell>{entry.machineId?.modelName || 'N/A'}</TableCell>
+                                            <TableCell>{entry.sendDetailsTo}</TableCell>
+                                            <TableCell>{entry.remarks}</TableCell>
+                                            <TableCell>
+                                                {entry.countImageUpload?.url ? (
+                                                    <a href={entry.countImageUpload.url} target="_blank" rel="noopener noreferrer">
+                                                        <img src={entry.countImageUpload.url} alt="Count" style={{ width: '50px', height: '50px', objectFit: 'cover' }} />
+                                                    </a>
+                                                ) : 'No Image'}
+                                            </TableCell>
+                                            <TableCell>{entry?.assignedTo ? (
+                                                <Chip label={entry.assignedTo} size="small" color="primary" variant="outlined" />
+                                            ) : (
+                                                'N/A'
+                                            )}</TableCell>
+                                            <TableCell>
+                                                <Stack spacing={1}>
+                                                    {hasPermission("rentalInvoice") ? <Button variant="outlined" size="small" onClick={() => handleEdit(entry._id)}>
+                                                        Edit
+                                                    </Button> : null}
+                                                    <Button variant="outlined" size="small" onClick={() => handleSendInvoice(entry._id)}>
+                                                        Send Invoice
+                                                    </Button>
+                                                    <Button variant="outlined" size="small" onClick={() => {
+                                                        handleOpenPaymentDetailsModal(entry)
+                                                    }}>
+                                                        Update Payment Details
+                                                    </Button>
+                                                    <Button
+                                                        variant="contained"
+                                                        color="success"
+                                                        size="small"
+                                                        startIcon={<UploadFileIcon />}
+                                                        onClick={() => handleUploadSignedInvoice(entry._id, entry?.invoiceLink)}
+                                                    >
+                                                        Upload Signed Quotation
+                                                    </Button>
+                                                </Stack>
+                                            </TableCell>
+                                        </TableRow>
+                                        <TableRow>
+                                            <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={9}>
+                                                <Collapse in={open} timeout="auto" unmountOnExit>
+                                                    <Box sx={{ margin: 1 }}>
+                                                        <Typography variant="h6" gutterBottom component="div">
+                                                            Invoice Links
+                                                        </Typography>
+                                                        <Stack direction="row" spacing={1} flexWrap="wrap"> {/* Use Stack for layout */}
+                                                            {
+                                                                entry.invoiceLink?.map((link, index) => (
+                                                                    <Button
+                                                                        key={index}
+                                                                        variant="outlined"
+                                                                        size="small"
+                                                                        startIcon={<LinkIcon />}
+                                                                        href={link}
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
+                                                                        sx={{ my: 0.5 }} // Add some vertical margin for wrapping
+                                                                    >
+                                                                        Invoice {index + 1}
+                                                                    </Button>
+                                                                ))
+                                                            }
+                                                        </Stack>
+                                                    </Box>
+                                                </Collapse>
+                                            </TableCell>
+                                        </TableRow>
+                                    </>
                                 ))}
                             </TableBody>
                         </Table>

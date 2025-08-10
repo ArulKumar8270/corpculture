@@ -82,7 +82,7 @@ export const createServiceQuotation = async (req, res) => {
         }
 
         // Calculate overall Quotation totals
-        const { subtotal, grandTotal } = calculateInvoiceTotals(processedProducts);
+        const { subtotal, grandTotal } = calculateQuotationTotals(processedProducts);
         const newServiceQuotation = new ServiceQuotation({
             quotationNumber,
             companyId,
@@ -147,6 +147,45 @@ export const getServiceQuotationById = async (req, res) => {
         res.status(500).send({ success: false, message: 'Error in getting service Quotation', error });
     }
 };
+
+
+// Get Service Quotation by assignedTo
+export const getServiceQuotationAssignedTo = async (req, res) => {
+    try {
+        const { assignedTo } = req.params; // Assuming phone is passed as a URL parameter
+
+        if (!assignedTo) {
+            return res.status(400).send({
+                success: false,
+                message: "assignedTo is required",
+                errorType: "missingParameter"
+            });
+        }
+
+        const serviceQuotations = await ServiceQuotation.find({ assignedTo: assignedTo }).sort({ createdAt: -1 }); // Find services by phone number
+
+        if (!serviceQuotations || serviceQuotations.length === 0) {
+            return res.status(404).send({
+                success: false,
+                message: "No ServiceQuotation found for this assigned to",
+                errorType: "servicesNotFound"
+            });
+        }
+
+        res.status(200).send({
+            success: true,
+            serviceQuotations
+        });
+    } catch (error) {
+        console.error("Error in getting ServiceQuotation by phone:", error); // Log the error
+        res.status(500).send({
+            success: false,
+            message: "Error in getting services by phone",
+            error
+        });
+    }
+};
+
 
 // Update Service Quotation
 export const updateServiceQuotation = async (req, res) => {
@@ -226,7 +265,7 @@ export const updateServiceQuotation = async (req, res) => {
                 });
             }
             serviceQuotation.products = processedProducts;
-            const { subtotal, grandTotal } = calculateInvoiceTotals(processedProducts);
+            const { subtotal, grandTotal } = calculateQuotationTotals(processedProducts);
             serviceQuotation.subtotal = subtotal;
             serviceQuotation.grandTotal = grandTotal;
         }

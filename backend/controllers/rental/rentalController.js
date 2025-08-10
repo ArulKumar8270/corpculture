@@ -67,6 +67,44 @@ export const getRentalById = async (req, res) => {
     }
 };
 
+
+// Get Service by assignedTo
+export const getRentalAssignedTo = async (req, res) => {
+    try {
+        const { assignedTo } = req.params; // Assuming phone is passed as a URL parameter
+
+        if (!assignedTo) {
+            return res.status(400).send({
+                success: false,
+                message: "assignedTo is required",
+                errorType: "missingParameter"
+            });
+        }
+
+        const rental = await RentalModel.find({ employeeId: assignedTo }).sort({ createdAt: -1 }); // Find services by phone number
+
+        if (!rental || rental.length === 0) {
+            return res.status(404).send({
+                success: false,
+                message: "No rental found for this assignedTo",
+                errorType: "servicesNotFound"
+            });
+        }
+
+        res.status(200).send({
+            success: true,
+            rental
+        });
+    } catch (error) {
+        console.error("Error in getting rental by phone:", error); // Log the error
+        res.status(500).send({
+            success: false,
+            message: "Error in getting rental by phone",
+            error
+        });
+    }
+};
+
 // Update Rental
 export const updateRental = async (req, res) => {
     try {

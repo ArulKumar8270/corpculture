@@ -5,7 +5,8 @@ import {
     getAllServiceQuotations,
     getServiceQuotationById,
     updateServiceQuotation,
-    deleteServiceQuotation
+    deleteServiceQuotation,
+    getServiceQuotationAssignedTo
 } from "../controllers/serviceQuotation/serviceQuotationController.js";
 
 const router = express.Router();
@@ -21,6 +22,9 @@ router.get("/get/:id", getServiceQuotationById);
 
 // Update service Quotation
 router.put("/update/:id", isAdmin, updateServiceQuotation);
+
+// Get single service Quotation
+router.get("/assignedTo/:assignedTo", getServiceQuotationAssignedTo);
 
 // Delete service Quotation
 router.delete("/delete/:id", isAdmin, deleteServiceQuotation);

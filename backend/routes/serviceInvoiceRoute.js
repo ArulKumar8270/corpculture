@@ -5,7 +5,8 @@ import {
     getAllServiceInvoices,
     getServiceInvoiceById,
     updateServiceInvoice,
-    deleteServiceInvoice
+    deleteServiceInvoice,
+    getServiceInvoicesAssignedTo
 } from "../controllers/serviceInvoice/serviceInvoiceController.js";
 
 const router = express.Router();
@@ -18,6 +19,9 @@ router.get("/all", isAdmin, getAllServiceInvoices);
 
 // Get single service invoice
 router.get("/get/:id", getServiceInvoiceById);
+
+// Get single service invoice
+router.get("/assignedTo/:assignedTo", getServiceInvoicesAssignedTo);
 
 // Update service invoice
 router.put("/update/:id", isAdmin, updateServiceInvoice);

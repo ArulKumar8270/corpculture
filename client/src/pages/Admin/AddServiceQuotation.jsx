@@ -44,7 +44,7 @@ const AddServiceQuotation = () => {
         description: '',
         status: 'draft'
     });
-
+ 
     const [companyData, setCompanyData] = useState(null)
     // State for products added to the table (these are the line items for the Quotation)
     const [productsInTable, setProductsInTable] = useState([]);
@@ -272,7 +272,7 @@ const AddServiceQuotation = () => {
             tax,
             grandTotal,
             status,
-            assignedTo : employeeNam
+            assignedTo : employeeName
         };
 
         try {

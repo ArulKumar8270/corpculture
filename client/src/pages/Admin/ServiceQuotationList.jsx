@@ -30,7 +30,9 @@ import axios from 'axios';
 import { useAuth } from '../../context/auth';
 import { useNavigate } from 'react-router-dom'; // Import useNavigate
 import UploadFileIcon from '@mui/icons-material/UploadFile';
-
+import LinkIcon from '@mui/icons-material/Link'; // Import LinkIcon
+import Stack from '@mui/material/Stack'; // Import Stack for layout
+import Chip from '@mui/material/Chip'; // Import Chip for assignedTo UI
 // Row component for each quotation, allowing expansion to show products
 function QuotationRow(props) {
     const { quotation, navigate } = props; // Destructure navigate from props
@@ -46,6 +48,7 @@ function QuotationRow(props) {
         companyNamePayment: quotation.companyNamePayment || '', // New field for Cheque/Bank Transfer/UPI
         otherPaymentMode: quotation.otherPaymentMode || '', // New field for OTHERS
     });
+    const [loading, setLoading] = useState(true);
 
 
     const hasPermission = (key) => {
@@ -56,9 +59,54 @@ function QuotationRow(props) {
         navigate(`../addServiceQuotation/${quotation._id}`); // Navigate to edit page
     };
 
-    const handleUploadSignedQuotation = () => {
-        // Implement file upload logic
-        toast.info('Upload Signed quotation (placeholder)!');
+    const handleUploadSignedQuotation = async (quotationId, oldQuotationLink) => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.pdf,.jpg,.jpeg,.png';
+
+        input.onchange = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append("file", file);
+            try {
+                setLoading(true)
+                const res = await axios.post(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/auth/upload-file`, formData,
+                    {
+                        headers: {
+                            Authorization: auth?.token
+                        },
+                    }
+                );
+                try {
+                    const serviceRes = await axios.put(
+                        `${import.meta.env.VITE_SERVER_URL}/api/v1/service-quotation/update/${quotationId}`,
+                        {
+                            quotationLink: [...oldQuotationLink, res.data?.fileUrl],
+                            status: "InvoiceSent"
+                        },
+                        {
+                            headers: {
+                                Authorization: auth.token,
+                            },
+                        }
+                    );
+                    toast.success("Signed invoice uploaded successfully!");
+                    // Optionally, refresh the list or update the specific invoice in state
+                } catch (err) {
+                    console.error("Upload failed", err);
+                    toast.error(err.response?.data?.message || "Failed to upload signed invoice.");
+                }
+            } catch (error) {
+                console.log(error, "Api error");
+            }
+            setLoading(false)
+            props.onQuotationUpdate();
+        };
+
+        input.click();
     };
 
     const handleOpenPaymentDetailsModal = () => {
@@ -144,6 +192,13 @@ function QuotationRow(props) {
                 <TableCell>{quotation.status}</TableCell>
                 <TableCell>{new Date(quotation.quotationDate).toLocaleDateString()}</TableCell>
                 <TableCell>
+                    {quotation?.assignedTo ? (
+                        <Chip label={quotation.assignedTo} size="small" color="primary" variant="outlined" />
+                    ) : (
+                        'N/A'
+                    )}
+                </TableCell>
+                <TableCell>
                     {hasPermission("serviceQuotation") ? <Button variant="outlined" size="small" sx={{ mr: 1 }} onClick={handleEdit}>Edit</Button> : null}
                     <Button variant="outlined" size="small" sx={{ my: 1 }} onClick={() => { }}>Send Quotation</Button>
                     <Button variant="outlined" size="small" sx={{ my: 1 }} onClick={handleOpenPaymentDetailsModal}>Update Payment Details</Button>
@@ -152,10 +207,41 @@ function QuotationRow(props) {
                         variant="contained"
                         sx={{ bgcolor: '#28a745', '&:hover': { bgcolor: '#218838' } }}
                         startIcon={<UploadFileIcon />}
-                        onClick={handleUploadSignedQuotation}
+                        onClick={() => handleUploadSignedQuotation(quotation?._id, quotation?.quotationLink)}
+                        disabled={loading}
                     >
-                        Upload Signed Quotation
+                        {loading ? <CircularProgress size={24} /> : 'Upload Signed Copy'}
                     </Button>
+
+                </TableCell>
+            </TableRow>
+            <TableRow>
+                <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={9}>
+                    <Collapse in={open} timeout="auto" unmountOnExit>
+                        <Box sx={{ margin: 1 }}>
+                            <Typography variant="h6" gutterBottom component="div">
+                                Quotation Links
+                            </Typography>
+                            <Stack direction="row" spacing={1} flexWrap="wrap"> {/* Use Stack for layout */}
+                                {
+                                    quotation.quotationLink?.map((link, index) => (
+                                        <Button
+                                            key={index}
+                                            variant="outlined"
+                                            size="small"
+                                            startIcon={<LinkIcon />}
+                                            href={link}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            sx={{ my: 0.5 }} // Add some vertical margin for wrapping
+                                        >
+                                            Quotation {index + 1}
+                                        </Button>
+                                    ))
+                                }
+                            </Stack>
+                        </Box>
+                    </Collapse>
                 </TableCell>
             </TableRow>
             <TableRow>
@@ -377,7 +463,7 @@ const ServiceQuotationList = () => {
     const fetchQuotations = async () => {
         try {
             setLoading(true);
-            const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/service-quotation/all`, {
+            const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/service-quotation/${auth?.user?.role === 3 ? `assignedTo/${auth?.user?._id}` : "all"}`, {
                 headers: {
                     Authorization: auth.token,
                 },
@@ -421,7 +507,7 @@ const ServiceQuotationList = () => {
     }
 
     return (
-        <Box sx={{ p: 3, bgcolor: 'background.default', minHeight: '100vh' }}>
+        <Box sx={{ p: 3, bgcolor: 'background.default', minHeight: '100vh' }} className='w-[95%]'>
             <div className='flex justify-between'>
                 <Typography variant="h5" component="h1" gutterBottom sx={{ mb: 3, color: '#019ee3', fontWeight: 'bold' }}>
                     Service Quotations
@@ -455,6 +541,7 @@ const ServiceQuotationList = () => {
                                 <TableCell align="right">Grand Total</TableCell>
                                 <TableCell>Status</TableCell>
                                 <TableCell>Quotation Date</TableCell>
+                                <TableCell>Assign To</TableCell>
                                 <TableCell>Actions</TableCell>
                             </TableRow>
                         </TableHead>

@@ -81,13 +81,12 @@ const AdminServices = () => {
       fetchEmployees();
     }
   }, [auth?.token]);
-
   // Fetch ALL Services initially
   useEffect(() => {
     const fetchAllServices = async () => {
       try {
         setLoading(true);
-        const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/service/all`, {
+        const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/service/${auth?.user?.role === 3 ? `assignedTo/${auth?.user?._id}` : "all"}`, {
           headers: {
             Authorization: auth.token,
           },
@@ -405,13 +404,13 @@ const AdminServices = () => {
                       {/* <MenuItem onClick={() => handleEdit(currentServiceIdForMenu)}>
                         <EditIcon sx={{ mr: 1 }} /> Edit
                       </MenuItem> */}
-                      <MenuItem onClick={() => handleInvoice(currentServiceIdForMenu, employees.find(emp => emp._id === enquiry.employeeId)?.name || enquiry.employeeId)}>
+                      <MenuItem onClick={() => handleInvoice(currentServiceIdForMenu, enquiry.employeeId)}>
                         <ReceiptIcon sx={{ mr: 1 }} /> Invoice
                       </MenuItem>
-                      <MenuItem onClick={() => handleQuotation(currentServiceIdForMenu, employees.find(emp => emp._id === enquiry.employeeId)?.name || enquiry.employeeId)}>
+                      <MenuItem onClick={() => handleQuotation(currentServiceIdForMenu, enquiry.employeeId)}>
                         <DescriptionIcon sx={{ mr: 1 }} /> Quotation
                       </MenuItem>
-                      <MenuItem onClick={() => handleReport(currentServiceIdForMenu, employees.find(emp => emp._id === enquiry.employeeId)?.name || enquiry.employeeId)}>
+                      <MenuItem onClick={() => handleReport(currentServiceIdForMenu, enquiry.employeeId)}>
                         <BarChartIcon sx={{ mr: 1 }} /> Report
                       </MenuItem>
                       <MenuItem onClick={() => handleMoveStatus(currentServiceIdForMenu, "Cancelled")}>
@@ -451,9 +450,9 @@ const AdminServices = () => {
                         disabled={auth?.user?.role === 1 ? false : true}
                       >
                         <option value="">-- Select Employee --</option>
-                        {employees?.filter(employee => employee.employeeType === 'Sales')
+                        {employees?.filter(employee => employee.employeeType === 'Service')
                           .map(employee => (
-                            <option key={employee._id} value={employee._id}>
+                            <option key={employee.userId} value={employee.userId}>
                               {employee.name}
                             </option>
                           ))}
