@@ -31,11 +31,11 @@ const serviceProductSchema = new mongoose.Schema({
         required: true,
         min: 0,
     },
-    gstType: {
+    gstType: [{ // Changed to an array of ObjectIds
         type: mongoose.Schema.Types.ObjectId,
         ref: 'GST', // Reference to the GST model we created earlier
         required: true,
-    },
+    }],
     totalAmount: {
         type: Number,
         required: true,

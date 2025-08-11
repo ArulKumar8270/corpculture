@@ -152,7 +152,18 @@ const RentalProductList = () => {
                                         <TableCell>{product.serialNo}</TableCell>
                                         <TableCell>{product.hsn}</TableCell>
                                         <TableCell>{product.basePrice}</TableCell>
-                                        <TableCell>{product.gstType?.gstType || 'N/A'} ({product.gstType?.gstPercentage || 0}%)</TableCell>
+                                        <TableCell>
+                                        {Array.isArray(product.gstType) && product.gstType.length > 0 ? (
+                                            product.gstType.map((gst, gstIndex) => (
+                                                <Typography key={gstIndex} variant="body2" component="span">
+                                                    {gst.gstType} ({gst.gstPercentage}%)
+                                                    {gstIndex < product.gstType.length - 1 ? ', ' : ''}
+                                                </Typography>
+                                            ))
+                                        ) : (
+                                            'N/A'
+                                        )}
+                                        </TableCell>
                                         <TableCell>{product.paymentDate ? dayjs(product.paymentDate).format('DD/MM/YYYY') : 'N/A'}</TableCell>
                                         <TableCell>
                                             <FormControl variant="outlined" size="small" fullWidth>
@@ -185,7 +196,7 @@ const RentalProductList = () => {
                                             >
                                                 Edit
                                             </Button>
-                                            <Button
+                                            {/* <Button
                                                 variant="contained"
                                                 color="error"
                                                 size="small"
@@ -194,7 +205,7 @@ const RentalProductList = () => {
                                                 className="bg-red-500 hover:bg-red-600"
                                             >
                                                 Delete
-                                            </Button>
+                                            </Button> */}
                                         </TableCell> : null}
                                     </TableRow>
                                 ))

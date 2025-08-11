@@ -101,7 +101,19 @@ const ServiceProductList = () => {
                                         <TableCell>{product.hsn}</TableCell>
                                         <TableCell>{product.quantity}</TableCell>
                                         <TableCell>{product.rate}</TableCell>
-                                        <TableCell>{product.gstType?.gstType || 'N/A'} ({product.gstType?.gstPercentage || 0}%)</TableCell>
+                                        <TableCell>
+                                            {/* Display multiple GST types */}
+                                            {Array.isArray(product.gstType) && product.gstType.length > 0 ? (
+                                                product.gstType.map((gst, gstIndex) => (
+                                                    <Typography key={gstIndex} variant="body2" component="span">
+                                                        {gst.gstType} ({gst.gstPercentage}%)
+                                                        {gstIndex < product.gstType.length - 1 ? ', ' : ''}
+                                                    </Typography>
+                                                ))
+                                            ) : (
+                                                'N/A'
+                                            )}
+                                        </TableCell>
                                         <TableCell>{product.totalAmount}</TableCell>
                                         {hasPermission("serviceProductList") ? <TableCell>
                                             <Button
@@ -114,7 +126,7 @@ const ServiceProductList = () => {
                                             >
                                                 Edit
                                             </Button>
-                                            <Button
+                                            {/* <Button
                                                 variant="contained"
                                                 color="error"
                                                 size="small"
@@ -123,7 +135,7 @@ const ServiceProductList = () => {
                                                 className="bg-red-500 hover:bg-red-600"
                                             >
                                                 Delete
-                                            </Button>
+                                            </Button> */}
                                         </TableCell> : null}
                                     </TableRow>
                                 ))

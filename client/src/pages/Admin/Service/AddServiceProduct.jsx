@@ -2,7 +2,11 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { TextField, Button, Select, MenuItem, FormControl, InputLabel, Paper, Typography } from '@mui/material';
+import {
+    TextField, Button, Select, MenuItem, FormControl, InputLabel, Paper, Typography,
+    Box, // Added for rendering multiple chips
+    Chip // Added for rendering multiple chips
+} from '@mui/material';
 import { useAuth } from '../../../context/auth';
 
 const AddServiceProduct = () => {
@@ -16,7 +20,7 @@ const AddServiceProduct = () => {
     const [hsn, setHsn] = useState('');
     const [quantity, setQuantity] = useState(1);
     const [rate, setRate] = useState('');
-    const [gstTypeId, setGstTypeId] = useState(''); // Stores the _id of the selected GST type
+    const [gstTypeIds, setGstTypeIds] = useState([]); // Changed to array for multiple selection
     const [totalAmount, setTotalAmount] = useState(0);
 
     const [companies, setCompanies] = useState([]);
@@ -38,7 +42,7 @@ const AddServiceProduct = () => {
     // Calculate total amount whenever quantity, rate, or GST changes
     useEffect(() => {
         calculateTotalAmount();
-    }, [quantity, rate, gstTypeId, gstOptions]); // Depend on gstOptions to ensure it's loaded
+    }, [quantity, rate, gstTypeIds, gstOptions]); // Depend on gstTypeIds (array)
 
     const fetchCompanies = async () => {
         try {
@@ -88,7 +92,9 @@ const AddServiceProduct = () => {
                 setHsn(product.hsn);
                 setQuantity(product.quantity);
                 setRate(product.rate);
-                setGstTypeId(product.gstType._id); // Assuming gstType is populated
+                // Set gstTypeIds from the fetched product data
+                // Assuming product.gstType is an array of populated GST objects or just IDs
+                setGstTypeIds(Array.isArray(product.gstType) ? product.gstType.map(g => typeof g === 'object' ? g._id : g) : []);
             } else {
                 toast.error(data?.message || 'Failed to fetch product details.');
             }
@@ -101,23 +107,26 @@ const AddServiceProduct = () => {
     const calculateTotalAmount = () => {
         const currentRate = parseFloat(rate) || 0;
         const currentQuantity = parseInt(quantity) || 0;
-        let gstPercentage = 0;
+        let totalGstPercentage = 0; // Sum of all selected GST percentages
 
-        if (gstTypeId && gstOptions.length > 0) {
-            const selectedGst = gstOptions.find(gst => gst._id === gstTypeId);
-            if (selectedGst) {
-                gstPercentage = selectedGst.gstPercentage;
-            }
+        if (gstTypeIds.length > 0 && gstOptions.length > 0) {
+            gstTypeIds.forEach(id => {
+                const selectedGst = gstOptions.find(gst => gst._id === id);
+                if (selectedGst) {
+                    totalGstPercentage += selectedGst.gstPercentage;
+                }
+            });
         }
 
         const subTotal = currentRate * currentQuantity;
-        const gstAmount = subTotal * (gstPercentage / 100);
+        const gstAmount = subTotal * (totalGstPercentage / 100);
         setTotalAmount((subTotal + gstAmount).toFixed(2)); // Format to 2 decimal places
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!company || !productName || !sku || !hsn || !quantity || !rate || !gstTypeId) {
+        // Updated validation for gstTypeIds (check if array is empty)
+        if (!company || !productName || !sku || !hsn || !quantity || !rate || gstTypeIds.length === 0) {
             toast.error('Please fill in all required fields.');
             return;
         }
@@ -130,7 +139,7 @@ const AddServiceProduct = () => {
                 hsn,
                 quantity: parseInt(quantity),
                 rate: parseFloat(rate),
-                gstType: gstTypeId, // Send the ID
+                gstType: gstTypeIds, // Send the array of IDs
                 totalAmount: parseFloat(totalAmount),
             };
 
@@ -155,7 +164,7 @@ const AddServiceProduct = () => {
                     setHsn('');
                     setQuantity(1);
                     setRate('');
-                    setGstTypeId('');
+                    setGstTypeIds([]); // Clear selected GST types
                     setTotalAmount(0);
                 } else {
                     toast.error(data?.message || 'Failed to add product.');
@@ -163,7 +172,7 @@ const AddServiceProduct = () => {
             }
         } catch (error) {
             console.error('Error submitting product:', error);
-            toast.error('Something went wrong while saving the product.');
+            alert(error?.response?.data?.message || 'Something went wrong.');
         }
     };
 
@@ -193,12 +202,8 @@ const AddServiceProduct = () => {
                             labelId="company-label"
                             value={company}
                             onChange={(e) => setCompany(e.target.value)}
-                            label="Company"
                             displayEmpty
                         >
-                            <MenuItem value="">
-                                <em>Select a Company</em>
-                            </MenuItem>
                             {companies.map((comp) => (
                                 <MenuItem key={comp._id} value={comp._id}>
                                     {comp.companyName}
@@ -264,14 +269,20 @@ const AddServiceProduct = () => {
                         <InputLabel id="gst-type-label">GST Type</InputLabel>
                         <Select
                             labelId="gst-type-label"
-                            value={gstTypeId}
-                            onChange={(e) => setGstTypeId(e.target.value)}
+                            multiple // Allow multiple selections
+                            value={gstTypeIds} // Use the array state
+                            onChange={(e) => setGstTypeIds(e.target.value)} // Update the array state
                             label="GST Type"
-                            displayEmpty
+                            renderValue={(selected) => ( // Render selected items as chips
+                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                                    {selected.map((value) => {
+                                        const selectedGst = gstOptions.find(gst => gst._id === value);
+                                        return selectedGst ? <Chip key={value} label={`${selectedGst.gstType} (${selectedGst.gstPercentage}%)`} /> : null;
+                                    })}
+                                </Box>
+                            )}
                         >
-                            <MenuItem value="">
-                                <em>Select a GST Type</em>
-                            </MenuItem>
+                            {/* No "Select a GST Type" option for multiple select */}
                             {gstOptions.map((gst) => (
                                 <MenuItem key={gst._id} value={gst._id}>
                                     {gst.gstType} ({gst.gstPercentage}%)

@@ -403,9 +403,7 @@ const RentalInvoiceForm = () => {
                                 name="companyId"
                                 value={formData.companyId}
                                 onChange={handleChange}
-                                label="Company"
                             >
-                                <MenuItem value="">Select a Company</MenuItem>
                                 {companies.map(comp => (
                                     <MenuItem key={comp._id} value={comp._id}>
                                         {comp.companyName}

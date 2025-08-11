@@ -315,12 +315,12 @@ const AdminServices = () => {
         >
           New Service Requests ({tabCounts.new})
         </button>
-        <button
+        {auth?.user?.role === 1 ? <button
           className={`px-4 py-2 rounded-md text-sm font-medium ${activeTab === 'assigned' ? 'bg-[#019ee3] text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
           onClick={() => setActiveTab('assigned')}
         >
           Assigned Requests ({tabCounts.assigned})
-        </button>
+        </button> : null}
         <button
           className={`px-4 py-2 rounded-md text-sm font-medium ${activeTab === 'pending' ? 'bg-[#019ee3] text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
           onClick={() => setActiveTab('pending')}
@@ -339,12 +339,12 @@ const AdminServices = () => {
         >
           Completed ({tabCounts.completed})
         </button>
-        <button
+        {auth?.user?.role === 1 ? <button
           className={`px-4 py-2 rounded-md text-sm font-medium ${activeTab === 'w_u' ? 'bg-[#019ee3] text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
           onClick={() => setActiveTab('w_u')}
         >
           W&U ({tabCounts.w_u})
-        </button>
+        </button> : null}
       </div>
 
       <div className="overflow-x-auto bg-white rounded-xl shadow p-4 w-[83%]">

@@ -97,7 +97,7 @@ const serviceQuotationSchema = new mongoose.Schema({
     },
     status: {
         type: String,
-        enum: ['draft', 'InvoiceSent', 'Cancelled', "Unpaid", "Paid", "Pending", "TDS"],
+        enum: ['draft', 'Cancelled', "Pending", "Progress", "Completed", "QuotationSent"],
         default: 'draft',
     },
     quotationDate: {

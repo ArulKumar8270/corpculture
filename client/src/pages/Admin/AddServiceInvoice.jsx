@@ -210,7 +210,10 @@ const AddServiceInvoice = () => {
                             productId: '', // Will be set when adding new products
                             quantity: '',
                             modeOfPayment: invoice.modeOfPayment || '',
-                            deliveryAddress: invoice.deliveryAddress || '',
+                            // Convert deliveryAddress object to string if it's an object
+                            deliveryAddress: typeof invoice.deliveryAddress === 'object' && invoice.deliveryAddress !== null
+                                ? `${invoice.deliveryAddress.address} - ${invoice.deliveryAddress.pincode}`
+                                : invoice.deliveryAddress || '',
                             reference: invoice.reference || '',
                             description: invoice.description || '',
                             status: invoice.status || '',
@@ -297,14 +300,12 @@ const AddServiceInvoice = () => {
                 data = res.data;
             }
             if (data?.success) {
-                toast.success(data.message);
                 handleCancel();
-                // navigate('/admin/service-invoices');
             } else {
-                toast.error(data?.message || 'Failed to save service invoice.');
+                alert (data?.message || 'Failed to save service invoice.');
             }
         } catch (error) {
-            toast.error(error.response?.data?.message || 'Something went wrong while saving the invoice.');
+            alert(error.response?.data?.message || 'Something went wrong while saving the invoice.');
         }
     };
 
@@ -322,7 +323,7 @@ const AddServiceInvoice = () => {
         });
         setProductsInTable([]);
         setAvailableProducts([]); // Clear available products
-        toast.info('Form cancelled and reset.');
+        navigate('../serviceInvoiceList');
     };
 
     const handleUploadSignedInvoice = () => {
@@ -456,8 +457,8 @@ const AddServiceInvoice = () => {
                             <MenuItem value="">Select Delivery Address</MenuItem>
                             {companyData?.serviceDeliveryAddresses?.map((result, index) => {
                                 return (
-                                    <MenuItem key={index} value={result}>
-                                        {result}
+                                    <MenuItem key={index} value={`${result.address} - ${result.pincode}`}>
+                                        {`${result.address} - ${result.pincode}`}
                                     </MenuItem>
                                 )
                             })}
@@ -478,7 +479,7 @@ const AddServiceInvoice = () => {
                     </Grid>
                     <Grid item xs={12} sm={6}>
                         <FormControl fullWidth margin="normal" size="small" required>
-                            <InputLabel id="payment-status-label">Payment Status</InputLabel>
+                            <InputLabel id="payment-status-label">Invoice Status</InputLabel>
                             <Select
                                 labelId="payment-status-label"
                                 id="status"
@@ -488,11 +489,10 @@ const AddServiceInvoice = () => {
                                 onChange={handleChange}
                             >
                                 <MenuItem value="InvoiceSent">Invoice Sent</MenuItem>
-                                <MenuItem value="Unpaid">Unpaid</MenuItem>
-                                <MenuItem value="Paid">Paid</MenuItem>
                                 <MenuItem value="Pending">Pending</MenuItem>
-                                <MenuItem value="TDS">TDS</MenuItem>
+                                <MenuItem value="Progress">In Progress</MenuItem>
                                 <MenuItem value="Cancelled">Cancelled</MenuItem>
+                                <MenuItem value="Completed">Completed</MenuItem>
                             </Select>
                         </FormControl>
                     </Grid>
