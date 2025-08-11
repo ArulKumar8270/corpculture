@@ -297,12 +297,11 @@ const AddServiceQuotation = () => {
             if (data?.success) {
                 toast.success(data.message);
                 handleCancel();
-                // navigate('/admin/service-quotations');
             } else {
-                toast.error(data?.message || 'Failed to save service quotation.');
+                alert(data?.message || 'Failed to save service quotation.');
             }
         } catch (error) {
-            toast.error(error.response?.data?.message || 'Something went wrong while saving the quotation.');
+            alert(error.response?.data?.message || 'Something went wrong while saving the quotation.');
         }
     };
 
@@ -320,7 +319,7 @@ const AddServiceQuotation = () => {
         });
         setProductsInTable([]);
         setAvailableProducts([]); // Clear available products
-        toast.info('Form cancelled and reset.');
+        navigate('../ServiceQuotationList');
     };
 
     if (loading) {
@@ -447,8 +446,8 @@ const AddServiceQuotation = () => {
                             <MenuItem value="">Select Delivery Address</MenuItem>
                             {companyData?.serviceDeliveryAddresses?.map((result, index) => {
                                 return (
-                                    <MenuItem key={index} value={result}>
-                                        {result}
+                                    <MenuItem key={index} value={`${result.address} - ${result.pincode}`}>
+                                        {`${result.address} - ${result.pincode}`}
                                     </MenuItem>
                                 )
                             })}
@@ -469,7 +468,7 @@ const AddServiceQuotation = () => {
                     </Grid>
                     <Grid item xs={12} sm={6}>
                         <FormControl fullWidth margin="normal" size="small" required>
-                            <InputLabel id="payment-status-label">Payment Status</InputLabel>
+                            <InputLabel id="payment-status-label">Quotaion Status</InputLabel>
                             <Select
                                 labelId="payment-status-label"
                                 id="status"
@@ -478,12 +477,11 @@ const AddServiceQuotation = () => {
                                 label="Payment Status"
                                 onChange={handleChange}
                             >
-                                <MenuItem value="InvoiceSent">Invoice Sent</MenuItem>
-                                <MenuItem value="Unpaid">Unpaid</MenuItem>
-                                <MenuItem value="Paid">Paid</MenuItem>
+                                <MenuItem value="QuotationSent">Quotation Sent</MenuItem>
                                 <MenuItem value="Pending">Pending</MenuItem>
-                                <MenuItem value="TDS">TDS</MenuItem>
+                                <MenuItem value="Progress">In Progress</MenuItem>
                                 <MenuItem value="Cancelled">Cancelled</MenuItem>
+                                <MenuItem value="Completed">Completed</MenuItem>
                             </Select>
                         </FormControl>
                     </Grid>

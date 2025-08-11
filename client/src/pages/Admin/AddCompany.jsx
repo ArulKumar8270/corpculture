@@ -33,11 +33,13 @@ const AddCompany = () => {
         state: '',
         pincode: '',
         gstNo: '',
-        customerType: '', // Added new field
+        customerType: 'New', // Added new field
         customerComplaint: '', // Added new field
+        phone: '', // Added phone field
     });
 
-    const [serviceDeliveryAddresses, setServiceDeliveryAddresses] = useState(['']); // Array of strings for addresses
+    // Changed to array of objects { address: '', pincode: '' }
+    const [serviceDeliveryAddresses, setServiceDeliveryAddresses] = useState([{ address: '', pincode: '' }]);
     const [contactPersons, setContactPersons] = useState([
         { name: '', mobile: '', email: '' }
     ]); // Array of objects for contact persons
@@ -47,7 +49,7 @@ const AddCompany = () => {
 
     // Effect to fetch company data if in edit mode
     useEffect(() => {
-        const fetchCompanyData = async () => { 
+        const fetchCompanyData = async () => {
             if (companyId) {
                 setInitialLoading(true);
                 try {
@@ -69,10 +71,18 @@ const AddCompany = () => {
                             state: company.state || '',
                             pincode: company.pincode || '',
                             gstNo: company.gstNo || '',
-                            customerType: company.customerType || '',
+                            customerType: company.customerType || 'New',
                             customerComplaint: company.customerComplaint || '',
+                            phone: company.phone || '', // Populate phone field
                         });
-                        setServiceDeliveryAddresses(company.serviceDeliveryAddresses?.length > 0 ? company.serviceDeliveryAddresses : ['']);
+                        // Map existing addresses to the new object format
+                        setServiceDeliveryAddresses(
+                            company.serviceDeliveryAddresses?.length > 0
+                                ? company.serviceDeliveryAddresses.map(addr =>
+                                    typeof addr === 'string' ? { address: addr, pincode: '' } : addr
+                                )
+                                : [{ address: '', pincode: '' }]
+                        );
                         setContactPersons(company.contactPersons?.length > 0 ? company.contactPersons : [{ name: '', mobile: '', email: '' }]);
                     } else {
                         toast.error(data?.message || 'Failed to fetch company details.');
@@ -101,14 +111,15 @@ const AddCompany = () => {
         setCompanyData(prev => ({ ...prev, [name]: value }));
     };
 
-    const handleServiceAddressChange = (index, value) => {
+    // Updated to handle field and value for address objects
+    const handleServiceAddressChange = (index, field, value) => {
         const newAddresses = [...serviceDeliveryAddresses];
-        newAddresses[index] = value;
+        newAddresses[index] = { ...newAddresses[index], [field]: value };
         setServiceDeliveryAddresses(newAddresses);
     };
 
     const addServiceAddress = () => {
-        setServiceDeliveryAddresses(prev => [...prev, '']);
+        setServiceDeliveryAddresses(prev => [...prev, { address: '', pincode: '' }]); // Add new object
     };
 
     const removeServiceAddress = (index) => {
@@ -136,14 +147,15 @@ const AddCompany = () => {
         setLoading(true);
 
         // Basic validation
-        if (!companyData.companyName || !companyData.billingAddress || !companyData.city || !companyData.state || !companyData.pincode) {
+        if (!companyData.companyName || !companyData.billingAddress || !companyData.city || !companyData.state || !companyData.pincode || !companyData.phone) { // Added phone to validation
             toast.error('Please fill in all required company details.');
             setLoading(false);
             return;
         }
         // Ensure at least one service address is provided if the array is not empty
-        if (serviceDeliveryAddresses.length > 0 && serviceDeliveryAddresses.some(addr => !addr.trim())) {
-            toast.error('Please fill in all service/delivery addresses or remove empty ones.');
+        // Updated validation for address objects
+        if (serviceDeliveryAddresses.length > 0 && serviceDeliveryAddresses.some(addr => !addr.address.trim() || !addr.pincode.trim())) {
+            toast.error('Please fill in all service/delivery addresses and pincodes or remove empty ones.');
             setLoading(false);
             return;
         }
@@ -156,8 +168,9 @@ const AddCompany = () => {
 
         const payload = {
             ...companyData,
-            userId : auth?.user?._id,
-            serviceDeliveryAddresses: serviceDeliveryAddresses.filter(addr => addr.trim() !== ''),
+            userId: auth?.user?._id,
+            // Filter out empty address objects
+            serviceDeliveryAddresses: serviceDeliveryAddresses.filter(addr => addr.address.trim() !== '' && addr.pincode.trim() !== ''),
             contactPersons: contactPersons.filter(person => person.name.trim() !== '' && person.mobile.trim() !== '' && person.email.trim() !== ''),
         };
 
@@ -245,42 +258,6 @@ const AddCompany = () => {
                                 required
                             />
                         </Grid>
-
-                        {/* Service / Delivery Addresses */}
-                        <Grid item xs={12}>
-                            <Typography variant="subtitle1" sx={{ mb: 1 }}>Service / Delivery Addresses</Typography>
-                            {serviceDeliveryAddresses.map((address, index) => (
-                                <Box key={index} sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                                    <TextField
-                                        fullWidth
-                                        label={`Service / Delivery Address ${index + 1}`}
-                                        value={address}
-                                        onChange={(e) => handleServiceAddressChange(index, e.target.value)}
-                                        size="small"
-                                        multiline
-                                        rows={2}
-                                        sx={{ mr: 1 }}
-                                        required
-                                    />
-                                    {serviceDeliveryAddresses.length > 1 && (
-                                        <IconButton color="error" onClick={() => removeServiceAddress(index)}>
-                                            <DeleteIcon />
-                                        </IconButton>
-                                    )}
-                                    {index === serviceDeliveryAddresses.length - 1 && (
-                                        <Button
-                                            variant="contained"
-                                            startIcon={<AddIcon />}
-                                            onClick={addServiceAddress}
-                                            sx={{ ml: 1, bgcolor: '#019ee3', '&:hover': { bgcolor: '#007bb5' } }}
-                                        >
-                                            Add More Address
-                                        </Button>
-                                    )}
-                                </Box>
-                            ))}
-                        </Grid>
-
                         {/* Invoice Type */}
                         <Grid item xs={12} sm={6}>
                             <FormControl fullWidth size="small" required>
@@ -343,8 +320,20 @@ const AddCompany = () => {
                                 size="small"
                             />
                         </Grid>
-                        {/* Customer Type */}
+                        {/* Phone */}
                         <Grid item xs={12} sm={6}>
+                            <TextField
+                                fullWidth
+                                label="Phone"
+                                name="phone"
+                                value={companyData.phone}
+                                onChange={handleChange}
+                                size="small"
+                                required
+                            />
+                        </Grid>
+                        {/* Customer Type */}
+                        {/* <Grid item xs={12} sm={6}>
                             <TextField
                                 fullWidth
                                 label="Customer Type"
@@ -353,9 +342,9 @@ const AddCompany = () => {
                                 onChange={handleChange}
                                 size="small"
                             />
-                        </Grid>
+                        </Grid> */}
                         {/* Customer Complaint */}
-                        <Grid item xs={12} sm={6}>
+                        {/* <Grid item xs={12} sm={6}>
                             <TextField
                                 fullWidth
                                 label="Customer Complaint"
@@ -366,6 +355,49 @@ const AddCompany = () => {
                                 multiline
                                 rows={2}
                             />
+                        </Grid> */}
+
+                        {/* Service / Delivery Addresses */}
+                        <Grid item xs={12}>
+                            <Typography variant="subtitle1" sx={{ mb: 1 }}>Service / Delivery Addresses</Typography>
+                            {serviceDeliveryAddresses.map((addressObj, index) => ( // Changed 'address' to 'addressObj'
+                                <Box key={index} sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                                    <TextField
+                                        fullWidth
+                                        label={`Service / Delivery Address ${index + 1}`}
+                                        value={addressObj.address} // Access address property
+                                        onChange={(e) => handleServiceAddressChange(index, 'address', e.target.value)} // Pass field name
+                                        size="small"
+                                        multiline
+                                        rows={2}
+                                        sx={{ mr: 1 }}
+                                        required
+                                    />
+                                    <TextField
+                                        label="Pincode"
+                                        value={addressObj.pincode} // Access pincode property
+                                        onChange={(e) => handleServiceAddressChange(index, 'pincode', e.target.value)} // Pass field name
+                                        size="small"
+                                        sx={{ width: '150px', mr: 1 }} // Adjust width as needed
+                                        required
+                                    />
+                                    {serviceDeliveryAddresses.length > 1 && (
+                                        <IconButton color="error" onClick={() => removeServiceAddress(index)}>
+                                            <DeleteIcon />
+                                        </IconButton>
+                                    )}
+                                    {index === serviceDeliveryAddresses.length - 1 && (
+                                        <Button
+                                            variant="contained"
+                                            startIcon={<AddIcon />}
+                                            onClick={addServiceAddress}
+                                            sx={{ ml: 1, bgcolor: '#019ee3', '&:hover': { bgcolor: '#007bb5' } }}
+                                        >
+                                            Add More Address
+                                        </Button>
+                                    )}
+                                </Box>
+                            ))}
                         </Grid>
 
                         {/* Contact Persons */}

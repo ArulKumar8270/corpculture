@@ -269,7 +269,7 @@ const handleSubmit = async (e) => {
                     >
                       <option value="">Mode Of Customer</option>
                       <option value="New">New</option>
-                      <option value="Existing">Existing</option>
+                      <option value="Rework">Rework</option>
                     </select>
                     {errors.customerType && <span className="text-red-500 text-xs">{errors.customerType}</span>}
                   </div>

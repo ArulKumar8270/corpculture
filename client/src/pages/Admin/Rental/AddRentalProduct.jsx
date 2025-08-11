@@ -84,7 +84,7 @@ const AddRentalProduct = () => {
     const [serialNo, setSerialNo] = useState('');
     const [hsn, setHsn] = useState('');
     const [basePrice, setBasePrice] = useState('');
-    const [gstTypeId, setGstTypeId] = useState('');
+    const [gstTypeIds, setGstTypeIds] = useState([]); // Changed to array for multiple selection
     const [paymentDate, setPaymentDate] = useState(null); // dayjs object
 
     // Model Specifications checkboxes
@@ -165,7 +165,14 @@ const AddRentalProduct = () => {
                 setSerialNo(product.serialNo || '');
                 setHsn(product.hsn || '');
                 setBasePrice(product.basePrice || '');
-                setGstTypeId(product.gstType?._id || '');
+                // Handle gstType: if it's an array of objects, map to IDs; if single object, take its ID; otherwise empty array
+                if (Array.isArray(product.gstType)) {
+                    setGstTypeIds(product.gstType.map(gst => gst._id));
+                } else if (product.gstType && product.gstType._id) {
+                    setGstTypeIds([product.gstType._id]); // Wrap single ID in an array
+                } else {
+                    setGstTypeIds([]);
+                }
                 setPaymentDate(product.paymentDate ? dayjs(product.paymentDate) : null);
 
                 setModelSpecs({
@@ -205,7 +212,7 @@ const AddRentalProduct = () => {
         e.preventDefault();
 
         // Basic validation
-        if (!company || !branch || !department || !modelName || !serialNo || !hsn || !basePrice || !gstTypeId || !paymentDate) {
+        if (!company || !branch || !department || !modelName || !serialNo || !hsn || !basePrice || gstTypeIds.length === 0 || !paymentDate) { // Check gstTypeIds length
             toast.error('Please fill in all required fields.');
             return;
         }
@@ -218,7 +225,7 @@ const AddRentalProduct = () => {
             serialNo,
             hsn,
             basePrice: parseFloat(basePrice),
-            gstType: gstTypeId,
+            gstType: gstTypeIds, // Send as array
             paymentDate: paymentDate ? paymentDate.toISOString() : null, // Convert dayjs object to ISO string
             modelSpecs,
             a3Config: modelSpecs.isA3Selected ? a3Config : {},
@@ -249,7 +256,7 @@ const AddRentalProduct = () => {
                     setSerialNo('');
                     setHsn('');
                     setBasePrice('');
-                    setGstTypeId('');
+                    setGstTypeIds([]); // Clear as array
                     setPaymentDate(null);
                     setModelSpecs({ isA3Selected: false, isA4Selected: false, isA5Selected: false });
                     setA3Config({});
@@ -292,12 +299,8 @@ const AddRentalProduct = () => {
                                 labelId="company-label"
                                 value={company}
                                 onChange={(e) => setCompany(e.target.value)}
-                                label="Company *"
                                 displayEmpty
                             >
-                                <MenuItem value="">
-                                    <em>Select Company</em>
-                                </MenuItem>
                                 {companies.map((comp) => (
                                     <MenuItem key={comp._id} value={comp._id}>
                                         {comp.companyName}
@@ -372,8 +375,9 @@ const AddRentalProduct = () => {
                             <InputLabel id="gst-type-label">Select GST *</InputLabel>
                             <Select
                                 labelId="gst-type-label"
-                                value={gstTypeId}
-                                onChange={(e) => setGstTypeId(e.target.value)}
+                                multiple // Added for multiple selection
+                                value={gstTypeIds} // Now an array
+                                onChange={(e) => setGstTypeIds(e.target.value)} // Handles array of values
                                 label="Select GST *"
                                 displayEmpty
                             >

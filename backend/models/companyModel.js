@@ -6,11 +6,18 @@ const contactPersonSchema = new mongoose.Schema({
     email: { type: String, required: true },
 }, { _id: false }); // _id: false to prevent Mongoose from adding _id to subdocuments
 
+const deliveryAddressSchema = new mongoose.Schema({
+    address: { type: String, required: true },
+    pincode: { type: String, required: true },
+}, { _id: false }); // _id: false to prevent Mongoose from adding _id to subdocuments
+
+
 const companySchema = new mongoose.Schema({
     customerType: {
         type: String,
         required: false,
-        enum: ['New', "Existing"] // You can add more customer types here
+        enum: ['New', "Existing"],
+        default: "New" // You can add more customer types here
     },
     userId: {
         type: mongoose.Schema.Types.ObjectId,
@@ -25,10 +32,7 @@ const companySchema = new mongoose.Schema({
         type: String,
         required: true
     },
-    serviceDeliveryAddresses: [{ // Array of strings
-        type: String,
-        required: true
-    }],
+    serviceDeliveryAddresses: [deliveryAddressSchema],
     invoiceType: {
         type: String,
         required: true,

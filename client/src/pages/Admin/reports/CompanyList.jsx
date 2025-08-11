@@ -95,11 +95,11 @@ const CompanyList = () => {
                                     <TableCell sx={{ color: 'white' }}>State</TableCell>
                                     <TableCell sx={{ color: 'white' }}>Pincode</TableCell>
                                     <TableCell sx={{ color: 'white' }}>GST No</TableCell>
-                                    <TableCell sx={{ color: 'white' }}>Invoice Type</TableCell>
-                                    <TableCell sx={{ color: 'white' }}>Contact Person (Primary)</TableCell>
-                                    <TableCell sx={{ color: 'white' }}>Contact Mobile (Primary)</TableCell>
-                                    <TableCell sx={{ color: 'white' }}>Customer Type</TableCell>
-                                    <TableCell sx={{ color: 'white' }}>Created At</TableCell>
+                                    {/* <TableCell sx={{ color: 'white' }}>Invoice Type</TableCell> */}
+                                    <TableCell sx={{ color: 'white' }}>Contact Person</TableCell>
+                                    <TableCell sx={{ color: 'white' }}>Company Mobile</TableCell>
+                                    {/* <TableCell sx={{ color: 'white' }}>Customer Type</TableCell> */}
+                                    {/* <TableCell sx={{ color: 'white' }}>Created At</TableCell> */}
                                     {hasPermission("reportsCompanyList") ? <TableCell sx={{ color: 'white' }}>Action</TableCell> : null}
                                 </TableRow>
                             </TableHead>
@@ -112,11 +112,11 @@ const CompanyList = () => {
                                         <TableCell>{company.state}</TableCell>
                                         <TableCell>{company.pincode}</TableCell>
                                         <TableCell>{company.gstNo || 'N/A'}</TableCell>
-                                        <TableCell>{company.invoiceType}</TableCell>
+                                        {/* <TableCell>{company.invoiceType}</TableCell> */}
                                         <TableCell>{company.contactPersons?.[0]?.name || company.contactPerson || 'N/A'}</TableCell>
-                                        <TableCell>{company.contactPersons?.[0]?.mobile || company.phone || 'N/A'}</TableCell>
-                                        <TableCell>{company.customerType || 'N/A'}</TableCell>
-                                        <TableCell>{new Date(company.createdAt).toLocaleDateString()}</TableCell>
+                                        <TableCell>{company.phone || company.contactPersons?.[0]?.mobile || 'N/A'}</TableCell> {/* Updated to prioritize company.phone */}
+                                        {/* <TableCell>{company.customerType || 'N/A'}</TableCell> */}
+                                        {/* <TableCell>{new Date(company.createdAt).toLocaleDateString()}</TableCell> */}
                                         {hasPermission("reportsCompanyList") ? <TableCell>
                                             <Button
                                                 variant="contained"
