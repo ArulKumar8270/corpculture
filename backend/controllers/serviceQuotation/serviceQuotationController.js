@@ -34,7 +34,8 @@ export const createServiceQuotation = async (req, res) => {
             description,
             tax, // Optional tax from frontend, or calculated here
             quotationDate,
-            assignedTo
+            assignedTo,
+            sendTo
         } = req.body;
 
         // Basic Validation
@@ -101,7 +102,8 @@ export const createServiceQuotation = async (req, res) => {
             tax: tax || 0, // Use provided tax or default to 0 // Use provided tax or calculated one
             grandTotal,
             quotationDate: quotationDate || Date.now(),
-            assignedTo
+            assignedTo,
+            sendTo
         });
 
         await newServiceQuotation.save();
@@ -229,7 +231,8 @@ export const updateServiceQuotation = async (req, res) => {
             status,
             quotationDate,
             quotationLink,
-            assignedTo
+            assignedTo,
+            sendTo
         } = req.body;
 
         // Find the Quotation to update
@@ -304,6 +307,7 @@ export const updateServiceQuotation = async (req, res) => {
         if (status) serviceQuotation.status = status;
         if (quotationDate) serviceQuotation.quotationDate = quotationDate;
         if (assignedTo) serviceQuotation.assignedTo = assignedTo;
+        if (sendTo) serviceQuotation.sendTo = sendTo;
         if (quotationLink !== undefined) serviceQuotation.quotationLink = quotationLink; // Update invoiceLink
         await serviceQuotation.save();
 

@@ -44,7 +44,8 @@ const AddServiceInvoice = () => {
         deliveryAddress: '',
         reference: '',
         description: '',
-        status: 'draft'
+        // status: 'draft', // Removed Invoice Status
+        sendTo: [] // Changed to an array for multi-select
     });
 
     const [companyData, setCompanyData] = useState(null)
@@ -53,8 +54,31 @@ const AddServiceInvoice = () => {
     // States for dropdown data
     const [companies, setCompanies] = useState([]);
     const [availableProducts, setAvailableProducts] = useState([]);
+    const [invoices, setInvoices] = useState([]);
     const [loading, setLoading] = useState(true); // Loading state for initial data
 
+
+    const fetchInvoices = async () => {
+        try {
+            setLoading(true);
+            const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/all`, {
+                headers: {
+                    Authorization: auth.token,
+                },
+            });
+            if (data?.success) {
+                setInvoices(data.serviceInvoices);
+            } else {
+                alert(data?.message || 'Failed to fetch service invoices.');
+            }
+        } catch (error) {
+            console.error("Error fetching service invoices:", error);
+            alert(error.response?.data?.message || 'Something went wrong while fetching invoices.');
+        } finally {
+            setLoading(false);
+        }
+    };
+    
     // Fetch companies on component mount
     useEffect(() => {
         const fetchCompanies = async () => {
@@ -77,6 +101,7 @@ const AddServiceInvoice = () => {
                 setLoading(false);
             }
         };
+        fetchInvoices();
         fetchCompanies();
     }, []);
 
@@ -152,6 +177,7 @@ const AddServiceInvoice = () => {
                 newData.productId = '';
                 newData.quantity = '';
                 setProductsInTable([]); // Clear products in table when company changes
+                newData.sendTo = []; // Clear sendTo when company changes, ensure it's an array
             }
             return newData;
         });
@@ -205,7 +231,7 @@ const AddServiceInvoice = () => {
                     if (data?.success) {
                         const invoice = data.serviceInvoice;
                         setInvoiceData({
-                            invoiceNumber: invoice.invoiceNumber || '',
+                            invoiceNumber: invoices?.length + 1 || 1,
                             companyId: invoice.companyId?._id || invoice.companyId || '',
                             productId: '', // Will be set when adding new products
                             quantity: '',
@@ -216,7 +242,9 @@ const AddServiceInvoice = () => {
                                 : invoice.deliveryAddress || '',
                             reference: invoice.reference || '',
                             description: invoice.description || '',
-                            status: invoice.status || '',
+                            // status: invoice.status || '', // Removed Invoice Status
+                            // Ensure sendTo is always an array
+                            sendTo: Array.isArray(invoice.sendTo) ? invoice.sendTo : (invoice.sendTo ? [invoice.sendTo] : []),
                         });
                         // Map products to table format with unique id
                         setProductsInTable(
@@ -247,9 +275,10 @@ const AddServiceInvoice = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        const { invoiceNumber, companyId, modeOfPayment, deliveryAddress, reference, description, status } = invoiceData;
+        const { invoiceNumber, companyId, modeOfPayment, deliveryAddress, reference, description, sendTo } = invoiceData; // Removed status
 
-        if (!invoiceNumber || !companyId || !modeOfPayment || !deliveryAddress || productsInTable.length === 0) {
+        // Updated validation for sendTo (check if array is empty)
+        if (!invoiceNumber || !companyId || !modeOfPayment || !deliveryAddress || productsInTable.length === 0 || sendTo.length === 0) {
             toast.error('Please fill all required fields and add at least one product.');
             return;
         }
@@ -276,7 +305,8 @@ const AddServiceInvoice = () => {
             subtotal,
             tax,
             grandTotal,
-            status,
+            // status, // Removed status from payload
+            sendTo, // sendTo is now an array
             assignedTo : employeeName
         };
 
@@ -319,7 +349,8 @@ const AddServiceInvoice = () => {
             deliveryAddress: '',
             reference: '',
             description: '',
-            status: 'draft'
+            // status: 'draft', // Removed status
+            sendTo: [] // Clear sendTo as an empty array
         });
         setProductsInTable([]);
         setAvailableProducts([]); // Clear available products
@@ -347,7 +378,7 @@ const AddServiceInvoice = () => {
 
             <Paper elevation={3} sx={{ p: 4, mb: 4, borderRadius: '8px' }}>
                 <Grid container spacing={3}>
-                    <Grid item xs={12} sm={6}>
+                    {/* <Grid item xs={12} sm={6}>
                         <TextField
                             fullWidth
                             margin="normal"
@@ -359,7 +390,7 @@ const AddServiceInvoice = () => {
                             size="small"
                             required
                         />
-                    </Grid>
+                    </Grid> */}
                     <Grid item xs={12} sm={6}>
                         <FormControl fullWidth margin="normal" size="small" required>
                             <InputLabel id="company-label">Company</InputLabel>
@@ -479,20 +510,30 @@ const AddServiceInvoice = () => {
                     </Grid>
                     <Grid item xs={12} sm={6}>
                         <FormControl fullWidth margin="normal" size="small" required>
-                            <InputLabel id="payment-status-label">Invoice Status</InputLabel>
+                            <InputLabel id="send-to-label">Send To</InputLabel>
                             <Select
-                                labelId="payment-status-label"
-                                id="status"
-                                name="status"
-                                value={invoiceData.status}
-                                label="Payment Status"
+                                labelId="send-to-label"
+                                id="sendTo"
+                                name="sendTo"
+                                multiple // Added multiple prop for multi-select
+                                value={invoiceData.sendTo}
                                 onChange={handleChange}
+                                label="Send To"
+                                disabled={!invoiceData.companyId || !companyData?.contactPersons?.length}
+                                renderValue={(selected) => { // Render selected values
+                                    const selectedNames = selected.map(email => {
+                                        const person = companyData?.contactPersons?.find(p => p.email === email);
+                                        return person ? person.name : email;
+                                    });
+                                    return selectedNames.join(', ');
+                                }}
                             >
-                                <MenuItem value="InvoiceSent">Invoice Sent</MenuItem>
-                                <MenuItem value="Pending">Pending</MenuItem>
-                                <MenuItem value="Progress">In Progress</MenuItem>
-                                <MenuItem value="Cancelled">Cancelled</MenuItem>
-                                <MenuItem value="Completed">Completed</MenuItem>
+                                <MenuItem value="">Select a Contact Person</MenuItem>
+                                {companyData?.contactPersons?.map((person, index) => (
+                                    <MenuItem key={index} value={person.email}>
+                                        {person.name} ({person.email})
+                                    </MenuItem>
+                                ))}
                             </Select>
                         </FormControl>
                     </Grid>

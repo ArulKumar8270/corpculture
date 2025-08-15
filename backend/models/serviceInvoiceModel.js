@@ -100,6 +100,10 @@ const serviceInvoiceSchema = new mongoose.Schema({
         enum: ['draft', 'Cancelled', "Pending", "Progress", "Completed", "InvoiceSent"],
         default: 'draft',
     },
+    sendTo: [{
+        type: String,
+        trim: true,
+    }],
     invoiceDate: {
         type: Date,
         default: Date.now,

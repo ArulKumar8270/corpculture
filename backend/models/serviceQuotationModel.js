@@ -100,6 +100,10 @@ const serviceQuotationSchema = new mongoose.Schema({
         enum: ['draft', 'Cancelled', "Pending", "Progress", "Completed", "QuotationSent"],
         default: 'draft',
     },
+    sendTo : [{
+        type: String,
+        trim: true,
+    }],
     quotationDate: {
         type: Date,
         default: Date.now,
