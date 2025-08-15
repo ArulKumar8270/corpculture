@@ -42,7 +42,8 @@ const AddServiceQuotation = () => {
         deliveryAddress: '',
         reference: '',
         description: '',
-        status: 'draft'
+        status: 'draft',
+        sendTo: []
     });
  
     const [companyData, setCompanyData] = useState(null)
@@ -52,7 +53,29 @@ const AddServiceQuotation = () => {
     const [companies, setCompanies] = useState([]);
     const [availableProducts, setAvailableProducts] = useState([]);
     const [loading, setLoading] = useState(true); // Loading state for initial data
+    const [invoices, setInvoices] = useState([]);
 
+
+    const fetchInvoices = async () => {
+        try {
+            setLoading(true);
+            const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/service-quotation/all`, {
+                headers: {
+                    Authorization: auth.token,
+                },
+            });
+            if (data?.success) {
+                setInvoices(data.serviceInvoices);
+            } else {
+                alert(data?.message || 'Failed to fetch service invoices.');
+            }
+        } catch (error) {
+            console.error("Error fetching service invoices:", error);
+            alert(error.response?.data?.message || 'Something went wrong while fetching invoices.');
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
         const fetchCompanyData = async () => {
@@ -108,6 +131,7 @@ const AddServiceQuotation = () => {
             }
         };
         fetchCompanies();
+        fetchInvoices();
     }, []);
 
     // Fetch products when companyId changes
@@ -150,6 +174,7 @@ const AddServiceQuotation = () => {
                 newData.productId = '';
                 newData.quantity = '';
                 setProductsInTable([]); // Clear products in table when company changes
+                newData.sendTo = [];
             }
             return newData;
         });
@@ -203,7 +228,7 @@ const AddServiceQuotation = () => {
                     if (data?.success) {
                         const quotation = data.serviceQuotation;
                         setQuotationData({
-                            quotationNumber: quotation.quotationNumber || '',
+                            quotationNumber:  invoices?.length + 1 || 1,
                             companyId: quotation.companyId?._id || quotation.companyId || '',
                             productId: '', // Will be set when adding new products
                             quantity: '',
@@ -212,6 +237,7 @@ const AddServiceQuotation = () => {
                             reference: quotation.reference || '',
                             description: quotation.description || '',
                             status: quotation.status || '',
+                            sendTo: Array.isArray(quotation.sendTo) ? quotation.sendTo : (quotation.sendTo ? [quotation.sendTo] : []),
                         });
                         // Map products to table format with unique id
                         setProductsInTable(
@@ -242,9 +268,9 @@ const AddServiceQuotation = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        const { quotationNumber, companyId, modeOfPayment, deliveryAddress, reference, description, status } = quotationData;
+        const { quotationNumber, companyId, modeOfPayment, deliveryAddress, reference, description, status, sendTo } = quotationData;
 
-        if (!quotationNumber || !companyId || !modeOfPayment || !deliveryAddress || productsInTable.length === 0) {
+        if (!quotationNumber || !companyId || !modeOfPayment || !deliveryAddress || productsInTable.length === 0 || sendTo?.length === 0) {
             toast.error('Please fill all required fields and add at least one product.');
             return;
         }
@@ -272,7 +298,8 @@ const AddServiceQuotation = () => {
             tax,
             grandTotal,
             status,
-            assignedTo : employeeName
+            assignedTo : employeeName,
+            sendTo
         };
 
         try {
@@ -315,7 +342,8 @@ const AddServiceQuotation = () => {
             deliveryAddress: '',
             reference: '',
             description: '',
-            status: 'draft'
+            status: 'draft',
+            sendTo: []
         });
         setProductsInTable([]);
         setAvailableProducts([]); // Clear available products
@@ -338,7 +366,7 @@ const AddServiceQuotation = () => {
 
             <Paper elevation={3} sx={{ p: 4, mb: 4, borderRadius: '8px' }}>
                 <Grid container spacing={3}>
-                    <Grid item xs={12} sm={6}>
+                    {/* <Grid item xs={12} sm={6}>
                         <TextField
                             fullWidth
                             margin="normal"
@@ -350,7 +378,7 @@ const AddServiceQuotation = () => {
                             size="small"
                             required
                         />
-                    </Grid>
+                    </Grid> */}
                     <Grid item xs={12} sm={6}>
                         <FormControl fullWidth margin="normal" size="small" required>
                             <InputLabel id="company-label">Company</InputLabel>
@@ -468,20 +496,30 @@ const AddServiceQuotation = () => {
                     </Grid>
                     <Grid item xs={12} sm={6}>
                         <FormControl fullWidth margin="normal" size="small" required>
-                            <InputLabel id="payment-status-label">Quotaion Status</InputLabel>
+                            <InputLabel id="send-to-label">Send To</InputLabel>
                             <Select
-                                labelId="payment-status-label"
-                                id="status"
-                                name="status"
-                                value={quotationData.status}
-                                label="Payment Status"
+                                labelId="send-to-label"
+                                id="sendTo"
+                                name="sendTo"
+                                multiple // Added multiple prop for multi-select
+                                value={quotationData.sendTo}
                                 onChange={handleChange}
+                                label="Send To"
+                                disabled={!quotationData.companyId || !companyData?.contactPersons?.length}
+                                renderValue={(selected) => { // Render selected values
+                                    const selectedNames = selected.map(email => {
+                                        const person = companyData?.contactPersons?.find(p => p.email === email);
+                                        return person ? person.name : email;
+                                    });
+                                    return selectedNames.join(', ');
+                                }}
                             >
-                                <MenuItem value="QuotationSent">Quotation Sent</MenuItem>
-                                <MenuItem value="Pending">Pending</MenuItem>
-                                <MenuItem value="Progress">In Progress</MenuItem>
-                                <MenuItem value="Cancelled">Cancelled</MenuItem>
-                                <MenuItem value="Completed">Completed</MenuItem>
+                                <MenuItem value="">Select a Contact Person</MenuItem>
+                                {companyData?.contactPersons?.map((person, index) => (
+                                    <MenuItem key={index} value={person.email}>
+                                        {person.name} ({person.email})
+                                    </MenuItem>
+                                ))}
                             </Select>
                         </FormControl>
                     </Grid>

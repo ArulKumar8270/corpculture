@@ -34,7 +34,8 @@ export const createServiceInvoice = async (req, res) => {
             description,
             tax, // Optional tax from frontend, or calculated here
             invoiceDate,
-            assignedTo
+            assignedTo,
+            sendTo
         } = req.body;
 
         // Basic Validation
@@ -102,7 +103,8 @@ export const createServiceInvoice = async (req, res) => {
             tax: tax || 0, // Use provided tax or default to 0
             grandTotal,
             invoiceDate: invoiceDate || Date.now(),
-            assignedTo
+            assignedTo,
+            sendTo
         });
 
         await newServiceInvoice.save();
@@ -226,7 +228,8 @@ export const updateServiceInvoice = async (req, res) => {
             status,
             invoiceDate,
             invoiceLink, // <-- Add invoiceLink here
-            assignedTo
+            assignedTo,
+            sendTo
         } = req.body;
 
         // Find the invoice to update
@@ -300,6 +303,7 @@ export const updateServiceInvoice = async (req, res) => {
         if (status) serviceInvoice.status = status;
         if (invoiceDate) serviceInvoice.invoiceDate = invoiceDate;
         if (assignedTo) serviceInvoice.assignedTo = assignedTo;
+        if (sendTo) serviceInvoice.sendTo = sendTo;
         if (invoiceLink !== undefined) serviceInvoice.invoiceLink = invoiceLink; // Update invoiceLink
 
         await serviceInvoice.save();

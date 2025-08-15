@@ -27,7 +27,7 @@ const menuStructure = [
                     { name: "All Products", key: "salesAllProducts", permissions: ['view', 'add', 'edit', 'delete'] },
                     { name: "All Category", key: "salesAllCategory", permissions: ['view', 'add', 'edit', 'delete'] },
                     { name: "Orders", key: "salesOrders", permissions: ['view', 'edit'] },
-                    { name: "Commission", key: "salesCommission", permissions: ['view'] },
+                    { name: "Commission", key: "salesCommission", permissions: ['view', 'add', 'edit', 'delete'] },
                 ]
             },
             {
@@ -36,7 +36,7 @@ const menuStructure = [
                 permissions: ['view', 'add', 'edit', 'delete'],
                 subItems: [
                     { name: "Service Enquiries", key: "serviceEnquiries", permissions: ['view', 'edit'] },
-                    { name: "Commission", key: "serviceCommission", permissions: ['view'] },
+                    { name: "Commission", key: "serviceCommission", permissions: ['view', 'add', 'edit', 'delete'] },
                     { name: "All Products", key: "serviceAllProducts", permissions: ['view', 'add', 'edit', 'delete'] },
                     { name: "Invoice", key: "serviceInvoice", permissions: ['view', 'add', 'edit', 'delete'] },
                     { name: "Quotation", key: "serviceQuotation", permissions: ['view', 'add', 'edit', 'delete'] },
@@ -47,11 +47,11 @@ const menuStructure = [
                 key: "rental",
                 permissions: ['view', 'add', 'edit', 'delete'],
                 subItems: [
-                    { name: "Rental Enquiries", key: "rentalEnquiries", permissions: ['view'] },
+                    { name: "Rental Enquiries", key: "rentalEnquiries", permissions: ['view', 'add', 'edit', 'delete'] },
                     { name: "All Products", key: "rentalAllProducts", permissions: ['view', 'add', 'edit', 'delete'] },
                     { name: "Invoice", key: "rentalInvoice", permissions: ['view', 'add', 'edit', 'delete'] },
                     { name: "Quotation", key: "rentalQuotation", permissions: ['view', 'add', 'edit', 'delete'] },
-                    { name: "Commission", key: "rentalCommission", permissions: ['view'] },
+                    { name: "Commission", key: "rentalCommission", permissions: ['view', 'add', 'edit', 'delete'] },
                 ]
             },
             {
@@ -69,11 +69,11 @@ const menuStructure = [
                 key: "reports",
                 permissions: ['view'],
                 subItems: [
-                    { name: "Company list", key: "reportsCompanyList", permissions: ['view'] },
-                    { name: "Service", key: "reportsService", permissions: ['view'] },
-                    { name: "Sales", key: "reportsSales", permissions: ['view'] },
-                    { name: "Employee list", key: "reportsEmployeeList", permissions: ['view'] },
-                    { name: "User list", key: "reportsUserList", permissions: ['view'] },
+                    { name: "Company list", key: "reportsCompanyList", permissions: ['view', 'add', 'edit', 'delete'] },
+                    { name: "Service", key: "reportsService", permissions: ['view', 'add', 'edit', 'delete'] },
+                    { name: "Sales", key: "reportsSales", permissions: ['view', 'add', 'edit', 'delete'] },
+                    { name: "Employee list", key: "reportsEmployeeList", permissions: ['view', 'add', 'edit', 'delete'] },
+                    { name: "User list", key: "reportsUserList", permissions: ['view', 'add', 'edit', 'delete'] },
                 ]
             }
         ]
