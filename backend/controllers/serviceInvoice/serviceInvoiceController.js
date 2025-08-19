@@ -239,11 +239,7 @@ export const updateServiceInvoice = async (req, res) => {
         }
 
         // Check if invoiceNumber is being changed to an existing one (excluding itself)
-        if (invoiceNumber && invoiceNumber !== serviceInvoice.invoiceNumber) {
-            const existingInvoice = await ServiceInvoice.findOne({ invoiceNumber });
-            if (existingInvoice) {
-                return res.status(409).send({ success: false, message: 'Service Invoice with this invoice number already exists.' });
-            }
+        if (invoiceNumber) {
             serviceInvoice.invoiceNumber = invoiceNumber;
         }
 

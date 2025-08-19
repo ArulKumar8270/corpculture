@@ -119,8 +119,9 @@ export const createServiceQuotation = async (req, res) => {
 
 // Get All Service Quotations
 export const getAllServiceQuotations = async (req, res) => {
+    const { status } = req.params;
     try {
-        const serviceQuotations = await ServiceQuotation.find({})
+        const serviceQuotations = await ServiceQuotation.find({ status: status === "unMovedToInvoicing" ? { $ne: "moveToInvoicing" } : {$eq: "moveToInvoicing"} }) // Filter out quotations with status "moveToInvoicing"
             .populate('companyId') // Populate company name
             .populate({
                 path: 'products.productId', // First populate productId
@@ -242,11 +243,7 @@ export const updateServiceQuotation = async (req, res) => {
         }
 
         // Check if QuotationNumber is being changed to an existing one (excluding itself)
-        if (quotationNumber && quotationNumber !== serviceQuotation.quotationNumber) {
-            const existingQuotation = await ServiceQuotation.findOne({ quotationNumber });
-            if (existingQuotation) {
-                return res.status(409).send({ success: false, message: 'Service Quotation with this Quotation number already exists.' });
-            }
+        if (quotationNumber ) {
             serviceQuotation.quotationNumber = quotationNumber;
         }
 

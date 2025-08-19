@@ -33,10 +33,9 @@ const AddServiceInvoice = () => {
     const { invoiceId, assignedTo } = useParams(); // <-- get invoiceId from URL
     const [searchParams] = useSearchParams();
     const employeeName = searchParams.get("employeeName");
-
+    const [invoices, setInvoices] = useState(null);
     // State for form fields
     const [invoiceData, setInvoiceData] = useState({
-        invoiceNumber: '', // New field for invoice number
         companyId: '', // Stores the _id of the selected company
         productId: '', // Stores the _id of the selected product for adding to table
         quantity: '', // Quantity for the product being added
@@ -54,7 +53,6 @@ const AddServiceInvoice = () => {
     // States for dropdown data
     const [companies, setCompanies] = useState([]);
     const [availableProducts, setAvailableProducts] = useState([]);
-    const [invoices, setInvoices] = useState([]);
     const [loading, setLoading] = useState(true); // Loading state for initial data
 
 
@@ -67,7 +65,7 @@ const AddServiceInvoice = () => {
                 },
             });
             if (data?.success) {
-                setInvoices(data.serviceInvoices);
+                setInvoices(data.serviceInvoices?.length + 1 || 1);
             } else {
                 alert(data?.message || 'Failed to fetch service invoices.');
             }
@@ -231,7 +229,6 @@ const AddServiceInvoice = () => {
                     if (data?.success) {
                         const invoice = data.serviceInvoice;
                         setInvoiceData({
-                            invoiceNumber: invoices?.length + 1 || 1,
                             companyId: invoice.companyId?._id || invoice.companyId || '',
                             productId: '', // Will be set when adding new products
                             quantity: '',
@@ -275,11 +272,11 @@ const AddServiceInvoice = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        const { invoiceNumber, companyId, modeOfPayment, deliveryAddress, reference, description, sendTo } = invoiceData; // Removed status
+        const {  companyId, modeOfPayment, deliveryAddress, reference, description, sendTo } = invoiceData; // Removed status
 
         // Updated validation for sendTo (check if array is empty)
-        if (!invoiceNumber || !companyId || !modeOfPayment || !deliveryAddress || productsInTable.length === 0 || sendTo.length === 0) {
-            toast.error('Please fill all required fields and add at least one product.');
+        if (!companyId || !modeOfPayment || !deliveryAddress || productsInTable.length === 0) {
+            alert('Please fill all required fields and add at least one product.');
             return;
         }
 
@@ -289,7 +286,7 @@ const AddServiceInvoice = () => {
         const grandTotal = subtotal + tax;
 
         const payload = {
-            invoiceNumber,
+            invoiceNumber:invoices,
             companyId,
             products: productsInTable.map(p => ({
                 productId: p.productId,
@@ -341,7 +338,6 @@ const AddServiceInvoice = () => {
 
     const handleCancel = () => {
         setInvoiceData({
-            invoiceNumber: '',
             companyId: '',
             productId: '',
             quantity: '',

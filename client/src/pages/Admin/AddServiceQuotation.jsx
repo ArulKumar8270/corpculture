@@ -32,9 +32,10 @@ const AddServiceQuotation = () => {
     const { quotationId } = useParams(); // <-- get QuotationId from URL
     const [searchParams] = useSearchParams();
     const employeeName = searchParams.get("employeeName");
+    const [invoices, setInvoices] = useState(null);
+
     // State for form fields
     const [quotationData, setQuotationData] = useState({
-        quotationNumber: '', // New field for Quotation number
         companyId: '', // Stores the _id of the selected company
         productId: '', // Stores the _id of the selected product for adding to table
         quantity: '', // Quantity for the product being added
@@ -45,7 +46,7 @@ const AddServiceQuotation = () => {
         status: 'draft',
         sendTo: []
     });
- 
+
     const [companyData, setCompanyData] = useState(null)
     // State for products added to the table (these are the line items for the Quotation)
     const [productsInTable, setProductsInTable] = useState([]);
@@ -53,7 +54,6 @@ const AddServiceQuotation = () => {
     const [companies, setCompanies] = useState([]);
     const [availableProducts, setAvailableProducts] = useState([]);
     const [loading, setLoading] = useState(true); // Loading state for initial data
-    const [invoices, setInvoices] = useState([]);
 
 
     const fetchInvoices = async () => {
@@ -65,7 +65,7 @@ const AddServiceQuotation = () => {
                 },
             });
             if (data?.success) {
-                setInvoices(data.serviceInvoices);
+                setInvoices(data.serviceInvoices?.length + 1);
             } else {
                 alert(data?.message || 'Failed to fetch service invoices.');
             }
@@ -107,7 +107,7 @@ const AddServiceQuotation = () => {
             fetchCompanyData();
         }
     }, [quotationData?.companyId, auth?.token]);
-    
+
     // Fetch companies on component mount
     useEffect(() => {
         const fetchCompanies = async () => {
@@ -228,7 +228,6 @@ const AddServiceQuotation = () => {
                     if (data?.success) {
                         const quotation = data.serviceQuotation;
                         setQuotationData({
-                            quotationNumber:  invoices?.length + 1 || 1,
                             companyId: quotation.companyId?._id || quotation.companyId || '',
                             productId: '', // Will be set when adding new products
                             quantity: '',
@@ -268,9 +267,9 @@ const AddServiceQuotation = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        const { quotationNumber, companyId, modeOfPayment, deliveryAddress, reference, description, status, sendTo } = quotationData;
+        const {companyId, modeOfPayment, deliveryAddress, reference, description, status, sendTo } = quotationData;
 
-        if (!quotationNumber || !companyId || !modeOfPayment || !deliveryAddress || productsInTable.length === 0 || sendTo?.length === 0) {
+        if ( !companyId || !modeOfPayment || !deliveryAddress || productsInTable.length === 0 || sendTo?.length === 0) {
             toast.error('Please fill all required fields and add at least one product.');
             return;
         }
@@ -281,7 +280,7 @@ const AddServiceQuotation = () => {
         const grandTotal = subtotal + tax;
 
         const payload = {
-            quotationNumber,
+            quotationNumber : invoices,
             companyId,
             products: productsInTable.map(p => ({
                 productId: p.productId,
@@ -298,7 +297,7 @@ const AddServiceQuotation = () => {
             tax,
             grandTotal,
             status,
-            assignedTo : employeeName,
+            assignedTo: employeeName,
             sendTo
         };
 

@@ -170,6 +170,35 @@ function QuotationRow(props) {
         }
     };
 
+    const onMoveToInvoice = async (status) => {
+        try {
+            const payload = {
+                status: status
+            };
+
+            const res = await axios.put(
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/service-quotation/update/${quotation._id}`,
+                payload,
+                {
+                    headers: {
+                        Authorization: auth.token,
+                    },
+                }
+            );
+
+            if (res.data?.success) {
+                alert(res.data.message || 'Moved to invoice successfully!');
+                handleClosePaymentDetailsModal();
+                props.onQuotationUpdate(); // Call the prop to trigger re-fetch in parent
+            } else {
+                alert(res.data?.message || 'Failed to update move quotation details.');
+            }
+        } catch (error) {
+            console.error('Error updating status details:', error);
+            alert(error.response?.data?.message || 'Something went wrong while updating status details.');
+        }
+    }
+
     const onSendQuotation = async (quotation) => {
         console.log(quotation, "invoice79037254093")
     }
@@ -205,6 +234,7 @@ function QuotationRow(props) {
                 <TableCell>
                     {hasPermission("serviceQuotation") ? <Button variant="outlined" size="small" sx={{ mr: 1 }} onClick={handleEdit}>Edit</Button> : null}
                     <Button variant="outlined" size="small" sx={{ my: 1 }} onClick={() => onSendQuotation(quotation)}>Send Quotation</Button>
+                    <Button variant="outlined" size="small" sx={{ my: 1 }} onClick={() => onMoveToInvoice("moveToInvoicing")}>Move to Invoice</Button>
                     <Button variant="outlined" size="small" sx={{ my: 1 }} onClick={handleOpenPaymentDetailsModal}>Update Payment Details</Button>
 
                     <Button
@@ -453,7 +483,7 @@ function QuotationRow(props) {
     );
 }
 
-const ServiceQuotationList = () => {
+const ServiceQuotationList = (props) => {
     const [quotations, setQuotations] = useState([]);
     const [loading, setLoading] = useState(true);
     const { auth, userPermissions } = useAuth();
@@ -467,11 +497,18 @@ const ServiceQuotationList = () => {
     const fetchQuotations = async () => {
         try {
             setLoading(true);
-            const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/service-quotation/${auth?.user?.role === 3 ? `assignedTo/${auth?.user?._id}` : "all"}`, {
-                headers: {
-                    Authorization: auth.token,
-                },
-            });
+            const { data } = await axios.get(
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/service-quotation/${auth?.user?.role === 3
+                    ? `assignedTo/${auth?.user?._id}`
+                    : `all/${props.status ? props.status : 'unMovedToInvoicing'}`
+                }`,
+                {
+                    headers: {
+                        Authorization: auth?.token,
+                    },
+                }
+            );
+
             if (data?.success) {
                 setQuotations(data.serviceQuotations);
             } else {
@@ -512,7 +549,7 @@ const ServiceQuotationList = () => {
 
     return (
         <Box sx={{ p: 3, bgcolor: 'background.default', minHeight: '100vh' }} className='w-[95%]'>
-            <div className='flex justify-between'>
+            {!props.status ? <div className='flex justify-between'>
                 <Typography variant="h5" component="h1" gutterBottom sx={{ mb: 3, color: '#019ee3', fontWeight: 'bold' }}>
                     Service Quotations
                 </Typography>
@@ -521,7 +558,7 @@ const ServiceQuotationList = () => {
                         Create New Quotation
                     </Button>
                 </Typography> : null}
-            </div>
+            </div> : null}
             {/* Search Input Field */}
             <TextField
                 fullWidth
