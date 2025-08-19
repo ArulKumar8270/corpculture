@@ -15,7 +15,7 @@ const router = express.Router();
 router.post("/create", isAdmin, createServiceQuotation);
 
 // Get all service Quotations
-router.get("/all/:status", isAdmin, getAllServiceQuotations);
+router.get("/all/:status?", isAdmin, getAllServiceQuotations);
 
 // Get single service Quotation
 router.get("/get/:id", getServiceQuotationById);
