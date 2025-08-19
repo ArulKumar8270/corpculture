@@ -33,6 +33,7 @@ import UploadFileIcon from '@mui/icons-material/UploadFile';
 import LinkIcon from '@mui/icons-material/Link'; // Import LinkIcon
 import Stack from '@mui/material/Stack'; // Import Stack for layout
 import Chip from '@mui/material/Chip'; // Import Chip for assignedTo UI
+import ServiceQuotationList from './ServiceQuotationList';
 
 // Row component for each invoice, allowing expansion to show products
 function InvoiceRow(props) {
@@ -170,9 +171,9 @@ function InvoiceRow(props) {
         }
     };
 
-   const onSendInvoice = async (invoice) => {
-    console.log(invoice, "invoice79037254093")
-   }
+    const onSendInvoice = async (invoice) => {
+        console.log(invoice, "invoice79037254093")
+    }
 
     return (
         <>
@@ -456,6 +457,7 @@ const ServiceInvoiceList = () => {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState(''); // New state for search term
     const { auth, userPermissions } = useAuth();
+    const [movidedList, setMovidedList] = useState(false); // New state for movidedList
     const navigate = useNavigate(); // Initialize useNavigate
     const hasPermission = (key) => {
         return userPermissions.some(p => p.key === key && p.actions.includes('edit')) || auth?.user?.role === 1;
@@ -506,10 +508,15 @@ const ServiceInvoiceList = () => {
     }
 
     return (
-        <Box sx={{ p: 3, bgcolor: 'background.default', minHeight: '100vh' }}  className='w-[95%]'>
+        <Box sx={{ p: 3, bgcolor: 'background.default', minHeight: '100vh' }} className='w-[95%]'>
             <div className='flex justify-between'>
                 <Typography variant="h5" component="h1" gutterBottom sx={{ mb: 3, color: '#019ee3', fontWeight: 'bold' }}>
                     Service Invoices
+                </Typography>
+                <Typography variant="h5" component="h1" gutterBottom sx={{ mb: 3, color: '#019ee3', fontWeight: 'bold' }}>
+                    <Button color="secondary" onClick={() => setMovidedList((prev) => !prev)} variant="outlined">
+                        {!movidedList ? "Movided Invoices" : "All Invoices"}
+                    </Button>
                 </Typography>
                 {hasPermission("serviceInvoice") ? <Typography variant="h5" component="h1" gutterBottom sx={{ mb: 3, color: '#019ee3', fontWeight: 'bold' }}>
                     <Button onClick={() => navigate("../addServiceInvoice")} color="primary">
@@ -518,48 +525,50 @@ const ServiceInvoiceList = () => {
                 </Typography> : null}
             </div>
             {/* Search Input Field */}
-            <TextField
-                fullWidth
-                margin="normal"
-                label="Search Invoices (Invoice No., Company, Payment Mode, Status, Date)"
-                variant="outlined"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                sx={{ mb: 3 }}
-            />
-            <Paper elevation={3} sx={{ p: 2, borderRadius: '8px' }}>
-                <TableContainer>
-                    <Table aria-label="collapsible table">
-                        <TableHead>
-                            <TableRow>
-                                <TableCell />
-                                <TableCell>Invoice Number</TableCell>
-                                <TableCell>Company</TableCell>
-                                <TableCell>Payment Mode</TableCell>
-                                <TableCell>Delivery Address</TableCell>
-                                <TableCell align="right">Grand Total</TableCell>
-                                <TableCell>Status</TableCell>
-                                <TableCell>Invoice Date</TableCell>
-                                <TableCell>Assign To</TableCell>
-                                <TableCell>Actions</TableCell>
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {filteredInvoices?.length === 0 ? (
-                                <TableRow>
-                                    <TableCell colSpan={9} align="center" sx={{ py: 3, color: 'text.secondary' }}>
-                                        No service invoices found.
-                                    </TableCell>
-                                </TableRow>
-                            ) : (
-                                filteredInvoices?.map((invoice) => (
-                                    <InvoiceRow key={invoice._id} invoice={invoice} navigate={navigate} onInvoiceUpdate={fetchInvoices} />
-                                ))
-                            )}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
-            </Paper>
+            {!movidedList ?
+                <><TextField
+                    fullWidth
+                    margin="normal"
+                    label="Search Invoices (Invoice No., Company, Payment Mode, Status, Date)"
+                    variant="outlined"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    sx={{ mb: 3 }}
+                />
+                    <Paper elevation={3} sx={{ p: 2, borderRadius: '8px' }}>
+                        <TableContainer>
+                            <Table aria-label="collapsible table">
+                                <TableHead>
+                                    <TableRow>
+                                        <TableCell />
+                                        <TableCell>Invoice Number</TableCell>
+                                        <TableCell>Company</TableCell>
+                                        <TableCell>Payment Mode</TableCell>
+                                        <TableCell>Delivery Address</TableCell>
+                                        <TableCell align="right">Grand Total</TableCell>
+                                        <TableCell>Status</TableCell>
+                                        <TableCell>Invoice Date</TableCell>
+                                        <TableCell>Assign To</TableCell>
+                                        <TableCell>Actions</TableCell>
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                    {filteredInvoices?.length === 0 ? (
+                                        <TableRow>
+                                            <TableCell colSpan={9} align="center" sx={{ py: 3, color: 'text.secondary' }}>
+                                                No service invoices found.
+                                            </TableCell>
+                                        </TableRow>
+                                    ) : (
+                                        filteredInvoices?.map((invoice) => (
+                                            <InvoiceRow key={invoice._id} invoice={invoice} navigate={navigate} onInvoiceUpdate={fetchInvoices} />
+                                        ))
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </TableContainer>
+                    </Paper>
+                </> : <ServiceQuotationList status="moveToInvoicing" />}
         </Box>
     );
 };

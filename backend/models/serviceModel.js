@@ -13,7 +13,7 @@ const serviceSchema = new mongoose.Schema({
         type: String,
         required: true
     },
-    customerComplaint: {
+    complaint: {
         type: String,
         required: false // Optional as marked in the form
     },
@@ -40,6 +40,14 @@ const serviceSchema = new mongoose.Schema({
     serviceType: {
         type: String,
         required: true
+    },
+    oldServiceId: {
+        type: String,
+        required: false
+    },
+    serviceImage : {
+        type: String,
+        required: false
     },
     serviceTitle : {
         type: String,

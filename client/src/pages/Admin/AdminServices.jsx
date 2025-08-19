@@ -360,17 +360,19 @@ const AdminServices = () => {
               <th className="py-2 px-3 text-left">Contact Person</th>
               <th className="py-2 px-3 text-left">Email</th>
               <th className="py-2 px-3 text-left">Address Detail</th>
-              <th className="py-2 px-3 text-left">Location Detail</th>
+              <th className="py-2 px-3 text-left">Service Image</th> {/* New column */}
               <th className="py-2 px-3 text-left">Complaint (Optional)</th>
               <th className="py-2 px-3 text-left">Service Type</th>
               <th className="py-2 px-3 text-left">Service Title</th>
+              <th className="py-2 px-3 text-left">Old Service ID</th> {/* New column */}
+             
               <th className="py-2 px-3 text-left">Submitted At</th>
             </tr>
           </thead>
           <tbody>
             {filteredEnquiries.length === 0 ? (
               <tr>
-                <td colSpan={14} className="text-center py-6 text-gray-400">No service enquiries found.</td>
+                <td colSpan={16} className="text-center py-6 text-gray-400">No service enquiries found.</td> {/* Updated colspan */}
               </tr>
             ) : (
               filteredEnquiries.map(enquiry => (
@@ -464,11 +466,21 @@ const AdminServices = () => {
                   <td className="py-2 px-3">{enquiry.companyName}</td>
                   <td className="py-2 px-3">{enquiry.contactPerson}</td>
                   <td className="py-2 px-3">{enquiry.email}</td>
-                  <td className="py-2 px-3">{enquiry.address}</td>
                   <td className="py-2 px-3">{enquiry.location}</td>
+                  <td className="py-2 px-3"> {/* Display Service Image */}
+                    {enquiry.serviceImage ? (
+                      <a href={enquiry.serviceImage} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                        View Image
+                      </a>
+                    ) : (
+                      "-"
+                    )}
+                  </td>
                   <td className="py-2 px-3">{enquiry.customerComplaint || "-"}</td>
                   <td className="py-2 px-3">{enquiry.serviceType || "-"}</td>
                   <td className="py-2 px-3 text-left">{enquiry.serviceTitle || "-"}</td>
+                  <td className="py-2 px-3">{enquiry.oldServiceId || "-"}</td> {/* Display Old Service ID */}
+                  
                   <td className="py-2 px-3 text-left">{enquiry.createdAt ? new Date(enquiry.createdAt).toLocaleDateString() : "-"}</td>
 
                 </tr>

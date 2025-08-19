@@ -145,7 +145,8 @@ export const getServiceByPhone = async (req, res) => {
             });
         }
 
-        const services = await ServiceModel.find({ phone: phone }).sort({ createdAt: -1 }); // Find services by phone number
+        // Changed to use regex for partial matching
+        const services = await ServiceModel.find({ phone: { $regex: phone, $options: 'i' } }).sort({ createdAt: -1 });
 
         if (!services || services.length === 0) {
             return res.status(404).send({

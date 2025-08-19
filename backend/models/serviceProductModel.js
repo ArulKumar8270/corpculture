@@ -30,6 +30,12 @@ const serviceProductSchema = new mongoose.Schema({
         type: Number,
         required: true,
         min: 0,
+        default: 0,
+    },
+    commission: {
+        type: Number,
+        required: true,
+        min: 0,
     },
     gstType: [{ // Changed to an array of ObjectIds
         type: mongoose.Schema.Types.ObjectId,

@@ -22,6 +22,7 @@ const AddServiceProduct = () => {
     const [rate, setRate] = useState('');
     const [gstTypeIds, setGstTypeIds] = useState([]); // Changed to array for multiple selection
     const [totalAmount, setTotalAmount] = useState(0);
+    const [commission, setCommission] = useState(''); // New state for commission
 
     const [companies, setCompanies] = useState([]);
     const [gstOptions, setGstOptions] = useState([]); // Stores GST types with their percentages
@@ -92,6 +93,7 @@ const AddServiceProduct = () => {
                 setHsn(product.hsn);
                 setQuantity(product.quantity);
                 setRate(product.rate);
+                setCommission(product.commission || ''); // Populate commission field
                 // Set gstTypeIds from the fetched product data
                 // Assuming product.gstType is an array of populated GST objects or just IDs
                 setGstTypeIds(Array.isArray(product.gstType) ? product.gstType.map(g => typeof g === 'object' ? g._id : g) : []);
@@ -126,7 +128,7 @@ const AddServiceProduct = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         // Updated validation for gstTypeIds (check if array is empty)
-        if (!company || !productName || !sku || !hsn || !quantity || !rate || gstTypeIds.length === 0) {
+        if (!company || !productName || !sku || !hsn || !quantity || !rate || gstTypeIds.length === 0 || commission === '') { // Added commission to validation
             toast.error('Please fill in all required fields.');
             return;
         }
@@ -141,6 +143,7 @@ const AddServiceProduct = () => {
                 rate: parseFloat(rate),
                 gstType: gstTypeIds, // Send the array of IDs
                 totalAmount: parseFloat(totalAmount),
+                commission: parseFloat(commission), // Add commission to payload
             };
 
             if (product_id) {
@@ -166,6 +169,7 @@ const AddServiceProduct = () => {
                     setRate('');
                     setGstTypeIds([]); // Clear selected GST types
                     setTotalAmount(0);
+                    setCommission(''); // Clear commission
                 } else {
                     toast.error(data?.message || 'Failed to add product.');
                 }
@@ -290,6 +294,18 @@ const AddServiceProduct = () => {
                             ))}
                         </Select>
                     </FormControl>
+
+                    <TextField
+                        label="Commission"
+                        type="number"
+                        placeholder="Enter Commission"
+                        value={commission}
+                        onChange={(e) => setCommission(e.target.value)}
+                        fullWidth
+                        variant="outlined"
+                        size="small"
+                        inputProps={{ step: "0.01" }}
+                    />
 
                     <TextField
                         label="Total Amount"

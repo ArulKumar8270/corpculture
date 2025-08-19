@@ -5,7 +5,7 @@ import GST from "../../models/gstModel.js"; // Assuming this path is correct
 // Create Service Product
 export const createServiceProduct = async (req, res) => {
     try {
-        const { company, productName, sku, hsn, quantity, rate, gstType, totalAmount } = req.body;
+        const { company, productName, sku, hsn, quantity, rate, gstType, totalAmount, commission } = req.body;
 
         // Validation
         if (!company || !productName || !sku || quantity === undefined || rate === undefined || !gstType || totalAmount === undefined) {
@@ -47,6 +47,7 @@ export const createServiceProduct = async (req, res) => {
             quantity: parseInt(quantity),
             rate: parseFloat(rate),
             gstType,
+            commission,
             totalAmount: parseFloat(totalAmount),
         });
 
@@ -120,7 +121,7 @@ export const getServiceProductsByCompany = async (req, res) => {
 export const updateServiceProduct = async (req, res) => {
     try {
         const { id } = req.params;
-        const { company, productName, sku, hsn, quantity, rate, gstType, totalAmount } = req.body;
+        const { company, productName, sku, hsn, quantity, rate, gstType, totalAmount, commission } = req.body;
 
         // Basic validation for required fields (can be more granular)
         if (!company || !productName || !sku || quantity === undefined || rate === undefined || !gstType || totalAmount === undefined) {
@@ -164,6 +165,7 @@ export const updateServiceProduct = async (req, res) => {
                 quantity: parseInt(quantity),
                 rate: parseFloat(rate),
                 gstType,
+                commission,
                 totalAmount: parseFloat(totalAmount),
             },
             { new: true, runValidators: true }
