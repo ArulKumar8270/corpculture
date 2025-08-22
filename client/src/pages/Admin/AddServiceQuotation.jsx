@@ -39,7 +39,7 @@ const AddServiceQuotation = () => {
         companyId: '', // Stores the _id of the selected company
         productId: '', // Stores the _id of the selected product for adding to table
         quantity: '', // Quantity for the product being added
-        modeOfPayment: '',
+        modeOfPayment: 'Cash',
         deliveryAddress: '',
         reference: '',
         description: '',
@@ -65,7 +65,7 @@ const AddServiceQuotation = () => {
                 },
             });
             if (data?.success) {
-                setInvoices(data.serviceInvoices?.length + 1);
+                setInvoices(data.serviceQuotations?.length + 1);
             } else {
                 alert(data?.message || 'Failed to fetch service invoices.');
             }
@@ -337,7 +337,7 @@ const AddServiceQuotation = () => {
             companyId: '',
             productId: '',
             quantity: '',
-            modeOfPayment: '',
+            modeOfPayment: 'Cash',
             deliveryAddress: '',
             reference: '',
             description: '',
@@ -430,7 +430,7 @@ const AddServiceQuotation = () => {
                             disabled={!quotationData.productId}
                         />
                     </Grid>
-                    <Grid item xs={12} sm={6}>
+                    {/* <Grid item xs={12} sm={6}>
                         <FormControl fullWidth margin="normal" size="small" required>
                             <InputLabel id="mode-of-payment-label">Mode Of Payment</InputLabel>
                             <Select
@@ -448,7 +448,7 @@ const AddServiceQuotation = () => {
                                 <MenuItem value="UPI">UPI</MenuItem>
                             </Select>
                         </FormControl>
-                    </Grid>
+                    </Grid> */}
                     <Grid item xs={12} sm={6}>
                         {/* <TextField
                             fullWidth

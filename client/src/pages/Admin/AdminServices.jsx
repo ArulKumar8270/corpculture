@@ -249,17 +249,17 @@ const AdminServices = () => {
   };
 
   const handleInvoice = (serviceId, employeeName) => {
-    navigate(`../addServiceInvoice?employeeName=${employeeName}`);
+    navigate(`../addServiceInvoice?employeeName=${employeeName}&invoiceType=invoice`);
     handleClose();
   };
 
   const handleQuotation = (serviceId, employeeName) => {
-    navigate(`../AddServiceQuotation?employeeName=${employeeName}`);
+    navigate(`../addServiceInvoice?employeeName=${employeeName}&invoiceType=quotation`);
     handleClose();
   };
 
   const handleReport = (serviceId, employeeName) => {
-    navigate(`../addServiceReport?employeeName=${employeeName}`);
+    navigate(`../addServiceReport?employeeName=${employeeName}&reportType=service`);
     handleClose();
   };
 

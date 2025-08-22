@@ -1,6 +1,10 @@
 import mongoose from "mongoose";
 
 const serviceInvoiceSchema = new mongoose.Schema({
+    invoiceType: {
+        type: String,
+        required: true,
+    },
     invoiceNumber: {
         type: String,
         required: true,

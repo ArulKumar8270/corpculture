@@ -86,6 +86,7 @@ const AddRentalProduct = () => {
     const [basePrice, setBasePrice] = useState('');
     const [gstTypeIds, setGstTypeIds] = useState([]); // Changed to array for multiple selection
     const [paymentDate, setPaymentDate] = useState(null); // dayjs object
+    const [commission, setCommission] = useState(''); // New state for commission
 
     // Model Specifications checkboxes
     const [modelSpecs, setModelSpecs] = useState({
@@ -174,6 +175,7 @@ const AddRentalProduct = () => {
                     setGstTypeIds([]);
                 }
                 setPaymentDate(product.paymentDate ? dayjs(product.paymentDate) : null);
+                setCommission(product.commission || ''); // Populate commission
 
                 setModelSpecs({
                     isA3Selected: product.modelSpecs?.isA3Selected || false,
@@ -212,7 +214,7 @@ const AddRentalProduct = () => {
         e.preventDefault();
 
         // Basic validation
-        if (!company || !branch || !department || !modelName || !serialNo || !hsn || !basePrice || gstTypeIds.length === 0 || !paymentDate) { // Check gstTypeIds length
+        if (!company || !branch || !department || !modelName || !serialNo || !hsn || !basePrice || gstTypeIds.length === 0 || !paymentDate || !commission) { // Check gstTypeIds length and commission
             toast.error('Please fill in all required fields.');
             return;
         }
@@ -227,11 +229,12 @@ const AddRentalProduct = () => {
             basePrice: parseFloat(basePrice),
             gstType: gstTypeIds, // Send as array
             paymentDate: paymentDate ? paymentDate.toISOString() : null, // Convert dayjs object to ISO string
+            commission: parseFloat(commission), // Include commission in payload
             modelSpecs,
             a3Config: modelSpecs.isA3Selected ? a3Config : {},
             a4Config: modelSpecs.isA4Selected ? a4Config : {},
             a5Config: modelSpecs.isA5Selected ? a5Config : {},
-            assignedTo : employeeName
+            assignedTo: employeeName
         };
         try {
             if (id) {
@@ -258,6 +261,7 @@ const AddRentalProduct = () => {
                     setBasePrice('');
                     setGstTypeIds([]); // Clear as array
                     setPaymentDate(null);
+                    setCommission(''); // Clear commission
                     setModelSpecs({ isA3Selected: false, isA4Selected: false, isA5Selected: false });
                     setA3Config({});
                     setA4Config({});
@@ -404,6 +408,17 @@ const AddRentalProduct = () => {
                                     size="small"
                                 />
                             )}
+                        />
+
+                        <TextField
+                            label="Commission"
+                            type="number"
+                            placeholder="Enter Commission Percentage"
+                            value={commission}
+                            onChange={(e) => setCommission(e.target.value)}
+                            fullWidth
+                            variant="outlined"
+                            size="small"
                         />
 
                         <div className="md:col-span-2 lg:col-span-3">

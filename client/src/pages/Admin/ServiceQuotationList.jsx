@@ -234,7 +234,7 @@ function QuotationRow(props) {
                 <TableCell>
                     {hasPermission("serviceQuotation") ? <Button variant="outlined" size="small" sx={{ mr: 1 }} onClick={handleEdit}>Edit</Button> : null}
                     <Button variant="outlined" size="small" sx={{ my: 1 }} onClick={() => onSendQuotation(quotation)}>Send Quotation</Button>
-                    <Button variant="outlined" size="small" sx={{ my: 1 }} onClick={() => onMoveToInvoice("moveToInvoicing")}>Move to Invoice</Button>
+                    {props?.componentProps?.status ? null : <Button variant="outlined" size="small" sx={{ my: 1 }} onClick={() => onMoveToInvoice("moveToInvoicing")}>Move to Invoice</Button>}
                     <Button variant="outlined" size="small" sx={{ my: 1 }} onClick={handleOpenPaymentDetailsModal}>Update Payment Details</Button>
 
                     <Button
@@ -595,7 +595,7 @@ const ServiceQuotationList = (props) => {
                                 </TableRow>
                             ) : (
                                 filteredQuotaion?.map((quotation) => (
-                                    <QuotationRow key={quotation._id} quotation={quotation} navigate={navigate} onQuotationUpdate={() => fetchQuotations()} />
+                                    <QuotationRow key={quotation._id} quotation={quotation} navigate={navigate} onQuotationUpdate={() => fetchQuotations()} componentProps={props} />
                                 ))
                             )}
                         </TableBody>
