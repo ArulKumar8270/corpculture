@@ -26,7 +26,8 @@ export const createRentalProduct = async (req, res) => {
     try {
         const {
             company, branch, department, modelName, serialNo, hsn, basePrice, gstType, paymentDate,
-            modelSpecs, a3Config, a4Config, a5Config
+            modelSpecs, a3Config, a4Config, a5Config,
+            commission
         } = req.body;
 
         // Basic Validation
@@ -64,6 +65,7 @@ export const createRentalProduct = async (req, res) => {
             hsn,
             basePrice: parseFloat(basePrice),
             gstType,
+            commission,
             paymentDate: new Date(paymentDate),
             modelSpecs: modelSpecs || {},
             a3Config: parseConfigFields(a3Config),
@@ -143,7 +145,7 @@ export const updateRentalProduct = async (req, res) => {
         const { id } = req.params;
         const {
             company, branch, department, modelName, serialNo, hsn, basePrice, gstType, paymentDate,
-            modelSpecs, a3Config, a4Config, a5Config, employeeId
+            modelSpecs, a3Config, a4Config, a5Config, employeeId,commission
         } = req.body;
 
         // Basic Validation for update
@@ -183,6 +185,7 @@ export const updateRentalProduct = async (req, res) => {
                 hsn,
                 basePrice: parseFloat(basePrice),
                 gstType,
+                commission,
                 paymentDate: new Date(paymentDate),
                 modelSpecs: modelSpecs || {},
                 a3Config: parseConfigFields(a3Config),

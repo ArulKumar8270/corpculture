@@ -84,6 +84,10 @@ const rentalPaymentEntrySchema = new mongoose.Schema({
         ref: 'User',
         required: true,
     },
+    invoiceType: {
+        type: String,
+        trim: true,
+    },
     invoiceLink: {
         type: [String], // Changed to an array of strings to allow multiple URLs
         trim: true,

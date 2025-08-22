@@ -35,7 +35,8 @@ export const createServiceInvoice = async (req, res) => {
             tax, // Optional tax from frontend, or calculated here
             invoiceDate,
             assignedTo,
-            sendTo
+            sendTo,
+            invoiceType
         } = req.body;
 
         // Basic Validation
@@ -104,7 +105,8 @@ export const createServiceInvoice = async (req, res) => {
             grandTotal,
             invoiceDate: invoiceDate || Date.now(),
             assignedTo,
-            sendTo
+            sendTo,
+            invoiceType
         });
 
         await newServiceInvoice.save();
@@ -119,7 +121,14 @@ export const createServiceInvoice = async (req, res) => {
 // Get All Service Invoices
 export const getAllServiceInvoices = async (req, res) => {
     try {
-        const serviceInvoices = await ServiceInvoice.find({})
+        const { invoiceType } = req.params; // Get invoiceType from query parameters
+        let query = {};
+
+        if (invoiceType) {
+            query.invoiceType = invoiceType; // Add invoiceType to the query if provided
+        }
+
+        const serviceInvoices = await ServiceInvoice.find(query) // Use the constructed query
             .populate('companyId') // Populate company name
             .populate({
                 path: 'products.productId', // First populate productId
@@ -229,7 +238,8 @@ export const updateServiceInvoice = async (req, res) => {
             invoiceDate,
             invoiceLink, // <-- Add invoiceLink here
             assignedTo,
-            sendTo
+            sendTo,
+            invoiceType
         } = req.body;
 
         // Find the invoice to update
@@ -300,6 +310,7 @@ export const updateServiceInvoice = async (req, res) => {
         if (invoiceDate) serviceInvoice.invoiceDate = invoiceDate;
         if (assignedTo) serviceInvoice.assignedTo = assignedTo;
         if (sendTo) serviceInvoice.sendTo = sendTo;
+        if (invoiceType) serviceInvoice.invoiceType = invoiceType;
         if (invoiceLink !== undefined) serviceInvoice.invoiceLink = invoiceLink; // Update invoiceLink
 
         await serviceInvoice.save();

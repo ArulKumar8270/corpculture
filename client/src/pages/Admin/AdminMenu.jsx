@@ -327,6 +327,20 @@ const AdminMenu = ({ toggleMenu }) => {
                                                         </div>
                                                     </NavLink>
                                                 )}
+                                                <NavLink
+                                                    to="./serviceReportlist"
+                                                    onClick={scrollToTop}
+                                                    className={({ isActive }) =>
+                                                        `rounded-lg mx-2 my-1 transition-all ${isActive
+                                                            ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
+                                                            : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
+                                                        }`
+                                                    }
+                                                >
+                                                    <div className="h-10 px-8 flex items-center">
+                                                        Report & Gatpass
+                                                    </div>
+                                                </NavLink>
                                                 {/* Commission under Service */}
                                                 {hasPermission('serviceCommission') && (
                                                     <NavLink
@@ -422,7 +436,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                                 )}
                                                 {hasPermission('rentalQuotation') && (
                                                     <NavLink
-                                                        to="./rentalIQuotationList"
+                                                        to="./rentalQuotationList"
                                                         onClick={scrollToTop}
                                                         className={({ isActive }) =>
                                                             `rounded-lg mx-2 my-1 transition-all ${isActive
@@ -437,6 +451,20 @@ const AdminMenu = ({ toggleMenu }) => {
                                                         </div>
                                                     </NavLink>
                                                 )}
+                                                <NavLink
+                                                    to="./RentalReportlist"
+                                                    onClick={scrollToTop}
+                                                    className={({ isActive }) =>
+                                                        `rounded-lg mx-2 my-1 transition-all ${isActive
+                                                            ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
+                                                            : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
+                                                        }`
+                                                    }
+                                                >
+                                                    <div className="h-10 px-8 flex items-center">
+                                                        Report & Gatpass
+                                                    </div>
+                                                </NavLink>
                                                 {hasPermission('rentalCommission') && (
                                                     <NavLink
                                                         to="/admin/commission"

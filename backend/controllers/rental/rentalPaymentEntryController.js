@@ -10,7 +10,8 @@ export const createRentalPaymentEntry = async (req, res) => {
             remarks,
             companyId,
             countImageUpload,
-            assignedTo
+            assignedTo,
+            invoiceType
         } = req.body;
 
         // {{ edit_1 }}
@@ -45,6 +46,7 @@ export const createRentalPaymentEntry = async (req, res) => {
             sendDetailsTo,
             countImageUpload: countImageUploadUrl,
             assignedTo,
+            invoiceType,
             remarks,
             // {{ edit_3 }}
             a3Config, // These now include the new fields due to JSON.parse
@@ -65,7 +67,13 @@ export const createRentalPaymentEntry = async (req, res) => {
 // Get all rental payment entries
 export const getAllRentalPaymentEntries = async (req, res) => {
     try {
-        const entries = await RentalPaymentEntry.find({})
+        const { invoiceType } = req.params; // Get invoiceType from query parameters
+        let query = {};
+
+        if (invoiceType) {
+            query.invoiceType = invoiceType; // Add invoiceType to the query if provided
+        }
+        const entries = await RentalPaymentEntry.find(query)
             .populate({
                 path: 'machineId', // First populate productId
                 populate: {
@@ -191,7 +199,8 @@ export const updateRentalPaymentEntry = async (req, res) => {
             transferDate,
             companyNamePayment,
             otherPaymentMode,
-            invoiceLink
+            invoiceLink,
+            invoiceType
             // {{ edit_1 }}
         } = req.body;
 
@@ -254,6 +263,7 @@ export const updateRentalPaymentEntry = async (req, res) => {
         }
         entry.companyId = companyId || entry.companyId;
         entry.invoiceLink = invoiceLink || entry.invoiceLink;
+        entry.invoiceType = invoiceType || entry.invoiceType;
         entry.countImageUpload = countImageUploadUrl;
         // {{ edit_2 }}
         entry.modeOfPayment = modeOfPayment !== undefined ? modeOfPayment : entry.modeOfPayment;

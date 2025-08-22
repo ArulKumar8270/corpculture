@@ -24,6 +24,8 @@ import vendorProductRoutes from "./routes/vendorProductRoutes.js"; // New import
 import purchaseRoutes from "./routes/purchaseRoutes.js"; // New import
 import serviceInvoiceRoutes from "./routes/serviceInvoiceRoute.js"; // New import
 import serviceQuotationRoutes from "./routes/serviceQuotationRoute.js"; // New import
+import reportRoutes from "./routes/reportRoutes.js";
+import commonDetailsRoutes from "./routes/commonDetailsRoutes.js"; // Import the new routes
 import rentalPaymentEntryRoutes from './routes/rentalPaymentEntryRoutes.js'; // Import new routes
 
 const __filename = fileURLToPath(import.meta.url);
@@ -105,6 +107,10 @@ app.use("/api/v1/service-quotation", serviceQuotationRoutes);
 //     res.sendFile(path.join(__dirname, "../client/dist/index.html"));
 // });
 app.use('/api/v1/rental-payment', rentalPaymentEntryRoutes); // Use new routes
+
+app.use("/api/v1/report", reportRoutes); // Or choose your desired base path
+app.use("/api/v1/common-details", commonDetailsRoutes); // Add the new common details routes
+
 app.listen(PORT, () => {
     console.log(`SERVER RUNNING ON PORT ${PORT}`);
 });

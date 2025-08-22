@@ -37,7 +37,7 @@ const menuStructure = [
                 subItems: [
                     { name: "Service Enquiries", key: "serviceEnquiries", permissions: ['view', 'edit'] },
                     { name: "Commission", key: "serviceCommission", permissions: ['view', 'add', 'edit', 'delete'] },
-                    { name: "All Products", key: "serviceAllProducts", permissions: ['view', 'add', 'edit', 'delete'] },
+                    { name: "All Products", key: "serviceProductList", permissions: ['view', 'add', 'edit', 'delete'] },
                     { name: "Invoice", key: "serviceInvoice", permissions: ['view', 'add', 'edit', 'delete'] },
                     { name: "Quotation", key: "serviceQuotation", permissions: ['view', 'add', 'edit', 'delete'] },
                 ]

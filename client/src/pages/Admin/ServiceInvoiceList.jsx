@@ -33,11 +33,10 @@ import UploadFileIcon from '@mui/icons-material/UploadFile';
 import LinkIcon from '@mui/icons-material/Link'; // Import LinkIcon
 import Stack from '@mui/material/Stack'; // Import Stack for layout
 import Chip from '@mui/material/Chip'; // Import Chip for assignedTo UI
-import ServiceQuotationList from './ServiceQuotationList';
 
 // Row component for each invoice, allowing expansion to show products
 function InvoiceRow(props) {
-    const { invoice, navigate } = props;
+    const { invoice, navigate, invoiceType } = props;
     const { auth, userPermissions } = useAuth();
     const [open, setOpen] = useState(false);
     const [openPaymentModal, setOpenPaymentModal] = useState(false); // State for payment modal
@@ -171,6 +170,33 @@ function InvoiceRow(props) {
         }
     };
 
+    const onMoveToInvoice = async (status) => {
+        try {
+            const payload = {
+                invoiceType: status
+            };
+
+            const res = await axios.put(
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/update/${invoice._id}`,
+                payload,
+                {
+                    headers: {
+                        Authorization: auth.token,
+                    },
+                }
+            );
+
+            if (res.data?.success) {
+                props.onInvoiceUpdate();
+                alert(res.data.message || 'Moved to invoice successfully!');
+            } else {
+                alert(res.data?.message || 'Failed to update move quotation details.');
+            }
+        } catch (error) {
+            console.error('Error updating status details:', error);
+        }
+    }
+
     const onSendInvoice = async (invoice) => {
         console.log(invoice, "invoice79037254093")
     }
@@ -205,7 +231,9 @@ function InvoiceRow(props) {
                 </TableCell>
                 <TableCell>
                     {hasPermission("serviceInvoice") ? <Button variant="outlined" size="small" sx={{ mr: 1 }} onClick={handleEdit}>Edit</Button> : null}
-                    <Button variant="outlined" size="small" sx={{ my: 1 }} onClick={() => onSendInvoice(invoice)}>Send InVoice</Button>
+                    <Button variant="outlined" size="small" sx={{ my: 1 }} onClick={() => onSendInvoice(invoice)}>Send {invoiceType === "quotaion" ? "Invoice" : "Quotaion"}</Button>
+                    {invoiceType === "quotaion" ? <Button variant="outlined" size="small" sx={{ my: 1 }} onClick={() => onMoveToInvoice("invoice")}>Move to invoice</Button>
+                        : null}
                     <Button variant="outlined" size="small" sx={{ my: 1 }} onClick={handleOpenPaymentDetailsModal}>Update Payment Details</Button>
                     <Button
                         variant="contained"
@@ -223,7 +251,7 @@ function InvoiceRow(props) {
                     <Collapse in={open} timeout="auto" unmountOnExit>
                         <Box sx={{ margin: 1 }}>
                             <Typography variant="h6" gutterBottom component="div">
-                                Invoice Links
+                                {invoiceType === "invoice" ? "Invoices" : "Quotations"} Links
                             </Typography>
                             <Stack direction="row" spacing={1} flexWrap="wrap"> {/* Use Stack for layout */}
                                 {
@@ -452,20 +480,17 @@ function InvoiceRow(props) {
     );
 }
 
-const ServiceInvoiceList = () => {
+const ServiceInvoiceList = (props) => {
     const [invoices, setInvoices] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState(''); // New state for search term
     const { auth, userPermissions } = useAuth();
-    const [movidedList, setMovidedList] = useState(false); // New state for movidedList
     const navigate = useNavigate(); // Initialize useNavigate
-    const hasPermission = (key) => {
-        return userPermissions.some(p => p.key === key && p.actions.includes('edit')) || auth?.user?.role === 1;
-    };
+
     const fetchInvoices = async () => {
         try {
             setLoading(true);
-            const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/${auth?.user?.role === 3 ? `assignedTo/${auth?.user?._id}` : "all"}`, {
+            const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/${auth?.user?.role === 3 ? `assignedTo/${auth?.user?._id}` : `all/${props?.invoice}`}`, {
                 headers: {
                     Authorization: auth.token,
                 },
@@ -485,7 +510,7 @@ const ServiceInvoiceList = () => {
 
     useEffect(() => {
         fetchInvoices();
-    }, [auth.token]);
+    }, [auth.token, props?.invoice]);
 
     // Filter invoices based on search term
     const filteredInvoices = invoices?.filter(invoice => {
@@ -511,64 +536,60 @@ const ServiceInvoiceList = () => {
         <Box sx={{ p: 3, bgcolor: 'background.default', minHeight: '100vh' }} className='w-[95%]'>
             <div className='flex justify-between'>
                 <Typography variant="h5" component="h1" gutterBottom sx={{ mb: 3, color: '#019ee3', fontWeight: 'bold' }}>
-                    Service Invoices
+                    Service {props?.invoice === "invoice" ? "Invoices" : "Quotations"}
                 </Typography>
-                <Typography variant="h5" component="h1" gutterBottom sx={{ mb: 3, color: '#019ee3', fontWeight: 'bold' }}>
-                    <Button color="secondary" onClick={() => setMovidedList((prev) => !prev)} variant="outlined">
-                        {!movidedList ? "Movided Invoices" : "All Invoices"}
-                    </Button>
-                </Typography>
-                {hasPermission("serviceInvoice") ? <Typography variant="h5" component="h1" gutterBottom sx={{ mb: 3, color: '#019ee3', fontWeight: 'bold' }}>
+                {/* {hasPermission("serviceInvoice") ? <Typography variant="h5" component="h1" gutterBottom sx={{ mb: 3, color: '#019ee3', fontWeight: 'bold' }}>
                     <Button onClick={() => navigate("../addServiceInvoice")} color="primary">
                         Create New Invoice
                     </Button>
-                </Typography> : null}
+                </Typography> : null} */}
             </div>
             {/* Search Input Field */}
-            {!movidedList ?
-                <><TextField
+
+            <>
+                <TextField
                     fullWidth
                     margin="normal"
-                    label="Search Invoices (Invoice No., Company, Payment Mode, Status, Date)"
+                    label={`Search ${props?.invoice === "invoice" ? "Invoices" : "Quotations"} (Company, Payment Mode, Status, Date)`}
                     variant="outlined"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     sx={{ mb: 3 }}
                 />
-                    <Paper elevation={3} sx={{ p: 2, borderRadius: '8px' }}>
-                        <TableContainer>
-                            <Table aria-label="collapsible table">
-                                <TableHead>
+                <Paper elevation={3} sx={{ p: 2, borderRadius: '8px' }}>
+                    <TableContainer>
+                        <Table aria-label="collapsible table">
+                            <TableHead>
+                                <TableRow>
+                                    <TableCell />
+                                    <TableCell>Invoice Number</TableCell>
+                                    <TableCell>Company</TableCell>
+                                    <TableCell>Payment Mode</TableCell>
+                                    <TableCell>Delivery Address</TableCell>
+                                    <TableCell align="right">Grand Total</TableCell>
+                                    <TableCell>Status</TableCell>
+                                    <TableCell>Invoice Date</TableCell>
+                                    <TableCell>Assign To</TableCell>
+                                    <TableCell>Actions</TableCell>
+                                </TableRow>
+                            </TableHead>
+                            <TableBody>
+                                {filteredInvoices?.length === 0 ? (
                                     <TableRow>
-                                        <TableCell />
-                                        <TableCell>Invoice Number</TableCell>
-                                        <TableCell>Company</TableCell>
-                                        <TableCell>Payment Mode</TableCell>
-                                        <TableCell>Delivery Address</TableCell>
-                                        <TableCell align="right">Grand Total</TableCell>
-                                        <TableCell>Status</TableCell>
-                                        <TableCell>Invoice Date</TableCell>
-                                        <TableCell>Assign To</TableCell>
-                                        <TableCell>Actions</TableCell>
+                                        <TableCell colSpan={9} align="center" sx={{ py: 3, color: 'text.secondary' }}>
+                                            No service invoices found.
+                                        </TableCell>
                                     </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                    {filteredInvoices?.length === 0 ? (
-                                        <TableRow>
-                                            <TableCell colSpan={9} align="center" sx={{ py: 3, color: 'text.secondary' }}>
-                                                No service invoices found.
-                                            </TableCell>
-                                        </TableRow>
-                                    ) : (
-                                        filteredInvoices?.map((invoice) => (
-                                            <InvoiceRow key={invoice._id} invoice={invoice} navigate={navigate} onInvoiceUpdate={fetchInvoices} />
-                                        ))
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </TableContainer>
-                    </Paper>
-                </> : <ServiceQuotationList status="moveToInvoicing" />}
+                                ) : (
+                                    filteredInvoices?.map((invoice) => (
+                                        <InvoiceRow key={invoice._id} invoice={invoice} navigate={navigate} onInvoiceUpdate={fetchInvoices} invoiceType={props?.invoice} />
+                                    ))
+                                )}
+                            </TableBody>
+                        </Table>
+                    </TableContainer>
+                </Paper>
+            </>
         </Box>
     );
 };

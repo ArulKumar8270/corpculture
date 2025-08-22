@@ -26,6 +26,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'; // <
 import toast from 'react-hot-toast';
 import axios from 'axios'; // Import axios
 import { useAuth } from '../../context/auth';
+import { cache } from 'react';
 
 const AddServiceInvoice = () => {
     const navigate = useNavigate();
@@ -33,13 +34,14 @@ const AddServiceInvoice = () => {
     const { invoiceId, assignedTo } = useParams(); // <-- get invoiceId from URL
     const [searchParams] = useSearchParams();
     const employeeName = searchParams.get("employeeName");
+    const invoiceType = searchParams.get("invoiceType");
     const [invoices, setInvoices] = useState(null);
     // State for form fields
     const [invoiceData, setInvoiceData] = useState({
         companyId: '', // Stores the _id of the selected company
         productId: '', // Stores the _id of the selected product for adding to table
         quantity: '', // Quantity for the product being added
-        modeOfPayment: '',
+        modeOfPayment: 'Cash',
         deliveryAddress: '',
         reference: '',
         description: '',
@@ -59,13 +61,13 @@ const AddServiceInvoice = () => {
     const fetchInvoices = async () => {
         try {
             setLoading(true);
-            const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/all`, {
+            const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/common-details`, {
                 headers: {
                     Authorization: auth.token,
                 },
             });
             if (data?.success) {
-                setInvoices(data.serviceInvoices?.length + 1 || 1);
+                setInvoices(data.commonDetails?.invoiceCount + 1 || 1);
             } else {
                 alert(data?.message || 'Failed to fetch service invoices.');
             }
@@ -76,7 +78,7 @@ const AddServiceInvoice = () => {
             setLoading(false);
         }
     };
-    
+
     // Fetch companies on component mount
     useEffect(() => {
         const fetchCompanies = async () => {
@@ -121,50 +123,47 @@ const AddServiceInvoice = () => {
                         setCompanyData(company);
 
                     } else {
-                        toast.error(data?.message || 'Failed to fetch company details.');
+                        alert(data?.message || 'Failed to fetch company details.');
                     }
                 } catch (error) {
                     console.error('Error fetching company details:', error);
-                    toast.error(error.response?.data?.message || 'Something went wrong while fetching company details.');
+                    alert(error.response?.data?.message || 'Something went wrong while fetching company details.');
                 }
             }
         };
 
         if (auth?.token) {
             fetchCompanyData();
+            fetchProductsByCompany();
         }
     }, [invoiceData?.companyId, auth?.token]);
 
-    // Fetch products when companyId changes
-    useEffect(() => {
-        const fetchProductsByCompany = async () => {
-            if (invoiceData.companyId) {
-                try {
-                    setLoading(true);
-                    const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/service-products/getServiceProductsByCompany/${invoiceData.companyId}`, {
-                        headers: {
-                            Authorization: auth.token,
-                        },
-                    });
-                    if (data?.success) {
-                        setAvailableProducts(data.serviceProducts);
-                    } else {
-                        toast.error(data?.message || 'Failed to fetch products for the selected company.');
-                        setAvailableProducts([]); // Clear products if fetch fails
-                    }
-                } catch (error) {
-                    console.error("Error fetching products by company:", error);
-                    toast.error('Something went wrong while fetching products.');
-                    setAvailableProducts([]); // Clear products on error
-                } finally {
-                    setLoading(false);
+    const fetchProductsByCompany = async () => {
+        if (invoiceData.companyId) {
+            try {
+                setLoading(true);
+                const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/service-products/getServiceProductsByCompany/${invoiceData.companyId}`, {
+                    headers: {
+                        Authorization: auth.token,
+                    },
+                });
+                if (data?.success) {
+                    setAvailableProducts(data.serviceProducts);
+                } else {
+                    alert(data?.message || 'Failed to fetch products for the selected company.');
+                    setAvailableProducts([]); // Clear products if fetch fails
                 }
-            } else {
-                setAvailableProducts([]); // Clear products if no company is selected
+            } catch (error) {
+                console.error("Error fetching products by company:", error);
+                alert('Something went wrong while fetching products.');
+                setAvailableProducts([]); // Clear products on error
+            } finally {
+                setLoading(false);
             }
-        };
-        fetchProductsByCompany();
-    }, [invoiceData.companyId]);
+        } else {
+            setAvailableProducts([]); // Clear products if no company is selected
+        }
+    };
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -272,7 +271,7 @@ const AddServiceInvoice = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        const {  companyId, modeOfPayment, deliveryAddress, reference, description, sendTo } = invoiceData; // Removed status
+        const { companyId, modeOfPayment, deliveryAddress, reference, description, sendTo } = invoiceData; // Removed status
 
         // Updated validation for sendTo (check if array is empty)
         if (!companyId || !modeOfPayment || !deliveryAddress || productsInTable.length === 0) {
@@ -286,7 +285,7 @@ const AddServiceInvoice = () => {
         const grandTotal = subtotal + tax;
 
         const payload = {
-            invoiceNumber:invoices,
+            invoiceNumber: invoices,
             companyId,
             products: productsInTable.map(p => ({
                 productId: p.productId,
@@ -304,7 +303,8 @@ const AddServiceInvoice = () => {
             grandTotal,
             // status, // Removed status from payload
             sendTo, // sendTo is now an array
-            assignedTo : employeeName
+            assignedTo: employeeName,
+            invoiceType
         };
 
         try {
@@ -327,21 +327,46 @@ const AddServiceInvoice = () => {
                 data = res.data;
             }
             if (data?.success) {
+                if (!invoiceId) {
+                    handleUpdateInvoiceCount()
+                }
                 handleCancel();
             } else {
-                alert (data?.message || 'Failed to save service invoice.');
+                alert(data?.message || 'Failed to save service invoice.');
             }
         } catch (error) {
             alert(error.response?.data?.message || 'Something went wrong while saving the invoice.');
         }
     };
 
+    const handleUpdateInvoiceCount = async () => {
+        try {
+            const { data } = await axios.put(
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/common-details/increment-invoice`,
+                {
+                    invoiceCount: invoices,
+                },
+                {
+                    headers: {
+                        Authorization: auth.token,
+                    },
+                }
+            );
+            if (data?.success) {
+                // Update the local state
+                setInvoices(null);
+            }
+        } catch (error) {
+            console.error('Error updating invoice count:', error);
+        }
+    }
+
     const handleCancel = () => {
         setInvoiceData({
             companyId: '',
             productId: '',
             quantity: '',
-            modeOfPayment: '',
+            modeOfPayment: 'Cash',
             deliveryAddress: '',
             reference: '',
             description: '',
@@ -369,7 +394,7 @@ const AddServiceInvoice = () => {
     return (
         <Box sx={{ p: 3, bgcolor: 'background.default', minHeight: '100vh' }}>
             <Typography variant="h5" component="h1" gutterBottom sx={{ mb: 3, color: '#019ee3', fontWeight: 'bold' }}>
-                Add Service Invoice
+                Add Service {invoiceType === "quotation" ? " Quotation" : "Invoice"}
             </Typography>
 
             <Paper elevation={3} sx={{ p: 4, mb: 4, borderRadius: '8px' }}>
@@ -441,7 +466,7 @@ const AddServiceInvoice = () => {
                             disabled={!invoiceData.productId}
                         />
                     </Grid>
-                    <Grid item xs={12} sm={6}>
+                    {/* <Grid item xs={12} sm={6}>
                         <FormControl fullWidth margin="normal" size="small" required>
                             <InputLabel id="mode-of-payment-label">Mode Of Payment</InputLabel>
                             <Select
@@ -459,7 +484,7 @@ const AddServiceInvoice = () => {
                                 <MenuItem value="UPI">UPI</MenuItem>
                             </Select>
                         </FormControl>
-                    </Grid>
+                    </Grid> */}
                     <Grid item xs={12} sm={6}>
                         {/* <TextField
                             fullWidth

@@ -250,17 +250,17 @@ const AdminRental
     };
 
     const handleInvoice = (rentalId, employeeName) => {
-      navigate(`../addRentalInvoice?employeeName=${employeeName}`);
+      navigate(`../addRentalInvoice?employeeName=${employeeName}&invoiceType=invoice`);
       handleClose();
     };
 
     const handleQuotation = (rentalId, employeeName) => {
-      navigate(`../AddRentalQuotation?employeeName=${employeeName}`);
+      navigate(`../addRentalInvoice?employeeName=${employeeName}&invoiceType=quotation`);
       handleClose();
     };
 
     const handleReport = (rentalId, employeeName) => {
-      navigate(`../addRentalReport?employeeName=${employeeName}`);
+      navigate(`../addRentalReport?employeeName=${employeeName}&reportType=rental`);
       handleClose();
     };
 

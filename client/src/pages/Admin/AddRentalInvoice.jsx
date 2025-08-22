@@ -22,11 +22,13 @@ const MAX_IMAGE_SIZE = 500 * 1024;
 const RentalInvoiceForm = () => {
     const [searchParams] = useSearchParams();
     const employeeName = searchParams.get("employeeName");
+    const invoiceType = searchParams.get("invoiceType");
     const [loading, setLoading] = useState(true);
     const [companies, setCompanies] = useState([]);
     const [availableProducts, setAvailableProducts] = useState([]);
     const [logoPreview, setLogoPreview] = useState("");
     const [contactOptions, setContactOptions] = useState([]);
+    const [invoices, setInvoices] = useState(null);
     // {{ edit_1 }}
     const [formData, setFormData] = useState({
         companyId: '',
@@ -43,6 +45,26 @@ const RentalInvoiceForm = () => {
     const { auth } = useAuth();
     const navigate = useNavigate();
     const { id } = useParams();
+
+    const fetchInvoices = async () => {
+        try {
+            setLoading(true);
+            const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/common-details`, {
+                headers: {
+                    Authorization: auth.token,
+                },
+            });
+            if (data) {
+                setInvoices(data.commonDetails?.invoiceCount + 1 || 1);
+            } else {
+                alert(data?.message || 'Failed to fetch service invoices.');
+            }
+        } catch (error) {
+            console.error("Error fetching service invoices:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     // Fetch all companies on component mount
     useEffect(() => {
@@ -66,6 +88,7 @@ const RentalInvoiceForm = () => {
                 setLoading(false);
             }
         };
+        fetchInvoices();
         fetchCompanies();
     }, [auth.token]);
 
@@ -314,6 +337,28 @@ const RentalInvoiceForm = () => {
         return Object.keys(tempErrors).length === 0;
     };
 
+    const handleUpdateInvoiceCount = async () => {
+        try {
+            const { data } = await axios.put(
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/common-details/increment-invoice`,
+                {
+                    invoiceCount: invoices,
+                },
+                {
+                    headers: {
+                        Authorization: auth.token,
+                    },
+                }
+            );
+            if (data?.success) {
+                // Update the local state
+                setInvoices(null);
+            }
+        } catch (error) {
+            console.error('Error updating invoice count:', error);
+        }
+    }
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!validateForm()) {
@@ -329,6 +374,7 @@ const RentalInvoiceForm = () => {
             data.append('sendDetailsTo', formData.sendDetailsTo);
             data.append('remarks', formData.remarks);
             data.append('assignedTo', employeeName);
+            data.append('invoiceType', invoiceType);
             // Append nested config objects as JSON strings
             data.append('a3Config', JSON.stringify(formData.a3Config));
             data.append('a4Config', JSON.stringify(formData.a4Config));
@@ -359,6 +405,9 @@ const RentalInvoiceForm = () => {
 
 
             if (res.data?.success) {
+                if(!id){
+                    handleUpdateInvoiceCount();
+                }
                 toast.success(res.data.message);
                 // Reset form or navigate
                 // {{ edit_1 }}

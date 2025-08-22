@@ -31,7 +31,7 @@ import LinkIcon from '@mui/icons-material/Link'; // Import LinkIcon
 import Stack from '@mui/material/Stack'; // Import Stack for layout
 import Chip from '@mui/material/Chip';
 
-function RentalInvoiceList() {
+function RentalInvoiceList(props) {
     const [loading, setLoading] = useState(true);
     const [rentalEntries, setRentalEntries] = useState([]);
     const { auth, userPermissions } = useAuth();
@@ -49,29 +49,30 @@ function RentalInvoiceList() {
     });
 
     useEffect(() => {
-        const fetchRentalEntries = async () => {
-            try {
-                setLoading(true);
-                const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/${auth?.user?.role === 3 ? `assignedTo/${auth?.user?._id}` : "all"}`, {
-                    headers: {
-                        Authorization: auth.token,
-                    },
-                });
-                if (data?.success) {
-                    setRentalEntries(data.entries);
-                } else {
-                    toast.error(data?.message || 'Failed to fetch rental entries.');
-                }
-            } catch (error) {
-                console.error("Error fetching rental entries:", error);
-                toast.error('Something went wrong while fetching rental entries.');
-            } finally {
-                setLoading(false);
-            }
-        };
         fetchRentalEntries();
-    }, [auth.token]);
+    }, [auth.token, props.invoice]);
 
+
+    const fetchRentalEntries = async () => {
+        try {
+            setLoading(true);
+            const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/${auth?.user?.role === 3 ? `assignedTo/${auth?.user?._id}` : `all/${props?.invoice}`}`, {
+                headers: {
+                    Authorization: auth.token,
+                },
+            });
+            if (data?.success) {
+                setRentalEntries(data.entries);
+            } else {
+                toast.error(data?.message || 'Failed to fetch rental entries.');
+            }
+        } catch (error) {
+            console.error("Error fetching rental entries:", error);
+            toast.error('Something went wrong while fetching rental entries.');
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const hasPermission = (key) => {
         return userPermissions.some(p => p.key === key && p.actions.includes('edit')) || auth?.user?.role === 1;
@@ -201,6 +202,32 @@ function RentalInvoiceList() {
         }
     };
 
+    const onMoveToInvoice = async (status, entry) => {
+        try {
+            const payload = {
+                invoiceType: status
+            };
+
+            const res = await axios.put(
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/${entry?._id}`,
+                payload,
+                {
+                    headers: {
+                        Authorization: auth.token,
+                    },
+                }
+            );
+            if (res.data) {
+                fetchRentalEntries();
+                alert(res.data.message || 'Moved to invoice successfully!');
+            } else {
+                alert(res.data?.message || 'Failed to update move quotation details.');
+            }
+        } catch (error) {
+            console.error('Error updating status details:', error);
+        }
+    }
+
     if (loading) {
         return (
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
@@ -213,13 +240,13 @@ function RentalInvoiceList() {
         <Box sx={{ p: 3, bgcolor: 'background.default', minHeight: '100vh' }}>
             <div className='flex justify-between'>
                 <Typography variant="h5" component="h1" gutterBottom sx={{ mb: 3, color: '#019ee3', fontWeight: 'bold' }}>
-                    Rental Invoice List
+                    {props?.invoice === "invoice" ? "Invoices" : "Quotations"} List
                 </Typography>
-                {hasPermission("rentalInvoice") ? <Typography variant="h5" component="h1" gutterBottom sx={{ mb: 3, color: '#019ee3', fontWeight: 'bold' }}>
+                {/* {hasPermission("rentalInvoice") ? <Typography variant="h5" component="h1" gutterBottom sx={{ mb: 3, color: '#019ee3', fontWeight: 'bold' }}>
                     <Button onClick={() => navigate("../addRentalInvoice")} color="primary">
                         Create New Invoice
                     </Button>
-                </Typography> : null}
+                </Typography> : null} */}
             </div>
             <Paper elevation={3} sx={{ p: 2, borderRadius: '8px' }}>
                 {rentalEntries.length === 0 ? (
@@ -269,8 +296,10 @@ function RentalInvoiceList() {
                                                         Edit
                                                     </Button> : null}
                                                     <Button variant="outlined" size="small" onClick={() => handleSendInvoice(entry)}>
-                                                        Send Invoice
+                                                        Send {props?.invoice === "invoice" ? "Invoice" : "Quotation"}
                                                     </Button>
+                                                    {props?.invoice === "quotation" ? <Button variant="outlined" size="small" sx={{ my: 1 }} onClick={() => onMoveToInvoice("invoice", entry)}>Move to invoice</Button>
+                                                        : null}
                                                     <Button variant="outlined" size="small" onClick={() => {
                                                         handleOpenPaymentDetailsModal(entry)
                                                     }}>
@@ -283,7 +312,7 @@ function RentalInvoiceList() {
                                                         startIcon={<UploadFileIcon />}
                                                         onClick={() => handleUploadSignedInvoice(entry._id, entry?.invoiceLink)}
                                                     >
-                                                        Upload Signed Quotation
+                                                        Upload Signed {props?.invoice === "invoice" ? "Invoices" : "Quotations"}
                                                     </Button>
                                                 </Stack>
                                             </TableCell>
@@ -293,7 +322,7 @@ function RentalInvoiceList() {
                                                 <Collapse in={open} timeout="auto" unmountOnExit>
                                                     <Box sx={{ margin: 1 }}>
                                                         <Typography variant="h6" gutterBottom component="div">
-                                                            Invoice Links
+                                                            {props?.invoice === "invoice" ? "Invoices" : "Quotations"} Links
                                                         </Typography>
                                                         <Stack direction="row" spacing={1} flexWrap="wrap"> {/* Use Stack for layout */}
                                                             {

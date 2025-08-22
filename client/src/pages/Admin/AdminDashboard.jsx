@@ -37,6 +37,7 @@ import AddCompany from "./AddCompany";
 import AddRentalInvoice from "./addRentalInvoice";
 import AdminRental from "./AdminRental";
 import RentalInvoiceList from "./RentalInvoiceList";
+import ServiceReportsandGatpass from "./ServiceReportsandGatpass";
 
 const AdminDashboard = () => {
     const navigate = useNavigate();
@@ -104,11 +105,14 @@ const AdminDashboard = () => {
                             <Route path="serviceReports" element={<ServiceReports />} />
                             <Route path="addServiceQuotation/:quotationId?" element={<AddServiceQuotation />} />
                             <Route path="addServiceInvoice/:invoiceId?" element={<AddServiceInvoice />} />
-                            <Route path="serviceInvoiceList" element={<ServiceInvoiceList />} />
-                            <Route path="serviceQuotationList" element={<ServiceQuotationList />} />
-                            <Route path="addServiceReport" element={<AddServiceReport />} />
+                            <Route path="serviceInvoiceList" element={<ServiceInvoiceList invoice={"invoice"}/>} />
+                            <Route path="serviceQuotationList" element={<ServiceInvoiceList invoice={"quotation"} />} />
+                            <Route path="addServiceReport/:id?" element={<AddServiceReport />} />
+                            <Route path="serviceReportlist" element={<ServiceReportsandGatpass reportType={"service"}/>} />
+                            <Route path="RentalReportlist" element={<ServiceReportsandGatpass reportType={"rental"}/>} />
                             <Route path="addRentalInvoice/:id?" element={<AddRentalInvoice />} />
-                            <Route path="rentalInvoiceList" element={<RentalInvoiceList />} />
+                            <Route path="rentalInvoiceList" element={<RentalInvoiceList invoice={"invoice"}/>} />
+                            <Route path="rentalQuotationList" element={<RentalInvoiceList invoice={"quotation"}/>} />
                             <Route path="users" element={<Users />} />
                             {/* Add the new route for Service Enquiries */}
                             <Route path="service-enquiries" element={<AdminServices />} />

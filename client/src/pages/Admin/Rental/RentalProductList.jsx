@@ -138,7 +138,8 @@ const RentalProductList = () => {
                                 <TableCell className="font-semibold">Base Price</TableCell>
                                 <TableCell className="font-semibold">GST Type</TableCell>
                                 <TableCell className="font-semibold">Payment Date</TableCell>
-                                <TableCell className="font-semibold">Assigned Employee</TableCell> {/* New Table Header */}
+                                <TableCell className="font-semibold">Commission</TableCell> {/* New Table Header */}
+                                <TableCell className="font-semibold">Assigned Employee</TableCell>
                                 {hasPermission("rentalAllProducts") ? <TableCell className="font-semibold">Action</TableCell> : null}
                             </TableRow>
                         </TableHead>
@@ -165,6 +166,7 @@ const RentalProductList = () => {
                                         )}
                                         </TableCell>
                                         <TableCell>{product.paymentDate ? dayjs(product.paymentDate).format('DD/MM/YYYY') : 'N/A'}</TableCell>
+                                        <TableCell>{product.commission ? `${product.commission}%` : 'N/A'}</TableCell> {/* Display Commission */}
                                         <TableCell>
                                             <FormControl variant="outlined" size="small" fullWidth>
                                                 <InputLabel>Employee</InputLabel>
@@ -211,7 +213,7 @@ const RentalProductList = () => {
                                 ))
                             ) : (
                                 <TableRow>
-                                    <TableCell colSpan={10} className="text-center text-gray-500 py-4"> {/* Adjusted colspan to 10 */}
+                                    <TableCell colSpan={11} className="text-center text-gray-500 py-4"> {/* Adjusted colspan to 11 */}
                                         No rental products found.
                                     </TableCell>
                                 </TableRow>
