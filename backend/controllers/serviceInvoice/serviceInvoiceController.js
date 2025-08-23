@@ -149,7 +149,7 @@ export const getAllServiceInvoices = async (req, res) => {
 // Get Service Invoices by assignedTo
 export const getServiceInvoicesAssignedTo = async (req, res) => {
     try {
-        const { assignedTo } = req.params; // Assuming phone is passed as a URL parameter
+        const { assignedTo, invoiceType } = req.params; // Assuming phone is passed as a URL parameter
 
         if (!assignedTo) {
             return res.status(400).send({
@@ -159,7 +159,11 @@ export const getServiceInvoicesAssignedTo = async (req, res) => {
             });
         }
 
-        const serviceInvoices = await ServiceInvoice.find({ assignedTo: assignedTo })
+        let query = {};
+        if (invoiceType && assignedTo) {
+            query = { invoiceType, assignedTo };
+        }
+        const serviceInvoices = await ServiceInvoice.find(query)
             .populate('companyId') // Populate company name
             .populate({
                 path: 'products.productId', // First populate productId

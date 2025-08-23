@@ -21,6 +21,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown'; // Import down arrow icon
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';   // Import up arrow icon
+import SendIcon from '@mui/icons-material/Send'; // Import SendIcon
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import axios from 'axios';
@@ -38,7 +39,7 @@ const ServiceReportsandGatpass = (props) => {
         setLoading(true);
         setError(null);
         try {
-            const response = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/report/${props?.reportType}`, {
+            const response = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/report/${auth?.user?.role === 3 ? `${auth?.user?._id}/${props?.reportType}` : `${props?.reportType}`}`, {
                 headers: { Authorization: auth?.token }
             });
             if (response.data.success) {
@@ -49,7 +50,6 @@ const ServiceReportsandGatpass = (props) => {
             }
         } catch (err) {
             console.error('Error fetching reports:', err);
-            toast.error(err.response?.data?.message || 'Something went wrong while fetching reports.');
             setError(err.response?.data?.message || 'Error fetching reports.');
         } finally {
             setLoading(false);
@@ -89,6 +89,10 @@ const ServiceReportsandGatpass = (props) => {
 
     const handleToggleExpand = (reportId) => {
         setExpandedReportId(prevId => (prevId === reportId ? null : reportId));
+    };
+
+    const handleSendQuotation = (reportId, companyId) => {
+        navigate(`../addServiceQuotation?reportId=${reportId}&companyId=${companyId}`);
     };
 
     if (loading) {
@@ -177,7 +181,14 @@ const ServiceReportsandGatpass = (props) => {
                                                 )}
                                             </TableCell>
                                             <TableCell align="center">
-
+                                                <Tooltip title="Send Report">
+                                                    <IconButton
+                                                        onClick={() => handleSendQuotation(report._id, report.company?._id)}
+                                                        color="success" // You can choose a different color
+                                                    >
+                                                        <SendIcon />
+                                                    </IconButton>
+                                                </Tooltip>
                                                 <Tooltip title="Edit Report">
                                                     <IconButton onClick={() => handleEdit(report._id)} color="primary">
                                                         <EditIcon />
@@ -192,7 +203,7 @@ const ServiceReportsandGatpass = (props) => {
                                         </TableRow>
                                         {/* Expanded row for materials */}
                                         <TableRow>
-                                            <TableCell style={{ paddingBottom: 0, paddingTop: 0, width:"100%" }} colSpan={9}>
+                                            <TableCell style={{ paddingBottom: 0, paddingTop: 0, width: "100%" }} colSpan={9}>
                                                 <Collapse in={expandedReportId === report._id} timeout="auto" unmountOnExit>
                                                     <Box sx={{ margin: 1 }}>
                                                         <Typography variant="h6" gutterBottom component="div">

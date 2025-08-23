@@ -201,6 +201,8 @@ function InvoiceRow(props) {
         console.log(invoice, "invoice79037254093")
     }
 
+    console.log(invoiceType, "asdfas70d9")
+
     return (
         <>
             <TableRow sx={{ '& > *': { borderBottom: 'unset' } }}>
@@ -231,8 +233,8 @@ function InvoiceRow(props) {
                 </TableCell>
                 <TableCell>
                     {hasPermission("serviceInvoice") ? <Button variant="outlined" size="small" sx={{ mr: 1 }} onClick={handleEdit}>Edit</Button> : null}
-                    <Button variant="outlined" size="small" sx={{ my: 1 }} onClick={() => onSendInvoice(invoice)}>Send {invoiceType === "quotaion" ? "Invoice" : "Quotaion"}</Button>
-                    {invoiceType === "quotaion" ? <Button variant="outlined" size="small" sx={{ my: 1 }} onClick={() => onMoveToInvoice("invoice")}>Move to invoice</Button>
+                    <Button variant="outlined" size="small" sx={{ my: 1 }} onClick={() => onSendInvoice(invoice)}>Send {invoiceType === "quotation" ? "Quotaion" : "Invoice"}</Button>
+                    {invoiceType === "quotation" ? <Button variant="outlined" size="small" sx={{ my: 1 }} onClick={() => onMoveToInvoice("invoice")}>Move to invoice</Button>
                         : null}
                     <Button variant="outlined" size="small" sx={{ my: 1 }} onClick={handleOpenPaymentDetailsModal}>Update Payment Details</Button>
                     <Button
@@ -490,7 +492,7 @@ const ServiceInvoiceList = (props) => {
     const fetchInvoices = async () => {
         try {
             setLoading(true);
-            const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/${auth?.user?.role === 3 ? `assignedTo/${auth?.user?._id}` : `all/${props?.invoice}`}`, {
+            const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/${auth?.user?.role === 3 ? `assignedTo/${auth?.user?._id}/${props?.invoice}` : `all/${props?.invoice}`}`, {
                 headers: {
                     Authorization: auth.token,
                 },
@@ -498,11 +500,11 @@ const ServiceInvoiceList = (props) => {
             if (data?.success) {
                 setInvoices(data.serviceInvoices);
             } else {
-                toast.error(data?.message || 'Failed to fetch service invoices.');
+                setInvoices([]);
             }
         } catch (error) {
             console.error("Error fetching service invoices:", error);
-            toast.error(error.response?.data?.message || 'Something went wrong while fetching invoices.');
+            setInvoices([]);
         } finally {
             setLoading(false);
         }

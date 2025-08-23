@@ -78,7 +78,7 @@ const AddEmployee = () => {
                 );
                 if (response.status === 201) {
                     toast.success("Employee added successfully!");
-                    navigate('/admin/AdminEmployees'); // *** Update with your actual employees list route ***
+                    navigate('../employee'); // *** Update with your actual employees list route ***
                 }
             } catch (error) {
                 console.error("Error adding employee:", error);

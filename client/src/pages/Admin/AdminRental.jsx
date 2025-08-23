@@ -310,12 +310,12 @@ const AdminRental
 
         {/* Tab Navigation */}
         <div className="mb-6 flex flex-wrap gap-2">
-          <button
+          {auth?.user?.role === 1 ? <button
             className={`px-4 py-2 rounded-md text-sm font-medium ${activeTab === 'new' ? 'bg-[#019ee3] text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
             onClick={() => setActiveTab('new')}
           >
             New Rental Requests ({tabCounts.new})
-          </button>
+          </button> : null}
           {auth?.user?.role === 1 ? <button
             className={`px-4 py-2 rounded-md text-sm font-medium ${activeTab === 'assigned' ? 'bg-[#019ee3] text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
             onClick={() => setActiveTab('assigned')}
@@ -451,8 +451,7 @@ const AdminRental
                           disabled={auth?.user?.role === 1 ? false : true}
                         >
                           <option value="">-- Select Employee --</option>
-                          {employees?.filter(employee => employee.employeeType === 'Rentals')
-                            .map(employee => (
+                          {employees?.map(employee => (
                               <option key={employee.userId} value={employee.userId}>
                                 {employee.name}
                               </option>

@@ -21,7 +21,7 @@ router.get("/all/:invoiceType?", isAdmin, getAllServiceInvoices);
 router.get("/get/:id", getServiceInvoiceById);
 
 // Get single service invoice
-router.get("/assignedTo/:assignedTo", getServiceInvoicesAssignedTo);
+router.get("/assignedTo/:assignedTo?/:invoiceType", getServiceInvoicesAssignedTo);
 
 // Update service invoice
 router.put("/update/:id", isAdmin, updateServiceInvoice);

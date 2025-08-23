@@ -575,9 +575,10 @@ const AdminMenu = ({ toggleMenu }) => {
                                         </button>
                                         {expandedSections.reports && (
                                             <div className="flex flex-col text-black font-light text-sm mb-2">
+
                                                 {hasPermission('reportsCompanyList') && (
                                                     <NavLink
-                                                        to="./companyList"
+                                                        to="./companyReports"
                                                         onClick={scrollToTop}
                                                         className={({ isActive }) =>
                                                             `rounded-lg mx-2 my-1 transition-all ${isActive
@@ -587,13 +588,13 @@ const AdminMenu = ({ toggleMenu }) => {
                                                         }
                                                     >
                                                         <div className="h-10 px-8 flex items-center">
-                                                            Company list
+                                                            Company
                                                         </div>
                                                     </NavLink>
                                                 )}
                                                 {hasPermission('reportsService') && (
                                                     <NavLink
-                                                        to="./serviceReports"
+                                                        to="./serviceReportsSummary"
                                                         onClick={scrollToTop}
                                                         className={({ isActive }) =>
                                                             `rounded-lg mx-2 my-1 transition-all ${isActive
@@ -607,9 +608,23 @@ const AdminMenu = ({ toggleMenu }) => {
                                                         </div>
                                                     </NavLink>
                                                 )}
+                                                <NavLink
+                                                    to="./rentalReportsSummary"
+                                                    onClick={scrollToTop}
+                                                    className={({ isActive }) =>
+                                                        `rounded-lg mx-2 my-1 transition-all ${isActive
+                                                            ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
+                                                            : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
+                                                        }`
+                                                    }
+                                                >
+                                                    <div className="h-10 px-8 flex items-center">
+                                                        Rental
+                                                    </div>
+                                                </NavLink>
                                                 {hasPermission('reportsSales') && (
                                                     <NavLink
-                                                        to="/admin/reports/sales-reports"
+                                                        to="./salesReportsSummary"
                                                         onClick={scrollToTop}
                                                         className={({ isActive }) =>
                                                             `rounded-lg mx-2 my-1 transition-all ${isActive
@@ -635,7 +650,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                                         }
                                                     >
                                                         <div className="h-10 px-8 flex items-center">
-                                                            Employee list
+                                                            Employees
                                                         </div>
                                                     </NavLink>
                                                 )}
@@ -651,7 +666,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                                         }
                                                     >
                                                         <div className="h-10 px-8 flex items-center">
-                                                            Users list
+                                                            Users
                                                         </div>
                                                     </NavLink>
                                                 )}
@@ -687,6 +702,20 @@ const AdminMenu = ({ toggleMenu }) => {
                             <div className="flex flex-col text-black font-light text-sm mb-2">
                                 {hasPermission('otherSettingsGst') && (
                                     <>
+                                        <NavLink
+                                            to="./companyList"
+                                            onClick={scrollToTop}
+                                            className={({ isActive }) =>
+                                                `rounded-lg mx-2 my-1 transition-all ${isActive
+                                                    ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
+                                                    : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
+                                                }`
+                                            }
+                                        >
+                                            <div className="h-10 px-8 flex items-center">
+                                                Company
+                                            </div>
+                                        </NavLink>
                                         <NavLink
                                             to="./gst"
                                             onClick={scrollToTop}

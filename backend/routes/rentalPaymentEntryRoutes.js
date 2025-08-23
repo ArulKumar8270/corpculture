@@ -24,7 +24,7 @@ router.get('/:id', isAdmin, getRentalPaymentEntryById);
 router.put('/:id', isAdmin, updateRentalPaymentEntry); // {{ edit_2 }}
 
 // Get single Rental invoice
-router.get("/assignedTo/:assignedTo", getRentalInvoiceAssignedTo);
+router.get("/assignedTo/:assignedTo?/:invoiceType?", getRentalInvoiceAssignedTo);
 
 // Get send details to options || GET
 router.get('/send-details-options', isAdmin, getSendDetailsToOptions);

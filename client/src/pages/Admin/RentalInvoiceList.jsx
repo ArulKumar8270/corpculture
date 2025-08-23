@@ -56,7 +56,7 @@ function RentalInvoiceList(props) {
     const fetchRentalEntries = async () => {
         try {
             setLoading(true);
-            const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/${auth?.user?.role === 3 ? `assignedTo/${auth?.user?._id}` : `all/${props?.invoice}`}`, {
+            const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/${auth?.user?.role === 3 ? `assignedTo/${auth?.user?._id}/${props?.invoice}` : `all/${props?.invoice}`}`, {
                 headers: {
                     Authorization: auth.token,
                 },
