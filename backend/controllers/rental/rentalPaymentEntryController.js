@@ -139,7 +139,7 @@ export const getRentalPaymentEntryById = async (req, res) => {
 // Get Service rental by assignedTo
 export const getRentalInvoiceAssignedTo = async (req, res) => {
     try {
-        const { assignedTo } = req.params; // Assuming phone is passed as a URL parameter
+        const { assignedTo, invoiceType } = req.params; // Assuming phone is passed as a URL parameter
 
         if (!assignedTo) {
             return res.status(400).send({
@@ -149,7 +149,12 @@ export const getRentalInvoiceAssignedTo = async (req, res) => {
             });
         }
 
-        const entries = await RentalPaymentEntry.find({ assignedTo: assignedTo }).populate({
+        let query = {};
+        if (invoiceType && assignedTo) {
+            query = { invoiceType, assignedTo };
+        }
+
+        const entries = await RentalPaymentEntry.find(query).populate({
             path: 'machineId', // First populate productId
             populate: {
                 path: 'gstType',        // Then populate gstType inside the product

@@ -15,7 +15,7 @@ const router = express.Router();
 router.post("/", createReport); // Consider adding isAdmin middleware here
 
 // Get all Reports
-router.get("/:reportType?", getAllReports);
+router.get("/:assignedTo?/:reportType?", getAllReports);
 
 // Get Report by ID
 router.get("/:id", getReportById);

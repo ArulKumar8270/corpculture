@@ -5,6 +5,9 @@ import { useAuth } from "../../context/auth";
 import SeoData from "../../SEO/SeoData"; // Assuming you have an SeoData component
 import { Link } from 'react-router-dom'; // Import Link for navigation
 import { useNavigate } from 'react-router-dom'; // Import useNavigate for navigation
+import { IconButton } from '@mui/material'; // Import IconButton
+import EditIcon from '@mui/icons-material/Edit'; // Import EditIcon
+
 const AdminEmployees = () => {
   const { auth, userPermissions } = useAuth();
   const navigate = useNavigate();
@@ -46,6 +49,10 @@ const AdminEmployees = () => {
     return userPermissions.some(p => p.key === key && p.actions.includes('edit')) || auth?.user?.role === 1;
   };
 
+  const handleEditEmployee = (employeeId) => {
+    navigate(`/admin/edit-employee/${employeeId}`); // Navigate to the employee edit page
+  };
+
   return (
     <div className="p-6 bg-gradient-to-br from-[#e6fbff] to-[#f7fafd] min-h-screen">
       <div className="flex justify-between items-center p-4 bg-white rounded-2xl shadow mb-4">
@@ -73,28 +80,40 @@ const AdminEmployees = () => {
                 <th className="py-2 px-3 text-left">Phone</th>
                 <th className="py-2 px-3 text-left">Address</th>
                 <th className="py-2 px-3 text-left">Employee Type</th>
+                <th className="py-2 px-3 text-center">Actions</th> {/* New column for actions */}
               </tr>
             </thead>
             <tbody>
               {employees?.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="text-center py-6 text-gray-400">No employees found.</td> {/* Updated colspan */}
+                  <td colSpan={7} className="text-center py-6 text-gray-400">No employees found.</td> {/* Updated colspan */}
                 </tr>
               ) : (
                 employees.map(employee => (
                   <tr key={employee._id} className="border-b last:border-b-0 hover:bg-gray-50">
-                    <td className="py-2 px-3"> {/* Wrap employee name in Link */} {/* {{ edit_2 }} */}
-                      <Link // {{ edit_2 }}
-                        to={`/admin/employee_details/${employee._id}`} // Link to employee details page // {{ edit_2 }}
-                        className="text-blue-600 hover:underline" // Add styling to make it look like a link // {{ edit_2 }}
-                      > {/* {{ edit_2 }} */}
-                        {employee.name} {/* {{ edit_2 }} */}
-                      </Link> {/* {{ edit_2 }} */}
-                    </td> {/* {{ edit_2 }} */}
+                    <td className="py-2 px-3"> {/* Wrap employee name in Link */}
+                      <Link
+                        to={`/admin/employee_details/${employee._id}`} // Link to employee details page
+                        className="text-blue-600 hover:underline" // Add styling to make it look like a link
+                      >
+                        {employee.name}
+                      </Link>
+                    </td>
                     <td className="py-2 px-3">{employee.email}</td>
                     <td className="py-2 px-3">{employee.phone}</td>
                     <td className="py-2 px-3">{employee.address}</td>
                     <td className="py-2 px-3">{employee.employeeType}</td>
+                    <td className="py-2 px-3 text-center"> {/* New cell for actions */}
+                      {hasPermission("reportsEmployeeList") && ( // Check permission for edit button
+                        <IconButton
+                          onClick={() => handleEditEmployee(employee._id)}
+                          color="primary"
+                          aria-label="edit employee"
+                        >
+                          <EditIcon />
+                        </IconButton>
+                      )}
+                    </td>
                   </tr>
                 ))
               )}

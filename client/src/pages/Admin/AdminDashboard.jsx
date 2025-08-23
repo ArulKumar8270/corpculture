@@ -16,6 +16,7 @@ import AdminServices from "./AdminServices"; // Import the new component
 import GST from "./OtherSettings/GST";
 import AdminEmployees from "./adminemployees";
 import MenuSetting from "./OtherSettings/MenuSetting";
+import CompanyList from "./OtherSettings/CompanyList";
 import AddServiceProduct from "./Service/AddServiceProduct";
 import ServiceProductList from "./Service/ServiceProductList";
 import RentalProductList from "./Rental/RentalProductList";
@@ -26,7 +27,6 @@ import VendorProductList from "./Vendor/VendorProductList";
 import AddVendorProduct from "./Vendor/AddVendorProduct";
 import PurchaseList from "./Purchase/PurchaseList";
 import PurchaseRegister from "./Purchase/PurchaseRegister";
-import CompanyList from "./reports/CompanyList";
 import ServiceReports from "./reports/ServiceReports";
 import AddServiceQuotation from "./AddServiceQuotation";
 import AddServiceInvoice from "./AddServiceInvoice";
@@ -38,6 +38,12 @@ import AddRentalInvoice from "./addRentalInvoice";
 import AdminRental from "./AdminRental";
 import RentalInvoiceList from "./RentalInvoiceList";
 import ServiceReportsandGatpass from "./ServiceReportsandGatpass";
+import ReportsDashboard from "./ReportsDashboard";
+import ServiceInvoicesReport from "./reports/ServiceInvoicesReport";
+import CompanyReports from "./reports/CompanyReports";
+import ServiceReportsSummary from "./reports/ServiceReportsSummary";
+import RentalReportsSummary from "./reports/RentalReportsSummary";
+import SalesReportsSummary from "./reports/SalesReportsSummary";
 
 const AdminDashboard = () => {
     const navigate = useNavigate();
@@ -119,6 +125,14 @@ const AdminDashboard = () => {
                             <Route path="rental-enquiries" element={<AdminRental />} />
                             <Route path="profile/deactivate" element={<Deactivate />} />
                             <Route path="product/:productId" element={<EditProduct />} />
+
+                            {/* Reports Routes */}
+                            <Route path="companyReports" element={<CompanyReports />} />
+                            <Route path="serviceReportsSummary" element={<ServiceReportsSummary />} />
+                            <Route path="rentalReportsSummary" element={<RentalReportsSummary />} />
+                            <Route path="salesReportsSummary" element={<SalesReportsSummary />} />
+                            <Route path="reportsDashboard" element={<ReportsDashboard />} />
+                            <Route path="serviceInvoicesReport" element={<ServiceInvoicesReport />} />
                         </Routes>
                     </div>
                 </div>
