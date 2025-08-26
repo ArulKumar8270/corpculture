@@ -23,6 +23,7 @@ const RentalInvoiceForm = () => {
     const [searchParams] = useSearchParams();
     const employeeName = searchParams.get("employeeName");
     const invoiceType = searchParams.get("invoiceType");
+    const rentalId = searchParams.get("rentalId");
     const [loading, setLoading] = useState(true);
     const [companies, setCompanies] = useState([]);
     const [availableProducts, setAvailableProducts] = useState([]);
@@ -359,6 +360,27 @@ const RentalInvoiceForm = () => {
         }
     }
 
+    const updateStausToRental = async (rentalId, status) => {
+        try {
+            const { data } = await axios.put(
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/rental/update/${rentalId}`,
+                { status },
+                {
+                    headers: {
+                        Authorization: auth.token,
+                    },
+                }
+            );
+            if (data?.success) {
+                alert(data.message || 'Status Updated successfully!');
+            } else {
+                alert(data?.message || 'Failed to Status Updated .');
+            }
+        } catch (err) {
+            console.error('Error Status Updated :', err);
+        }
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!validateForm()) {
@@ -370,6 +392,8 @@ const RentalInvoiceForm = () => {
             setLoading(true);
             const data = new FormData();
             data.append('machineId', formData.machineId);
+            data.append('rentalId', rentalId);
+            { invoiceType !== "quotation" ? data.append('invoiceNumber', invoices) : null }
             data.append('companyId', formData.companyId);
             data.append('sendDetailsTo', formData.sendDetailsTo);
             data.append('remarks', formData.remarks);
@@ -405,8 +429,9 @@ const RentalInvoiceForm = () => {
 
 
             if (res.data?.success) {
-                if(!id){
+                if (!id && invoiceType !== "quotation") {
                     handleUpdateInvoiceCount();
+                    updateStausToRental(rentalId, "Completed")
                 }
                 toast.success(res.data.message);
                 // Reset form or navigate
@@ -423,7 +448,12 @@ const RentalInvoiceForm = () => {
                 });
                 // {{ edit_1 }}
                 setLogoPreview(""); // Clear image preview
-                navigate('../rentalInvoiceList'); // Navigate to the list page
+                if (invoiceType === "quotation") {
+                    navigate('../rentalQuotationList');
+                } else {
+                    navigate('../rentalInvoiceList');
+                }
+                // Navigate to the list page
             } else {
                 toast.error(res.data?.message || `Failed to ${id ? 'update' : 'create'} rental payment entry.`);
             }

@@ -15,13 +15,14 @@ import TextField from '@mui/material/TextField';
 
 const AdminRental
   = () => {
+    const { auth, userPermissions } = useAuth();
     const [enquiries, setEnquiries] = useState([]);
     const [allRentalsData, setAllRentalsData] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [employees, setEmployees] = useState([]);
     const [updatingRentalId, setUpdatingRentalId] = useState(null);
-    const [activeTab, setActiveTab] = useState('new');
+    const [activeTab, setActiveTab] = useState(auth?.user?.role === 1 ? "new" : 'assigned');
     const [tabCounts, setTabCounts] = useState({
       new: 0,
       assigned: 0,
@@ -33,7 +34,6 @@ const AdminRental
       inProgress: 0,
       completed: 0,
     });
-    const { auth, userPermissions } = useAuth();
     const location = useLocation();
     const navigate = useNavigate();
     const [searchTerm, setSearchTerm] = useState('');
@@ -243,24 +243,18 @@ const AdminRental
       }
     };
 
-    // Placeholder functions for actions
-    const handleEdit = (rentalId) => {
-      alert(`Edit rental ${rentalId}`);
-      handleClose();
-    };
-
     const handleInvoice = (rentalId, employeeName) => {
-      navigate(`../addRentalInvoice?employeeName=${employeeName}&invoiceType=invoice`);
+      navigate(`../addRentalInvoice?employeeName=${employeeName}&invoiceType=invoice&rentalId=${rentalId}`);
       handleClose();
     };
 
     const handleQuotation = (rentalId, employeeName) => {
-      navigate(`../addRentalInvoice?employeeName=${employeeName}&invoiceType=quotation`);
+      navigate(`../addRentalInvoice?employeeName=${employeeName}&invoiceType=quotation&rentalId=${rentalId}`);
       handleClose();
     };
 
     const handleReport = (rentalId, employeeName) => {
-      navigate(`../addRentalReport?employeeName=${employeeName}&reportType=rental`);
+      navigate(`../addRentalReport?employeeName=${employeeName}&reportType=rental&rentalId=${rentalId}`);
       handleClose();
     };
 
@@ -320,9 +314,9 @@ const AdminRental
             className={`px-4 py-2 rounded-md text-sm font-medium ${activeTab === 'assigned' ? 'bg-[#019ee3] text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
             onClick={() => setActiveTab('assigned')}
           >
-            Assigned Requests ({tabCounts.assigned})
+            Assigned ({tabCounts.assigned})
           </button> : null}
-          <button
+          {/* <button
             className={`px-4 py-2 rounded-md text-sm font-medium ${activeTab === 'pending' ? 'bg-[#019ee3] text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
             onClick={() => setActiveTab('pending')}
           >
@@ -345,7 +339,7 @@ const AdminRental
             onClick={() => setActiveTab('w_u')}
           >
             W&U ({tabCounts.w_u})
-          </button> : null}
+          </button> : null} */}
         </div>
 
         <div className="overflow-x-auto bg-white rounded-xl shadow p-4 w-[83%]">
@@ -405,16 +399,16 @@ const AdminRental
                         {/* <MenuItem onClick={() => handleEdit(currentRentalIdForMenu)}>
                         <EditIcon sx={{ mr: 1 }} /> Edit
                       </MenuItem> */}
-                        <MenuItem onClick={() => handleInvoice(currentRentalIdForMenu, enquiry.employeeId)}>
+                        <MenuItem onClick={() => handleInvoice(enquiry._id, enquiry.employeeId)}>
                           <ReceiptIcon sx={{ mr: 1 }} /> Invoice
                         </MenuItem>
-                        <MenuItem onClick={() => handleQuotation(currentRentalIdForMenu, enquiry.employeeId)}>
+                        <MenuItem onClick={() => handleQuotation(enquiry._id, enquiry.employeeId)}>
                           <DescriptionIcon sx={{ mr: 1 }} /> Quotation
                         </MenuItem>
-                        <MenuItem onClick={() => handleReport(currentRentalIdForMenu, enquiry.employeeId)}>
+                        <MenuItem onClick={() => handleReport(enquiry._id, enquiry.employeeId)}>
                           <BarChartIcon sx={{ mr: 1 }} /> Report
                         </MenuItem>
-                        <MenuItem onClick={() => handleMoveStatus(currentRentalIdForMenu, "Cancelled")}>
+                        {/* <MenuItem onClick={() => handleMoveStatus(currentRentalIdForMenu, "Cancelled")}>
                           <ArrowForwardIcon sx={{ mr: 1 }} /> Move To Unwanted Tab
                         </MenuItem>
                         <MenuItem onClick={() => handleMoveStatus(currentRentalIdForMenu, "Pending")}>
@@ -425,7 +419,7 @@ const AdminRental
                         </MenuItem>
                         <MenuItem onClick={() => handleMoveStatus(currentRentalIdForMenu, "Completed")}>
                           <ArrowForwardIcon sx={{ mr: 1 }} /> Move To Completed
-                        </MenuItem>
+                        </MenuItem> */}
                       </Menu>
                     </td> : null}
                     <td className="py-2 px-3">

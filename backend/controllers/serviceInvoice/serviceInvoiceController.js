@@ -36,12 +36,13 @@ export const createServiceInvoice = async (req, res) => {
             invoiceDate,
             assignedTo,
             sendTo,
-            invoiceType
+            invoiceType,
+            serviceId
         } = req.body;
 
         // Basic Validation
-        if (!invoiceNumber || !companyId || !products || products.length === 0 || !modeOfPayment || !deliveryAddress) {
-            return res.status(400).send({ success: false, message: 'Missing required fields: invoiceNumber, companyId, products, modeOfPayment, deliveryAddress.' });
+        if (!companyId || !products || products.length === 0 || !modeOfPayment || !deliveryAddress) {
+            return res.status(400).send({ success: false, message: 'Missing required fields: companyId, products, modeOfPayment, deliveryAddress.' });
         }
 
         // Check if invoice number already exists
@@ -106,7 +107,8 @@ export const createServiceInvoice = async (req, res) => {
             invoiceDate: invoiceDate || Date.now(),
             assignedTo,
             sendTo,
-            invoiceType
+            invoiceType,
+            serviceId
         });
 
         await newServiceInvoice.save();
@@ -243,7 +245,8 @@ export const updateServiceInvoice = async (req, res) => {
             invoiceLink, // <-- Add invoiceLink here
             assignedTo,
             sendTo,
-            invoiceType
+            invoiceType,
+            serviceId
         } = req.body;
 
         // Find the invoice to update
@@ -315,6 +318,7 @@ export const updateServiceInvoice = async (req, res) => {
         if (assignedTo) serviceInvoice.assignedTo = assignedTo;
         if (sendTo) serviceInvoice.sendTo = sendTo;
         if (invoiceType) serviceInvoice.invoiceType = invoiceType;
+        if (serviceId) serviceInvoice.serviceId = serviceId;
         if (invoiceLink !== undefined) serviceInvoice.invoiceLink = invoiceLink; // Update invoiceLink
 
         await serviceInvoice.save();

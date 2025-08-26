@@ -5,9 +5,13 @@ const serviceInvoiceSchema = new mongoose.Schema({
         type: String,
         required: true,
     },
+    serviceId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Service', // Reference to the Service model
+        required: true,
+    },
     invoiceNumber: {
         type: String,
-        required: true,
         unique: true,
         trim: true,
     },

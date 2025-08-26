@@ -36,6 +36,10 @@ const materialGroupSchema = new mongoose.Schema({
 
 // Main Report Schema
 const reportSchema = new mongoose.Schema({
+    serviceId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Service',
+    },
     reportType: {
         type: String,
         required: true,

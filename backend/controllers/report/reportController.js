@@ -5,6 +5,7 @@ import Company from "../../models/companyModel.js"; // Assuming Company model pa
 export const createReport = async (req, res) => {
     try {
         const {
+            serviceId,
             reportType,
             reportFor,
             company, // This should be the company's ObjectId
@@ -55,6 +56,7 @@ export const createReport = async (req, res) => {
 
         const newReport = new Report({
             reportType,
+            serviceId,
             reportFor,
             company,
             problemReport,

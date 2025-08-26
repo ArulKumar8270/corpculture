@@ -37,6 +37,7 @@ const AddServiceReport = () => {
     const [searchParams] = useSearchParams();
     const employeeName = searchParams.get("employeeName");
     const reportFor = searchParams.get("reportType");
+    const serviceId = searchParams.get("serviceId");
     // State for form fields
     const [reportData, setReportData] = useState({
         reportType: 'Service Report', // Default to 'Service Report'
@@ -89,7 +90,7 @@ const AddServiceReport = () => {
                         headers: { Authorization: auth?.token }
                     });
                     if (reportResponse.data.success) {
-                        const fetchedReport = reportResponse.data.report;
+                        const fetchedReport = reportResponse.data.reports?.[0];
                         setReportData({
                             reportType: fetchedReport.reportType || 'Service Report',
                             reportFor: fetchedReport.reportFor || 'service',
@@ -361,6 +362,7 @@ const AddServiceReport = () => {
 
         // Construct the payload for the backend
         const payload = {
+            serviceId: serviceId,
             reportType: reportData.reportType,
             company: reportData.company, // This is the company _id
             problemReport: reportData.problemReport,
@@ -419,7 +421,6 @@ const AddServiceReport = () => {
             }
         } catch (err) {
             console.error(`Error ${reportId ? 'updating' : 'submitting'} service report:`, err);
-            alert(err.response?.data?.message || `Something went wrong while ${reportId ? 'updating' : 'submitting'} service report.`);
         }
     };
 
@@ -473,7 +474,6 @@ const AddServiceReport = () => {
                             value={reportData.reportType}
                             onChange={handleChange}
                         >
-                            <FormControlLabel value="Gate Pass" control={<Radio />} label="Gate Pass" />
                             <FormControlLabel value="Service Report" control={<Radio />} label="Service Report" />
                         </RadioGroup>
                     </FormControl>

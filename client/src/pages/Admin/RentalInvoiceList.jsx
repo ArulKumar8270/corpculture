@@ -22,7 +22,7 @@ import {
     TextField,
     Collapse
 } from '@mui/material';
-import { Visibility as VisibilityIcon, UploadFile as UploadFileIcon } from '@mui/icons-material'; // {{ edit_1 }}
+import { Visibility as VisibilityIcon, UploadFile as UploadFileIcon } from '@mui/icons-material';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../context/auth';
@@ -30,6 +30,8 @@ import { useNavigate } from 'react-router-dom';
 import LinkIcon from '@mui/icons-material/Link'; // Import LinkIcon
 import Stack from '@mui/material/Stack'; // Import Stack for layout
 import Chip from '@mui/material/Chip';
+import SearchIcon from '@mui/icons-material/Search'; // Import SearchIcon
+import InputAdornment from '@mui/material/InputAdornment'; // Import InputAdornment
 
 function RentalInvoiceList(props) {
     const [loading, setLoading] = useState(true);
@@ -47,10 +49,38 @@ function RentalInvoiceList(props) {
         otherPaymentMode: '', // New field for OTHERS,
         invoiceId: ''
     });
+    const [invoiceCount, setInvoiceCount] = useState(0);
+    const [searchQuery, setSearchQuery] = useState(''); // State for search query
+    const [filteredRentalEntries, setFilteredRentalEntries] = useState([]); // State for filtered entries
 
     useEffect(() => {
         fetchRentalEntries();
     }, [auth.token, props.invoice]);
+
+    // Effect to filter rental entries based on search query
+    useEffect(() => {
+        const filterData = () => {
+            if (!searchQuery) {
+                setFilteredRentalEntries(rentalEntries);
+                return;
+            }
+
+            const lowercasedQuery = searchQuery.toLowerCase();
+            const filtered = rentalEntries.filter(entry => {
+                const invoiceNumberMatch = props.invoice === "invoice" && entry.invoiceNumber?.toString().toLowerCase().includes(lowercasedQuery);
+                const companyNameMatch = entry.companyId?.companyName?.toLowerCase().includes(lowercasedQuery);
+
+                // Date matching: Convert createdAt to a date string (e.g., "YYYY-MM-DD")
+                const createdAtDate = entry.createdAt ? new Date(entry.createdAt).toISOString().split('T')[0] : '';
+                const dateMatch = createdAtDate.includes(lowercasedQuery);
+
+                return invoiceNumberMatch || companyNameMatch || dateMatch;
+            });
+            setFilteredRentalEntries(filtered);
+        };
+
+        filterData();
+    }, [searchQuery, rentalEntries, props.invoice]); // Re-run filter when query or original data changes
 
 
     const fetchRentalEntries = async () => {
@@ -62,7 +92,9 @@ function RentalInvoiceList(props) {
                 },
             });
             if (data?.success) {
-                setRentalEntries(data.entries);
+                setRentalEntries(data.entries); // Store original data
+                // The useEffect for filtering will handle the initial set for filteredRentalEntries
+                fetchInvoicesCount()
             } else {
                 toast.error(data?.message || 'Failed to fetch rental entries.');
             }
@@ -74,11 +106,27 @@ function RentalInvoiceList(props) {
         }
     };
 
+    const fetchInvoicesCount = async () => {
+        try {
+            const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/common-details`, {
+                headers: {
+                    Authorization: auth.token,
+                },
+            });
+            if (data?.success) {
+                setInvoiceCount(data.commonDetails?.invoiceCount + 1 || 1);
+            } else {
+                alert(data?.message || 'Failed to fetch service invoices.');
+            }
+        } catch (error) {
+            console.error("Error fetching service invoices:", error);
+        }
+    };
+
     const hasPermission = (key) => {
         return userPermissions.some(p => p.key === key && p.actions.includes('edit')) || auth?.user?.role === 1;
     };
 
-    // {{ edit_2 }}
     const handleEdit = (id) => {
         // Implement navigation to edit page or open a modal
         navigate(`../addRentalInvoice/${id}`);
@@ -189,10 +237,7 @@ function RentalInvoiceList(props) {
             if (res.data?.success) {
                 toast.success(res.data.message || 'Payment details updated successfully!');
                 handleClosePaymentDetailsModal();
-                // You might want to trigger a re-fetch of invoices in the parent component
-                // or update the specific invoice in the `invoices` state.
-                // For simplicity, we'll just close the modal and show success.
-                fetchRentalEntries(); // Call the prop to trigger re-fetch in parent
+                fetchRentalEntries(); // Re-fetch to update the list
             } else {
                 toast.error(res.data?.message || 'Failed to update payment details.');
             }
@@ -202,10 +247,29 @@ function RentalInvoiceList(props) {
         }
     };
 
+    const handleUpdateInvoiceCount = async () => {
+        try {
+            const { data } = await axios.put(
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/common-details/increment-invoice`,
+                {
+                    invoiceCount: invoiceCount,
+                },
+                {
+                    headers: {
+                        Authorization: auth.token,
+                    },
+                }
+            );
+        } catch (error) {
+            console.error('Error updating invoice count:', error);
+        }
+    }
+
     const onMoveToInvoice = async (status, entry) => {
         try {
             const payload = {
-                invoiceType: status
+                invoiceType: status,
+                invoiceNumber: invoiceCount,
             };
 
             const res = await axios.put(
@@ -218,6 +282,7 @@ function RentalInvoiceList(props) {
                 }
             );
             if (res.data) {
+                handleUpdateInvoiceCount();
                 fetchRentalEntries();
                 alert(res.data.message || 'Moved to invoice successfully!');
             } else {
@@ -227,6 +292,10 @@ function RentalInvoiceList(props) {
             console.error('Error updating status details:', error);
         }
     }
+
+    const handleSearchChange = (event) => {
+        setSearchQuery(event.target.value);
+    };
 
     if (loading) {
         return (
@@ -238,27 +307,32 @@ function RentalInvoiceList(props) {
 
     return (
         <Box sx={{ p: 3, bgcolor: 'background.default', minHeight: '100vh' }}>
-            <div className='flex justify-between'>
-                <Typography variant="h5" component="h1" gutterBottom sx={{ mb: 3, color: '#019ee3', fontWeight: 'bold' }}>
+            <div className='flex justify-between items-center'>
+                <Typography variant="h5" component="h1" gutterBottom sx={{ mb: 2, color: '#019ee3', fontWeight: 'bold' }}>
                     {props?.invoice === "invoice" ? "Invoices" : "Quotations"} List
                 </Typography>
-                {/* {hasPermission("rentalInvoice") ? <Typography variant="h5" component="h1" gutterBottom sx={{ mb: 3, color: '#019ee3', fontWeight: 'bold' }}>
-                    <Button onClick={() => navigate("../addRentalInvoice")} color="primary">
-                        Create New Invoice
-                    </Button>
-                </Typography> : null} */}
             </div>
+            <TextField
+                fullWidth
+                label={`Search ${props?.invoice === "invoice" ? "Invoices" : "Quotations"} (Company, Payment Mode, Status, Date)`}
+                margin="normal"
+                variant="outlined"
+                size="small"
+                value={searchQuery}
+                onChange={handleSearchChange}
+                sx={{ mb: 3 }}
+            />
             <Paper elevation={3} sx={{ p: 2, borderRadius: '8px' }}>
-                {rentalEntries.length === 0 ? (
+                {filteredRentalEntries.length === 0 ? (
                     <Typography variant="h6" sx={{ textAlign: 'center', mt: 4 }}>
-                        No rental invoices found.
+                        {searchQuery ? "No matching rental invoices found." : "No rental invoices found."}
                     </Typography>
                 ) : (
-                    // {{ edit_1 }}
                     <TableContainer sx={{ overflowX: 'auto' }}>
                         <Table stickyHeader aria-label="rental invoice table">
                             <TableHead>
                                 <TableRow>
+                                    {props?.invoice === "invoice" ? <TableCell>Invoice Number</TableCell> : null}
                                     <TableCell>Company Name</TableCell>
                                     <TableCell>Serial No.</TableCell>
                                     <TableCell>Model Name</TableCell>
@@ -270,9 +344,10 @@ function RentalInvoiceList(props) {
                                 </TableRow>
                             </TableHead>
                             <TableBody>
-                                {rentalEntries.map((entry) => (
+                                {filteredRentalEntries.map((entry) => (
                                     <>
                                         <TableRow key={entry._id}>
+                                            {props?.invoice === "invoice" ? <TableCell>{entry.invoiceNumber || 'N/A'}</TableCell> : null}
                                             <TableCell>{entry.companyId?.companyName || 'N/A'}</TableCell>
                                             <TableCell>{entry.machineId?.serialNo || 'N/A'}</TableCell>
                                             <TableCell>{entry.machineId?.modelName || 'N/A'}</TableCell>
@@ -351,7 +426,6 @@ function RentalInvoiceList(props) {
                             </TableBody>
                         </Table>
                     </TableContainer>
-                    // {{ edit_1 }}
                 )}
             </Paper>
             {/* Payment Details Update Modal */}

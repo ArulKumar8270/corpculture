@@ -6,12 +6,14 @@ export const createRentalPaymentEntry = async (req, res) => {
     try {
         const {
             machineId,
+            invoiceNumber,
             sendDetailsTo,
             remarks,
             companyId,
             countImageUpload,
             assignedTo,
-            invoiceType
+            invoiceType,
+            rentalId
         } = req.body;
 
         // {{ edit_1 }}
@@ -42,6 +44,8 @@ export const createRentalPaymentEntry = async (req, res) => {
 
         const newEntry = new RentalPaymentEntry({
             machineId,
+            invoiceNumber,
+            rentalId,
             companyId: companyId, // Get companyId from the machine
             sendDetailsTo,
             countImageUpload: countImageUploadUrl,
@@ -192,6 +196,7 @@ export const updateRentalPaymentEntry = async (req, res) => {
         const { id } = req.params;
         const {
             machineId,
+            invoiceNumber,
             sendDetailsTo,
             remarks,
             companyId,
@@ -205,7 +210,8 @@ export const updateRentalPaymentEntry = async (req, res) => {
             companyNamePayment,
             otherPaymentMode,
             invoiceLink,
-            invoiceType
+            invoiceType,
+            rentalId
             // {{ edit_1 }}
         } = req.body;
 
@@ -269,6 +275,8 @@ export const updateRentalPaymentEntry = async (req, res) => {
         entry.companyId = companyId || entry.companyId;
         entry.invoiceLink = invoiceLink || entry.invoiceLink;
         entry.invoiceType = invoiceType || entry.invoiceType;
+        entry.rentalId = rentalId || entry.rentalId;
+        entry.invoiceNumber = invoiceNumber || entry.invoiceNumber;
         entry.countImageUpload = countImageUploadUrl;
         // {{ edit_2 }}
         entry.modeOfPayment = modeOfPayment !== undefined ? modeOfPayment : entry.modeOfPayment;

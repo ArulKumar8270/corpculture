@@ -18,7 +18,7 @@ const AuthProvider = ({ children }) => {
     const [refetch, setRefetch] = useState(false); // {{ edit_7 }}
     const [selectedCompany, setSelectedCompany] = useState(null); // {{ edit_8 }}
     const [userPermissions, setUserPermissions] = useState([]);
-
+    const [loadingPermissions, setLoadingPermissions] = useState(true);
     useEffect(() => {
         if (auth?.user?._id || refetch) {
             getCompanyDetails();

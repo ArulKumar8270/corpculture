@@ -12,6 +12,15 @@ const configSchema = new mongoose.Schema({
 // {{ edit_1 }}
 
 const rentalPaymentEntrySchema = new mongoose.Schema({
+    rentalId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Rental',
+        required: true,
+    },
+    invoiceNumber: {
+        type: String,
+        trim: true,
+    },
     machineId: { // Reference to the Machine model for serial number and company
         type: mongoose.Schema.Types.ObjectId,
         ref: 'RentalProduct',
