@@ -45,70 +45,36 @@ const CompanyReports = () => {
     const [reminderMail, setReminderMail] = useState('');
     const [ccMail, setCcMail] = useState('');
     const [selectedReminderDates, setSelectedReminderDates] = useState([]); // Array of strings (days of month)
-
     // Options for reminder dates (days of the month, 1 to 31)
     const reminderDateOptions = Array.from({ length: 31 }, (_, i) => (i + 1).toString());
 
-    // Sample data for demonstration
-    const sampleCompanies = [
-        {
-            _id: 'comp1',
-            companyName: 'Tech Solutions Inc.',
-            companyAddress: '123 Main St, Anytown',
-            mobileNumber: '9876543210',
-            serviceInvoiceCount: 5,
-            serviceQuotationCount: 8,
-            serviceReportCount: 12,
-            rentalInvoiceCount: 2,
-            rentalQuotationCount: 3,
-            rentalReportCount: 5,
-            commissionAmount: 1500.75,
-        },
-        {
-            _id: 'comp2',
-            companyName: 'Global Logistics Ltd.',
-            companyAddress: '456 Oak Ave, Cityville',
-            mobileNumber: '9123456789',
-            serviceInvoiceCount: 3,
-            serviceQuotationCount: 6,
-            serviceReportCount: 9,
-            rentalInvoiceCount: 1,
-            rentalQuotationCount: 2,
-            rentalReportCount: 4,
-            commissionAmount: 800.50,
-        },
-        {
-            _id: 'comp3',
-            companyName: 'Innovate Systems',
-            companyAddress: '789 Pine Ln, Villagetown',
-            mobileNumber: '9988776655',
-            serviceInvoiceCount: 7,
-            serviceQuotationCount: 10,
-            serviceReportCount: 15,
-            rentalInvoiceCount: 0, // Example with zero count
-            rentalQuotationCount: 1,
-            rentalReportCount: 2,
-            commissionAmount: 2200.00,
-        },
-    ];
-
     useEffect(() => {
-        // In a real application, you would fetch this data from your backend.
-        // For now, we're using sample data.
         setLoading(true);
         setError(null);
-        try {
-            // Simulate API call delay
-            setTimeout(() => {
-                setCompanies(sampleCompanies);
+        axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/company/all`, {
+            headers: { Authorization: auth?.token }
+        })
+            .then(res => {
+                if (res.data.success && Array.isArray(res.data.companies)) {
+                    // Map only required fields for table
+                    const mappedCompanies = res.data.companies.map(c => ({
+                        _id: c._id,
+                        companyName: c.companyName,
+                        companyAddress: c.billingAddress || c.addressDetail || '', // fallback if billingAddress not present
+                        mobileNumber: c.mobileNumber || c.phone || 'N/A', // fallback if mobileNumber not present
+                    }));
+                    setCompanies(mappedCompanies);
+                } else {
+                    setCompanies([]);
+                    setError(res.data.message || 'Failed to fetch company data.');
+                }
                 setLoading(false);
-            }, 500);
-        } catch (err) {
-            console.error('Error setting sample company data:', err);
-            setError('Failed to load company data.');
-            setLoading(false);
-        }
-    }, []);
+            })
+            .catch(err => {
+                setError('Failed to load company data.');
+                setLoading(false);
+            });
+    }, [auth?.token]);
 
     const handleViewDetails = (companyId) => {
         // Implement navigation to a detailed company report page
@@ -254,6 +220,11 @@ const CompanyReports = () => {
                                             >
                                                 {company.serviceInvoiceCount}
                                             </Button>
+                                            <Tooltip title="Set Reminder">
+                                                <IconButton onClick={() => handleSetReminder(company._id)} color="warning">
+                                                    <NotificationsActiveIcon />
+                                                </IconButton>
+                                            </Tooltip>
                                         </TableCell>
                                         <TableCell align="center">
                                             <Button
@@ -277,7 +248,7 @@ const CompanyReports = () => {
                                                 {company.serviceReportCount}
                                             </Button>
                                         </TableCell>
-                                        <TableCell align="center">
+                                        <TableCell align="center" className='flex'>
                                             <Button
                                                 variant="text"
                                                 color="primary"
@@ -287,6 +258,11 @@ const CompanyReports = () => {
                                             >
                                                 {company.rentalInvoiceCount}
                                             </Button>
+                                            <Tooltip title="Set Reminder">
+                                                <IconButton onClick={() => handleSetReminder(company._id)} color="warning">
+                                                    <NotificationsActiveIcon />
+                                                </IconButton>
+                                            </Tooltip>
                                         </TableCell>
                                         <TableCell align="center">
                                             <Button
@@ -310,13 +286,13 @@ const CompanyReports = () => {
                                                 {company.rentalReportCount}
                                             </Button>
                                         </TableCell>
-                                        <TableCell align="center">
+                                        {/* <TableCell align="center">
                                             <Tooltip title="Set Reminder">
                                                 <IconButton onClick={() => handleSetReminder(company._id)} color="warning">
                                                     <NotificationsActiveIcon />
                                                 </IconButton>
                                             </Tooltip>
-                                        </TableCell>
+                                        </TableCell> */}
                                     </TableRow>
                                 ))
                             )}
