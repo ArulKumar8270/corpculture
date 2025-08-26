@@ -14,13 +14,14 @@ import ArrowForwardIcon from '@mui/icons-material/ArrowForward'; // For Move To 
 import TextField from '@mui/material/TextField';
 
 const AdminServices = () => {
+  const { auth, userPermissions } = useAuth();
   const [enquiries, setEnquiries] = useState([]);
   const [allServicesData, setAllServicesData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [employees, setEmployees] = useState([]);
   const [updatingServiceId, setUpdatingServiceId] = useState(null);
-  const [activeTab, setActiveTab] = useState('new');
+  const [activeTab, setActiveTab] = useState(auth?.user?.role === 1 ? "new" : 'assigned');
   const [tabCounts, setTabCounts] = useState({
     new: 0,
     assigned: 0,
@@ -32,7 +33,6 @@ const AdminServices = () => {
     inProgress: 0,
     completed: 0,
   });
-  const { auth, userPermissions } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
@@ -242,24 +242,18 @@ const AdminServices = () => {
     }
   };
 
-  // Placeholder functions for actions
-  const handleEdit = (serviceId) => {
-    alert(`Edit service ${serviceId}`);
-    handleClose();
-  };
-
   const handleInvoice = (serviceId, employeeName) => {
-    navigate(`../addServiceInvoice?employeeName=${employeeName}&invoiceType=invoice`);
+    navigate(`../addServiceInvoice?employeeName=${employeeName}&invoiceType=invoice&serviceId=${serviceId}`);
     handleClose();
   };
 
   const handleQuotation = (serviceId, employeeName) => {
-    navigate(`../addServiceInvoice?employeeName=${employeeName}&invoiceType=quotation`);
+    navigate(`../addServiceInvoice?employeeName=${employeeName}&invoiceType=quotation&serviceId=${serviceId}`);
     handleClose();
   };
 
   const handleReport = (serviceId, employeeName) => {
-    navigate(`../addServiceReport?employeeName=${employeeName}&reportType=service`);
+    navigate(`../addServiceReport?employeeName=${employeeName}&reportType=service&serviceId=${serviceId}`);
     handleClose();
   };
 
@@ -321,7 +315,7 @@ const AdminServices = () => {
         >
           Assigned Requests ({tabCounts.assigned})
         </button> : null}
-        <button
+        {/* <button
           className={`px-4 py-2 rounded-md text-sm font-medium ${activeTab === 'pending' ? 'bg-[#019ee3] text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
           onClick={() => setActiveTab('pending')}
         >
@@ -344,7 +338,7 @@ const AdminServices = () => {
           onClick={() => setActiveTab('w_u')}
         >
           W&U ({tabCounts.w_u})
-        </button> : null}
+        </button> : null} */}
       </div>
 
       <div className="overflow-x-auto bg-white rounded-xl shadow p-4 w-[83%]">
@@ -406,16 +400,16 @@ const AdminServices = () => {
                       {/* <MenuItem onClick={() => handleEdit(currentServiceIdForMenu)}>
                         <EditIcon sx={{ mr: 1 }} /> Edit
                       </MenuItem> */}
-                      <MenuItem onClick={() => handleInvoice(currentServiceIdForMenu, enquiry.employeeId)}>
+                      <MenuItem onClick={() => handleInvoice(enquiry._id, enquiry.employeeId)}>
                         <ReceiptIcon sx={{ mr: 1 }} /> Invoice
                       </MenuItem>
-                      <MenuItem onClick={() => handleQuotation(currentServiceIdForMenu, enquiry.employeeId)}>
+                      <MenuItem onClick={() => handleQuotation(enquiry._id, enquiry.employeeId)}>
                         <DescriptionIcon sx={{ mr: 1 }} /> Quotation
                       </MenuItem>
-                      <MenuItem onClick={() => handleReport(currentServiceIdForMenu, enquiry.employeeId)}>
+                      <MenuItem onClick={() => handleReport(enquiry._id, enquiry.employeeId)}>
                         <BarChartIcon sx={{ mr: 1 }} /> Report
                       </MenuItem>
-                      <MenuItem onClick={() => handleMoveStatus(currentServiceIdForMenu, "Cancelled")}>
+                      {/* <MenuItem onClick={() => handleMoveStatus(currentServiceIdForMenu, "Cancelled")}>
                         <ArrowForwardIcon sx={{ mr: 1 }} /> Move To Unwanted Tab
                       </MenuItem>
                       <MenuItem onClick={() => handleMoveStatus(currentServiceIdForMenu, "Pending")}>
@@ -426,7 +420,7 @@ const AdminServices = () => {
                       </MenuItem>
                       <MenuItem onClick={() => handleMoveStatus(currentServiceIdForMenu, "Completed")}>
                         <ArrowForwardIcon sx={{ mr: 1 }} /> Move To Completed
-                      </MenuItem>
+                      </MenuItem> */}
                     </Menu>
                   </td> : null}
                   <td className="py-2 px-3">

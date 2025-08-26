@@ -36,7 +36,7 @@ import Chip from '@mui/material/Chip'; // Import Chip for assignedTo UI
 
 // Row component for each invoice, allowing expansion to show products
 function InvoiceRow(props) {
-    const { invoice, navigate, invoiceType } = props;
+    const { invoice, navigate, invoiceType, invoiceCount } = props;
     const { auth, userPermissions } = useAuth();
     const [open, setOpen] = useState(false);
     const [openPaymentModal, setOpenPaymentModal] = useState(false); // State for payment modal
@@ -170,10 +170,29 @@ function InvoiceRow(props) {
         }
     };
 
+    const handleUpdateInvoiceCount = async () => {
+        try {
+            const { data } = await axios.put(
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/common-details/increment-invoice`,
+                {
+                    invoiceCount: invoiceCount,
+                },
+                {
+                    headers: {
+                        Authorization: auth.token,
+                    },
+                }
+            );
+        } catch (error) {
+            console.error('Error updating invoice count:', error);
+        }
+    }
+
     const onMoveToInvoice = async (status) => {
         try {
             const payload = {
-                invoiceType: status
+                invoiceType: status,
+                invoiceNumber: invoiceCount,
             };
 
             const res = await axios.put(
@@ -187,6 +206,7 @@ function InvoiceRow(props) {
             );
 
             if (res.data?.success) {
+                handleUpdateInvoiceCount()
                 props.onInvoiceUpdate();
                 alert(res.data.message || 'Moved to invoice successfully!');
             } else {
@@ -201,8 +221,6 @@ function InvoiceRow(props) {
         console.log(invoice, "invoice79037254093")
     }
 
-    console.log(invoiceType, "asdfas70d9")
-
     return (
         <>
             <TableRow sx={{ '& > *': { borderBottom: 'unset' } }}>
@@ -215,9 +233,9 @@ function InvoiceRow(props) {
                         {open ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
                     </IconButton>
                 </TableCell>
-                <TableCell component="th" scope="row">
+                {invoiceType === "invoice" ? <TableCell component="th" scope="row">
                     {invoice.invoiceNumber}
-                </TableCell>
+                </TableCell> : null}
                 <TableCell>{invoice.companyId?.companyName || 'N/A'}</TableCell>
                 <TableCell>{invoice.modeOfPayment}</TableCell>
                 <TableCell>{invoice.deliveryAddress}</TableCell>
@@ -484,6 +502,7 @@ function InvoiceRow(props) {
 
 const ServiceInvoiceList = (props) => {
     const [invoices, setInvoices] = useState([]);
+    const [invoiceCount, setInvoiceCount] = useState(0);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState(''); // New state for search term
     const { auth, userPermissions } = useAuth();
@@ -499,6 +518,7 @@ const ServiceInvoiceList = (props) => {
             });
             if (data?.success) {
                 setInvoices(data.serviceInvoices);
+                fetchInvoicesCount();
             } else {
                 setInvoices([]);
             }
@@ -510,6 +530,23 @@ const ServiceInvoiceList = (props) => {
         }
     };
 
+    const fetchInvoicesCount = async () => {
+        try {
+            const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/common-details`, {
+                headers: {
+                    Authorization: auth.token,
+                },
+            });
+            if (data?.success) {
+                setInvoiceCount(data.commonDetails?.invoiceCount + 1 || 1);
+            } else {
+                alert(data?.message || 'Failed to fetch service invoices.');
+            }
+        } catch (error) {
+            console.error("Error fetching service invoices:", error);
+        }
+    };
+
     useEffect(() => {
         fetchInvoices();
     }, [auth.token, props?.invoice]);
@@ -518,7 +555,7 @@ const ServiceInvoiceList = (props) => {
     const filteredInvoices = invoices?.filter(invoice => {
         const lowerCaseSearchTerm = searchTerm.toLowerCase();
         return (
-            invoice.invoiceNumber.toLowerCase().includes(lowerCaseSearchTerm) ||
+            invoice?.invoiceNumber?.toLowerCase()?.includes(lowerCaseSearchTerm) ||
             invoice.companyId?.companyName.toLowerCase().includes(lowerCaseSearchTerm) ||
             invoice.modeOfPayment.toLowerCase().includes(lowerCaseSearchTerm) ||
             invoice.status.toLowerCase().includes(lowerCaseSearchTerm) ||
@@ -564,7 +601,7 @@ const ServiceInvoiceList = (props) => {
                             <TableHead>
                                 <TableRow>
                                     <TableCell />
-                                    <TableCell>Invoice Number</TableCell>
+                                    {props?.invoice === "invoice" ? <TableCell>Invoice Number</TableCell> : null}
                                     <TableCell>Company</TableCell>
                                     <TableCell>Payment Mode</TableCell>
                                     <TableCell>Delivery Address</TableCell>
@@ -584,7 +621,7 @@ const ServiceInvoiceList = (props) => {
                                     </TableRow>
                                 ) : (
                                     filteredInvoices?.map((invoice) => (
-                                        <InvoiceRow key={invoice._id} invoice={invoice} navigate={navigate} onInvoiceUpdate={fetchInvoices} invoiceType={props?.invoice} />
+                                        <InvoiceRow key={invoice._id} invoice={invoice} navigate={navigate} onInvoiceUpdate={fetchInvoices} invoiceType={props?.invoice} invoiceCount={invoiceCount} />
                                     ))
                                 )}
                             </TableBody>

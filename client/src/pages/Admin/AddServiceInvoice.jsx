@@ -35,6 +35,7 @@ const AddServiceInvoice = () => {
     const [searchParams] = useSearchParams();
     const employeeName = searchParams.get("employeeName");
     const invoiceType = searchParams.get("invoiceType");
+    const serviceId = searchParams.get("serviceId");
     const [invoices, setInvoices] = useState(null);
     // State for form fields
     const [invoiceData, setInvoiceData] = useState({
@@ -285,7 +286,7 @@ const AddServiceInvoice = () => {
         const grandTotal = subtotal + tax;
 
         const payload = {
-            invoiceNumber: invoices,
+            invoiceNumber: invoiceType === "quotation" ? null : invoices,
             companyId,
             products: productsInTable.map(p => ({
                 productId: p.productId,
@@ -304,7 +305,8 @@ const AddServiceInvoice = () => {
             // status, // Removed status from payload
             sendTo, // sendTo is now an array
             assignedTo: employeeName,
-            invoiceType
+            invoiceType,
+            serviceId: serviceId,
         };
 
         try {
@@ -327,8 +329,9 @@ const AddServiceInvoice = () => {
                 data = res.data;
             }
             if (data?.success) {
-                if (!invoiceId) {
+                if (!invoiceId && invoiceType !== "quotation") {
                     handleUpdateInvoiceCount()
+                    updateStausToService(serviceId, 'Completed');
                 }
                 handleCancel();
             } else {
@@ -375,12 +378,32 @@ const AddServiceInvoice = () => {
         });
         setProductsInTable([]);
         setAvailableProducts([]); // Clear available products
-        navigate('../serviceInvoiceList');
+        if (invoiceType === "quotation") {
+            navigate('../ServiceQuotationList');
+        } else {
+            navigate('../serviceInvoiceList');
+        }
     };
 
-    const handleUploadSignedInvoice = () => {
-        // Implement file upload logic
-        toast.info('Upload Signed Invoice (placeholder)!');
+    const updateStausToService = async (serviceId, status) => {
+        try {
+            const { data } = await axios.put(
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/service/update/${serviceId}`,
+                { status },
+                {
+                    headers: {
+                        Authorization: auth.token,
+                    },
+                }
+            );
+            if (data?.success) {
+                alert(data.message || 'Status Updated successfully!');
+            } else {
+                alert(data?.message || 'Failed to Status Updated .');
+            }
+        } catch (err) {
+            console.error('Error Status Updated :', err);
+        }
     };
 
     if (loading) {

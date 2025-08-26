@@ -70,14 +70,16 @@ const CompanyList = () => {
         <div className="p-6 bg-gradient-to-br from-[#e6fbff] to-[#f7fafd] min-h-screen w-[95%]">
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-bold text-[#019ee3]">Company List</h1>
-               {hasPermission("reportsCompanyList") ? <Button
+               {/* {hasPermission("reportsCompanyList") ? */}
+                <Button
                     variant="contained"
                     color="primary"
                     onClick={() => navigate("../addCompany")}
                     className="bg-[#019ee3] hover:bg-[#017bb3] text-white px-4 py-2 rounded"
                 >
                     Add New Company
-                </Button> : null}
+                </Button> 
+                {/* : null} */}
             </div>
             <Paper className="p-4 shadow-md rounded-xl">
                 {companies.length === 0 ? (
@@ -117,7 +119,8 @@ const CompanyList = () => {
                                         <TableCell>{company.phone || company.contactPersons?.[0]?.mobile || 'N/A'}</TableCell> {/* Updated to prioritize company.phone */}
                                         {/* <TableCell>{company.customerType || 'N/A'}</TableCell> */}
                                         {/* <TableCell>{new Date(company.createdAt).toLocaleDateString()}</TableCell> */}
-                                        {hasPermission("reportsCompanyList") ? <TableCell>
+                                        {/* {hasPermission("reportsCompanyList") ?  */}
+                                        <TableCell>
                                             <Button
                                                 variant="contained"
                                                 size="small"
@@ -126,7 +129,8 @@ const CompanyList = () => {
                                             >
                                                 Edit
                                             </Button>
-                                        </TableCell> : null}
+                                        </TableCell> 
+                                        {/* : null} */}
                                     </TableRow>
                                 ))}
                             </TableBody>

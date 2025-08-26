@@ -45,6 +45,118 @@ const AdminMenu = ({ toggleMenu }) => {
         otherSettings: true, // New section, default to collapsed
     });
 
+    const [recordCounts, setRecordCounts] = useState({
+        serviceEnquiries: 0,
+        serviceProduct: 0,
+        serviceInvoice: 0,
+        serviceQuotation: 0,
+        serviceReport: 0,
+        rentalEnquiries: 0,
+        rentalProduct: 0,
+        rentalInvoice: 0,
+        rentalQuotation: 0,
+        rentalReport: 0,
+    });
+
+    useEffect(() => {
+        const fetchRecordCounts = async () => {
+            if (!auth?.user || !auth?.token) {
+                // Do not fetch if user is not authenticated or token is missing
+                return;
+            }
+
+            const config = {
+                headers: {
+                    Authorization: auth.token,
+                },
+            };
+
+            try {
+                // Fetch Service Enquiries count
+                const serviceEnquiriesUrl = `${import.meta.env.VITE_SERVER_URL}/api/v1/service/${auth?.user?.role === 3 ? `assignedTo/${auth?.user?._id}` : "all"}`;
+                const serviceEnquiriesRes = await axios.get(serviceEnquiriesUrl, config);
+                const serviceEnquiriesCount = serviceEnquiriesRes.data.services?.length;
+
+                // Fetch Service Products count
+                const serviceProductUrl = `${import.meta.env.VITE_SERVER_URL}/api/v1/service-products`;
+                const serviceProductRes = await axios.get(serviceProductUrl, config);
+                const serviceProductCount = serviceProductRes?.data?.serviceProducts?.length;
+
+                // Fetch Service Invoices count
+                const serviceInvoiceUrl = `${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/${auth?.user?.role === 3 ? `assignedTo/${auth?.user?._id}/invoice` : "all/invoice"}`;
+                const serviceInvoiceRes = await axios.get(serviceInvoiceUrl, config);
+                const serviceInvoiceCount = serviceInvoiceRes.data?.serviceInvoices?.length;
+                
+                // Fetch Service Quotation count
+                const quotationInvoiceUrl = `${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/${auth?.user?.role === 3 ? `assignedTo/${auth?.user?._id}/quotation` : "all/quotation"}`;
+                const quotationInvoiceRes = await axios.get(quotationInvoiceUrl, config);
+                const quotationInvoiceCount = quotationInvoiceRes.data?.serviceInvoices?.length;
+
+                // Fetch Service Reports count
+                const serviceReportUrl = `${import.meta.env.VITE_SERVER_URL}/api/v1/report/${auth?.user?.role === 3 ? `${auth?.user?._id}/service` : "service"}`;
+                const serviceReportRes = await axios.get(serviceReportUrl, config);
+                const serviceReportCount = serviceReportRes.data?.reports?.length;
+
+                // Fetch Rental Enquiries count
+                const rentalEnquiriesUrl = `${import.meta.env.VITE_SERVER_URL}/api/v1/rental/${auth?.user?.role === 3 ? `assignedTo/${auth?.user?._id}` : "all"}`;
+                const rentalEnquiriesRes = await axios.get(rentalEnquiriesUrl, config);
+                const rentalEnquiriesCount = rentalEnquiriesRes.data.rental?.length;
+
+                // Fetch Rental Products count
+                const rentalProductUrl = `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-products`;
+                const rentalProductRes = await axios.get(rentalProductUrl, config);
+                const rentalProductCount = rentalProductRes?.data?.rentalProducts?.length;
+
+                // Fetch Rental Invoices count
+                const rentalInvoiceUrl = `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/${auth?.user?.role === 3 ? `assignedTo/${auth?.user?._id}/invoice` : "all/invoice"}`;
+                const rentalInvoiceRes = await axios.get(rentalInvoiceUrl, config);
+                const rentalInvoiceCount = rentalInvoiceRes.data?.entries?.length;
+                
+                // Fetch Rental Invoices count
+                const rentalQuotationUrl = `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/${auth?.user?.role === 3 ? `assignedTo/${auth?.user?._id}/quotation` : "all/quotation"}`;
+                const rentalQuotationRes = await axios.get(rentalQuotationUrl, config);
+                const rentalQuotationCount = rentalQuotationRes.data?.entries?.length;
+
+                // Fetch Rental Reports count
+                const rentalReportUrl = `${import.meta.env.VITE_SERVER_URL}/api/v1/report/${auth?.user?.role === 3 ? `${auth?.user?._id}/rental` : "rental"}`;
+                const rentalReportRes = await axios.get(rentalReportUrl, config);
+                const rentalReportCount = rentalReportRes.data?.reports?.length;
+
+                setRecordCounts(prevCounts => ({
+                    ...prevCounts,
+                    serviceEnquiries: serviceEnquiriesCount,
+                    serviceProduct: serviceProductCount,
+                    serviceInvoice: serviceInvoiceCount,
+                    serviceQuotation: quotationInvoiceCount,
+                    serviceReport: serviceReportCount,
+                    rentalEnquiries: rentalEnquiriesCount,
+                    rentalProduct: rentalProductCount,
+                    rentalInvoice: rentalInvoiceCount,
+                    rentalQuotation: rentalQuotationCount,
+                    rentalReport: rentalReportCount,
+                    // serviceQuotation and rentalQuotation remain unchanged as APIs were not provided.
+                }));
+
+            } catch (error) {
+                console.error("Error fetching record counts:", error);
+                // Optionally, reset counts to 0 or handle the error state visually
+                setRecordCounts(prevCounts => ({
+                    ...prevCounts,
+                    serviceEnquiries: 0,
+                    serviceProduct: 0,
+                    serviceInvoice: 0,
+                    serviceReport: 0,
+                    rentalEnquiries: 0,
+                    rentalProduct: 0,
+                    rentalInvoice: 0,
+                    rentalReport: 0,
+                }));
+            }
+        };
+
+        fetchRecordCounts();
+    }, [auth?.user, auth?.token]);
+
     // {{ edit_2 }}
     const hasPermission = (key) => {
         return userPermissions.some(p => p.key === key && p.actions.includes('view')) || auth?.user?.role === 1;
@@ -274,7 +386,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                                         }
                                                     >
                                                         <div className="h-10 px-8 flex items-center">
-                                                            Enquiries
+                                                            Enquiries <span className="ml-2 text-xs font-normal text-gray-500 bg-gray-200 px-2 py-1 rounded-full">{recordCounts?.serviceEnquiries}</span>
                                                         </div>
                                                     </NavLink>
                                                 )}
@@ -291,7 +403,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                                         }
                                                     >
                                                         <div className="h-10 px-8 flex items-center">
-                                                            Products
+                                                            Products <span className="ml-2 text-xs font-normal text-gray-500 bg-gray-200 px-2 py-1 rounded-full">{recordCounts?.serviceProduct}</span>
                                                         </div>
                                                     </NavLink>
                                                 )}
@@ -307,7 +419,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                                         }
                                                     >
                                                         <div className="h-10 px-8 flex items-center">
-                                                            Invoices
+                                                            Invoices <span className="ml-2 text-xs font-normal text-gray-500 bg-gray-200 px-2 py-1 rounded-full">{recordCounts?.serviceInvoice}</span>
                                                         </div>
                                                     </NavLink>
                                                 )}
@@ -323,7 +435,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                                         }
                                                     >
                                                         <div className="h-10 px-8 flex items-center">
-                                                            Quotations
+                                                            Quotations <span className="ml-2 text-xs font-normal text-gray-500 bg-gray-200 px-2 py-1 rounded-full">{recordCounts?.serviceQuotation}</span>
                                                         </div>
                                                     </NavLink>
                                                 )}
@@ -338,7 +450,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                                     }
                                                 >
                                                     <div className="h-10 px-8 flex items-center">
-                                                        Report & Gatpass
+                                                        Reports <span className="ml-2 text-xs font-normal text-gray-500 bg-gray-200 px-2 py-1 rounded-full">{recordCounts?.serviceReport}</span>
                                                     </div>
                                                 </NavLink>
                                                 {/* Commission under Service */}
@@ -395,7 +507,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                                         }
                                                     >
                                                         <div className="h-10 px-8 flex items-center">
-                                                            Enquiries
+                                                            Enquiries <span className="ml-2 text-xs font-normal text-gray-500 bg-gray-200 px-2 py-1 rounded-full">{recordCounts?.rentalEnquiries}</span>
                                                         </div>
                                                     </NavLink>
                                                 )}
@@ -412,7 +524,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                                         }
                                                     >
                                                         <div className="h-10 px-8 flex items-center">
-                                                            Products
+                                                            Products <span className="ml-2 text-xs font-normal text-gray-500 bg-gray-200 px-2 py-1 rounded-full">{recordCounts?.rentalProduct}</span>
                                                         </div>
                                                     </NavLink>
                                                 )}
@@ -429,8 +541,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                                         }
                                                     >
                                                         <div className="h-10 px-8 flex items-center gap-3">
-                                                            <ReceiptIcon sx={{ fontSize: "20px" }} />
-                                                            Invoices
+                                                            Invoices <span className="ml-2 text-xs font-normal text-gray-500 bg-gray-200 px-2 py-1 rounded-full">{recordCounts?.rentalInvoice}</span>
                                                         </div>
                                                     </NavLink>
                                                 )}
@@ -446,8 +557,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                                         }
                                                     >
                                                         <div className="h-10 px-8 flex items-center gap-3">
-                                                            <ReceiptIcon sx={{ fontSize: "20px" }} />
-                                                            Quotations
+                                                            Quotations <span className="ml-2 text-xs font-normal text-gray-500 bg-gray-200 px-2 py-1 rounded-full">{recordCounts?.rentalQuotation}</span>
                                                         </div>
                                                     </NavLink>
                                                 )}
@@ -462,7 +572,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                                     }
                                                 >
                                                     <div className="h-10 px-8 flex items-center">
-                                                        Report & Gatpass
+                                                        Reports <span className="ml-2 text-xs font-normal text-gray-500 bg-gray-200 px-2 py-1 rounded-full">{recordCounts?.rentalReport}</span>
                                                     </div>
                                                 </NavLink>
                                                 {hasPermission('rentalCommission') && (
