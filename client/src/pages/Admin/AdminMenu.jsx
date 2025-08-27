@@ -698,7 +698,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                                         }
                                                     >
                                                         <div className="h-10 px-8 flex items-center">
-                                                            Company
+                                                            Over all Company Details
                                                         </div>
                                                     </NavLink>
                                                 )}
@@ -714,7 +714,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                                         }
                                                     >
                                                         <div className="h-10 px-8 flex items-center">
-                                                            Service
+                                                            Service Over all Details
                                                         </div>
                                                     </NavLink>
                                                 )}
@@ -729,7 +729,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                                     }
                                                 >
                                                     <div className="h-10 px-8 flex items-center">
-                                                        Rental
+                                                        Rental Over all Details
                                                     </div>
                                                 </NavLink>
                                                 {hasPermission('reportsSales') && (
@@ -744,7 +744,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                                         }
                                                     >
                                                         <div className="h-10 px-8 flex items-center">
-                                                            Sales
+                                                            Sales Over all Details
                                                         </div>
                                                     </NavLink>
                                                 )}

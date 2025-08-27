@@ -11,15 +11,15 @@ const commissionSchema = new mongoose.Schema({
         ref: 'Order', // Reference to the order this commission is based on
         required: true
     },
+    commisionFrom: {
+        type : String,
+    },
     commissionAmount: {
         type: Number,
         required: true
     },
     percentageRate: {
         type: Number,
-        required: function () {
-            return this.commissionType === 'percentage';
-        }
     },
     isPaid: {
         type: Boolean,

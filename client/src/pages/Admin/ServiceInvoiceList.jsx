@@ -218,7 +218,13 @@ function InvoiceRow(props) {
     }
 
     const onSendInvoice = async (invoice) => {
-        console.log(invoice, "invoice79037254093")
+        try {
+            const res = await axios.post('https://n8n.nicknameinfo.net/webhook/f8d3ad37-a38e-4a38-a06e-09c74fdc3b91', {invoiceId : invoice?._id});
+            console.log('Webhook successfully triggered.', res);
+        } catch (webhookError) {
+            console.error('Error triggering webhook:', webhookError);
+            toast.error('Failed to trigger webhook for external notification.');
+        }
     }
 
     return (

@@ -175,7 +175,13 @@ export const getCompanyByPhone = async (req, res) => {
             });
         }
 
-        const company = await companyModel.findOne({ phone: phone });
+        // Search for a company where any contact person's mobile matches the provided phone
+        const last8 = phone.slice(-8);
+
+        const company = await companyModel.findOne({
+            "contactPersons.mobile": { $regex: last8 + '$' }
+        });
+
 
         if (!company) {
             return res.status(404).send({

@@ -37,7 +37,7 @@ const ServiceReportsSummary = () => {
             // Simulate API call delay to fetch data
             setTimeout(() => {
                 const data = [
-                    { id: 'serviceInvoices', name: 'Service Invoices', count: 120, path: '/admin/reports/service/invoices' },
+                    { id: 'serviceInvoices', name: 'Service Invoices', count: 120, path: '../serviceInvoicesReport' },
                     { id: 'serviceQuotations', name: 'Service Quotations', count: 150, path: '/admin/reports/service/quotations' },
                     { id: 'serviceReports', name: 'Service Reports & Gatpass', count: 200, path: '/admin/reports/service/reports-gatpass' },
                     { id: 'productsUsed', name: 'Products Used in Service', count: 500, path: '/admin/reports/service/products' },
@@ -54,7 +54,6 @@ const ServiceReportsSummary = () => {
     }, []);
 
     const handleViewDetails = (path, categoryName) => {
-        toast.info(`Navigating to ${categoryName} list.`);
         navigate(path);
     };
 

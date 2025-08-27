@@ -70,7 +70,6 @@ const OrderSuccess = () => {
             const commissionRange = item.commissionRange?.find(
                 (range) => quantity >= parseInt(range.from) && quantity <= parseInt(range.to)
             );
-            console.log(commissionRange, "itemAmount3542452345", amount);
             const commissionPercent = commissionRange ? parseFloat(commissionRange.commission) : 0;
 
             const commissionAmount = (amount * commissionPercent) / 100;

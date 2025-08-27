@@ -91,8 +91,14 @@ const ServiceReportsandGatpass = (props) => {
         setExpandedReportId(prevId => (prevId === reportId ? null : reportId));
     };
 
-    const handleSendQuotation = (reportId, companyId) => {
-        navigate(`../addServiceQuotation?reportId=${reportId}&companyId=${companyId}`);
+    const handleSendQuotation = async (reportId, companyId) => {
+        try {
+            const res = await axios.post('https://n8n.nicknameinfo.net/webhook/88ed0a9b-ee21-43e0-9684-f5c5859f9734', {reportId : reportId});
+            console.log('Webhook successfully triggered.', res);
+        } catch (webhookError) {
+            console.error('Error triggering webhook:', webhookError);
+            toast.error('Failed to trigger webhook for external notification.');
+        }
     };
 
     if (loading) {

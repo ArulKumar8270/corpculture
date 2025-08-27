@@ -559,7 +559,7 @@ const RentalInvoiceForm = () => {
                         </Box>
                     </Box>
 
-                    <TextField
+                    {/* <TextField
                         fullWidth
                         label="Remarks"
                         name="remarks"
@@ -568,7 +568,7 @@ const RentalInvoiceForm = () => {
                         multiline
                         rows={4}
                         sx={{ mb: 3 }}
-                    />
+                    /> */}
 
                     <Typography variant="h6" gutterBottom sx={{ mt: 3, mb: 2 }}>A3 Entry:</Typography>
                     <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 3, mb: 3 }}>
