@@ -123,11 +123,28 @@ export const createServiceInvoice = async (req, res) => {
 // Get All Service Invoices
 export const getAllServiceInvoices = async (req, res) => {
     try {
-        const { invoiceType } = req.params; // Get invoiceType from query parameters
+        // Get invoiceType from query parameters, and fromDate/toDate from query
+        const { invoiceType, fromDate, toDate } = req.query;
         let query = {};
 
         if (invoiceType) {
             query.invoiceType = invoiceType; // Add invoiceType to the query if provided
+        }
+
+        // Add date range filtering for invoiceDate
+        if (fromDate || toDate) {
+            query.invoiceDate = {};
+            if (fromDate) {
+                // Convert fromDate string to Date object and use $gte
+                query.invoiceDate.$gte = new Date(fromDate);
+            }
+            if (toDate) {
+                // Convert toDate string to Date object and use $lte
+                // To include the entire day, set the time to the end of the day (23:59:59.999)
+                const endOfDay = new Date(toDate);
+                endOfDay.setHours(23, 59, 59, 999);
+                query.invoiceDate.$lte = endOfDay;
+            }
         }
 
         const serviceInvoices = await ServiceInvoice.find(query) // Use the constructed query

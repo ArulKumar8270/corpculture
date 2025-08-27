@@ -270,6 +270,30 @@ const AddServiceInvoice = () => {
         // eslint-disable-next-line
     }, [invoiceId]);
 
+    const updateCommissionDetails = async (invoice) => {
+        try {
+            const apiParams = {
+                userId: auth?.user?.parentId || auth?.user?._id,
+                orderId: data?._id,
+                commissionAmount: 3452,
+                percentageRate: 2,
+            }
+            const payment = await axios.post(
+                `${import.meta.env.VITE_SERVER_URL
+                }/api/v1/commissions`,
+                apiParams,
+                {
+                    headers: {
+                        Authorization: auth?.token,
+                    },
+                }
+            );
+
+        } catch (error) {
+            console.log(error);
+        }
+    }
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         const { companyId, modeOfPayment, deliveryAddress, reference, description, sendTo } = invoiceData; // Removed status
@@ -329,6 +353,13 @@ const AddServiceInvoice = () => {
                 data = res.data;
             }
             if (data?.success) {
+                try {
+                    const res = await axios.post('https://n8n.nicknameinfo.net/webhook/f8d3ad37-a38e-4a38-a06e-09c74fdc3b91', data);
+                    console.log('Webhook successfully triggered.', res);
+                } catch (webhookError) {
+                    console.error('Error triggering webhook:', webhookError);
+                    toast.error('Failed to trigger webhook for external notification.');
+                }
                 if (!invoiceId && invoiceType !== "quotation") {
                     handleUpdateInvoiceCount()
                     updateStausToService(serviceId, 'Completed');
