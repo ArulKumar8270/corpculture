@@ -124,7 +124,7 @@ export const createServiceInvoice = async (req, res) => {
 export const getAllServiceInvoices = async (req, res) => {
     try {
         // Get invoiceType from query parameters, and fromDate/toDate from query
-        const { invoiceType, fromDate, toDate } = req.query;
+        const { invoiceType, fromDate, toDate } = req.params;
         let query = {};
 
         if (invoiceType) {
