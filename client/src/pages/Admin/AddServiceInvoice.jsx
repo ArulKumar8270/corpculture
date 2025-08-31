@@ -59,7 +59,12 @@ const AddServiceInvoice = () => {
     const [loading, setLoading] = useState(true); // Loading state for initial data
 
 
-    const fetchInvoices = async () => {
+
+    useEffect(() => {
+        fetchInvoicesCounts();
+    }, [serviceId]);
+
+    const fetchInvoicesCounts = async () => {
         try {
             setLoading(true);
             const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/common-details`, {
@@ -102,7 +107,6 @@ const AddServiceInvoice = () => {
                 setLoading(false);
             }
         };
-        fetchInvoices();
         fetchCompanies();
     }, []);
 
@@ -156,7 +160,6 @@ const AddServiceInvoice = () => {
                 }
             } catch (error) {
                 console.error("Error fetching products by company:", error);
-                alert('Something went wrong while fetching products.');
                 setAvailableProducts([]); // Clear products on error
             } finally {
                 setLoading(false);
@@ -196,7 +199,7 @@ const AddServiceInvoice = () => {
             hsn: selectedProduct.hsn,
             quantity: parseInt(invoiceData.quantity),
             rate: selectedProduct.rate,
-            totalAmount: parseInt(invoiceData.quantity) * selectedProduct.rate,
+            totalAmount: parseInt(invoiceData.quantity) * selectedProduct.totalAmount,
         };
 
         setProductsInTable(prevProducts => [...prevProducts, newProduct]);
@@ -270,30 +273,6 @@ const AddServiceInvoice = () => {
         // eslint-disable-next-line
     }, [invoiceId]);
 
-    const updateCommissionDetails = async (invoice) => {
-        try {
-            const apiParams = {
-                userId: auth?.user?.parentId || auth?.user?._id,
-                orderId: data?._id,
-                commissionAmount: 3452,
-                percentageRate: 2,
-            }
-            const payment = await axios.post(
-                `${import.meta.env.VITE_SERVER_URL
-                }/api/v1/commissions`,
-                apiParams,
-                {
-                    headers: {
-                        Authorization: auth?.token,
-                    },
-                }
-            );
-
-        } catch (error) {
-            console.log(error);
-        }
-    }
-
     const handleSubmit = async (e) => {
         e.preventDefault();
         const { companyId, modeOfPayment, deliveryAddress, reference, description, sendTo } = invoiceData; // Removed status
@@ -310,7 +289,7 @@ const AddServiceInvoice = () => {
         const grandTotal = subtotal + tax;
 
         const payload = {
-            invoiceNumber: invoiceType === "quotation" ? null : invoices,
+            ...(!invoiceId && invoiceType !== "quotation" ? { invoiceNumber: invoices } : []),
             companyId,
             products: productsInTable.map(p => ({
                 productId: p.productId,
@@ -353,18 +332,14 @@ const AddServiceInvoice = () => {
                 data = res.data;
             }
             if (data?.success) {
-                try {
-                    const res = await axios.post('https://n8n.nicknameinfo.net/webhook/f8d3ad37-a38e-4a38-a06e-09c74fdc3b91', data);
-                    console.log('Webhook successfully triggered.', res);
-                } catch (webhookError) {
-                    console.error('Error triggering webhook:', webhookError);
-                    toast.error('Failed to trigger webhook for external notification.');
-                }
-                if (!invoiceId && invoiceType !== "quotation") {
-                    handleUpdateInvoiceCount()
-                    updateStausToService(serviceId, 'Completed');
-                }
-                handleCancel();
+                // try {
+                //     const res = await axios.post('https://n8n.nicknameinfo.net/webhook/f8d3ad37-a38e-4a38-a06e-09c74fdc3b91', {});
+                //     console.log('Webhook successfully triggered.', res);
+                // } catch (webhookError) {
+                //     console.error('Error triggering webhook:', webhookError);
+                //     toast.error('Failed to trigger webhook for external notification.');
+                // }
+                handleCancel(data.serviceInvoice);
             } else {
                 alert(data?.message || 'Failed to save service invoice.');
             }
@@ -395,7 +370,7 @@ const AddServiceInvoice = () => {
         }
     }
 
-    const handleCancel = () => {
+    const handleCancel = (invoice) => {
         setInvoiceData({
             companyId: '',
             productId: '',
@@ -409,6 +384,11 @@ const AddServiceInvoice = () => {
         });
         setProductsInTable([]);
         setAvailableProducts([]); // Clear available products
+        if (!invoiceId && invoiceType !== "quotation") {
+            handleUpdateInvoiceCount()
+        }
+        updateCommissionDetails(invoice);
+        updateStausToService(serviceId, 'Completed');
         if (invoiceType === "quotation") {
             navigate('../ServiceQuotationList');
         } else {
@@ -436,6 +416,53 @@ const AddServiceInvoice = () => {
             console.error('Error Status Updated :', err);
         }
     };
+
+    const updateCommissionDetails = async (invoice) => {
+
+        try {
+            let totalCommissionAmount = 0;
+            let percentageRate = 0; // Default or first product's commission percentage
+
+            if (invoice?.products && invoice.products.length > 0) {
+                // Calculate total commission amount by summing commissions from all products
+                totalCommissionAmount = invoice.products.reduce((sum, product) => {
+                    // Ensure productId and commission exist and are numbers
+                    if (product.productId && typeof product.productId.commission === 'number') {
+                        return sum + (product.totalAmount * (product.productId.commission / 100));
+                    }
+                    return sum;
+                }, 0);
+
+                // Set percentageRate from the first product's commission, if available.
+                // Note: If products have different commission percentages, this single field
+                // might not accurately reflect all product commissions.
+                if (invoice.products[0].productId && typeof invoice.products[0].productId.commission === 'number') {
+                    percentageRate = invoice.products[0].productId.commission;
+                }
+            }
+
+            const apiParams = {
+                commissionFrom: "Service",
+                userId: invoice?.companyId?._id,
+                serviceInvoiceId: invoice?._id,
+                commissionAmount: totalCommissionAmount, // Calculated dynamically
+                percentageRate: percentageRate, // Derived from first product's commission
+            }
+            const payment = await axios.post(
+                `${import.meta.env.VITE_SERVER_URL
+                }/api/v1/commissions`,
+                apiParams,
+                {
+                    headers: {
+                        Authorization: auth?.token,
+                    },
+                }
+            );
+
+        } catch (error) {
+            console.log(error);
+        }
+    }
 
     if (loading) {
         return (
@@ -632,7 +659,7 @@ const AddServiceInvoice = () => {
                     <Button variant="contained" sx={{ bgcolor: '#1976d2', '&:hover': { bgcolor: '#1565c0' } }} onClick={(e) => handleSubmit(e)}>
                         Submit
                     </Button>
-                    <Button variant="contained" sx={{ bgcolor: '#dc3545', '&:hover': { bgcolor: '#c82333' } }} onClick={handleCancel}>
+                    <Button variant="contained" sx={{ bgcolor: '#dc3545', '&:hover': { bgcolor: '#c82333' } }} onClick={() => handleCancel()}>
                         Cancel
                     </Button>
                     <Button

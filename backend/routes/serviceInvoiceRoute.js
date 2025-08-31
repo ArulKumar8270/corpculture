@@ -15,13 +15,13 @@ const router = express.Router();
 router.post("/create", isAdmin, createServiceInvoice);
 
 // Get all service invoices
-router.get("/all/:invoiceType?/:fromDate?/:toDate?", isAdmin, getAllServiceInvoices);
+router.post("/all", isAdmin, getAllServiceInvoices);
 
 // Get single service invoice
 router.get("/get/:id", getServiceInvoiceById);
 
 // Get single service invoice
-router.get("/assignedTo/:assignedTo?/:invoiceType", getServiceInvoicesAssignedTo);
+router.post("/assignedTo/:assignedTo?/:invoiceType", getServiceInvoicesAssignedTo);
 
 // Update service invoice
 router.put("/update/:id", isAdmin, updateServiceInvoice);

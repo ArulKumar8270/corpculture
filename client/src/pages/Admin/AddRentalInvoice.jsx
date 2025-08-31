@@ -29,6 +29,7 @@ const RentalInvoiceForm = () => {
     const [availableProducts, setAvailableProducts] = useState([]);
     const [logoPreview, setLogoPreview] = useState("");
     const [contactOptions, setContactOptions] = useState([]);
+    const [selectedProduct, setSelectedProduct] = useState(null);
     const [invoices, setInvoices] = useState(null);
     // {{ edit_1 }}
     const [formData, setFormData] = useState({
@@ -47,7 +48,12 @@ const RentalInvoiceForm = () => {
     const navigate = useNavigate();
     const { id } = useParams();
 
-    const fetchInvoices = async () => {
+
+    useEffect(() => {
+        fetchInvoicesCounts();
+    }, [rentalId]);
+
+    const fetchInvoicesCounts = async () => {
         try {
             setLoading(true);
             const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/common-details`, {
@@ -89,7 +95,6 @@ const RentalInvoiceForm = () => {
                 setLoading(false);
             }
         };
-        fetchInvoices();
         fetchCompanies();
     }, [auth.token]);
 
@@ -106,7 +111,7 @@ const RentalInvoiceForm = () => {
                     });
                     if (data?.success) {
                         const entry = data.entry;
-                        // {{ edit_1 }}
+                        setSelectedProduct(entry.machineId);
                         setFormData({
                             companyId: entry.companyId?._id || '',
                             machineId: entry.machineId?._id || '',
@@ -148,7 +153,6 @@ const RentalInvoiceForm = () => {
                     }
                 } catch (error) {
                     console.error("Error fetching rental entry:", error);
-                    toast.error('Something went wrong while fetching rental entry details.');
                     navigate('/admin/rental-invoices');
                 } finally {
                     setLoading(false);
@@ -232,13 +236,7 @@ const RentalInvoiceForm = () => {
 
     const handleImagehange = (e) => {
         const file = e.target.files[0];
-
-        if (file.size > MAX_IMAGE_SIZE) {
-            toast.warning("Logo image size exceeds 500 KB!");
-            return;
-        }
         const reader = new FileReader();
-
         reader.onload = () => {
             if (reader.readyState === 2) {
                 setLogoPreview(reader.result);
@@ -275,6 +273,7 @@ const RentalInvoiceForm = () => {
         setErrors(prev => ({ ...prev, machineId: '' }));
 
         const selectedProduct = availableProducts.find(prod => prod._id === selectedProductId);
+        setSelectedProduct(selectedProduct);
         if (selectedProduct) {
             // {{ edit_2 }}
             setFormData(prev => ({
@@ -387,7 +386,6 @@ const RentalInvoiceForm = () => {
             toast.error("Please correct the errors in the form.");
             return;
         }
-
         try {
             setLoading(true);
             const data = new FormData();
@@ -431,11 +429,52 @@ const RentalInvoiceForm = () => {
             if (res.data?.success) {
                 if (!id && invoiceType !== "quotation") {
                     handleUpdateInvoiceCount();
+                }
+                if (!id) {
                     updateStausToRental(rentalId, "Completed")
                 }
-                toast.success(res.data.message);
-                // Reset form or navigate
-                // {{ edit_1 }}
+                onUpdateRentalProduct()
+                updateCommissionDetails(res.data?.entry)
+                console.log("Rental entry created successfully!", res.data);
+            } else {
+                toast.error(res.data?.message || `Failed to ${id ? 'update' : 'create'} rental payment entry.`);
+            }
+        } catch (error) {
+            console.error(`Error ${id ? 'updating' : 'creating'} rental payment entry:`, error);
+            toast.error(error.response?.data?.message || 'Something went wrong.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const onUpdateRentalProduct = async (e) => {
+        const apiPayload = {
+            ...selectedProduct,
+            a3Config: {
+                ...selectedProduct?.a3Config,
+                bwOldCount: formData.a3Config.bwNewCount,
+                colorOldCount: formData.a3Config.colorNewCount,
+                colorScanningOldCount: formData.a3Config.colorScanningNewCount,
+               
+            },
+            a4Config: {
+                ...selectedProduct?.a4Config,
+                bwOldCount: formData.a4Config.bwNewCount,
+                colorOldCount: formData.a4Config.colorNewCount,
+                colorScanningOldCount: formData.a4Config.colorScanningNewCount,
+                
+            },
+            a5Config: {
+                ...selectedProduct?.a5Config,
+                bwOldCount: formData.a5Config.bwNewCount,
+                colorOldCount: formData.a5Config.colorNewCount,
+                colorScanningOldCount: formData.a5Config.colorScanningNewCount,
+            }
+        }
+        try {
+            // Update existing product
+            const { data } = await axios.put(`${import.meta.env.VITE_SERVER_URL}/api/v1/rental-products/${selectedProduct?._id}`, apiPayload);
+            if (data?.success) {
                 setFormData({
                     companyId: '',
                     machineId: '',
@@ -453,17 +492,87 @@ const RentalInvoiceForm = () => {
                 } else {
                     navigate('../rentalInvoiceList');
                 }
-                // Navigate to the list page
-            } else {
-                toast.error(res.data?.message || `Failed to ${id ? 'update' : 'create'} rental payment entry.`);
             }
         } catch (error) {
-            console.error(`Error ${id ? 'updating' : 'creating'} rental payment entry:`, error);
-            toast.error(error.response?.data?.message || 'Something went wrong.');
-        } finally {
-            setLoading(false);
+            alert('Something went wrong while saving the rental product.');
         }
     };
+
+
+    const updateCommissionDetails = async (entry, auth) => {
+        try {
+            let totalBillableAmount = 0;
+            const machine = entry.machineId;
+    
+            // Helper to calculate amount
+            const calculateCountAmount = (machineOld, entryNew, freeC, extraAmt) => {
+                machineOld = parseFloat(machineOld) || 0;
+                entryNew = parseFloat(entryNew) || 0;
+                freeC = parseFloat(freeC) || 0;
+                extraAmt = parseFloat(extraAmt) || 0;
+    
+                const copiesUsed = entryNew - machineOld;
+                if (copiesUsed <= 0) return 0;
+                const billableCopies = Math.max(0, copiesUsed - freeC);
+                return billableCopies * extraAmt;
+            };
+    
+            // A3
+            if (machine.a3Config && entry.a3Config) {
+                totalBillableAmount += calculateCountAmount(machine.a3Config.bwOldCount, entry.a3Config.bwNewCount, machine.a3Config.freeCopiesBw, machine.a3Config.extraAmountBw);
+                totalBillableAmount += calculateCountAmount(machine.a3Config.colorOldCount, entry.a3Config.colorNewCount, machine.a3Config.freeCopiesColor, machine.a3Config.extraAmountColor);
+                totalBillableAmount += calculateCountAmount(machine.a3Config.colorScanningOldCount, entry.a3Config.colorScanningNewCount, machine.a3Config.freeCopiesColorScanning, machine.a3Config.extraAmountColorScanning);
+            }
+    
+            // A4
+            if (machine.a4Config && entry.a4Config) {
+                totalBillableAmount += calculateCountAmount(machine.a4Config.bwOldCount, entry.a4Config.bwNewCount, machine.a4Config.freeCopiesBw, machine.a4Config.extraAmountBw);
+                totalBillableAmount += calculateCountAmount(machine.a4Config.colorOldCount, entry.a4Config.colorNewCount, machine.a4Config.freeCopiesColor, machine.a4Config.extraAmountColor);
+                totalBillableAmount += calculateCountAmount(machine.a4Config.colorScanningOldCount, entry.a4Config.colorScanningNewCount, machine.a4Config.freeCopiesColorScanning, machine.a4Config.extraAmountColorScanning);
+            }
+    
+            // A5
+            if (machine.a5Config && entry.a5Config) {
+                totalBillableAmount += calculateCountAmount(machine.a5Config.bwOldCount, entry.a5Config.bwNewCount, machine.a5Config.freeCopiesBw, machine.a5Config.extraAmountBw);
+                totalBillableAmount += calculateCountAmount(machine.a5Config.colorOldCount, entry.a5Config.colorNewCount, machine.a5Config.freeCopiesColor, machine.a5Config.extraAmountColor);
+                totalBillableAmount += calculateCountAmount(machine.a5Config.colorScanningOldCount, entry.a5Config.colorScanningNewCount, machine.a5Config.freeCopiesColorScanning, machine.a5Config.extraAmountColorScanning);
+            }
+    
+            // GST
+            let totalGSTPercentage = 0;
+            if (machine.gstType && machine.gstType.length > 0) {
+                totalGSTPercentage = machine.gstType.reduce(
+                    (sum, gst) => sum + (parseFloat(gst.gstPercentage) || 0),
+                    0
+                );
+            }
+    
+            const totalAmountIncludingGST = totalBillableAmount * (1 + totalGSTPercentage / 100);
+    
+            // Commission
+            const commissionPercentage = parseFloat(machine.commission) || 0;
+            const totalCommissionAmount = totalAmountIncludingGST * (commissionPercentage / 100);
+    
+            const apiParams = {
+                commissionFrom: "Rental",
+                userId: entry?.companyId?._id,
+                rentalInvoiceId: entry?._id,
+                commissionAmount: totalCommissionAmount.toFixed(2),
+                percentageRate: commissionPercentage,
+            };
+    
+            // Send commission API
+            const payment = await axios.post(
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/commissions`,
+                apiParams,
+                { headers: { Authorization: auth?.token } }
+            );
+    
+        } catch (error) {
+            console.error("Commission calc error ❌", error);
+        }
+    };
+    
 
     return (
         <Box sx={{ p: 3, bgcolor: 'background.default', minHeight: '100vh' }}>

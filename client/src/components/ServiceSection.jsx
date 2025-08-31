@@ -8,6 +8,7 @@ const ServiceSection = ({ services }) => {
   const [isFetchingServices, setIsFetchingServices] = useState(false); // Loading state for phone lookup
   const [fetchError, setFetchError] = useState(null); // Error state for phone lookup
   const [fetchedServices, setFetchedServices] = useState([]); // State to store fetched services
+  const [fetchedCompanies, setFetchedCompanies] = useState([]); // New state for fetched companies
   const { auth } = useAuth();
 
   const handleServiceClick = (service) => {
@@ -21,8 +22,8 @@ const ServiceSection = ({ services }) => {
       complaint: "",
       contactPerson: "",
       email: "",
-      address: "",
-      location: "",
+      address: "", // Reset address
+      location: "", // Reset location
       oldServiceId: "", // Reset oldServiceId
       serviceImage: null, // Reset serviceImage
     });
@@ -31,6 +32,7 @@ const ServiceSection = ({ services }) => {
     setFetchedServices([]);
     setFetchError(null);
     setIsFetchingServices(false);
+    setFetchedCompanies([]); // Reset fetched companies
   };
 
   const closeModal = () => {
@@ -44,8 +46,8 @@ const ServiceSection = ({ services }) => {
       complaint: "",
       contactPerson: "",
       email: "",
-      address: "",
-      location: "",
+      address: "", // Reset address
+      location: "", // Reset location
       oldServiceId: "", // Reset oldServiceId
       serviceImage: null, // Reset serviceImage
     });
@@ -54,6 +56,7 @@ const ServiceSection = ({ services }) => {
     setFetchedServices([]);
     setFetchError(null);
     setIsFetchingServices(false);
+    setFetchedCompanies([]); // Reset fetched companies
   };
 
 
@@ -64,8 +67,8 @@ const ServiceSection = ({ services }) => {
     complaint: "",
     contactPerson: "",
     email: "",
-    address: "",
-    location: "",
+    address: "", // Initialize address
+    location: "", // Initialize location
     oldServiceId: "", // Initialize oldServiceId
     serviceType: selectedService?.id,
     serviceTitle: selectedService?.title, // Set the serviceType based on the selected service
@@ -85,8 +88,8 @@ const ServiceSection = ({ services }) => {
     if (!form.contactPerson) newErrors.contactPerson = "Contact person is required";
     if (!form.email) newErrors.email = "Email is required";
     else if (!/^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$/.test(form.email)) newErrors.email = "Invalid email";
-    // if (!form.address) newErrors.address = "Address is required";
-    if (!form.location) newErrors.location = "Location is required";
+    if (!form.address) newErrors.address = "Address is required"; // Validate address
+    if (!form.location) newErrors.location = "Location is required"; // Validate location
     if (form.customerType === "Rework" && !form.oldServiceId) { // Validate oldServiceId for Rework
       newErrors.oldServiceId = "Old Service ID is required for Rework";
     }
@@ -96,6 +99,7 @@ const ServiceSection = ({ services }) => {
   const fetchServicesByPhone = async (phoneNumber) => { // New function to fetch services by phone
     if (!phoneNumber || phoneNumber.length < 9) { // Only fetch if phone is 10 digits
       setFetchError(null); // Clear previous error
+      setFetchedCompanies([]); // Clear fetched companies
       // Optionally clear form fields related to previous customer if phone number is cleared/invalidated
       setForm(prevForm => ({
         ...prevForm,
@@ -115,63 +119,71 @@ const ServiceSection = ({ services }) => {
 
     setIsFetchingServices(true); // Set loading state
     setFetchError(null); // Clear previous error
+    setFetchedCompanies([]); // Clear previous companies before fetching
 
     try {
-      const response = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/service/phone/${phoneNumber}`);
-      if (response.data.success) { // Check for success and if services were returned
-        setFetchedServices(response.data.services); // Update fetched services
-        // Set customer type to Existing if services are found
-        setForm(prevForm => ({ // Update form with fetched data
-          ...prevForm, // Keep the current phone number
-          customerType: "New", // Set customer type to Existing
-          companyName: response.data.services?.[0]?.companyName || "", // Pre-fill company name
-          contactPerson: response.data.services?.[0]?.contactPerson || "", // Pre-fill contact person
-          email: response.data.services?.[0]?.email || "", // Pre-fill email
-          address: response.data.services?.[0]?.addressDetail || "", // Pre-fill address
-          location: response.data.services?.[0]?.location || "", // Pre-fill location
-          serviceType: response.data.services?.[0]?.serviceType,
-          serviceTitle: response.data.services?.[0]?.title,
-          oldServiceId: "", // Do not pre-fill oldServiceId from phone lookup
-          // complaint is usually specific to the new request, so don't pre-fill
-        }));
+      const serviceList = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/service/phone/${phoneNumber}`);
+      setFetchedServices(serviceList.data.services); // Update fetched services
+    } catch (error) {
+      console.error("Error fetching services by phone:", error);
+      setFetchedServices([]); // Clear results on error
+    }
+
+    try {
+      const response = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/company/getByPhone/${phoneNumber}`);
+      if (response.data.success && response.data.company && response.data.company.length > 0) {
+        setFetchedCompanies(response.data.company); // Store all fetched companies
+        setFetchError(null); // Clear any previous fetch error
+        // Do NOT auto-populate form fields here. User will select a company.
       } else {
-        // Handle cases where success is false or no services found
-        setFetchError(response.data.message || "No services found for this phone number.");
-        // Optionally clear form fields if no previous customer found
+        setFetchedCompanies([]); // No companies found
+        setFetchError("No existing company found for this phone number.");
+        // Clear company-related form fields if no company found
         setForm(prevForm => ({
-          ...prevForm, // Keep the current phone number
-          customerType: "", // Reset customer type
-          companyName: "", // Reset company name
-          contactPerson: "", // Reset contact person
-          email: "", // Reset email
-          address: "", // Reset address
-          location: "", // Reset location
-          oldServiceId: "", // Reset oldServiceId
+          ...prevForm,
+          companyName: "",
+          contactPerson: "",
+          email: "",
+          address: "",
+          location: "",
         }));
       }
     } catch (err) {
-      console.error("Error fetching services by phone:", err);
-      setFetchedServices([]); // Clear results on error
-      // Set a user-friendly error message
+      console.error("Error fetching companies by phone:", err);
+      setFetchedCompanies([]);
       if (err.response && err.response.status === 404) {
-        setFetchError("No services found for this phone number.");
+        setFetchError("No existing company found for this phone number.");
       } else {
-        setFetchError("Failed to fetch services. Please try again.");
+        setFetchError("Failed to fetch company details. Please try again.");
       }
-      // Optionally clear form fields on error
+      // Clear company-related form fields on error
       setForm(prevForm => ({
-        ...prevForm, // Keep the current phone number
-        customerType: "", // Reset customer type
-        companyName: "", // Reset company name
-        contactPerson: "", // Reset contact person
-        email: "", // Reset email
-        address: "", // Reset address
-        location: "", // Reset location
-        oldServiceId: "", // Reset oldServiceId
+        ...prevForm,
+        companyName: "",
+        contactPerson: "",
+        email: "",
+        address: "",
+        location: "",
       }));
     } finally {
       setIsFetchingServices(false); // Clear loading state
     }
+  };
+
+  // New function to handle company selection
+  const handleCompanySelect = (company) => {
+    setForm(prevForm => ({
+      ...prevForm,
+      customerType: "New", // Assuming a new service request for an existing company
+      companyName: company.companyName || "",
+      contactPerson: company.contactPersons?.[0]?.name || "", // Assuming first contact person
+      email: company.contactPersons?.[0]?.email || "", // Assuming first contact person
+      address: company.billingAddress || "", // Map billingAddress to form.address
+      location: company.city || "", // Map city to form.location
+      // Do not set oldServiceId here, as it's for Rework type
+    }));
+    setFetchedCompanies([]); // Clear the list after selection
+    setFetchError(null); // Clear any error message
   };
 
 
@@ -183,7 +195,7 @@ const ServiceSection = ({ services }) => {
       if (name === 'customerType' && value !== 'Rework') {
         newForm.oldServiceId = '';
       }
-      if(name === 'serviceImage'){
+      if (name === 'serviceImage') {
         newForm.serviceImage = e.target.files[0];
       }
       return newForm;
@@ -208,7 +220,7 @@ const ServiceSection = ({ services }) => {
     if (form.serviceImage) {
       formData.append("file", form.serviceImage);
     }
-    
+
     let imageUrl = '';
     if (form.serviceImage) {
       try {
@@ -242,8 +254,8 @@ const ServiceSection = ({ services }) => {
         complaint: "",
         contactPerson: "",
         email: "",
-        address: "",
-        location: "",
+        address: "", // Reset address after submission
+        location: "", // Reset location after submission
         oldServiceId: "", // Reset oldServiceId after submission
         serviceType: selectedService?.id,
         serviceTitle: selectedService?.title, // Set the serviceType based on the selected service
@@ -252,6 +264,7 @@ const ServiceSection = ({ services }) => {
       setErrors({});
       setFetchedServices([]); // Clear fetched services after successful submission
       setFetchError(null); // Clear fetch error after successful submission
+      setFetchedCompanies([]); // Clear fetched companies after successful submission
     } catch (err) {
       console.error("Service submission error:", err); // Log the error
       setSubmitStatus(false);
@@ -362,22 +375,52 @@ const ServiceSection = ({ services }) => {
                   )}
 
                   {form.customerType === "Rework" && fetchedServices.length > 0 && (
-                    <div className="md:col-span-2 mt-4">
-                      <h3 className="text-lg font-semibold mb-2 text-gray-700">Previous Services for this Phone Number:</h3>
-                      <div className="max-h-48 overflow-y-auto border border-gray-300 rounded-lg p-2 bg-gray-50">
+                    <div>
+                      <label className="block font-semibold mb-1 text-gray-700">Select a Previous Service</label>
+                      <select
+                        name="oldServiceId"
+                        value={form.oldServiceId}
+                        onChange={handleChange}
+                        className="w-full rounded-lg px-3 py-2 border border-gray-300 focus:border-sky-500 focus:ring-2 focus:ring-sky-200 transition bg-white"
+                      >
+                        <option value="">-- Select a previous service --</option>
                         {fetchedServices.map((service) => (
-                          <div
-                            key={service._id}
-                            className={`p-3 mb-2 border rounded-md cursor-pointer transition-all duration-200 ${form.oldServiceId === service._id ? 'bg-sky-100 border-sky-500' : 'bg-white border-gray-200 hover:bg-gray-100'}`}
-                            onClick={() => setForm(prevForm => ({ ...prevForm, oldServiceId: service._id }))}
-                          >
-                            <p className="font-medium text-gray-800">Service ID: <span className="font-normal text-sm text-gray-600">{service._id}</span></p>
-                            <p className="font-medium text-gray-800">Service Type: <span className="font-normal text-sm text-gray-600">{service.serviceTitle || 'N/A'}</span></p>
-                            <p className="font-medium text-gray-800">Complaint: <span className="font-normal text-sm text-gray-600">{service.complaint || 'No complaint details'}</span></p>
-                            <p className="font-medium text-gray-800">Date: <span className="font-normal text-sm text-gray-600">{new Date(service.createdAt).toLocaleDateString()}</span></p>
-                          </div>
+                          <option key={service._id} value={service._id}>
+                            Service ID: {service._id} - {service.serviceTitle || 'N/A'} ({new Date(service.createdAt).toLocaleDateString()})
+                          </option>
                         ))}
-                      </div>
+                      </select>
+                      {errors.oldServiceId && <span className="text-red-500 text-xs">{errors.oldServiceId}</span>}
+                    </div>
+                  )}
+
+                  {/* New: Display fetched companies for selection as a dropdown */}
+                  {fetchedCompanies.length > 0 && (
+                    <div>
+                      <label className="block font-semibold mb-1 text-gray-700">Select an Existing Company</label>
+                      <select
+                        name="selectedCompany" // This name is for internal use, not directly tied to form state
+                        onChange={(e) => {
+                          const selectedCompanyId = e.target.value;
+                          if (selectedCompanyId) { // Ensure a company is selected (not the default empty option)
+                            const selectedCompany = fetchedCompanies.find(
+                              (company) => company._id === selectedCompanyId
+                            );
+                            if (selectedCompany) {
+                              handleCompanySelect(selectedCompany);
+                            }
+                          }
+                        }}
+                        className="w-full rounded-lg px-3 py-2 border border-gray-300 focus:border-sky-500 focus:ring-2 focus:ring-sky-200 transition bg-white"
+                        value="" // This makes the default option selected initially
+                      >
+                        <option value="">-- Select an existing company --</option>
+                        {fetchedCompanies.map((company) => (
+                          <option key={company._id} value={company._id}>
+                            {company.companyName} (Phone: {company.phone})
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   )}
 
@@ -409,7 +452,7 @@ const ServiceSection = ({ services }) => {
                       name="contactPerson"
                       value={form.contactPerson}
                       onChange={handleChange}
-                      className={`w-full rounded-lg px-3 py-2 border ${errors.contactPerson ? "border-red-400" : "border-gray-300"} focus:border-sky-500 focus:ring-2 focus:ring-sky-200 transition bg-white`}
+                      className={`w-full rounded-lg px-3 py-2 border ${errors.contactPerson ? "border-red-400" : "border-gray-300"} focus:border-sky-500 focus:ring-2 focus:ring-200 transition bg-white`}
                     />
                     {errors.contactPerson && <span className="text-red-500 text-xs">{errors.contactPerson}</span>}
                   </div>
@@ -420,7 +463,7 @@ const ServiceSection = ({ services }) => {
                       name="email"
                       value={form.email}
                       onChange={handleChange}
-                      className={`w-full rounded-lg px-3 py-2 border ${errors.email ? "border-red-400" : "border-gray-300"} focus:border-sky-500 focus:ring-2 focus:ring-sky-200 transition bg-white`}
+                      className={`w-full rounded-lg px-3 py-2 border ${errors.email ? "border-red-400" : "border-gray-300"} focus:border-sky-500 focus:ring-2 focus:ring-200 transition bg-white`}
                     />
                     {errors.email && <span className="text-red-500 text-xs">{errors.email}</span>}
                   </div>
@@ -428,24 +471,24 @@ const ServiceSection = ({ services }) => {
                     <label className="block font-semibold mb-1 text-gray-700">Address Detail</label>
                     <input
                       type="text"
-                      name="location" // Changed from location to address
-                      value={form.location} // Changed from location to address
+                      name="address" // Corrected name to 'address'
+                      value={form.address} // Corrected value to 'form.address'
                       onChange={handleChange}
-                      className={`w-full rounded-lg px-3 py-2 border ${errors.location ? "border-red-400" : "border-gray-300"} focus:border-sky-500 focus:ring-2 focus:ring-sky-200 transition bg-white`}
+                      className={`w-full rounded-lg px-3 py-2 border ${errors.address ? "border-red-400" : "border-gray-300"} focus:border-sky-500 focus:ring-2 focus:ring-sky-200 transition bg-white`}
                     />
-                    {errors.location && <span className="text-red-500 text-xs">{errors.location}</span>}
+                    {errors.address && <span className="text-red-500 text-xs">{errors.address}</span>}
                   </div>
-                  {/* <div>
+                  <div>
                     <label className="block font-semibold mb-1 text-gray-700">Location Detail</label>
                     <input
                       type="text"
                       name="location"
                       value={form.location}
                       onChange={handleChange}
-                      className={`w-full rounded-lg px-3 py-2 border ${errors.location ? "border-red-400" : "border-gray-300"} focus:border-sky-500 focus:ring-2 focus:ring-sky-200 transition bg-white`}
+                      className={`w-full rounded-lg px-3 py-2 border ${errors.location ? "border-red-400" : "border-gray-300"} focus:border-sky-500 focus:ring-2 focus:ring-200 transition bg-white`}
                     />
                     {errors.location && <span className="text-red-500 text-xs">{errors.location}</span>}
-                  </div> */}
+                  </div>
                   <div>
                     <label className="block font-semibold mb-1 text-gray-700">Service Image</label>
                     <input

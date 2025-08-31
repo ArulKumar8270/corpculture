@@ -24,7 +24,7 @@ export const createrRental = async (req, res) => {
 // Get All Services
 export const getAllRental = async (req, res) => {
     try {
-        const rental = await RentalModel.find({}).sort({ createdAt: -1 });
+        const rental = await RentalModel.find({status: { $nin: ["Completed", "Cancelled"] }}).sort({ createdAt: -1 });
         res.status(200).send({
             success: true,
             rental
@@ -81,7 +81,7 @@ export const getRentalAssignedTo = async (req, res) => {
             });
         }
 
-        const rental = await RentalModel.find({ employeeId: assignedTo }).sort({ createdAt: -1 }); // Find services by phone number
+        const rental = await RentalModel.find({ employeeId: assignedTo, status: { $nin: ["Completed", "Cancelled"] } }).sort({ createdAt: -1 }); // Find services by phone number
 
         if (!rental || rental.length === 0) {
             return res.status(404).send({
@@ -220,7 +220,7 @@ export const getRentalByType = async (req, res) => {
             });
         }
 
-        const rental = await RentalModel.find({ rentalType: rentalType }).sort({ createdAt: -1 });
+        const rental = await RentalModel.find({ rentalType: rentalType, status: { $nin: ["Completed", "Cancelled"] } }).sort({ createdAt: -1 });
 
         if (!rental || rental.length === 0) {
             return res.status(404).send({

@@ -15,7 +15,7 @@ const router = express.Router();
 router.post('/create-rental-entry', isAdmin, createRentalPaymentEntry);
 
 // Get all Rental Payment Entries || GET
-router.get('/all/:invoiceType?', isAdmin, getAllRentalPaymentEntries);
+router.post('/all', isAdmin, getAllRentalPaymentEntries);
 
 // Get single Rental Payment Entry by ID || GET
 router.get('/:id', isAdmin, getRentalPaymentEntryById);
@@ -24,7 +24,7 @@ router.get('/:id', isAdmin, getRentalPaymentEntryById);
 router.put('/:id', isAdmin, updateRentalPaymentEntry); // {{ edit_2 }}
 
 // Get single Rental invoice
-router.get("/assignedTo/:assignedTo?/:invoiceType?", getRentalInvoiceAssignedTo);
+router.post("/assignedTo/:assignedTo?/:invoiceType?", getRentalInvoiceAssignedTo);
 
 // Get send details to options || GET
 router.get('/send-details-options', isAdmin, getSendDetailsToOptions);
