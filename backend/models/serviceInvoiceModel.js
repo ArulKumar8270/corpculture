@@ -53,6 +53,18 @@ const serviceInvoiceSchema = new mongoose.Schema({
         required: true,
         trim: true,
     },
+    pendingAmount: {
+        type: Number,
+        trim: true,
+    },
+    tdsAmount: {
+        type: Number,
+        trim: true,
+    },
+    paymentAmountType: {
+        type: String,
+        trim: true,
+    },
     bankName: { // New field
         type: String,
         trim: true,
@@ -105,8 +117,8 @@ const serviceInvoiceSchema = new mongoose.Schema({
     },
     status: {
         type: String,
-        enum: ['draft', 'Cancelled', "Pending", "Progress", "Completed", "InvoiceSent"],
-        default: 'draft',
+        enum: ['draft', 'Cancelled', "Pending", "Progress", "Completed", "InvoiceSent", "Paid", "Unpaid"],
+        default: 'Unpaid',
     },
     sendTo: [{
         type: String,

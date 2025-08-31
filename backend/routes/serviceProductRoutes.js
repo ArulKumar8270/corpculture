@@ -5,6 +5,7 @@ import {
     getServiceProductById,
     updateServiceProduct,
     deleteServiceProduct,
+    getServiceProductsByCompany,
 } from "../controllers/serviceProduct/serviceProductController.js";
 // You might want to add authentication/authorization middleware here, e.g., isAdmin, requireSignIn
 // import { requireSignIn, isAdmin } from "../middleware/authMiddleware.js";
@@ -17,7 +18,7 @@ router.post("/", createServiceProduct); // Consider adding isAdmin middleware he
 // Get all Service Products
 router.get("/", getAllServiceProducts);
 
-router.get("/getServiceProductsByCompany/:companyId", getAllServiceProducts);
+router.get("/getServiceProductsByCompany/:companyId", getServiceProductsByCompany);
 
 // Get Service Product by ID
 router.get("/:id", getServiceProductById);

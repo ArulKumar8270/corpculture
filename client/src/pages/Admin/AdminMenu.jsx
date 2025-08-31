@@ -83,13 +83,25 @@ const AdminMenu = ({ toggleMenu }) => {
                 const serviceProductCount = serviceProductRes?.data?.serviceProducts?.length;
 
                 // Fetch Service Invoices count
-                const serviceInvoiceUrl = `${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/${auth?.user?.role === 3 ? `assignedTo/${auth?.user?._id}/invoice` : "all/invoice"}`;
-                const serviceInvoiceRes = await axios.get(serviceInvoiceUrl, config);
+                let serviceInvoiceRes;
+                if (auth?.user?.role === 3) {
+                    const serviceInvoiceUrl = `${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/assignedTo/${auth?.user?._id}/invoice`;
+                    serviceInvoiceRes = await axios.get(serviceInvoiceUrl, config);
+                } else {
+                    const serviceInvoiceUrl = `${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/all`;
+                    serviceInvoiceRes = await axios.post(serviceInvoiceUrl, { invoiceType: "invoice", tdsAmount: { $eq: null }, status: { $ne: "Paid" } }, config);
+                }
                 const serviceInvoiceCount = serviceInvoiceRes.data?.serviceInvoices?.length;
-                
+
                 // Fetch Service Quotation count
-                const quotationInvoiceUrl = `${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/${auth?.user?.role === 3 ? `assignedTo/${auth?.user?._id}/quotation` : "all/quotation"}`;
-                const quotationInvoiceRes = await axios.get(quotationInvoiceUrl, config);
+                let quotationInvoiceRes;
+                if (auth?.user?.role === 3) {
+                    const quotationInvoiceUrl = `${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/assignedTo/${auth?.user?._id}/quotation`;
+                    quotationInvoiceRes = await axios.get(quotationInvoiceUrl, config);
+                } else {
+                    const quotationInvoiceUrl = `${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/all`;
+                    quotationInvoiceRes = await axios.post(quotationInvoiceUrl, { invoiceType: "quotation" }, config);
+                }
                 const quotationInvoiceCount = quotationInvoiceRes.data?.serviceInvoices?.length;
 
                 // Fetch Service Reports count
@@ -107,20 +119,35 @@ const AdminMenu = ({ toggleMenu }) => {
                 const rentalProductRes = await axios.get(rentalProductUrl, config);
                 const rentalProductCount = rentalProductRes?.data?.rentalProducts?.length;
 
-                // Fetch Rental Invoices count
-                const rentalInvoiceUrl = `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/${auth?.user?.role === 3 ? `assignedTo/${auth?.user?._id}/invoice` : "all/invoice"}`;
-                const rentalInvoiceRes = await axios.get(rentalInvoiceUrl, config);
-                const rentalInvoiceCount = rentalInvoiceRes.data?.entries?.length;
-                
-                // Fetch Rental Invoices count
-                const rentalQuotationUrl = `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/${auth?.user?.role === 3 ? `assignedTo/${auth?.user?._id}/quotation` : "all/quotation"}`;
-                const rentalQuotationRes = await axios.get(rentalQuotationUrl, config);
-                const rentalQuotationCount = rentalQuotationRes.data?.entries?.length;
 
+
+                // Fetch Service Invoices count
+                let rentalInvoiceRes;
+                if (auth?.user?.role === 3) {
+                    const rantalInvoiceUrl = `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/assignedTo/${auth?.user?._id}/invoice`;
+                    rentalInvoiceRes = await axios.get(rantalInvoiceUrl, config);
+                } else {
+                    const rantalInvoiceUrl = `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/all`;
+                    rentalInvoiceRes = await axios.post(rantalInvoiceUrl, { invoiceType: "invoice", tdsAmount: { $eq: null }, status: { $ne: "Paid" } }, config);
+                }
+                const rentalInvoiceCount = rentalInvoiceRes.data?.entries?.length;
+
+                // Fetch Service Quotation count
+                let rentalQuotationRes;
+                if (auth?.user?.role === 3) {
+                    const quotationInvoiceUrl = `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/assignedTo/${auth?.user?._id}/quotation`;
+                    rentalQuotationRes = await axios.get(quotationInvoiceUrl, config);
+                } else {
+                    const quotationInvoiceUrl = `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/all`;
+                    rentalQuotationRes = await axios.post(quotationInvoiceUrl, { invoiceType: "quotation" }, config);
+                }
+                const rentalQuotationCount = rentalQuotationRes.data?.entries?.length;
+                
                 // Fetch Rental Reports count
                 const rentalReportUrl = `${import.meta.env.VITE_SERVER_URL}/api/v1/report/${auth?.user?.role === 3 ? `${auth?.user?._id}/rental` : "rental"}`;
                 const rentalReportRes = await axios.get(rentalReportUrl, config);
                 const rentalReportCount = rentalReportRes.data?.reports?.length;
+
 
                 setRecordCounts(prevCounts => ({
                     ...prevCounts,
@@ -466,7 +493,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                                         }
                                                     >
                                                         <div className="h-10 px-8 flex items-center">
-                                                            Commissions
+                                                            Partners
                                                         </div>
                                                     </NavLink>
                                                 )}

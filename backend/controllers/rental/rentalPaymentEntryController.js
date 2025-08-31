@@ -28,7 +28,7 @@ export const createRentalPaymentEntry = async (req, res) => {
         // Expanded validation to include new required fields if necessary,
         // for now, keeping it focused on bwNewCount as per previous logic.
         // You might want to add validation for colorNewCount and colorScanningNewCount here if they are mandatory.
-        if (!machineId || !sendDetailsTo || !a4Config || a4Config.bwNewCount === undefined) {
+        if (!machineId || !sendDetailsTo) {
             return res.status(400).send({ success: false, message: 'Missing required fields (machineId, sendDetailsTo, a4Config.bwNewCount).' });
         }
         // {{ edit_2 }}
@@ -56,11 +56,19 @@ export const createRentalPaymentEntry = async (req, res) => {
             a3Config, // These now include the new fields due to JSON.parse
             a4Config,
             a5Config,
-            // {{ edit_3 }}
+            // {{ edit_3 }}v
         });
 
         await newEntry.save();
-        res.status(201).send({ success: true, message: 'Rental Payment Entry created successfully', entry: newEntry });
+
+        // Fetch the newly created invoice and populate necessary fields
+        const populatedInvoice = await RentalPaymentEntry.findById(newEntry._id)
+            .populate('companyId') // Populate company details
+            .populate("machineId")
+            .populate('assignedTo') // Populate assignedTo user details
+            .populate('machineId.gstType'); 
+
+        res.status(201).send({ success: true, message: 'Rental Payment Entry created successfully', entry: populatedInvoice });
 
     } catch (error) {
         console.error("Error in createRentalPaymentEntry:", error);
@@ -71,12 +79,29 @@ export const createRentalPaymentEntry = async (req, res) => {
 // Get all rental payment entries
 export const getAllRentalPaymentEntries = async (req, res) => {
     try {
-        const { invoiceType } = req.params; // Get invoiceType from query parameters
+        const { fromDate, toDate, ...filters } = req.body; // Get invoiceType from query parameters
         let query = {};
 
-        if (invoiceType) {
-            query.invoiceType = invoiceType; // Add invoiceType to the query if provided
+        for (const key in filters) {
+            if (filters.hasOwnProperty(key)) {
+                query[key] = filters[key];
+            }
         }
+        if (fromDate || toDate) {
+            query.entryDate = {};
+            if (fromDate) {
+                // Convert fromDate string to Date object and use $gte
+                query.entryDate.$gte = new Date(fromDate);
+            }
+            if (toDate) {
+                // Convert toDate string to Date object and use $lte
+                // To include the entire day, set the time to the end of the day (23:59:59.999)
+                const endOfDay = new Date(toDate);
+                endOfDay.setHours(23, 59, 59, 999);
+                query.entryDate.$lte = endOfDay;
+            }
+        }
+
         const entries = await RentalPaymentEntry.find(query)
             .populate({
                 path: 'machineId', // First populate productId
@@ -155,7 +180,7 @@ export const getRentalInvoiceAssignedTo = async (req, res) => {
 
         let query = {};
         if (invoiceType && assignedTo) {
-            query = { invoiceType, assignedTo };
+            query = { invoiceType, assignedTo, tdsAmount: { $eq: null } };
         }
 
         const entries = await RentalPaymentEntry.find(query).populate({
@@ -201,18 +226,19 @@ export const updateRentalPaymentEntry = async (req, res) => {
             remarks,
             companyId,
             countImageUpload,
-            // {{ edit_1 }}
             modeOfPayment,
             bankName,
             transactionDetails,
-            chequeDate,
+            chequeDate,// New field
+            pendingAmount,
+            tdsAmount,
+            paymentAmountType,
             transferDate,
             companyNamePayment,
             otherPaymentMode,
             invoiceLink,
             invoiceType,
-            rentalId
-            // {{ edit_1 }}
+            staus
         } = req.body;
 
         // Parse the JSON strings for config objects
@@ -272,13 +298,16 @@ export const updateRentalPaymentEntry = async (req, res) => {
             entry.a5Config.colorScanningOldCount = a5Config.colorScanningOldCount !== undefined ? a5Config.colorScanningOldCount : entry.a5Config.colorScanningOldCount;
             entry.a5Config.colorScanningNewCount = a5Config.colorScanningNewCount !== undefined ? a5Config.colorScanningNewCount : entry.a5Config.colorScanningNewCount;
         }
+        if (pendingAmount) entry.pendingAmount = pendingAmount;
+        if (tdsAmount) entry.tdsAmount = tdsAmount;
+        if (paymentAmountType) entry.paymentAmountType = paymentAmountType;
         entry.companyId = companyId || entry.companyId;
         entry.invoiceLink = invoiceLink || entry.invoiceLink;
         entry.invoiceType = invoiceType || entry.invoiceType;
-        entry.rentalId = rentalId || entry.rentalId;
         entry.invoiceNumber = invoiceNumber || entry.invoiceNumber;
         entry.countImageUpload = countImageUploadUrl;
-        // {{ edit_2 }}
+        if (staus) entry.staus = staus;
+        if (invoiceNumber) entry.invoiceNumber = invoiceNumber;
         entry.modeOfPayment = modeOfPayment !== undefined ? modeOfPayment : entry.modeOfPayment;
         entry.bankName = bankName !== undefined ? bankName : entry.bankName;
         entry.transactionDetails = transactionDetails !== undefined ? transactionDetails : entry.transactionDetails;
@@ -290,7 +319,17 @@ export const updateRentalPaymentEntry = async (req, res) => {
 
         await entry.save();
 
-        res.status(200).send({ success: true, message: 'Rental Payment Entry updated successfully', entry });
+        const populatedInvoice = await RentalPaymentEntry.findById(id)
+            .populate('companyId') // Populate company details
+            .populate({
+                path: 'machineId', // Populate machineId
+                populate: {
+                    path: 'gstType', // Then populate gstType inside the machineId document
+                }
+            })
+            .populate('assignedTo'); // Populate assignedTo user details
+
+        res.status(200).send({ success: true, message: 'Rental Payment Entry updated successfully', entry: populatedInvoice });
 
     } catch (error) {
         console.error("Error in updateRentalPaymentEntry:", error);

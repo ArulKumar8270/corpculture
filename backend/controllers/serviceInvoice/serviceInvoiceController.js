@@ -6,7 +6,7 @@ import cloudinary from "cloudinary";
 const calculateInvoiceTotals = (products) => {
     let subtotal = 0;
     for (const item of products) {
-        subtotal += item.quantity * item.rate;
+        subtotal += item.quantity * item.totalAmount;
     }
     // For simplicity, tax is assumed to be 0 for now or handled externally.
     // You can add tax calculation logic here if needed.
@@ -81,7 +81,7 @@ export const createServiceInvoice = async (req, res) => {
                 productName: serviceProduct.productName, // Store product name from fetched product
                 quantity: item.quantity,
                 rate: item.rate,
-                totalAmount: item.quantity * item.rate,
+                totalAmount: item.quantity * item.totalAmount,
             });
         }
 
@@ -112,7 +112,19 @@ export const createServiceInvoice = async (req, res) => {
         });
 
         await newServiceInvoice.save();
-        res.status(201).send({ success: true, message: 'Service Invoice created successfully', serviceInvoice: newServiceInvoice });
+
+        // Fetch the newly created invoice and populate necessary fields
+        const populatedInvoice = await ServiceInvoice.findById(newServiceInvoice._id)
+            .populate('companyId') // Populate company details
+            .populate({
+                path: 'products.productId', // Populate product details
+                populate: {
+                    path: 'gstType',        // Then populate gstType inside the product
+                }
+            })
+            .populate('assignedTo'); // Populate assignedTo user details
+
+        res.status(201).send({ success: true, message: 'Service Invoice created successfully', serviceInvoice: populatedInvoice });
 
     } catch (error) {
         console.error("Error in createServiceInvoice:", error);
@@ -123,12 +135,14 @@ export const createServiceInvoice = async (req, res) => {
 // Get All Service Invoices
 export const getAllServiceInvoices = async (req, res) => {
     try {
-        // Get invoiceType from query parameters, and fromDate/toDate from query
-        const { invoiceType, fromDate, toDate } = req.params;
+        const { fromDate, toDate, ...filters } = req.body; // Destructure fromDate, toDate, and collect other filters
         let query = {};
 
-        if (invoiceType) {
-            query.invoiceType = invoiceType; // Add invoiceType to the query if provided
+        // Add all other filters from req.body to the query
+        for (const key in filters) {
+            if (filters.hasOwnProperty(key)) {
+                query[key] = filters[key];
+            }
         }
 
         // Add date range filtering for invoiceDate
@@ -180,7 +194,7 @@ export const getServiceInvoicesAssignedTo = async (req, res) => {
 
         let query = {};
         if (invoiceType && assignedTo) {
-            query = { invoiceType, assignedTo };
+            query = { invoiceType, assignedTo, tdsAmount: { $eq: null } };
         }
         const serviceInvoices = await ServiceInvoice.find(query)
             .populate('companyId') // Populate company name
@@ -250,6 +264,9 @@ export const updateServiceInvoice = async (req, res) => {
             bankName, // New field
             transactionDetails, // New field
             chequeDate, // New field
+            pendingAmount,
+            tdsAmount,
+            paymentAmountType,
             transferDate, // New field
             companyNamePayment, // New field
             otherPaymentMode, // New field
@@ -263,18 +280,14 @@ export const updateServiceInvoice = async (req, res) => {
             assignedTo,
             sendTo,
             invoiceType,
-            serviceId
+            serviceId,
+            staus
         } = req.body;
 
         // Find the invoice to update
         const serviceInvoice = await ServiceInvoice.findById(id);
         if (!serviceInvoice) {
             return res.status(404).send({ success: false, message: 'Service Invoice not found.' });
-        }
-
-        // Check if invoiceNumber is being changed to an existing one (excluding itself)
-        if (invoiceNumber) {
-            serviceInvoice.invoiceNumber = invoiceNumber;
         }
 
         // Update fields if provided
@@ -310,7 +323,7 @@ export const updateServiceInvoice = async (req, res) => {
                     productName: serviceProduct.productName,
                     quantity: item.quantity,
                     rate: item.rate,
-                    totalAmount: item.quantity * item.rate,
+                    totalAmount: item.quantity * item.totalAmount,
                 });
             }
             serviceInvoice.products = processedProducts;
@@ -320,6 +333,9 @@ export const updateServiceInvoice = async (req, res) => {
         }
 
         if (modeOfPayment) serviceInvoice.modeOfPayment = modeOfPayment;
+        if (pendingAmount) serviceInvoice.pendingAmount = pendingAmount;
+        if (tdsAmount) serviceInvoice.tdsAmount = tdsAmount;
+        if (paymentAmountType) serviceInvoice.paymentAmountType = paymentAmountType;
         if (bankName !== undefined) serviceInvoice.bankName = bankName; // Update new field
         if (transactionDetails !== undefined) serviceInvoice.transactionDetails = transactionDetails; // Update new field
         if (chequeDate !== undefined) serviceInvoice.chequeDate = chequeDate; // Update new field
@@ -334,8 +350,10 @@ export const updateServiceInvoice = async (req, res) => {
         if (invoiceDate) serviceInvoice.invoiceDate = invoiceDate;
         if (assignedTo) serviceInvoice.assignedTo = assignedTo;
         if (sendTo) serviceInvoice.sendTo = sendTo;
+        if (staus) serviceInvoice.staus = staus;
         if (invoiceType) serviceInvoice.invoiceType = invoiceType;
         if (serviceId) serviceInvoice.serviceId = serviceId;
+        if (invoiceNumber) serviceInvoice.invoiceNumber = invoiceNumber;
         if (invoiceLink !== undefined) serviceInvoice.invoiceLink = invoiceLink; // Update invoiceLink
 
         await serviceInvoice.save();

@@ -18,13 +18,13 @@ export const createService = async (req, res) => {
             message: "Error in service creation",
             error
         });
-    }
+    } 
 };
 
 // Get All Services
 export const getAllServices = async (req, res) => {
     try {
-        const services = await ServiceModel.find({}).sort({ createdAt: -1 });
+        const services = await ServiceModel.find({status: { $nin: ["Completed", "Cancelled"] }}).sort({ createdAt: -1 });
         res.status(200).send({
             success: true,
             services
@@ -183,7 +183,11 @@ export const getServiceAssignedTo = async (req, res) => {
             });
         }
 
-        const services = await ServiceModel.find({ employeeId: assignedTo }).sort({ createdAt: -1 }); // Find services by phone number
+        // Find services by employeeId, excluding those with status 'Completed' or 'Cancelled'
+        const services = await ServiceModel.find({ 
+            employeeId: assignedTo,
+            status: { $nin: ["Completed", "Cancelled"] } 
+        }).sort({ createdAt: -1 });
 
         if (!services || services.length === 0) {
             return res.status(404).send({
@@ -220,7 +224,7 @@ export const getServiceByType = async (req, res) => {
             });
         }
 
-        const services = await ServiceModel.find({ serviceType: serviceType }).sort({ createdAt: -1 });
+        const services = await ServiceModel.find({ serviceType: serviceType, status: { $nin: ["Completed", "Cancelled"] } }).sort({ createdAt: -1 });
 
         if (!services || services.length === 0) {
             return res.status(404).send({

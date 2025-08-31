@@ -147,7 +147,7 @@ const AddCompany = () => {
         setLoading(true);
 
         // Basic validation
-        if (!companyData.companyName || !companyData.billingAddress || !companyData.city || !companyData.state || !companyData.pincode || !companyData.phone) { // Added phone to validation
+        if (!companyData.companyName || !companyData.billingAddress || !companyData.city || !companyData.state || !companyData.pincode) { // Added phone to validation
             toast.error('Please fill in all required company details.');
             setLoading(false);
             return;
@@ -321,7 +321,7 @@ const AddCompany = () => {
                             />
                         </Grid>
                         {/* Phone */}
-                        <Grid item xs={12} sm={6}>
+                        {/* <Grid item xs={12} sm={6}>
                             <TextField
                                 fullWidth
                                 label="Phone"
@@ -331,7 +331,7 @@ const AddCompany = () => {
                                 size="small"
                                 required
                             />
-                        </Grid>
+                        </Grid> */}
                         {/* Customer Type */}
                         {/* <Grid item xs={12} sm={6}>
                             <TextField

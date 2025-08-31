@@ -3,19 +3,51 @@ import commissionModel from "../../models/commissionModel.js";
 // Create Commission
 export const createCommission = async (req, res) => {
     try {
-        const commission = new commissionModel(req.body);
-        await commission.save();
+        const { rentalInvoiceId, serviceInvoiceId, salesInvoiceId } = req.body;
 
-        res.status(201).send({
+        let query = {};
+        if (rentalInvoiceId) {
+            query = { rentalInvoiceId };
+        } else if (serviceInvoiceId) {
+            query = { serviceInvoiceId };
+        } else if (salesInvoiceId) {
+            query = { salesInvoiceId };
+        } else {
+            // If none of the specific invoice IDs are provided, it's an error
+            return res.status(400).send({
+                success: false,
+                message: "Missing required invoice ID (rentalInvoiceId, serviceInvoiceId, or salesInvoiceId) for commission creation/update."
+            });
+        }
+
+        // Find and update the commission, or create if it doesn't exist
+        const result = await commissionModel.findOneAndUpdate(
+            query,
+            req.body, // The entire req.body contains all fields to update/set
+            {
+                new: true, // Return the updated document
+                upsert: true, // Create a new document if no match is found
+                setDefaultsOnInsert: true, // Apply schema defaults if a new document is inserted
+                rawResult: true // Return the raw result from MongoDB driver to check for upserted status
+            }
+        );
+
+        const commission = result.value; // The actual document
+        const isNew = result.lastErrorObject.upserted !== undefined; // Check if upserted field exists
+
+        let message = isNew ? "Commission created successfully" : "Commission updated successfully";
+        let status = isNew ? 201 : 200;
+
+        res.status(status).send({
             success: true,
-            message: "Commission created successfully",
+            message: message,
             commission
         });
     } catch (error) {
-        console.error("Error in creating commission:", error);
+        console.error("Error in creating/updating commission:", error);
         res.status(500).send({
             success: false,
-            message: "Error in creating commission",
+            message: "Error in creating/updating commission",
             error
         });
     }

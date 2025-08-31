@@ -41,6 +41,9 @@ function InvoiceRow(props) {
     const [open, setOpen] = useState(false);
     const [openPaymentModal, setOpenPaymentModal] = useState(false); // State for payment modal
     const [loading, setLoading] = useState(false);
+    const [companyPendingInvoice, setCompanyPendingInvoice] = useState([])
+    const [selectedInvliceId, setSelectedInvliceId] = useState(null)
+    const [balanceAmount, setBalanceAmount] = useState(0)
     const [paymentForm, setPaymentForm] = useState({ // State for payment form data
         modeOfPayment: invoice.modeOfPayment || '',
         bankName: invoice.bankName || '',
@@ -49,6 +52,9 @@ function InvoiceRow(props) {
         transferDate: invoice.transferDate || '', // New field for Bank Transfer/UPI
         companyNamePayment: invoice.companyNamePayment || '', // New field for Cheque/Bank Transfer/UPI
         otherPaymentMode: invoice.otherPaymentMode || '', // New field for OTHERS
+        paymentAmount: 0, // Single field for amount
+        paymentAmountType: '', // Type of amount (TDS or Pending)
+        grandTotal: invoice.grandTotal || 0,
     });
 
     const hasPermission = (key) => {
@@ -56,7 +62,7 @@ function InvoiceRow(props) {
     };
 
     const handleEdit = () => {
-        navigate(`../addServiceInvoice/${invoice._id}`);
+        navigate(`../addServiceInvoice/${invoice._id}?invoiceType=${invoiceType}`);
     };
 
     const handleUploadSignedInvoice = async (invoiceId, oldInvoicLink) => {
@@ -93,11 +99,9 @@ function InvoiceRow(props) {
                             },
                         }
                     );
-                    toast.success("Signed invoice uploaded successfully!");
                     // Optionally, refresh the list or update the specific invoice in state
                 } catch (err) {
                     console.error("Upload failed", err);
-                    toast.error(err.response?.data?.message || "Failed to upload signed invoice.");
                 }
             } catch (error) {
                 console.log(error, "Api error");
@@ -110,6 +114,18 @@ function InvoiceRow(props) {
     };
 
     const handleOpenPaymentDetailsModal = () => {
+        let initialPaymentAmount = 0;
+        let initialPaymentAmountType = '';
+
+        // Initialize paymentAmount and paymentAmountType based on existing invoice data
+        if (invoice.tdsAmount > 0) {
+            initialPaymentAmount = invoice.tdsAmount;
+            initialPaymentAmountType = 'TDS';
+        } else if (invoice.pendingAmount > 0) {
+            initialPaymentAmount = invoice.pendingAmount;
+            initialPaymentAmountType = 'Pending';
+        }
+
         setPaymentForm({
             modeOfPayment: invoice.modeOfPayment || '',
             bankName: invoice.bankName || '',
@@ -118,6 +134,8 @@ function InvoiceRow(props) {
             transferDate: invoice.transferDate ? new Date(invoice.transferDate).toISOString().split('T')[0] : '',
             companyNamePayment: invoice.companyNamePayment || '',
             otherPaymentMode: invoice.otherPaymentMode || '',
+            paymentAmount: initialPaymentAmount,
+            paymentAmountType: initialPaymentAmountType,
         });
         setOpenPaymentModal(true);
     };
@@ -127,13 +145,34 @@ function InvoiceRow(props) {
         // Optionally reset form here if needed, but it's re-initialized on open
     };
 
-    const handlePaymentFormChange = (e) => {
+    const handlePaymentFormChange = async (e) => {
         const { name, value } = e.target;
         setPaymentForm(prev => ({ ...prev, [name]: value }));
+
+        if (name === "paymentAmount" && value > invoice?.grandTotal) {
+            let balanceAmount = value - invoice?.grandTotal;
+            setBalanceAmount(balanceAmount)
+            try {
+                let response = await axios.post(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/all`,
+                    { companyId: invoice?.companyId, tdsAmount: { $eq: null }, status: { $ne: "Paid" } }, // Send invoiceType in the request body
+                    {
+                        headers: {
+                            Authorization: auth.token,
+                        },
+                    }
+                );
+                setCompanyPendingInvoice(response.data?.serviceInvoices)
+            } catch (err) {
+                console.log(err, "Api error")
+            }
+        }
+
     };
 
-    const handleSavePaymentDetails = async () => {
+    const handleSavePaymentDetails = async (balanceAmount, tsdBalance) => {
         try {
+            let amountCheck = paymentForm.paymentAmount >= paymentForm?.grandTotal
             const payload = {
                 modeOfPayment: paymentForm.modeOfPayment,
                 bankName: paymentForm.bankName,
@@ -142,10 +181,21 @@ function InvoiceRow(props) {
                 transferDate: paymentForm.transferDate,
                 companyNamePayment: paymentForm.companyNamePayment,
                 otherPaymentMode: paymentForm.otherPaymentMode,
+                paymentAmountType: paymentForm.paymentAmountType,
+                tdsAmount: 0, // Default to 0, will be updated if type is TDS
+                pendingAmount: 0, // Default to 0, will be updated if type is Pending
+                status: balanceAmount >= paymentForm?.grandTotal || paymentForm.paymentAmount >= paymentForm?.grandTotal || paymentForm.paymentAmountType === 'TDS' ? "Paid" : "Unpaid",
             };
 
+            // Conditionally set tdsAmount or pendingAmount based on selected type
+            if (paymentForm.paymentAmountType === 'TDS') {
+                payload.tdsAmount = balanceAmount ? balanceAmount : amountCheck ? paymentForm?.grandTotal : parseFloat(paymentForm.paymentAmount) || 0;
+            } else if (paymentForm.paymentAmountType === 'Pending') {
+                payload.pendingAmount = balanceAmount ? balanceAmount : amountCheck ? paymentForm?.grandTotal : parseFloat(paymentForm.paymentAmount) || 0;
+            }
+
             const res = await axios.put(
-                `${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/update/${invoice._id}`,
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/update/${selectedInvliceId ? selectedInvliceId : invoice._id}`,
                 payload,
                 {
                     headers: {
@@ -157,16 +207,10 @@ function InvoiceRow(props) {
             if (res.data?.success) {
                 toast.success(res.data.message || 'Payment details updated successfully!');
                 handleClosePaymentDetailsModal();
-                // You might want to trigger a re-fetch of invoices in the parent component
-                // or update the specific invoice in the `invoices` state.
-                // For simplicity, we'll just close the modal and show success.
-                props.onInvoiceUpdate(); // Call the prop to trigger re-fetch in parent
-            } else {
-                toast.error(res.data?.message || 'Failed to update payment details.');
+                props.onInvoiceUpdate();
             }
         } catch (error) {
             console.error('Error updating payment details:', error);
-            toast.error(error.response?.data?.message || 'Something went wrong while updating payment details.');
         }
     };
 
@@ -219,7 +263,7 @@ function InvoiceRow(props) {
 
     const onSendInvoice = async (invoice) => {
         try {
-            const res = await axios.post('https://n8n.nicknameinfo.net/webhook/f8d3ad37-a38e-4a38-a06e-09c74fdc3b91', {invoiceId : invoice?._id});
+            const res = await axios.post('https://n8n.nicknameinfo.net/webhook/f8d3ad37-a38e-4a38-a06e-09c74fdc3b91', { invoiceId: invoice?._id });
             console.log('Webhook successfully triggered.', res);
         } catch (webhookError) {
             console.error('Error triggering webhook:', webhookError);
@@ -260,7 +304,7 @@ function InvoiceRow(props) {
                     <Button variant="outlined" size="small" sx={{ my: 1 }} onClick={() => onSendInvoice(invoice)}>Send {invoiceType === "quotation" ? "Quotaion" : "Invoice"}</Button>
                     {invoiceType === "quotation" ? <Button variant="outlined" size="small" sx={{ my: 1 }} onClick={() => onMoveToInvoice("invoice")}>Move to invoice</Button>
                         : null}
-                    <Button variant="outlined" size="small" sx={{ my: 1 }} onClick={handleOpenPaymentDetailsModal}>Update Payment Details</Button>
+                    {!invoice?.tdsAmount && invoiceType !== "quotation" ? <Button variant="outlined" size="small" sx={{ my: 1 }} onClick={handleOpenPaymentDetailsModal}>Update Payment Details</Button> : null}
                     <Button
                         variant="contained"
                         sx={{ bgcolor: '#28a745', '&:hover': { bgcolor: '#218838' } }}
@@ -490,6 +534,60 @@ function InvoiceRow(props) {
                             size="small"
                         />
                     )}
+                    {/* New: Amount Type Selector */}
+                    {paymentForm.modeOfPayment && (
+                        <FormControl fullWidth margin="normal" size="small">
+                            <InputLabel id="payment-amount-type-label">Amount Type</InputLabel>
+                            <Select
+                                labelId="payment-amount-type-label"
+                                id="paymentAmountType"
+                                name="paymentAmountType"
+                                value={paymentForm.paymentAmountType}
+                                onChange={handlePaymentFormChange}
+                                label="Amount Type"
+                            >
+                                <MenuItem value="">--select Amount Type--</MenuItem>
+                                <MenuItem value="TDS">TDS Amount</MenuItem>
+                                <MenuItem value="Pending">Pending Amount</MenuItem>
+                            </Select>
+                        </FormControl>)}
+
+                    {/* New: Single Amount Field, shown only if a type is selected */}
+                    {paymentForm.paymentAmountType && (
+                        <TextField
+                            fullWidth
+                            margin="normal"
+                            label={`${paymentForm.paymentAmountType} Amount`}
+                            name="paymentAmount"
+                            type="number"
+                            value={paymentForm.paymentAmount}
+                            onChange={handlePaymentFormChange}
+                            size="small"
+                        />
+                    )}
+
+                    {companyPendingInvoice?.length > 0 &&
+                        <>
+                            <p>Previous Invoice Balance - Rs {balanceAmount}</p>
+                            <FormControl fullWidth margin="normal" size="small">
+                                <InputLabel id="mode-of-payment-label">Select Pending Invoice</InputLabel>
+                                <Select
+                                    labelId="mode-of-payment-label"
+                                    id="selectedInvliceId"
+                                    name="selectedInvliceId"
+                                    value={selectedInvliceId}
+                                    onChange={(e) => setSelectedInvliceId(e.target.value)}
+                                    label="Mode Of Payment"
+                                >
+                                    <MenuItem value="">--select Payment Mode--</MenuItem>
+                                    {companyPendingInvoice?.map((invoice) => {
+                                        return <MenuItem key={invoice._id} value={invoice._id}>{new Date(invoice.invoiceDate).toLocaleDateString() + " - Rs " + invoice?.grandTotal}</MenuItem>
+                                    })}
+                                </Select>
+                            </FormControl>
+                        </>
+
+                    }
                     {/* For CASH, no specific additional fields are added here */}
 
                 </DialogContent>
@@ -497,7 +595,16 @@ function InvoiceRow(props) {
                     <Button onClick={handleClosePaymentDetailsModal} color="primary">
                         Close
                     </Button>
-                    <Button onClick={handleSavePaymentDetails} color="primary" variant="contained">
+                    <Button onClick={() => {
+                        handleSavePaymentDetails()
+                        if (balanceAmount) {
+                            setTimeout(() => {
+                                handleSavePaymentDetails(balanceAmount)
+                            }, 1000)
+                        }
+
+                    }
+                    } color="primary" variant="contained">
                         Save changes
                     </Button>
                 </DialogActions>
@@ -517,13 +624,32 @@ const ServiceInvoiceList = (props) => {
     const fetchInvoices = async () => {
         try {
             setLoading(true);
-            const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/${auth?.user?.role === 3 ? `assignedTo/${auth?.user?._id}/${props?.invoice}` : `all/${props?.invoice}`}`, {
-                headers: {
-                    Authorization: auth.token,
-                },
-            });
-            if (data?.success) {
-                setInvoices(data.serviceInvoices);
+            let response;
+            if (auth?.user?.role === 3) {
+                // For assignedTo, the backend still expects params in the URL
+                response = await axios.get(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/assignedTo/${auth?.user?._id}/${props?.invoice}`,
+                    {
+                        headers: {
+                            Authorization: auth.token,
+                        },
+                    }
+                );
+            } else {
+                // For 'all' invoices, the backend now expects filters in the request body
+                response = await axios.post(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/all`,
+                    { invoiceType: props?.invoice, tdsAmount: { $eq: null }, status: { $ne: "Paid" } }, // Send invoiceType in the request body
+                    {
+                        headers: {
+                            Authorization: auth.token,
+                        },
+                    }
+                );
+            }
+
+            if (response.data?.success) {
+                setInvoices(response.data.serviceInvoices);
                 fetchInvoicesCount();
             } else {
                 setInvoices([]);
@@ -564,7 +690,7 @@ const ServiceInvoiceList = (props) => {
             invoice?.invoiceNumber?.toLowerCase()?.includes(lowerCaseSearchTerm) ||
             invoice.companyId?.companyName.toLowerCase().includes(lowerCaseSearchTerm) ||
             invoice.modeOfPayment.toLowerCase().includes(lowerCaseSearchTerm) ||
-            invoice.status.toLowerCase().includes(lowerCaseSearchTerm) ||
+            invoice?.status?.toLowerCase().includes(lowerCaseSearchTerm) ||
             new Date(invoice.invoiceDate).toLocaleDateString().toLowerCase().includes(lowerCaseSearchTerm)
         );
     });

@@ -178,7 +178,7 @@ export const getCompanyByPhone = async (req, res) => {
         // Search for a company where any contact person's mobile matches the provided phone
         const last8 = phone.slice(-8);
 
-        const company = await companyModel.findOne({
+        const company = await companyModel.find({
             "contactPersons.mobile": { $regex: last8 + '$' }
         });
 

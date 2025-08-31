@@ -101,8 +101,8 @@ export const getServiceProductsByCompany = async (req, res) => {
             return res.status(400).send({ success: false, message: 'Company ID is required.' });
         }
 
-        const serviceProducts = await ServiceProduct.find({ company: companyId })
-            .populate('company', 'name') // Populate company name
+        const serviceProducts = await ServiceProduct.find({ company: companyId }) // Corrected query
+            .populate('company', 'companyName') // Populate company name
             .populate('gstType', 'gstType gstPercentage') // Populate GST details
             .sort({ createdAt: -1 });
 

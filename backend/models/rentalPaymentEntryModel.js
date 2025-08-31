@@ -81,6 +81,18 @@ const rentalPaymentEntrySchema = new mongoose.Schema({
     chequeDate: { // New field for Cheque payment
         type: Date,
     },
+    pendingAmount: {
+        type: Number,
+        trim: true,
+    },
+    tdsAmount: {
+        type: Number,
+        trim: true,
+    },
+    paymentAmountType: {
+        type: String,
+        trim: true,
+    },
     transferDate: { // New field for Bank Transfer/UPI
         type: Date,
     },
@@ -100,6 +112,11 @@ const rentalPaymentEntrySchema = new mongoose.Schema({
     invoiceLink: {
         type: [String], // Changed to an array of strings to allow multiple URLs
         trim: true,
+    },
+    status: {
+        type: String,
+        enum: ['draft', 'Cancelled', "Pending", "Progress", "Completed", "InvoiceSent", "Paid", "Unpaid"],
+        default: 'Unpaid',
     },
     otherPaymentMode: { // New field for 'OTHERS' payment mode
         type: String,

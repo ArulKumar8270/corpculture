@@ -85,8 +85,8 @@ export const createRentalProduct = async (req, res) => {
 export const getAllRentalProducts = async (req, res) => {
     try {
         const rentalProducts = await RentalProduct.find({})
-            .populate('company', "companyName") // Populate company name
-            .populate('gstType', 'gstType gstPercentage') // Populate GST details
+            .populate('company') // Populate company name
+            .populate('gstType') // Populate GST details
             .sort({ createdAt: -1 });
 
         res.status(200).send({ success: true, message: 'All Rental Products fetched', rentalProducts });
@@ -101,8 +101,8 @@ export const getRentalProductById = async (req, res) => {
     try {
         const { id } = req.params;
         const rentalProduct = await RentalProduct.findById(id)
-            .populate('company', 'name')
-            .populate('gstType', 'gstType gstPercentage');
+            .populate('company') // Populate company name
+            .populate('gstType')
 
         if (!rentalProduct) {
             return res.status(404).send({ success: false, message: 'Rental Product not found' });
@@ -124,8 +124,8 @@ export const getRentalProductsByCompany = async (req, res) => {
         }
 
         const rentalProducts = await RentalProduct.find({ company: companyId })
-            .populate('company', "companyName") // Populate company name
-            .populate('gstType', 'gstType gstPercentage') // Populate GST details
+            .populate('company') // Populate company name
+            .populate('gstType')
             .sort({ createdAt: -1 });
 
         if (rentalProducts.length === 0) {
@@ -145,7 +145,7 @@ export const updateRentalProduct = async (req, res) => {
         const { id } = req.params;
         const {
             company, branch, department, modelName, serialNo, hsn, basePrice, gstType, paymentDate,
-            modelSpecs, a3Config, a4Config, a5Config, employeeId,commission
+            modelSpecs, a3Config, a4Config, a5Config, employeeId, commission
         } = req.body;
 
         // Basic Validation for update

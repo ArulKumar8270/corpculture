@@ -47,11 +47,17 @@ function RentalInvoiceList(props) {
         transferDate: '', // New field for Bank Transfer/UPI
         companyNamePayment: '', // New field for Cheque/Bank Transfer/UPI
         otherPaymentMode: '', // New field for OTHERS,
-        invoiceId: ''
+        invoiceId: '',
+        paymentAmount: 0, // Single field for amount
+        paymentAmountType: '', // Type of amount (TDS or Pending)
+        grandTotal: 0,
     });
     const [invoiceCount, setInvoiceCount] = useState(0);
     const [searchQuery, setSearchQuery] = useState(''); // State for search query
     const [filteredRentalEntries, setFilteredRentalEntries] = useState([]); // State for filtered entries
+    const [companyPendingInvoice, setCompanyPendingInvoice] = useState([])
+    const [selectedInvliceId, setSelectedInvliceId] = useState(null)
+    const [balanceAmount, setBalanceAmount] = useState(0)
 
     useEffect(() => {
         fetchRentalEntries();
@@ -69,12 +75,13 @@ function RentalInvoiceList(props) {
             const filtered = rentalEntries.filter(entry => {
                 const invoiceNumberMatch = props.invoice === "invoice" && entry.invoiceNumber?.toString().toLowerCase().includes(lowercasedQuery);
                 const companyNameMatch = entry.companyId?.companyName?.toLowerCase().includes(lowercasedQuery);
+                const statusMatch = entry.paymentAmountType?.toLowerCase().includes(lowercasedQuery);
 
                 // Date matching: Convert createdAt to a date string (e.g., "YYYY-MM-DD")
                 const createdAtDate = entry.createdAt ? new Date(entry.createdAt).toISOString().split('T')[0] : '';
                 const dateMatch = createdAtDate.includes(lowercasedQuery);
 
-                return invoiceNumberMatch || companyNameMatch || dateMatch;
+                return invoiceNumberMatch || companyNameMatch || dateMatch || statusMatch;
             });
             setFilteredRentalEntries(filtered);
         };
@@ -86,25 +93,44 @@ function RentalInvoiceList(props) {
     const fetchRentalEntries = async () => {
         try {
             setLoading(true);
-            const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/${auth?.user?.role === 3 ? `assignedTo/${auth?.user?._id}/${props?.invoice}` : `all/${props?.invoice}`}`, {
-                headers: {
-                    Authorization: auth.token,
-                },
-            });
-            if (data?.success) {
-                setRentalEntries(data.entries); // Store original data
-                // The useEffect for filtering will handle the initial set for filteredRentalEntries
-                fetchInvoicesCount()
+            let response;
+            if (auth?.user?.role === 3) {
+                // For assignedTo, the backend still expects params in the URL
+                response = await axios.get(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/assignedTo/${auth?.user?._id}/${props?.invoice}`,
+                    {
+                        headers: {
+                            Authorization: auth.token,
+                        },
+                    }
+                );
             } else {
-                toast.error(data?.message || 'Failed to fetch rental entries.');
+                // For 'all' invoices, the backend now expects filters in the request body
+                response = await axios.post(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/all`,
+                    { invoiceType: props?.invoice, tdsAmount: { $eq: null }, status: { $ne: "Paid" } }, // Send invoiceType in the request body
+                    {
+                        headers: {
+                            Authorization: auth.token,
+                        },
+                    }
+                );
+            }
+
+            if (response.data?.success) {
+                setRentalEntries(response?.data?.entries);
+                fetchInvoicesCount();
+            } else {
+                setRentalEntries([]);
             }
         } catch (error) {
-            console.error("Error fetching rental entries:", error);
-            toast.error('Something went wrong while fetching rental entries.');
+            console.error("Error fetching service invoices:", error);
+            setRentalEntries([]);
         } finally {
             setLoading(false);
         }
     };
+
 
     const fetchInvoicesCount = async () => {
         try {
@@ -129,7 +155,7 @@ function RentalInvoiceList(props) {
 
     const handleEdit = (id) => {
         // Implement navigation to edit page or open a modal
-        navigate(`../addRentalInvoice/${id}`);
+        navigate(`../addRentalInvoice/${id}?invoiceType=${props.invoice}`);
         console.log('Edit:', id);
     };
 
@@ -171,11 +197,9 @@ function RentalInvoiceList(props) {
                             },
                         }
                     );
-                    toast.success("Signed invoice uploaded successfully!");
-                    // Optionally, refresh the list or update the specific invoice in state
+
                 } catch (err) {
                     console.error("Upload failed", err);
-                    toast.error(err.response?.data?.message || "Failed to upload signed invoice.");
                 }
             } catch (error) {
                 console.log(error, "Api error");
@@ -189,6 +213,17 @@ function RentalInvoiceList(props) {
 
 
     const handleOpenPaymentDetailsModal = (invoice) => {
+        let initialPaymentAmount = 0;
+        let initialPaymentAmountType = '';
+
+        // Initialize paymentAmount and paymentAmountType based on existing invoice data
+        if (invoice.tdsAmount > 0) {
+            initialPaymentAmount = invoice.tdsAmount;
+            initialPaymentAmountType = 'TDS';
+        } else if (invoice.pendingAmount > 0) {
+            initialPaymentAmount = invoice.pendingAmount;
+            initialPaymentAmountType = 'Pending';
+        }
         setPaymentForm({
             modeOfPayment: invoice?.modeOfPayment || '',
             bankName: invoice?.bankName || '',
@@ -197,7 +232,11 @@ function RentalInvoiceList(props) {
             transferDate: invoice?.transferDate ? new Date(invoice?.transferDate).toISOString().split('T')[0] : '',
             companyNamePayment: invoice?.companyNamePayment || '',
             otherPaymentMode: invoice?.otherPaymentMode || '',
-            invoiceId: invoice?._id
+            invoiceId: invoice?._id,
+            paymentAmount: initialPaymentAmount,
+            paymentAmountType: initialPaymentAmountType,
+            grandTotal: invoice?.grandTotal,
+            companyId: invoice?.companyId
         });
         setOpenPaymentModal(true);
     };
@@ -207,12 +246,32 @@ function RentalInvoiceList(props) {
         // Optionally reset form here if needed, but it's re-initialized on open
     };
 
-    const handlePaymentFormChange = (e) => {
+    const handlePaymentFormChange = async (e) => {
         const { name, value } = e.target;
         setPaymentForm(prev => ({ ...prev, [name]: value }));
+        if (name === "paymentAmount" && value > invoice?.grandTotal) {
+            let balanceAmount = value - invoice?.grandTotal;
+            setBalanceAmount(balanceAmount)
+            try {
+                let response = await axios.post(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/all`,
+                    { companyId: paymentForm?.companyId, tdsAmount: { $eq: null }, status: { $ne: "Paid" } }, // Send invoiceType in the request body
+                    {
+                        headers: {
+                            Authorization: auth.token,
+                        },
+                    }
+                );
+                setCompanyPendingInvoice(response.data?.entries)
+            } catch (err) {
+                console.log(err, "Api error")
+            }
+        }
+
     };
 
     const handleSavePaymentDetails = async () => {
+        let amountCheck = paymentForm.paymentAmount >= paymentForm?.grandTotal
         try {
             const payload = {
                 modeOfPayment: paymentForm.modeOfPayment,
@@ -222,10 +281,21 @@ function RentalInvoiceList(props) {
                 transferDate: paymentForm.transferDate,
                 companyNamePayment: paymentForm.companyNamePayment,
                 otherPaymentMode: paymentForm.otherPaymentMode,
+                paymentAmountType: paymentForm.paymentAmountType,
+                tdsAmount: 0, // Default to 0, will be updated if type is TDS
+                pendingAmount: 0, // Default to 0, will be updated if type is Pending
+                status: balanceAmount >= paymentForm?.grandTotal || paymentForm.paymentAmount >= paymentForm?.grandTotal || paymentForm.paymentAmountType === 'TDS' ? "Paid" : "Unpaid",
             };
 
+            // Conditionally set tdsAmount or pendingAmount based on selected type
+            if (paymentForm.paymentAmountType === 'TDS') {
+                payload.tdsAmount = balanceAmount ? balanceAmount : amountCheck ? paymentForm?.grandTotal : parseFloat(paymentForm.paymentAmount) || 0;
+            } else if (paymentForm.paymentAmountType === 'Pending') {
+                payload.pendingAmount = balanceAmount ? balanceAmount : amountCheck ? paymentForm?.grandTotal : parseFloat(paymentForm.paymentAmount) || 0;
+            }
+
             const res = await axios.put(
-                `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/${paymentForm?.invoiceId}`,
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/${selectedInvliceId ? selectedInvliceId : paymentForm?.invoiceId}`,
                 payload,
                 {
                     headers: {
@@ -337,7 +407,6 @@ function RentalInvoiceList(props) {
                                     <TableCell>Serial No.</TableCell>
                                     <TableCell>Model Name</TableCell>
                                     <TableCell>Send Details To</TableCell>
-                                    <TableCell>Remarks</TableCell>
                                     <TableCell>Image</TableCell>
                                     <TableCell>Assinged To</TableCell>
                                     <TableCell>Actions</TableCell>
@@ -352,7 +421,6 @@ function RentalInvoiceList(props) {
                                             <TableCell>{entry.machineId?.serialNo || 'N/A'}</TableCell>
                                             <TableCell>{entry.machineId?.modelName || 'N/A'}</TableCell>
                                             <TableCell>{entry.sendDetailsTo}</TableCell>
-                                            <TableCell>{entry.remarks}</TableCell>
                                             <TableCell>
                                                 {entry.countImageUpload?.url ? (
                                                     <a href={entry.countImageUpload.url} target="_blank" rel="noopener noreferrer">
@@ -375,11 +443,11 @@ function RentalInvoiceList(props) {
                                                     </Button>
                                                     {props?.invoice === "quotation" ? <Button variant="outlined" size="small" sx={{ my: 1 }} onClick={() => onMoveToInvoice("invoice", entry)}>Move to invoice</Button>
                                                         : null}
-                                                    <Button variant="outlined" size="small" onClick={() => {
+                                                    {!entry?.tdsAmount && props?.invoice !== "quotation" ? <Button variant="outlined" size="small" onClick={() => {
                                                         handleOpenPaymentDetailsModal(entry)
                                                     }}>
                                                         Update Payment Details
-                                                    </Button>
+                                                    </Button> : null}
                                                     <Button
                                                         variant="contained"
                                                         color="success"
@@ -579,14 +647,75 @@ function RentalInvoiceList(props) {
                             size="small"
                         />
                     )}
-                    {/* For CASH, no specific additional fields are added here */}
+                    {/* New: Amount Type Selector */}
+                    {paymentForm.modeOfPayment && (
+                        <FormControl fullWidth margin="normal" size="small">
+                            <InputLabel id="payment-amount-type-label">Amount Type</InputLabel>
+                            <Select
+                                labelId="payment-amount-type-label"
+                                id="paymentAmountType"
+                                name="paymentAmountType"
+                                value={paymentForm.paymentAmountType}
+                                onChange={handlePaymentFormChange}
+                                label="Amount Type"
+                            >
+                                <MenuItem value="">--select Amount Type--</MenuItem>
+                                <MenuItem value="TDS">TDS Amount</MenuItem>
+                                <MenuItem value="Pending">Pending Amount</MenuItem>
+                            </Select>
+                        </FormControl>)}
+
+                    {/* New: Single Amount Field, shown only if a type is selected */}
+                    {paymentForm.paymentAmountType && (
+                        <TextField
+                            fullWidth
+                            margin="normal"
+                            label={`${paymentForm.paymentAmountType} Amount`}
+                            name="paymentAmount"
+                            type="number"
+                            value={paymentForm.paymentAmount}
+                            onChange={handlePaymentFormChange}
+                            size="small"
+                        />
+                    )}
+
+                    {companyPendingInvoice?.length > 0 &&
+                        <>
+                            <p>Previous Invoice Balance - Rs {balanceAmount}</p>
+                            <FormControl fullWidth margin="normal" size="small">
+                                <InputLabel id="mode-of-payment-label">Select Pending Invoice</InputLabel>
+                                <Select
+                                    labelId="mode-of-payment-label"
+                                    id="selectedInvliceId"
+                                    name="selectedInvliceId"
+                                    value={selectedInvliceId}
+                                    onChange={(e) => setSelectedInvliceId(e.target.value)}
+                                    label="Mode Of Payment"
+                                >
+                                    <MenuItem value="">--select Payment Mode--</MenuItem>
+                                    {companyPendingInvoice?.map((invoice) => {
+                                        return <MenuItem key={invoice._id} value={invoice._id}>{new Date(invoice.invoiceDate).toLocaleDateString() + " - Rs " + invoice?.grandTotal}</MenuItem>
+                                    })}
+                                </Select>
+                            </FormControl>
+                        </>
+                    }
 
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={handleClosePaymentDetailsModal} color="primary">
                         Close
                     </Button>
-                    <Button onClick={handleSavePaymentDetails} color="primary" variant="contained">
+                    <Button onClick={() => {
+                        handleSavePaymentDetails()
+                        if (balanceAmount) {
+                            setTimeout(() => {
+                                handleSavePaymentDetails(balanceAmount)
+                            }, 1000)
+                        }
+
+                    }
+                    } color="primary" variant="contained">
                         Save changes
                     </Button>
                 </DialogActions>
