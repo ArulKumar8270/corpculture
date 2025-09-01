@@ -1,7 +1,7 @@
 import companyModel from "../../models/companyModel.js";
 import ServiceInvoice from "../../models/serviceInvoiceModel.js"; // Import ServiceInvoice model
 import Report from "../../models/reportModel.js"; // Import Report model
-import RentalPaymentEntry from "../../models/rentalpaymententrymodel.js"; // Import RentalPaymentEntry model
+import RentalPaymentEntry from "../../models/rentalPaymentEntryModel.js"; // Import RentalPaymentEntry model
 
 // Create Company
 export const createCompany = async (req, res) => {
