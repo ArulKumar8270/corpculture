@@ -44,6 +44,7 @@ import CompanyReports from "./reports/CompanyReports";
 import ServiceReportsSummary from "./reports/ServiceReportsSummary";
 import RentalReportsSummary from "./reports/RentalReportsSummary";
 import SalesReportsSummary from "./reports/SalesReportsSummary";
+import RentalInvoiceReport from "./Reports/RentalInvoiceReport";
 
 const AdminDashboard = () => {
     const navigate = useNavigate();
@@ -132,7 +133,10 @@ const AdminDashboard = () => {
                             <Route path="rentalReportsSummary" element={<RentalReportsSummary />} />
                             <Route path="salesReportsSummary" element={<SalesReportsSummary />} />
                             <Route path="reportsDashboard" element={<ReportsDashboard />} />
-                            <Route path="serviceInvoicesReport" element={<ServiceInvoicesReport />} />
+                            <Route path="serviceInvoicesReport/:companyId?" element={<ServiceInvoicesReport type={"invoice"}/>} />
+                            <Route path="serviceQuotationsReport/:companyId?" element={<ServiceInvoicesReport type={"quotation"}/>} />
+                            <Route path="rantalInvoicesReport/:companyId?" element={<RentalInvoiceReport type={"invoice"}/>} />
+                            <Route path="rentalQuotationsReport/:companyId?" element={<RentalInvoiceReport type={"quotation"}/>} />
                         </Routes>
                     </div>
                 </div>

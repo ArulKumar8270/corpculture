@@ -6,7 +6,7 @@ import {
     Button,
     Grid,
     Paper,
-    Select,
+    Select, // Keep Select for other dropdowns if any
     MenuItem,
     FormControl,
     InputLabel,
@@ -17,7 +17,8 @@ import {
     TableHead,
     TableRow,
     IconButton,
-    CircularProgress // Import CircularProgress
+    CircularProgress, // Import CircularProgress,
+    Autocomplete
 } from '@mui/material';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -495,42 +496,51 @@ const AddServiceInvoice = () => {
                     </Grid> */}
                     <Grid item xs={12} sm={6}>
                         <FormControl fullWidth margin="normal" size="small" required>
-                            <InputLabel id="company-label">Company</InputLabel>
-                            <Select
-                                labelId="company-label"
-                                id="companyId"
-                                name="companyId"
-                                value={invoiceData.companyId}
-                                onChange={handleChange}
-                                label="Company"
+                            {/* Replaced Select with Autocomplete for Company */}
+                            <Autocomplete
+                                id="companyId-autocomplete"
+                                options={companies}
+                                getOptionLabel={(option) => option.companyName || ''}
+                                isOptionEqualToValue={(option, value) => option._id === value._id}
+                                value={companies.find(comp => comp._id === invoiceData.companyId) || null}
+                                onChange={(event, newValue) => {
+                                    handleChange({ target: { name: 'companyId', value: newValue ? newValue._id : '' } });
+                                }}
+                                renderInput={(params) => (
+                                    <TextField
+                                        {...params}
+                                        label="Company"
+                                        variant="outlined"
+                                        size="small"
+                                        required
+                                    />
+                                )}
                                 disabled={!!invoiceId} // only disable in edit mode
-                            >
-                                <MenuItem value="">Select a Company</MenuItem>
-                                {companies.map(comp => (
-                                    <MenuItem key={comp._id} value={comp._id}>
-                                        {comp.companyName}
-                                    </MenuItem>
-                                ))}
-                            </Select>
+                            />
                         </FormControl>
                     </Grid>
                     <Grid item xs={12} sm={6}>
                         <FormControl fullWidth margin="normal" size="small">
-                            <InputLabel id="product-name-label">Product Name</InputLabel>
-                            <Select
-                                labelId="product-name-label"
-                                id="productId"
-                                name="productId"
-                                value={invoiceData.productId}
-                                onChange={handleChange}
-                                label="Product Name"
+                            {/* Replaced Select with Autocomplete for Product Name */}
+                            <Autocomplete
+                                id="productId-autocomplete"
+                                options={availableProducts}
+                                getOptionLabel={(option) => option.productName || ''}
+                                isOptionEqualToValue={(option, value) => option._id === value._id}
+                                value={availableProducts.find(prod => prod._id === invoiceData.productId) || null}
+                                onChange={(event, newValue) => {
+                                    handleChange({ target: { name: 'productId', value: newValue ? newValue._id : '' } });
+                                }}
+                                renderInput={(params) => (
+                                    <TextField
+                                        {...params}
+                                        label="Product Name"
+                                        variant="outlined"
+                                        size="small"
+                                    />
+                                )}
                                 disabled={!invoiceData.companyId || availableProducts.length === 0}
-                            >
-                                <MenuItem value="">Select a Product</MenuItem>
-                                {availableProducts.map(prod => (
-                                    <MenuItem key={prod._id} value={prod._id}>{prod.productName}</MenuItem>
-                                ))}
-                            </Select>
+                            />
                         </FormControl>
                     </Grid>
                     <Grid item xs={12} sm={6}>

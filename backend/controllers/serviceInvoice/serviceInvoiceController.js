@@ -40,17 +40,19 @@ export const createServiceInvoice = async (req, res) => {
             serviceId
         } = req.body;
 
+
         // Basic Validation
         if (!companyId || !products || products.length === 0 || !modeOfPayment || !deliveryAddress) {
             return res.status(400).send({ success: false, message: 'Missing required fields: companyId, products, modeOfPayment, deliveryAddress.' });
         }
 
         // Check if invoice number already exists
-        const existingInvoice = await ServiceInvoice.findOne({ invoiceNumber });
-        if (existingInvoice) {
-            return res.status(409).send({ success: false, message: 'Service Invoice with this invoice number already exists.' });
+        if (invoiceNumber) {
+            const existingInvoice = await ServiceInvoice.findOne({ invoiceNumber });
+            if (existingInvoice) {
+                return res.status(409).send({ success: false, message: 'Service Invoice with this invoice number already exists.' });
+            }
         }
-
         // Validate Company
         const existingCompany = await Company.findById(companyId);
         if (!existingCompany) {
@@ -135,13 +137,45 @@ export const createServiceInvoice = async (req, res) => {
 // Get All Service Invoices
 export const getAllServiceInvoices = async (req, res) => {
     try {
-        const { fromDate, toDate, ...filters } = req.body; // Destructure fromDate, toDate, and collect other filters
+        const {
+            fromDate,
+            toDate,
+            companyName,
+            invoiceNumber,
+            paymentStatus, // This will map to 'status' in the schema
+            invoiceType, // Assuming this can also be a filter
+            page = 1, // Default to page 1
+            limit = 10, // Default to 10 items per page
+            ...otherFilters // Catch any other direct filters
+        } = req.body;
+
         let query = {};
 
-        // Add all other filters from req.body to the query
-        for (const key in filters) {
-            if (filters.hasOwnProperty(key)) {
-                query[key] = filters[key];
+        // Add invoiceType filter if provided
+        if (invoiceType) {
+            query.invoiceType = invoiceType;
+        }
+
+        // Add invoiceNumber filter if provided
+        if (invoiceNumber) {
+            // Using regex for partial match and case-insensitivity
+            query.invoiceNumber = { $regex: invoiceNumber, $options: 'i' };
+        }
+
+        // Map paymentStatus to schema's 'status' field
+        if (paymentStatus) {
+            query.status = paymentStatus;
+        }
+
+        // Handle companyName filter
+        if (companyName) {
+            const companies = await Company.find({ companyName: { $regex: companyName, $options: 'i' } }).select('_id');
+            const companyIds = companies.map(company => company._id);
+            if (companyIds.length > 0) {
+                query.companyId = { $in: companyIds };
+            } else {
+                // If no companies match the name, return empty results
+                return res.status(200).send({ success: true, message: 'No service invoices found for the specified company name.', serviceInvoices: [], totalCount: 0 });
             }
         }
 
@@ -149,29 +183,47 @@ export const getAllServiceInvoices = async (req, res) => {
         if (fromDate || toDate) {
             query.invoiceDate = {};
             if (fromDate) {
-                // Convert fromDate string to Date object and use $gte
                 query.invoiceDate.$gte = new Date(fromDate);
             }
             if (toDate) {
-                // Convert toDate string to Date object and use $lte
-                // To include the entire day, set the time to the end of the day (23:59:59.999)
                 const endOfDay = new Date(toDate);
                 endOfDay.setHours(23, 59, 59, 999);
                 query.invoiceDate.$lte = endOfDay;
             }
         }
 
-        const serviceInvoices = await ServiceInvoice.find(query) // Use the constructed query
-            .populate('companyId') // Populate company name
+        // Add any other direct filters from req.body
+        for (const key in otherFilters) {
+            if (otherFilters.hasOwnProperty(key)) {
+                query[key] = otherFilters[key];
+            }
+        }
+
+        // Calculate skip value for pagination
+        const skip = (page - 1) * limit;
+
+        // Get total count of documents matching the query (before pagination)
+        const totalCount = await ServiceInvoice.countDocuments(query);
+
+        const serviceInvoices = await ServiceInvoice.find(query)
+            .populate('companyId')
             .populate({
-                path: 'products.productId', // First populate productId
+                path: 'products.productId',
                 populate: {
-                    path: 'gstType',        // Then populate gstType inside the product
+                    path: 'gstType',
                 }
-            })// Populate product details
-            .populate('assignedTo') // Populate product details
-            .sort({ createdAt: -1 });
-        res.status(200).send({ success: true, message: 'All service invoices fetched', serviceInvoices });
+            })
+            .populate('assignedTo')
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit);
+
+        res.status(200).send({
+            success: true,
+            message: 'All service invoices fetched',
+            serviceInvoices,
+            totalCount // Send total count for frontend pagination
+        });
     } catch (error) {
         console.error("Error in getAllServiceInvoices:", error);
         res.status(500).send({ success: false, message: 'Error in getting all service invoices', error });

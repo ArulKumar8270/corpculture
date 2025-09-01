@@ -37,10 +37,10 @@ const RentalReportsSummary = () => {
             // Simulate API call delay to fetch data
             setTimeout(() => {
                 const data = [
-                    { id: 'reantalInvoices', name: 'Reantal Invoices', count: 120, path: '/admin/reports/reantal/invoices' },
-                    { id: 'reantalQuotations', name: 'Reantal Quotations', count: 150, path: '/admin/reports/reantal/quotations' },
+                    { id: 'reantalInvoices', name: 'Reantal Invoices', count: 120, path: '../rantalInvoicesReport' },
+                    { id: 'reantalQuotations', name: 'Reantal Quotations', count: 150, path: '../rentalQuotationsReport' },
                     { id: 'reantalReports', name: 'Reantal Reports & Gatpass', count: 200, path: '/admin/reports/reantal/reports-gatpass' },
-                    { id: 'productsUsed', name: 'Products Used in Reantal', count: 500, path: '/admin/reports/reantal/products' },
+                    // { id: 'productsUsed', name: 'Products Used in Reantal', count: 500, path: '/admin/reports/reantal/products' },
                     { id: 'reantalEnquiries', name: 'Reantal Enquiries', count: 80, path: '/admin/reports/reantal/enquiries' },
                 ];
                 setReportData(data);
@@ -54,7 +54,6 @@ const RentalReportsSummary = () => {
     }, []);
 
     const handleViewDetails = (path, categoryName) => {
-        toast.info(`Navigating to ${categoryName} list.`);
         navigate(path);
     };
 
