@@ -12,7 +12,6 @@ const serviceInvoiceSchema = new mongoose.Schema({
     },
     invoiceNumber: {
         type: String,
-        unique: true,
         trim: true,
     },
     companyId: {

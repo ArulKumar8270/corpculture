@@ -38,9 +38,9 @@ const ServiceReportsSummary = () => {
             setTimeout(() => {
                 const data = [
                     { id: 'serviceInvoices', name: 'Service Invoices', count: 120, path: '../serviceInvoicesReport' },
-                    { id: 'serviceQuotations', name: 'Service Quotations', count: 150, path: '/admin/reports/service/quotations' },
-                    { id: 'serviceReports', name: 'Service Reports & Gatpass', count: 200, path: '/admin/reports/service/reports-gatpass' },
-                    { id: 'productsUsed', name: 'Products Used in Service', count: 500, path: '/admin/reports/service/products' },
+                    { id: 'serviceQuotations', name: 'Service Quotations', count: 150, path: '../serviceQuotationsReport' },
+                    { id: 'serviceReports', name: 'Service Reports', count: 200, path: '/admin/reports/service/reports-gatpass' },
+                    // { id: 'productsUsed', name: 'Products Used in Service', count: 500, path: '/admin/reports/service/products' },
                     { id: 'serviceEnquiries', name: 'Service Enquiries', count: 80, path: '/admin/reports/service/enquiries' },
                 ];
                 setReportData(data);

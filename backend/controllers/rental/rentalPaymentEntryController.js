@@ -79,28 +79,73 @@ export const createRentalPaymentEntry = async (req, res) => {
 // Get all rental payment entries
 export const getAllRentalPaymentEntries = async (req, res) => {
     try {
-        const { fromDate, toDate, ...filters } = req.body; // Get invoiceType from query parameters
+        const {
+            fromDate,
+            toDate,
+            companyName,
+            invoiceNumber,
+            paymentStatus, // This will map to 'status' in the schema
+            invoiceType, // Assuming this can also be a filter
+            page = 1, // Default to page 1
+            limit = 10, // Default to 10 items per page
+            ...otherFilters // Catch any other direct filters
+        } = req.body;
+
         let query = {};
 
-        for (const key in filters) {
-            if (filters.hasOwnProperty(key)) {
-                query[key] = filters[key];
+        // Add invoiceType filter if provided
+        if (invoiceType) {
+            query.invoiceType = invoiceType;
+        }
+
+        // Add invoiceNumber filter if provided
+        if (invoiceNumber) {
+            // Using regex for partial match and case-insensitivity
+            query.invoiceNumber = { $regex: invoiceNumber, $options: 'i' };
+        }
+
+        // Map paymentStatus to schema's 'status' field
+        if (paymentStatus) {
+            query.status = paymentStatus;
+        }
+
+        // Handle companyName filter
+        if (companyName) {
+            const companies = await Company.find({ companyName: { $regex: companyName, $options: 'i' } }).select('_id');
+            const companyIds = companies.map(company => company._id);
+            if (companyIds.length > 0) {
+                query.companyId = { $in: companyIds };
+            } else {
+                // If no companies match the name, return empty results
+                return res.status(200).send({ success: true, message: 'No service invoices found for the specified company name.', serviceInvoices: [], totalCount: 0 });
             }
         }
+
+        // Add date range filtering for invoiceDate
         if (fromDate || toDate) {
             query.entryDate = {};
             if (fromDate) {
-                // Convert fromDate string to Date object and use $gte
                 query.entryDate.$gte = new Date(fromDate);
             }
             if (toDate) {
-                // Convert toDate string to Date object and use $lte
-                // To include the entire day, set the time to the end of the day (23:59:59.999)
                 const endOfDay = new Date(toDate);
                 endOfDay.setHours(23, 59, 59, 999);
                 query.entryDate.$lte = endOfDay;
             }
         }
+
+        // Add any other direct filters from req.body
+        for (const key in otherFilters) {
+            if (otherFilters.hasOwnProperty(key)) {
+                query[key] = otherFilters[key];
+            }
+        }
+
+        // Calculate skip value for pagination
+        const skip = (page - 1) * limit;
+
+        // Get total count of documents matching the query (before pagination)
+        const totalCount = await RentalPaymentEntry.countDocuments(query);
 
         const entries = await RentalPaymentEntry.find(query)
             .populate({
@@ -111,12 +156,15 @@ export const getAllRentalPaymentEntries = async (req, res) => {
             })// Populate product details
             .populate('companyId') // Populate company name
             .populate('assignedTo') // Populate product details // Populate company details
-            .sort({ createdAt: -1 });
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit);
 
         res.status(200).send({
             success: true,
             message: 'All rental payment entries fetched successfully',
-            entries
+            entries,
+            totalCount
         });
     } catch (error) {
         console.error("Error in getAllRentalPaymentEntries:", error);

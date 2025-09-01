@@ -12,24 +12,28 @@ import {
     CircularProgress,
     Button,
     Tooltip,
-    IconButton
+    IconButton,
+    FormControl,
+    InputLabel,
+    Select,
+    MenuItem
 } from '@mui/material';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
-import CloseIcon from '@mui/icons-material/Close'; // New import for modal close button
+import CloseIcon from '@mui/icons-material/Close';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import axios from 'axios';
 import { useAuth } from '../../../context/auth';
 import {
-    Dialog, // New import for modal
-    DialogTitle, // New import for modal title
-    DialogContent, // New import for modal content
-    DialogActions, // New import for modal actions
-    TextField, // New import for input fields
-    Autocomplete, // New import for date selection with chips
-    Chip, // New import for displaying selected dates
-    Stack // New import for arranging chips (optional, Autocomplete handles it)
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    TextField,
+    Autocomplete,
+    Chip,
+    Stack
 } from '@mui/material';
 
 const CompanyReports = () => {
@@ -44,7 +48,9 @@ const CompanyReports = () => {
     const [currentCompanyIdForReminder, setCurrentCompanyIdForReminder] = useState(null);
     const [reminderMail, setReminderMail] = useState('');
     const [ccMail, setCcMail] = useState('');
-    const [selectedReminderDates, setSelectedReminderDates] = useState([]); // Array of strings (days of month)
+    const [selectedReminderDates, setSelectedReminderDates] = useState([]);
+    const [remainderType, setRemainderType] = useState('');
+    const [fetchingReminderData, setFetchingReminderData] = useState(false); // New state for loading reminder data
     // Options for reminder dates (days of the month, 1 to 31)
     const reminderDateOptions = Array.from({ length: 31 }, (_, i) => (i + 1).toString());
 
@@ -56,12 +62,19 @@ const CompanyReports = () => {
         })
             .then(res => {
                 if (res.data.success && Array.isArray(res.data.companies)) {
-                    // Map only required fields for table
+                    // Map only required fields for table, including new count fields
                     const mappedCompanies = res.data.companies.map(c => ({
                         _id: c._id,
                         companyName: c.companyName,
-                        companyAddress: c.billingAddress || c.addressDetail || '', // fallback if billingAddress not present
-                        mobileNumber: c.mobileNumber || c.phone || 'N/A', // fallback if mobileNumber not present
+                        companyAddress: c.billingAddress || c.addressDetail || '',
+                        mobileNumber: c.mobileNumber || c.phone || 'N/A',
+                        // Assuming these counts are now returned by the backend for each company
+                        serviceInvoiceCount: c.serviceInvoiceCount || 0,
+                        serviceQuotationCount: c.serviceQuotationCount || 0,
+                        serviceReportCount: c.serviceReportCount || 0,
+                        rentalInvoiceCount: c.rentalInvoiceCount || 0,
+                        rentalQuotationCount: c.rentalQuotationCount || 0,
+                        rentalReportCount: c.rentalReportCount || 0,
                     }));
                     setCompanies(mappedCompanies);
                 } else {
@@ -77,36 +90,28 @@ const CompanyReports = () => {
     }, [auth?.token]);
 
     const handleViewDetails = (companyId) => {
-        // Implement navigation to a detailed company report page
-        // This page would show all invoices, quotations, reports etc. for that specific company
         toast.info(`Viewing general details for company ID: ${companyId}`);
-        navigate(`/admin/reports/company/${companyId}`); // Example route for overall company details
+        navigate(`/admin/reports/company/${companyId}`);
     };
 
-    // New functions to handle navigation for specific report types
     const handleViewServiceInvoices = (companyId) => {
-        toast.info(`Viewing service invoices for company ID: ${companyId}`);
-        navigate(`/admin/reports/company/${companyId}/service-invoices`);
+        navigate(`../serviceInvoicesReport/${companyId}`);
     };
 
     const handleViewServiceQuotations = (companyId) => {
-        toast.info(`Viewing service quotations for company ID: ${companyId}`);
-        navigate(`/admin/reports/company/${companyId}/service-quotations`);
+        navigate(`../serviceQuotationsReport/${companyId}`);
     };
 
     const handleViewServiceReports = (companyId) => {
-        toast.info(`Viewing service reports for company ID: ${companyId}`);
-        navigate(`/admin/reports/company/${companyId}/service-reports`);
+        navigate(`../rantalInvoicesReport/${companyId}/`);
     };
 
     const handleViewRentalInvoices = (companyId) => {
-        toast.info(`Viewing rental invoices for company ID: ${companyId}`);
-        navigate(`/admin/reports/company/${companyId}/rental-invoices`);
+        navigate(`../rantalInvoicesReport/${companyId}`);
     };
 
     const handleViewRentalQuotations = (companyId) => {
-        toast.info(`Viewing rental quotations for company ID: ${companyId}`);
-        navigate(`/admin/reports/company/${companyId}/rental-quotations`);
+        navigate(`../rentalQuotationsReport/${companyId}`);
     };
 
     const handleViewRentalReports = (companyId) => {
@@ -115,13 +120,37 @@ const CompanyReports = () => {
     };
 
     // Functions for Reminder Modal
-    const handleOpenReminderModal = (companyId) => {
+    const handleOpenReminderModal = async (companyId, type) => { // Made async and accepts 'type'
         setCurrentCompanyIdForReminder(companyId);
-        // In a real app, you might fetch existing reminder data for this company here
+        setRemainderType(type); // Pre-select the type
         setReminderMail(''); // Reset form fields
         setCcMail('');
         setSelectedReminderDates([]);
-        setOpenReminderModal(true);
+        setFetchingReminderData(true); // Start loading
+
+        try {
+            const response = await axios.get(
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/remainders/company/${companyId}/${type}`,
+                { headers: { Authorization: auth?.token } }
+            );
+
+            if (response.data.success && response.data.remainders) { // Corrected from .remainders to .remainder
+                const fetchedReminder = response.data.remainders; // Corrected from .remainders to .remainder
+                setReminderMail(fetchedReminder.remainderMail);
+                setCcMail(fetchedReminder.ccMails.join(', ')); // Convert array back to comma-separated string
+                setSelectedReminderDates(fetchedReminder.remainderDates.map(String)); // Convert numbers back to strings
+            }
+        } catch (error) {
+            // If 404, it means no existing reminder, which is fine.
+            // For other errors, log or show toast.
+            if (error.response && error.response.status !== 404) {
+                console.error("Error fetching existing reminder:", error);
+                toast.error("Failed to load existing reminder data.");
+            }
+        } finally {
+            setFetchingReminderData(false); // End loading
+            setOpenReminderModal(true);
+        }
     };
 
     const handleCloseReminderModal = () => {
@@ -130,9 +159,11 @@ const CompanyReports = () => {
         setReminderMail('');
         setCcMail('');
         setSelectedReminderDates([]);
+        setRemainderType('');
+        setFetchingReminderData(false); // Reset loading state
     };
 
-    const handleSaveReminder = () => {
+    const handleSaveReminder = async () => {
         if (!reminderMail) {
             toast.error('Reminder Mail is required.');
             return;
@@ -141,21 +172,48 @@ const CompanyReports = () => {
             toast.error('At least one Reminder Date is required.');
             return;
         }
+        if (!remainderType) {
+            toast.error('Reminder Type is required.');
+            return;
+        }
 
-        // Here you would typically make an API call to save the reminder
-        console.log({
-            companyId: currentCompanyIdForReminder,
-            reminderMail,
-            ccMail,
-            selectedReminderDates
-        });
-        toast.success(`Reminder set for company ${currentCompanyIdForReminder}`);
-        handleCloseReminderModal();
+        const ccMailsArray = ccMail
+            .split(',')
+            .map(email => email.trim())
+            .filter(email => email !== '');
+
+        try {
+            const response = await axios.post(
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/remainders`,
+                {
+                    companyId: currentCompanyIdForReminder,
+                    remainderType: remainderType,
+                    remainderMail: reminderMail,
+                    ccMails: ccMailsArray,
+                    remainderDates: selectedReminderDates.map(Number)
+                },
+                {
+                    headers: {
+                        Authorization: auth?.token,
+                    },
+                }
+            );
+
+            if (response.data.success) {
+                toast.success(response.data.message); // Use the specific message from the backend
+                handleCloseReminderModal();
+            } else {
+                toast.error(response.data.message || 'Failed to save reminder.');
+            }
+        } catch (error) {
+            console.error("Error saving reminder:", error);
+            toast.error(error.response?.data?.message || 'Error saving reminder.');
+        }
     };
 
-    // Modified handleSetReminder to open the modal
-    const handleSetReminder = (companyId) => {
-        handleOpenReminderModal(companyId);
+    // Modified handleSetReminder to open the modal with specific type
+    const handleSetReminder = (companyId, type) => {
+        handleOpenReminderModal(companyId, type);
     };
 
     if (loading) {
@@ -194,7 +252,7 @@ const CompanyReports = () => {
                                 <TableCell align="center">Rental Invoice</TableCell>
                                 <TableCell align="center">Rental Quotation</TableCell>
                                 <TableCell align="center">Rental Report</TableCell>
-                                <TableCell align="center">Action</TableCell>
+                                {/* <TableCell align="center">Action</TableCell> */}
                             </TableRow>
                         </TableHead>
                         <TableBody>
@@ -216,12 +274,12 @@ const CompanyReports = () => {
                                                 color="primary"
                                                 onClick={() => handleViewServiceInvoices(company._id)}
                                                 disabled={company.serviceInvoiceCount === 0}
-                                                sx={{ minWidth: 'unset', padding: '4px 8px' }} // Adjust padding for number
+                                                sx={{ minWidth: 'unset', padding: '4px 8px' }}
                                             >
                                                 {company.serviceInvoiceCount}
                                             </Button>
                                             <Tooltip title="Set Reminder">
-                                                <IconButton onClick={() => handleSetReminder(company._id)} color="warning">
+                                                <IconButton onClick={() => handleSetReminder(company._id, 'ServiceInvoice')} color="warning">
                                                     <NotificationsActiveIcon />
                                                 </IconButton>
                                             </Tooltip>
@@ -259,7 +317,7 @@ const CompanyReports = () => {
                                                 {company.rentalInvoiceCount}
                                             </Button>
                                             <Tooltip title="Set Reminder">
-                                                <IconButton onClick={() => handleSetReminder(company._id)} color="warning">
+                                                <IconButton onClick={() => handleSetReminder(company._id, 'RentalInvoice')} color="warning">
                                                     <NotificationsActiveIcon />
                                                 </IconButton>
                                             </Tooltip>
@@ -319,60 +377,90 @@ const CompanyReports = () => {
                     </IconButton>
                 </DialogTitle>
                 <DialogContent dividers>
-                    <TextField
-                        autoFocus
-                        margin="dense"
-                        id="reminder-mail"
-                        label="Reminder Mail"
-                        type="email"
-                        fullWidth
-                        variant="outlined"
-                        value={reminderMail}
-                        onChange={(e) => setReminderMail(e.target.value)}
-                        required
-                        sx={{ mb: 2 }}
-                    />
-                    <TextField
-                        margin="dense"
-                        id="cc-mail"
-                        label="CC Mail"
-                        type="email"
-                        fullWidth
-                        variant="outlined"
-                        value={ccMail}
-                        onChange={(e) => setCcMail(e.target.value)}
-                        sx={{ mb: 2 }}
-                    />
-                    <Autocomplete
-                        multiple
-                        id="reminder-dates"
-                        options={reminderDateOptions}
-                        value={selectedReminderDates}
-                        onChange={(event, newValue) => {
-                            setSelectedReminderDates(newValue);
-                        }}
-                        renderTags={(value, getTagProps) =>
-                            value.map((option, index) => (
-                                <Chip variant="outlined" label={option} {...getTagProps({ index })} />
-                            ))
-                        }
-                        renderInput={(params) => (
+                    {fetchingReminderData ? (
+                        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '200px' }}>
+                            <CircularProgress />
+                        </Box>
+                    ) : (
+                        <>
                             <TextField
-                                {...params}
+                                autoFocus
+                                margin="dense"
+                                id="reminder-mail"
+                                label="Reminder Mail"
+                                type="email"
+                                fullWidth
                                 variant="outlined"
-                                label="Reminder Dates"
-                                placeholder="Select dates"
-                                required={selectedReminderDates.length === 0} // Mark as required if no dates selected
+                                value={reminderMail}
+                                onChange={(e) => setReminderMail(e.target.value)}
+                                required
+                                sx={{ mb: 2 }}
                             />
-                        )}
-                        sx={{ mb: 2 }}
-                    />
+                            <FormControl fullWidth margin="dense" sx={{ mb: 2 }}>
+                                <InputLabel id="remainder-type-label">Reminder Type</InputLabel>
+                                <Select
+                                    labelId="remainder-type-label"
+                                    id="remainder-type"
+                                    value={remainderType}
+                                    label="Reminder Type"
+                                    onChange={(e) => setRemainderType(e.target.value)}
+                                    required
+                                    disabled // Disable it as it's pre-selected based on the button clicked
+                                >
+                                    <MenuItem value="">
+                                        <em>None</em>
+                                    </MenuItem>
+                                    <MenuItem value="ServiceInvoice">Service Invoice</MenuItem>
+                                    <MenuItem value="RentalInvoice">Rental Invoice</MenuItem>
+                                    <MenuItem value="SalesInvoice">Sales Invoice</MenuItem>
+                                    <MenuItem value="Report">Report</MenuItem>
+                                    <MenuItem value="Quotation">Quotation</MenuItem>
+                                    <MenuItem value="Other">Other</MenuItem>
+                                </Select>
+                            </FormControl>
+                            <TextField
+                                margin="dense"
+                                id="cc-mail"
+                                label="CC Mail (comma-separated)"
+                                type="text"
+                                fullWidth
+                                variant="outlined"
+                                value={ccMail}
+                                onChange={(e) => setCcMail(e.target.value)}
+                                sx={{ mb: 2 }}
+                            />
+                            <Autocomplete
+                                multiple
+                                id="reminder-dates"
+                                options={reminderDateOptions}
+                                value={selectedReminderDates}
+                                onChange={(event, newValue) => {
+                                    setSelectedReminderDates(newValue);
+                                }}
+                                renderTags={(value, getTagProps) =>
+                                    value.map((option, index) => (
+                                        <Chip variant="outlined" label={option} {...getTagProps({ index })} />
+                                    ))
+                                }
+                                renderInput={(params) => (
+                                    <TextField
+                                        {...params}
+                                        variant="outlined"
+                                        label="Reminder Dates"
+                                        placeholder="Select dates"
+                                        required={selectedReminderDates.length === 0}
+                                    />
+                                )}
+                                sx={{ mb: 2 }}
+                            />
+                        </>
+                    )}
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={handleCloseReminderModal} color="secondary">
                         Cancel
                     </Button>
-                    <Button onClick={handleSaveReminder} color="primary" variant="contained">
+                    <Button onClick={handleSaveReminder} color="primary" variant="contained" disabled={fetchingReminderData}>
                         Save
                     </Button>
                 </DialogActions>

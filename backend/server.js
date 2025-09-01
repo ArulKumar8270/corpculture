@@ -27,6 +27,7 @@ import serviceQuotationRoutes from "./routes/serviceQuotationRoute.js"; // New i
 import reportRoutes from "./routes/reportRoutes.js";
 import commonDetailsRoutes from "./routes/commonDetailsRoutes.js"; // Import the new routes
 import rentalPaymentEntryRoutes from './routes/rentalPaymentEntryRoutes.js'; // Import new routes
+import remainderRoutes from "./routes/remainderRoutes.js"; // Import new routes
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -110,6 +111,7 @@ app.use('/api/v1/rental-payment', rentalPaymentEntryRoutes); // Use new routes
 
 app.use("/api/v1/report", reportRoutes); // Or choose your desired base path
 app.use("/api/v1/common-details", commonDetailsRoutes); // Add the new common details routes
+app.use("/api/v1/remainders", remainderRoutes);
 
 app.listen(PORT, () => {
     console.log(`SERVER RUNNING ON PORT ${PORT}`);

@@ -10,7 +10,8 @@ import {
     MenuItem,
     Paper,
     CircularProgress,
-    FormHelperText
+    FormHelperText,
+    Autocomplete
 } from '@mui/material';
 import axios from 'axios';
 import toast from 'react-hot-toast';
@@ -267,15 +268,14 @@ const RentalInvoiceForm = () => {
         }
     };
 
-    const handleProductChange = (e) => {
-        const selectedProductId = e.target.value;
+    const handleProductChange = (newValue) => { // Modified to accept newValue directly from Autocomplete
+        const selectedProductId = newValue ? newValue._id : '';
         setFormData(prev => ({ ...prev, machineId: selectedProductId }));
         setErrors(prev => ({ ...prev, machineId: '' }));
 
         const selectedProduct = availableProducts.find(prod => prod._id === selectedProductId);
         setSelectedProduct(selectedProduct);
         if (selectedProduct) {
-            // {{ edit_2 }}
             setFormData(prev => ({
                 ...prev,
                 a3Config: {
@@ -297,7 +297,6 @@ const RentalInvoiceForm = () => {
                     colorScanningOldCount: selectedProduct.a5Config?.colorScanningOldCount ?? 0,
                 },
             }));
-            // {{ edit_2 }}
         } else {
             setFormData(prev => ({
                 ...prev,
@@ -452,23 +451,23 @@ const RentalInvoiceForm = () => {
             ...selectedProduct,
             a3Config: {
                 ...selectedProduct?.a3Config,
-                bwOldCount: formData.a3Config.bwNewCount,
-                colorOldCount: formData.a3Config.colorNewCount,
-                colorScanningOldCount: formData.a3Config.colorScanningNewCount,
+                bwOldCount: Number(formData.a3Config.bwNewCount) || 0,
+                colorOldCount: Number(formData.a3Config.colorNewCount) || 0,
+                colorScanningOldCount: Number(formData.a3Config.colorScanningNewCount) || 0,
                
             },
             a4Config: {
                 ...selectedProduct?.a4Config,
-                bwOldCount: formData.a4Config.bwNewCount,
-                colorOldCount: formData.a4Config.colorNewCount,
-                colorScanningOldCount: formData.a4Config.colorScanningNewCount,
+                bwOldCount: Number(formData.a4Config.bwNewCount) || 0,
+                colorOldCount: Number(formData.a4Config.colorNewCount) || 0,
+                colorScanningOldCount: Number(formData.a4Config.colorScanningNewCount) || 0,
                 
             },
             a5Config: {
                 ...selectedProduct?.a5Config,
-                bwOldCount: formData.a5Config.bwNewCount,
-                colorOldCount: formData.a5Config.colorNewCount,
-                colorScanningOldCount: formData.a5Config.colorScanningNewCount,
+                bwOldCount: Number(formData.a5Config.bwNewCount) || 0,
+                colorOldCount: Number(formData.a5Config.colorNewCount) || 0,
+                colorScanningOldCount: Number(formData.a5Config.colorScanningNewCount) || 0,
             }
         }
         try {
@@ -584,39 +583,51 @@ const RentalInvoiceForm = () => {
                 <form onSubmit={handleSubmit}>
                     <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 3, mb: 3 }}>
                         <FormControl fullWidth margin="normal" size="small" required error={!!errors.companyId}>
-                            <InputLabel id="company-label">Company</InputLabel>
-                            <Select
-                                labelId="company-label"
-                                id="companyId"
-                                name="companyId"
-                                value={formData.companyId}
-                                onChange={handleChange}
-                            >
-                                {companies.map(comp => (
-                                    <MenuItem key={comp._id} value={comp._id}>
-                                        {comp.companyName}
-                                    </MenuItem>
-                                ))}
-                            </Select>
-                            {errors.companyId && <FormHelperText>{errors.companyId}</FormHelperText>}
+                            <Autocomplete
+                                id="companyId-autocomplete"
+                                options={companies}
+                                getOptionLabel={(option) => option.companyName || ''}
+                                isOptionEqualToValue={(option, value) => option._id === value._id}
+                                value={companies.find(comp => comp._id === formData.companyId) || null}
+                                onChange={(event, newValue) => {
+                                    handleChange({ target: { name: 'companyId', value: newValue ? newValue._id : '' } });
+                                }}
+                                renderInput={(params) => (
+                                    <TextField
+                                        {...params}
+                                        label="Company"
+                                        variant="outlined"
+                                        size="small"
+                                        required
+                                        error={!!errors.companyId}
+                                        helperText={errors.companyId}
+                                    />
+                                )}
+                                disabled={!!id} // Disable if in edit mode
+                            />
                         </FormControl>
                         <FormControl fullWidth margin="normal" size="small" error={!!errors.machineId}>
-                            <InputLabel id="product-name-label">Serial No.</InputLabel>
-                            <Select
-                                labelId="product-name-label"
-                                id="machineId"
-                                name="machineId"
-                                value={formData.machineId}
-                                onChange={handleProductChange}
-                                label="Serial No"
+                            <Autocomplete
+                                id="machineId-autocomplete"
+                                options={availableProducts}
+                                getOptionLabel={(option) => option.serialNo || ''}
+                                isOptionEqualToValue={(option, value) => option._id === value._id}
+                                value={availableProducts.find(prod => prod._id === formData.machineId) || null}
+                                onChange={(event, newValue) => {
+                                    handleProductChange(newValue); // Pass the selected object
+                                }}
+                                renderInput={(params) => (
+                                    <TextField
+                                        {...params}
+                                        label="Serial No."
+                                        variant="outlined"
+                                        size="small"
+                                        error={!!errors.machineId}
+                                        helperText={errors.machineId}
+                                    />
+                                )}
                                 disabled={!formData.companyId || availableProducts.length === 0}
-                            >
-                                <MenuItem value="">Select a Product</MenuItem>
-                                {availableProducts.map(prod => (
-                                    <MenuItem key={prod._id} value={prod._id}>{prod.serialNo}</MenuItem>
-                                ))}
-                            </Select>
-                            {errors.machineId && <FormHelperText>{errors.machineId}</FormHelperText>}
+                            />
                         </FormControl>
                     </Box>
 
@@ -946,11 +957,19 @@ const RentalInvoiceForm = () => {
                                     InputLabelProps={{ shrink: true }}
                                 />
                             </>
-
                         )}
-                        {/* {{ edit_9 }} */}
-
                     </Box>
+
+                    <TextField
+                        fullWidth
+                        label="Remarks"
+                        name="remarks"
+                        value={formData.remarks}
+                        onChange={handleChange}
+                        multiline
+                        rows={4}
+                        sx={{ mb: 3 }}
+                    />
 
                     <Button
                         type="submit"

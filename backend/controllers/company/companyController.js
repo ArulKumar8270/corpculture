@@ -1,4 +1,7 @@
 import companyModel from "../../models/companyModel.js";
+import ServiceInvoice from "../../models/serviceInvoiceModel.js"; // Import ServiceInvoice model
+import Report from "../../models/reportModel.js"; // Import Report model
+import RentalPaymentEntry from "../../models/rentalpaymententrymodel.js"; // Import RentalPaymentEntry model
 
 // Create Company
 export const createCompany = async (req, res) => {
@@ -24,10 +27,39 @@ export const createCompany = async (req, res) => {
 // Get All Companies
 export const getAllCompanies = async (req, res) => {
     try {
-        const companies = await companyModel.find({}).sort({ createdAt: -1 });
+        const companies = await companyModel.find({}).sort({ createdAt: -1 }).lean(); // Use .lean() for better performance when adding properties
+
+        const companiesWithCounts = await Promise.all(companies.map(async (company) => {
+            const [
+                serviceInvoiceCount,
+                serviceQuotationCount,
+                serviceReportCount,
+                rentalInvoiceCount,
+                rentalQuotationCount,
+                rentalReportCount
+            ] = await Promise.all([
+                ServiceInvoice.countDocuments({ companyId: company._id, invoiceType: "invoice" }),
+                ServiceInvoice.countDocuments({ companyId: company._id, invoiceType: "quotation" }),
+                Report.countDocuments({ company: company._id, reportType: "service" }),
+                RentalPaymentEntry.countDocuments({ companyId: company._id, invoiceType: "invoice" }),
+                RentalPaymentEntry.countDocuments({ companyId: company._id, invoiceType: "quotation" }),
+                Report.countDocuments({ company: company._id, reportType: "rental" })
+            ]);
+
+            return {
+                ...company,
+                serviceInvoiceCount,
+                serviceQuotationCount,
+                serviceReportCount,
+                rentalInvoiceCount,
+                rentalQuotationCount,
+                rentalReportCount
+            };
+        }));
+
         res.status(200).send({
             success: true,
-            companies
+            companies: companiesWithCounts
         });
     } catch (error) {
         console.error("Error in getting companies:", error);

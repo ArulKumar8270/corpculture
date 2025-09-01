@@ -1,15 +1,13 @@
 import mongoose from "mongoose";
 
-// {{ edit_1 }}
 const configSchema = new mongoose.Schema({
     bwOldCount: { type: Number, default: 0 },
     bwNewCount: { type: Number, default: 0 },
-    colorOldCount: { type: Number, default: 0 }, // New field
-    colorNewCount: { type: Number, default: 0 }, // New field
-    colorScanningOldCount: { type: Number, default: 0 }, // New field
-    colorScanningNewCount: { type: Number, default: 0 }, // New field
-}, { _id: false }); // _id: false to prevent Mongoose from creating _id for subdocuments
-// {{ edit_1 }}
+    colorOldCount: { type: Number, default: 0 },
+    colorNewCount: { type: Number, default: 0 },
+    colorScanningOldCount: { type: Number, default: 0 },
+    colorScanningNewCount: { type: Number, default: 0 },
+}, { _id: false });
 
 const rentalPaymentEntrySchema = new mongoose.Schema({
     rentalId: {
@@ -21,18 +19,18 @@ const rentalPaymentEntrySchema = new mongoose.Schema({
         type: String,
         trim: true,
     },
-    machineId: { // Reference to the Machine model for serial number and company
+    machineId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'RentalProduct',
         required: true,
     },
-    companyId: { // Storing companyId directly for easier access/populating
+    companyId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Company',
         required: true,
     },
     sendDetailsTo: {
-        type: String, // Assuming this is a string for now, could be an enum or ref to another model
+        type: String,
         required: true,
         trim: true,
     },
@@ -52,7 +50,7 @@ const rentalPaymentEntrySchema = new mongoose.Schema({
     },
     a3Config: {
         type: configSchema,
-        default: () => ({}), // Default to an empty object if not provided
+        default: () => ({}),
     },
     a4Config: {
         type: configSchema,
@@ -70,15 +68,15 @@ const rentalPaymentEntrySchema = new mongoose.Schema({
         type: String,
         trim: true,
     },
-    bankName: { // New field
+    bankName: {
         type: String,
         trim: true,
     },
-    transactionDetails: { // New field (e.g., Cheque Number, UPI ID, Transaction ID)
+    transactionDetails: {
         type: String,
         trim: true,
     },
-    chequeDate: { // New field for Cheque payment
+    chequeDate: {
         type: Date,
     },
     pendingAmount: {
@@ -93,10 +91,10 @@ const rentalPaymentEntrySchema = new mongoose.Schema({
         type: String,
         trim: true,
     },
-    transferDate: { // New field for Bank Transfer/UPI
+    transferDate: {
         type: Date,
     },
-    companyNamePayment: { // New field for payment from company
+    companyNamePayment: {
         type: String,
         trim: true,
     },
@@ -110,7 +108,7 @@ const rentalPaymentEntrySchema = new mongoose.Schema({
         trim: true,
     },
     invoiceLink: {
-        type: [String], // Changed to an array of strings to allow multiple URLs
+        type: [String],
         trim: true,
     },
     status: {
@@ -118,10 +116,11 @@ const rentalPaymentEntrySchema = new mongoose.Schema({
         enum: ['draft', 'Cancelled', "Pending", "Progress", "Completed", "InvoiceSent", "Paid", "Unpaid"],
         default: 'Unpaid',
     },
-    otherPaymentMode: { // New field for 'OTHERS' payment mode
+    otherPaymentMode: {
         type: String,
         trim: true,
     },
 }, { timestamps: true });
 
-export default mongoose.model('RentalPaymentEntry', rentalPaymentEntrySchema);
+// Check if the model already exists before defining it
+export default mongoose.models.RentalPaymentEntry || mongoose.model('RentalPaymentEntry', rentalPaymentEntrySchema);
