@@ -37,7 +37,8 @@ export const createServiceInvoice = async (req, res) => {
             assignedTo,
             sendTo,
             invoiceType,
-            serviceId
+            serviceId,
+            paymentAmount
         } = req.body;
 
 
@@ -110,7 +111,8 @@ export const createServiceInvoice = async (req, res) => {
             assignedTo,
             sendTo,
             invoiceType,
-            serviceId
+            serviceId,
+            paymentAmount
         });
 
         await newServiceInvoice.save();
@@ -206,13 +208,23 @@ export const getAllServiceInvoices = async (req, res) => {
         const totalCount = await ServiceInvoice.countDocuments(query);
 
         const serviceInvoices = await ServiceInvoice.find(query)
+        .populate({
+            path: "products.productId",
+            populate: [
+              {
+                path: "gstType", // populate gstType inside productId
+              },
+              {
+                path: "productName", // populate productName inside productId
+                populate: [
+                  {
+                    path: "productName", // also go deeper if productName itself references another model
+                  },
+                ],
+              },
+            ],
+          })
             .populate('companyId')
-            .populate({
-                path: 'products.productId',
-                populate: {
-                    path: 'gstType',
-                }
-            })
             .populate('assignedTo')
             .sort({ createdAt: -1 })
             .skip(skip)
@@ -251,11 +263,21 @@ export const getServiceInvoicesAssignedTo = async (req, res) => {
         const serviceInvoices = await ServiceInvoice.find(query)
             .populate('companyId') // Populate company name
             .populate({
-                path: 'products.productId', // First populate productId
-                populate: {
-                    path: 'gstType',        // Then populate gstType inside the product
-                }
-            })// Populate product details
+                path: "products.productId",
+                populate: [
+                  {
+                    path: "gstType", // populate gstType inside productId
+                  },
+                  {
+                    path: "productName", // populate productName inside productId
+                    populate: [
+                      {
+                        path: "productName", // also go deeper if productName itself references another model
+                      },
+                    ],
+                  },
+                ],
+              })
             .populate('assignedTo') // Populate product details
             .sort({ createdAt: -1 }); // Find services by phone number
 
@@ -288,11 +310,21 @@ export const getServiceInvoiceById = async (req, res) => {
         const serviceInvoice = await ServiceInvoice.findById(id)
             .populate('companyId') // Populate company name
             .populate({
-                path: 'products.productId', // First populate productId
-                populate: {
-                    path: 'gstType',        // Then populate gstType inside the product
-                }
-            })// Populate product details
+                path: "products.productId",
+                populate: [
+                  {
+                    path: "gstType", // populate gstType inside productId
+                  },
+                  {
+                    path: "productName", // populate productName inside productId
+                    populate: [
+                      {
+                        path: "productName", // also go deeper if productName itself references another model
+                      },
+                    ],
+                  },
+                ],
+              })
             .populate('assignedTo') // Populate product details
         if (!serviceInvoice) {
             return res.status(404).send({ success: false, message: 'Service Invoice not found.' });
@@ -333,7 +365,8 @@ export const updateServiceInvoice = async (req, res) => {
             sendTo,
             invoiceType,
             serviceId,
-            staus
+            staus,
+            paymentAmount
         } = req.body;
 
         // Find the invoice to update
@@ -405,6 +438,7 @@ export const updateServiceInvoice = async (req, res) => {
         if (staus) serviceInvoice.staus = staus;
         if (invoiceType) serviceInvoice.invoiceType = invoiceType;
         if (serviceId) serviceInvoice.serviceId = serviceId;
+        if (paymentAmount) serviceInvoice.paymentAmount = paymentAmount;
         if (invoiceNumber) serviceInvoice.invoiceNumber = invoiceNumber;
         if (invoiceLink !== undefined) serviceInvoice.invoiceLink = invoiceLink; // Update invoiceLink
 

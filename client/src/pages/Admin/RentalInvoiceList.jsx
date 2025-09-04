@@ -20,7 +20,8 @@ import {
     Select, // Added Select
     MenuItem, // Added MenuItem
     TextField,
-    Collapse
+    Collapse,
+    IconButton
 } from '@mui/material';
 import { Visibility as VisibilityIcon, UploadFile as UploadFileIcon } from '@mui/icons-material';
 import axios from 'axios';
@@ -32,6 +33,7 @@ import Stack from '@mui/material/Stack'; // Import Stack for layout
 import Chip from '@mui/material/Chip';
 import SearchIcon from '@mui/icons-material/Search'; // Import SearchIcon
 import InputAdornment from '@mui/material/InputAdornment'; // Import InputAdornment
+import DeleteIcon from '@mui/icons-material/Delete';
 
 function RentalInvoiceList(props) {
     const [loading, setLoading] = useState(true);
@@ -58,7 +60,9 @@ function RentalInvoiceList(props) {
     const [companyPendingInvoice, setCompanyPendingInvoice] = useState([])
     const [selectedInvliceId, setSelectedInvliceId] = useState(null)
     const [balanceAmount, setBalanceAmount] = useState(0)
-
+    const [pendingAmount, setPendingAmount] = useState(0)
+    const [deletingLink, setDeletingLink] = useState(false);
+    const [isInvoiceSend, setInvoiceSend] = useState(false)
     useEffect(() => {
         fetchRentalEntries();
     }, [auth.token, props.invoice]);
@@ -159,9 +163,19 @@ function RentalInvoiceList(props) {
         console.log('Edit:', id);
     };
 
-    const handleSendInvoice = (invoice) => {
-        console.log('Send Invoice:', invoice);
-    };
+    const onSendInvoice = async (invoice) => {
+        setInvoiceSend(true)
+        try {
+            const res = await axios.post('https://n8n.nicknameinfo.net/webhook/f8d3ad37-a38e-4a38-a06e-09c74fdc3b91', { invoiceId: invoice?._id });
+            if (res) {
+                setInvoiceSend(false)
+            }
+        } catch (webhookError) {
+            setInvoiceSend(false)
+            console.error('Error triggering webhook:', webhookError);
+            toast.error('Failed to trigger webhook for external notification.');
+        }
+    }
 
     const handleUploadSignedInvoice = async (invoiceId, oldInvoicLink) => {
         const input = document.createElement('input');
@@ -205,7 +219,7 @@ function RentalInvoiceList(props) {
                 console.log(error, "Api error");
             }
             setLoading(false)
-            props.onInvoiceUpdate();
+            fetchRentalEntries();
         };
 
         input.click();
@@ -233,7 +247,7 @@ function RentalInvoiceList(props) {
             companyNamePayment: invoice?.companyNamePayment || '',
             otherPaymentMode: invoice?.otherPaymentMode || '',
             invoiceId: invoice?._id,
-            paymentAmount: initialPaymentAmount,
+            paymentAmount: invoice?.paymentAmount ? invoice?.paymentAmount : initialPaymentAmount,
             paymentAmountType: initialPaymentAmountType,
             grandTotal: invoice?.grandTotal,
             companyId: invoice?.companyId
@@ -249,29 +263,36 @@ function RentalInvoiceList(props) {
     const handlePaymentFormChange = async (e) => {
         const { name, value } = e.target;
         setPaymentForm(prev => ({ ...prev, [name]: value }));
-        if (name === "paymentAmount" && value > invoice?.grandTotal) {
-            let balanceAmount = value - invoice?.grandTotal;
-            setBalanceAmount(balanceAmount)
-            try {
-                let response = await axios.post(
-                    `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/all`,
-                    { companyId: paymentForm?.companyId, tdsAmount: { $eq: null }, status: { $ne: "Paid" } }, // Send invoiceType in the request body
-                    {
-                        headers: {
-                            Authorization: auth.token,
-                        },
-                    }
-                );
-                setCompanyPendingInvoice(response.data?.entries)
-            } catch (err) {
-                console.log(err, "Api error")
+        if (name === "paymentAmount") {
+            if (value < invoice?.grandTotal) {
+                let balanceAmount = invoice?.grandTotal - value;
+                setPendingAmount(balanceAmount)
+                setBalanceAmount(0)
+            } else {
+                let balanceAmount = value - invoice?.grandTotal;
+                setBalanceAmount(balanceAmount)
+                setPendingAmount(0)
+                try {
+                    let response = await axios.post(
+                        `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/all`,
+                        { companyId: paymentForm?.companyId, tdsAmount: { $eq: null }, status: { $ne: "Paid" } }, // Send invoiceType in the request body
+                        {
+                            headers: {
+                                Authorization: auth.token,
+                            },
+                        }
+                    );
+                    setCompanyPendingInvoice(response.data?.entries)
+                } catch (err) {
+                    console.log(err, "Api error")
+                }
             }
+
         }
 
     };
 
     const handleSavePaymentDetails = async () => {
-        let amountCheck = paymentForm.paymentAmount >= paymentForm?.grandTotal
         try {
             const payload = {
                 modeOfPayment: paymentForm.modeOfPayment,
@@ -282,16 +303,18 @@ function RentalInvoiceList(props) {
                 companyNamePayment: paymentForm.companyNamePayment,
                 otherPaymentMode: paymentForm.otherPaymentMode,
                 paymentAmountType: paymentForm.paymentAmountType,
+                paymentAmount: paymentForm?.paymentAmount,
                 tdsAmount: 0, // Default to 0, will be updated if type is TDS
                 pendingAmount: 0, // Default to 0, will be updated if type is Pending
-                status: balanceAmount >= paymentForm?.grandTotal || paymentForm.paymentAmount >= paymentForm?.grandTotal || paymentForm.paymentAmountType === 'TDS' ? "Paid" : "Unpaid",
+                // status: balanceAmount >= paymentForm?.grandTotal || paymentForm.paymentAmount >= paymentForm?.grandTotal || paymentForm.paymentAmountType === 'TDS' ? "Paid" : "Unpaid",
+                status: "Paid",
             };
 
             // Conditionally set tdsAmount or pendingAmount based on selected type
             if (paymentForm.paymentAmountType === 'TDS') {
-                payload.tdsAmount = balanceAmount ? balanceAmount : amountCheck ? paymentForm?.grandTotal : parseFloat(paymentForm.paymentAmount) || 0;
+                payload.tdsAmount = pendingAmount || 0;
             } else if (paymentForm.paymentAmountType === 'Pending') {
-                payload.pendingAmount = balanceAmount ? balanceAmount : amountCheck ? paymentForm?.grandTotal : parseFloat(paymentForm.paymentAmount) || 0;
+                payload.pendingAmount = pendingAmount || 0;
             }
 
             const res = await axios.put(
@@ -314,6 +337,48 @@ function RentalInvoiceList(props) {
         } catch (error) {
             console.error('Error updating payment details:', error);
             toast.error(error.response?.data?.message || 'Something went wrong while updating payment details.');
+        }
+    };
+
+
+    const handleDeleteInvoiceLink = async (invoiceId, linkToDelete, invoice) => {
+        if (!window.confirm("Are you sure you want to delete this invoice link?")) {
+            return;
+        }
+        const fileName = linkToDelete.split("/").pop();
+        const res = await axios.post(
+            `${import.meta.env.VITE_SERVER_URL}/api/v1/auth/delete-file/${fileName}`,
+            {
+                headers: {
+                    Authorization: auth?.token
+                },
+            }
+        );
+        try {
+            setDeletingLink(true);
+            const updatedLinks = invoice.invoiceLink.filter(link => link !== linkToDelete);
+
+            const res = await axios.put(
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/${invoiceId}`,
+                {
+                    invoiceLink: updatedLinks,
+                },
+                {
+                    headers: {
+                        Authorization: auth.token,
+                    },
+                }
+            );
+
+            if (res.data?.success) {
+                fetchRentalEntries(); // Refresh the list
+            } else {
+                toast.error(res.data?.message || 'Failed to delete invoice link.');
+            }
+        } catch (error) {
+            toast.error('Error deleting invoice link.');
+        } finally {
+            setDeletingLink(false);
         }
     };
 
@@ -409,6 +474,7 @@ function RentalInvoiceList(props) {
                                     <TableCell>Send Details To</TableCell>
                                     <TableCell>Image</TableCell>
                                     <TableCell>Assinged To</TableCell>
+                                    <TableCell>Status</TableCell>
                                     <TableCell>Actions</TableCell>
                                 </TableRow>
                             </TableHead>
@@ -434,12 +500,30 @@ function RentalInvoiceList(props) {
                                                 'N/A'
                                             )}</TableCell>
                                             <TableCell>
+                                                {/* <Chip
+                                                    label={entry.status}
+                                                    size="small"
+                                                    color={
+                                                        entry.status === 'Paid' ? 'success' :
+                                                            entry.status === 'Unpaid' ? 'error' :
+                                                                entry.status === 'Pending' || entry.status === 'Progress' ? 'warning' :
+                                                                    'default'
+                                                    }
+                                                /> */}
+                                                {entry?.invoiceLink?.length <= 0 ? <Chip
+                                                    label={"Invoice Upload Pending"}
+                                                    size="small"
+                                                    color={"error"}
+                                                    className='mt-2'
+                                                /> : null}
+                                            </TableCell>
+                                            <TableCell>
                                                 <Stack spacing={1}>
                                                     {hasPermission("rentalInvoice") ? <Button variant="outlined" size="small" onClick={() => handleEdit(entry._id)}>
                                                         Edit
                                                     </Button> : null}
-                                                    <Button variant="outlined" size="small" onClick={() => handleSendInvoice(entry)}>
-                                                        Send {props?.invoice === "invoice" ? "Invoice" : "Quotation"}
+                                                    <Button variant="outlined" size="small" onClick={() => onSendInvoice(entry)}>
+                                                        {isInvoiceSend ? <CircularProgress size={24} /> : `Send ${props?.invoice === "quotation" === "quotation" ? "Quotaion" : "Invoice"}`}
                                                     </Button>
                                                     {props?.invoice === "quotation" ? <Button variant="outlined" size="small" sx={{ my: 1 }} onClick={() => onMoveToInvoice("invoice", entry)}>Move to invoice</Button>
                                                         : null}
@@ -470,18 +554,29 @@ function RentalInvoiceList(props) {
                                                         <Stack direction="row" spacing={1} flexWrap="wrap"> {/* Use Stack for layout */}
                                                             {
                                                                 entry.invoiceLink?.map((link, index) => (
-                                                                    <Button
-                                                                        key={index}
-                                                                        variant="outlined"
-                                                                        size="small"
-                                                                        startIcon={<LinkIcon />}
-                                                                        href={link}
-                                                                        target="_blank"
-                                                                        rel="noopener noreferrer"
-                                                                        sx={{ my: 0.5 }} // Add some vertical margin for wrapping
-                                                                    >
-                                                                        Invoice {index + 1}
-                                                                    </Button>
+                                                                    <Box key={index} sx={{ display: 'flex', alignItems: 'center', my: 0.5 }}>
+                                                                        <Button
+                                                                            variant="outlined"
+                                                                            size="small"
+                                                                            startIcon={<LinkIcon />}
+                                                                            href={link}
+                                                                            target="_blank"
+                                                                            rel="noopener noreferrer"
+                                                                        >
+                                                                            Invoice {index + 1}
+                                                                        </Button>
+                                                                        {hasPermission("serviceInvoice") && ( // Only show delete if user has permission
+                                                                            <IconButton
+                                                                                aria-label={`delete invoice link ${index + 1}`}
+                                                                                size="small"
+                                                                                onClick={() => handleDeleteInvoiceLink(entry._id, link, entry)}
+                                                                                disabled={deletingLink} // Disable during deletion
+                                                                                sx={{ ml: 0.5 }}
+                                                                            >
+                                                                                {deletingLink ? <CircularProgress size={16} /> : <DeleteIcon fontSize="small" />}
+                                                                            </IconButton>
+                                                                        )}
+                                                                    </Box>
                                                                 ))
                                                             }
                                                         </Stack>
@@ -647,41 +742,21 @@ function RentalInvoiceList(props) {
                             size="small"
                         />
                     )}
-                    {/* New: Amount Type Selector */}
-                    {paymentForm.modeOfPayment && (
-                        <FormControl fullWidth margin="normal" size="small">
-                            <InputLabel id="payment-amount-type-label">Amount Type</InputLabel>
-                            <Select
-                                labelId="payment-amount-type-label"
-                                id="paymentAmountType"
-                                name="paymentAmountType"
-                                value={paymentForm.paymentAmountType}
-                                onChange={handlePaymentFormChange}
-                                label="Amount Type"
-                            >
-                                <MenuItem value="">--select Amount Type--</MenuItem>
-                                <MenuItem value="TDS">TDS Amount</MenuItem>
-                                <MenuItem value="Pending">Pending Amount</MenuItem>
-                            </Select>
-                        </FormControl>)}
-
                     {/* New: Single Amount Field, shown only if a type is selected */}
-                    {paymentForm.paymentAmountType && (
-                        <TextField
-                            fullWidth
-                            margin="normal"
-                            label={`${paymentForm.paymentAmountType} Amount`}
-                            name="paymentAmount"
-                            type="number"
-                            value={paymentForm.paymentAmount}
-                            onChange={handlePaymentFormChange}
-                            size="small"
-                        />
-                    )}
+                    <TextField
+                        fullWidth
+                        margin="normal"
+                        label={`Amount`}
+                        name="paymentAmount"
+                        type="number"
+                        value={paymentForm.paymentAmount}
+                        onChange={handlePaymentFormChange}
+                        size="small"
+                    />
 
-                    {companyPendingInvoice?.length > 0 &&
+                    {companyPendingInvoice?.length > 0 && balanceAmount > 0 &&
                         <>
-                            <p>Previous Invoice Balance - Rs {balanceAmount}</p>
+                            <p>Previous Invoice Balance - Rs {balanceAmount.toFixed(2)}</p>
                             <FormControl fullWidth margin="normal" size="small">
                                 <InputLabel id="mode-of-payment-label">Select Pending Invoice</InputLabel>
                                 <Select
@@ -700,6 +775,24 @@ function RentalInvoiceList(props) {
                             </FormControl>
                         </>
                     }
+
+                    {/* New: Amount Type Selector */}
+                    {pendingAmount > 0 && (
+                        <FormControl fullWidth margin="normal" size="small">
+                            <InputLabel id="payment-amount-type-label">Amount Type</InputLabel>
+                            <Select
+                                labelId="payment-amount-type-label"
+                                id="paymentAmountType"
+                                name="paymentAmountType"
+                                value={paymentForm.paymentAmountType}
+                                onChange={handlePaymentFormChange}
+                                label="Amount Type"
+                            >
+                                <MenuItem value="">--select Amount Type--</MenuItem>
+                                <MenuItem value="TDS">TDS Amount</MenuItem>
+                                <MenuItem value="Pending">Pending Amount</MenuItem>
+                            </Select>
+                        </FormControl>)}
 
                 </DialogContent>
                 <DialogActions>

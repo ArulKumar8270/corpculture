@@ -7,7 +7,8 @@ const purchaseSchema = new mongoose.Schema({
         required: true,
     },
     productName: {
-        type: String,
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'VendorProduct', // Reference to the Product model
         required: true,
         trim: true,
     },
@@ -15,6 +16,11 @@ const purchaseSchema = new mongoose.Schema({
         type: String,
         required: true,
         trim: true,
+    },
+    category: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Category', // Reference to the Category model
+        required: true,
     },
     purchaseInvoiceNumber: {
         type: String,

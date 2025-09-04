@@ -243,18 +243,18 @@ const AdminRental
       }
     };
 
-    const handleInvoice = (rentalId, employeeName) => {
-      navigate(`../addRentalInvoice?employeeName=${employeeName}&invoiceType=invoice&rentalId=${rentalId}`);
+    const handleInvoice = (rentalId, employeeName, companyId) => {
+      navigate(`../addRentalInvoice?employeeName=${employeeName}&invoiceType=invoice&rentalId=${rentalId}&companyId=${companyId}`);
       handleClose();
     };
 
-    const handleQuotation = (rentalId, employeeName) => {
-      navigate(`../addRentalInvoice?employeeName=${employeeName}&invoiceType=quotation&rentalId=${rentalId}`);
+    const handleQuotation = (rentalId, employeeName, companyId) => {
+      navigate(`../addRentalInvoice?employeeName=${employeeName}&invoiceType=quotation&rentalId=${rentalId}&companyId=${companyId}`);
       handleClose();
     };
 
-    const handleReport = (rentalId, employeeName) => {
-      navigate(`../addRentalReport?employeeName=${employeeName}&reportType=rental&rentalId=${rentalId}`);
+    const handleReport = (rentalId, employeeName, companyId) => {
+      navigate(`../addRentalReport?employeeName=${employeeName}&reportType=rental&rentalId=${rentalId}&companyId=${companyId}`);
       handleClose();
     };
 
@@ -347,7 +347,7 @@ const AdminRental
             <thead>
               <tr className="bg-gradient-to-r from-[#019ee3] to-[#afcb09] text-white">
                 {hasPermission("rentalEnquiries") ? <th className="py-2 px-3 text-left">Action</th> : null}
-                <th className="py-2 px-3 text-left">Assigned To</th>
+                {/* <th className="py-2 px-3 text-left">Assigned To</th> */}
                 <th className="py-2 px-3 text-left">Assigned Employee</th>
                 <th className="py-2 px-3 text-left">Customer Type</th>
                 <th className="py-2 px-3 text-left">Phone</th>
@@ -399,14 +399,17 @@ const AdminRental
                         {/* <MenuItem onClick={() => handleEdit(currentRentalIdForMenu)}>
                         <EditIcon sx={{ mr: 1 }} /> Edit
                       </MenuItem> */}
-                        <MenuItem onClick={() => handleInvoice(enquiry._id, enquiry.employeeId)}>
+                        <MenuItem onClick={() => handleInvoice(enquiry._id, enquiry.employeeId, enquiry?.companyId)}>
                           <ReceiptIcon sx={{ mr: 1 }} /> Invoice
                         </MenuItem>
-                        <MenuItem onClick={() => handleQuotation(enquiry._id, enquiry.employeeId)}>
+                        <MenuItem onClick={() => handleQuotation(enquiry._id, enquiry.employeeId, enquiry?.companyId)}>
                           <DescriptionIcon sx={{ mr: 1 }} /> Quotation
                         </MenuItem>
-                        <MenuItem onClick={() => handleReport(enquiry._id, enquiry.employeeId)}>
+                        <MenuItem onClick={() => handleReport(enquiry._id, enquiry.employeeId, enquiry?.companyId)}>
                           <BarChartIcon sx={{ mr: 1 }} /> Report
+                        </MenuItem>
+                        <MenuItem onClick={() => handleMoveStatus(currentRentalIdForMenu, "Cancelled")}>
+                          <ArrowForwardIcon sx={{ mr: 1 }} /> Move To Unwanted Tab
                         </MenuItem>
                         {/* <MenuItem onClick={() => handleMoveStatus(currentRentalIdForMenu, "Cancelled")}>
                           <ArrowForwardIcon sx={{ mr: 1 }} /> Move To Unwanted Tab
@@ -422,7 +425,7 @@ const AdminRental
                         </MenuItem> */}
                       </Menu>
                     </td> : null}
-                    <td className="py-2 px-3">
+                    {/* <td className="py-2 px-3">
                       {enquiry.employeeId ? (
                         <Link
                           to={`/admin/employee_details/${enquiry.employeeId}`}
@@ -433,7 +436,7 @@ const AdminRental
                       ) : (
                         "Not Assigned"
                       )}
-                    </td>
+                    </td> */}
                     <td className="py-2 px-3">
                       {updatingRentalId === enquiry._id ? (
                         <Spinner size="sm" />
@@ -460,7 +463,7 @@ const AdminRental
                     <td className="py-2 px-3">{enquiry.email}</td>
                     <td className="py-2 px-3">{enquiry.address}</td>
                     <td className="py-2 px-3">{enquiry.location}</td>
-                    <td className="py-2 px-3">{enquiry.customerComplaint || "-"}</td>
+                    <td className="py-2 px-3">{enquiry.complaint || "-"}</td>
                     <td className="py-2 px-3">{enquiry.rentalType || "-"}</td>
                     <td className="py-2 px-3 text-left">{enquiry.rentalTitle || "-"}</td>
                     <td className="py-2 px-3 text-left">{enquiry.createdAt ? new Date(enquiry.createdAt).toLocaleDateString() : "-"}</td>

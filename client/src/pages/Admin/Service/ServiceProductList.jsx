@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
-import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Button, Typography } from '@mui/material';
+import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Button, Typography, TextField } from '@mui/material'; // Import TextField
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useAuth } from '../../../context/auth';
@@ -11,6 +11,7 @@ const ServiceProductList = () => {
     const { auth, userPermissions } = useAuth();
     const navigate = useNavigate();
     const [serviceProducts, setServiceProducts] = useState([]);
+    const [searchTerm, setSearchTerm] = useState(''); // New state for search term
 
     useEffect(() => {
         fetchServiceProducts();
@@ -59,6 +60,15 @@ const ServiceProductList = () => {
         }
     };
 
+    // Filter products based on search term
+    const filteredProducts = serviceProducts.filter(product => {
+        const companyName = product.company?.companyName?.toLowerCase() || '';
+        const productName = product.productName?.productName?.productName?.toLowerCase() || '';
+        const lowerCaseSearchTerm = searchTerm.toLowerCase();
+
+        return companyName.includes(lowerCaseSearchTerm) || productName.includes(lowerCaseSearchTerm);
+    });
+
     return (
         <div className="p-4">
             <div className="flex justify-between items-center mb-6">
@@ -72,6 +82,16 @@ const ServiceProductList = () => {
                     Add New Product
                 </Button> : null}
             </div>
+
+            {/* Search Input */}
+            <TextField
+                fullWidth
+                label="Search by Company or Product Name"
+                variant="outlined"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                sx={{ mb: 3 }}
+            />
 
             <Paper className="p-6 shadow-md">
                 <TableContainer>
@@ -91,12 +111,12 @@ const ServiceProductList = () => {
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {serviceProducts.length > 0 ? (
-                                serviceProducts.map((product, index) => (
+                            {filteredProducts.length > 0 ? ( // Use filteredProducts here
+                                filteredProducts.map((product, index) => (
                                     <TableRow key={product._id}>
                                         <TableCell>{index + 1}</TableCell>
                                         <TableCell>{product.company?.companyName || 'N/A'}</TableCell>
-                                        <TableCell>{product.productName}</TableCell>
+                                        <TableCell>{product.productName?.productName?.productName}</TableCell>
                                         <TableCell>{product.sku}</TableCell>
                                         <TableCell>{product.hsn}</TableCell>
                                         <TableCell>{product.quantity}</TableCell>

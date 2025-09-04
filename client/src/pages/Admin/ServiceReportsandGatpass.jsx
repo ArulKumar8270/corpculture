@@ -14,7 +14,8 @@ import {
     Tooltip,
     Button,
     Collapse, // Import Collapse for smooth animation
-    Chip
+    Chip,
+    TextField // Import TextField for search input
 } from '@mui/material';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import EditIcon from '@mui/icons-material/Edit';
@@ -33,7 +34,9 @@ const ServiceReportsandGatpass = (props) => {
     const [reports, setReports] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [onSendn8n, setOnSendn8n] = useState(false)
     const [expandedReportId, setExpandedReportId] = useState(null); // State to manage expanded row
+    const [searchTerm, setSearchTerm] = useState(''); // New state for search term
 
     const fetchReports = async () => {
         setLoading(true);
@@ -92,14 +95,33 @@ const ServiceReportsandGatpass = (props) => {
     };
 
     const handleSendQuotation = async (reportId, companyId) => {
+        setOnSendn8n(true)
         try {
-            const res = await axios.post('https://n8n.nicknameinfo.net/webhook/88ed0a9b-ee21-43e0-9684-f5c5859f9734', {reportId : reportId});
-            console.log('Webhook successfully triggered.', res);
+            const res = await axios.post('https://n8n.nicknameinfo.net/webhook/88ed0a9b-ee21-43e0-9684-f5c5859f9734', { reportId: reportId });
+            if (res) {
+                setOnSendn8n(false)
+            }
         } catch (webhookError) {
+            setOnSendn8n(false)
             console.error('Error triggering webhook:', webhookError);
-            toast.error('Failed to trigger webhook for external notification.');
         }
     };
+
+    // Filter reports based on search term
+    const filteredReports = reports.filter(report => {
+        const lowerCaseSearchTerm = searchTerm.toLowerCase();
+        const companyName = report.company?.companyName?.toLowerCase() || '';
+        const modelNo = report.modelNo?.toLowerCase() || '';
+        const branch = report.branch?.toLowerCase() || '';
+        const assignedToName = report.assignedTo?.name?.toLowerCase() || '';
+
+        return (
+            companyName.includes(lowerCaseSearchTerm) ||
+            modelNo.includes(lowerCaseSearchTerm) ||
+            branch.includes(lowerCaseSearchTerm) ||
+            assignedToName.includes(lowerCaseSearchTerm)
+        );
+    });
 
     if (loading) {
         return (
@@ -130,6 +152,15 @@ const ServiceReportsandGatpass = (props) => {
                     </Button>
                 </Typography> */}
             </div>
+            {/* Search Input */}
+            <TextField
+                fullWidth
+                label="Search by Company, Model No, Branch, or Assigned To"
+                variant="outlined"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                sx={{ mb: 3 }}
+            />
             <Paper elevation={3} sx={{ p: 2, borderRadius: '8px' }}>
                 <TableContainer>
                     <Table sx={{ minWidth: 650 }} aria-label="service reports table">
@@ -150,14 +181,14 @@ const ServiceReportsandGatpass = (props) => {
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {reports.length === 0 ? (
+                            {filteredReports.length === 0 ? ( // Use filteredReports here
                                 <TableRow>
-                                    <TableCell colSpan={9} align="center" sx={{ py: 3, color: 'text.secondary' }}>
+                                    <TableCell colSpan={12} align="center" sx={{ py: 3, color: 'text.secondary' }}>
                                         No service reports found.
                                     </TableCell>
                                 </TableRow>
                             ) : (
-                                reports.map((report, index) => (
+                                filteredReports.map((report, index) => ( // Use filteredReports here
                                     <React.Fragment key={report._id}>
                                         <TableRow>
                                             <TableCell>
@@ -192,7 +223,7 @@ const ServiceReportsandGatpass = (props) => {
                                                         onClick={() => handleSendQuotation(report._id, report.company?._id)}
                                                         color="success" // You can choose a different color
                                                     >
-                                                        <SendIcon />
+                                                        {onSendn8n ? <CircularProgress size={24} /> : <SendIcon />}
                                                     </IconButton>
                                                 </Tooltip>
                                                 <Tooltip title="Edit Report">
@@ -209,7 +240,7 @@ const ServiceReportsandGatpass = (props) => {
                                         </TableRow>
                                         {/* Expanded row for materials */}
                                         <TableRow>
-                                            <TableCell style={{ paddingBottom: 0, paddingTop: 0, width: "100%" }} colSpan={9}>
+                                            <TableCell style={{ paddingBottom: 0, paddingTop: 0, width: "100%" }} colSpan={12}> {/* Adjusted colspan */}
                                                 <Collapse in={expandedReportId === report._id} timeout="auto" unmountOnExit>
                                                     <Box sx={{ margin: 1 }}>
                                                         <Typography variant="h6" gutterBottom component="div">

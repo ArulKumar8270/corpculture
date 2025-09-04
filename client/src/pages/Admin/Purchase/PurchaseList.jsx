@@ -11,6 +11,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import SearchIcon from '@mui/icons-material/Search';
 import { useAuth } from '../../../context/auth';
+import dayjs from 'dayjs'; // Import dayjs
 
 const PurchaseList = () => {
     const navigate = useNavigate();
@@ -84,11 +85,20 @@ const PurchaseList = () => {
         setPage(0);
     };
 
-    const filteredPurchases = purchases.filter(purchase =>
-        purchase.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        purchase.purchaseInvoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        purchase.vendorCompanyName?.companyName.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredPurchases = purchases.filter(purchase => {
+        const lowerCaseSearchTerm = searchTerm.toLowerCase();
+        const productName = purchase?.productName?.productName?.toLowerCase() || '';
+        const invoiceNumber = purchase.purchaseInvoiceNumber?.toLowerCase() || '';
+        const vendorCompanyName = purchase.vendorCompanyName?.companyName?.toLowerCase() || '';
+        const purchaseDate = purchase.purchaseDate ? dayjs(purchase.purchaseDate).format('DD/MM/YYYY').toLowerCase() : ''; // Format date
+
+        return (
+            productName.includes(lowerCaseSearchTerm) ||
+            invoiceNumber.includes(lowerCaseSearchTerm) ||
+            vendorCompanyName.includes(lowerCaseSearchTerm) ||
+            purchaseDate.includes(lowerCaseSearchTerm) // Include purchase date in filter
+        );
+    });
 
     if (loading) {
         return (
@@ -110,7 +120,7 @@ const PurchaseList = () => {
         <div className="p-6 bg-gray-100 min-h-screen">
             <div className="flex justify-between items-center mb-6 w-[95%]">
                 <Typography variant="h5" className="font-semibold text-blue-600">
-                    Purchase List
+                    Materital List
                 </Typography>
                 {hasPermission("vendorPurchaseList") ? <Button
                     variant="contained"
@@ -124,7 +134,7 @@ const PurchaseList = () => {
             <Paper className="p-6 shadow-md w-[95%]" elevation={3}> {/* Increased elevation for a modern look */}
                 <div className="mb-4">
                     <TextField
-                        label="Search Purchases"
+                        label="Search Purchases (Product, Invoice, Vendor, Date)" // Updated label
                         variant="outlined"
                         size="small"
                         fullWidth
@@ -169,7 +179,7 @@ const PurchaseList = () => {
                                             <TableCell>{page * rowsPerPage + index + 1}</TableCell>
                                             <TableCell>{purchase.purchaseInvoiceNumber}</TableCell>
                                             <TableCell>{purchase.vendorCompanyName?.companyName}</TableCell>
-                                            <TableCell>{purchase.productName}</TableCell>
+                                            <TableCell>{purchase.productName?.productName}</TableCell> {/* Updated this line */}
                                             <TableCell>{new Date(purchase.purchaseDate).toLocaleDateString()}</TableCell>
                                             <TableCell align="right">{purchase.quantity}</TableCell>
                                             <TableCell align="right">{purchase.rate.toFixed(2)}</TableCell>

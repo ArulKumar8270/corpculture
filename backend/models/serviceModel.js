@@ -33,6 +33,10 @@ const serviceSchema = new mongoose.Schema({
         type: String,
         required: false
     },
+    companyId : {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Company'
+    },
     location: {
         type: String,
         required: false

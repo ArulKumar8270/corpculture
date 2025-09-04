@@ -5,6 +5,7 @@ import {
     getVendorProductById,
     updateVendorProduct,
     deleteVendorProduct,
+    getProductsByVendorId,
 } from "../controllers/vendorProduct/vendorProductController.js";
 // You might want to add authentication/authorization middleware here, e.g., isAdmin, requireSignIn
 // import { requireSignIn, isAdmin } from "../middleware/authMiddleware.js";
@@ -16,6 +17,8 @@ router.post("/", createVendorProduct); // Consider adding isAdmin middleware her
 
 // Get all Vendor Products
 router.get("/", getAllVendorProducts);
+
+router.get("/getProductsByVendorId/:vendorId?", getProductsByVendorId);
 
 // Get Vendor Product by ID
 router.get("/:id", getVendorProductById);

@@ -19,6 +19,7 @@ const ServiceSection = ({ services }) => {
       customerType: "",
       phone: "",
       companyName: "",
+      companyId : "",
       complaint: "",
       contactPerson: "",
       email: "",
@@ -43,6 +44,7 @@ const ServiceSection = ({ services }) => {
       customerType: "",
       phone: "",
       companyName: "",
+      companyId : "",
       complaint: "",
       contactPerson: "",
       email: "",
@@ -64,6 +66,7 @@ const ServiceSection = ({ services }) => {
     customerType: "",
     phone: "",
     companyName: "",
+    companyId : "",
     complaint: "",
     contactPerson: "",
     email: "",
@@ -105,6 +108,7 @@ const ServiceSection = ({ services }) => {
         ...prevForm,
         customerType: "", // Reset customer type
         companyName: "", // Reset company name
+        companyId : "",
         contactPerson: "", // Reset contact person
         email: "", // Reset email
         address: "", // Reset address
@@ -142,6 +146,7 @@ const ServiceSection = ({ services }) => {
         setForm(prevForm => ({
           ...prevForm,
           companyName: "",
+          companyId : "",
           contactPerson: "",
           email: "",
           address: "",
@@ -160,6 +165,7 @@ const ServiceSection = ({ services }) => {
       setForm(prevForm => ({
         ...prevForm,
         companyName: "",
+        companyId : "",
         contactPerson: "",
         email: "",
         address: "",
@@ -176,6 +182,7 @@ const ServiceSection = ({ services }) => {
       ...prevForm,
       customerType: "New", // Assuming a new service request for an existing company
       companyName: company.companyName || "",
+      companyId : company?._id,
       contactPerson: company.contactPersons?.[0]?.name || "", // Assuming first contact person
       email: company.contactPersons?.[0]?.email || "", // Assuming first contact person
       address: company.billingAddress || "", // Map billingAddress to form.address
@@ -251,6 +258,7 @@ const ServiceSection = ({ services }) => {
         customerType: "",
         phone: "",
         companyName: "",
+        companyId : "",
         complaint: "",
         contactPerson: "",
         email: "",

@@ -57,6 +57,30 @@ const AdminServices = () => {
     setCurrentServiceIdForMenu(null);
   };
 
+  const fetchAllServices = async () => {
+    try {
+      setLoading(true);
+      const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/service/${auth?.user?.role === 3 ? `assignedTo/${auth?.user?._id}` : "all"}`, {
+        headers: {
+          Authorization: auth.token,
+        },
+      });
+
+      if (data?.success) {
+        setAllServicesData(data.services);
+      } else {
+        setError(data?.message || 'Failed to fetch service enquiries.');
+        toast.error(data?.message || 'Failed to fetch service enquiries.');
+      }
+    } catch (err) {
+      console.error('Error fetching all service enquiries:', err);
+      setError('Something went wrong while fetching all service enquiries.');
+      toast.error('Something went wrong while fetching all service enquiries.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Fetch Employees (unchanged)
   useEffect(() => {
     const fetchEmployees = async () => {
@@ -83,30 +107,6 @@ const AdminServices = () => {
   }, [auth?.token]);
   // Fetch ALL Services initially
   useEffect(() => {
-    const fetchAllServices = async () => {
-      try {
-        setLoading(true);
-        const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/service/${auth?.user?.role === 3 ? `assignedTo/${auth?.user?._id}` : "all"}`, {
-          headers: {
-            Authorization: auth.token,
-          },
-        });
-
-        if (data?.success) {
-          setAllServicesData(data.services);
-        } else {
-          setError(data?.message || 'Failed to fetch service enquiries.');
-          toast.error(data?.message || 'Failed to fetch service enquiries.');
-        }
-      } catch (err) {
-        console.error('Error fetching all service enquiries:', err);
-        setError('Something went wrong while fetching all service enquiries.');
-        toast.error('Something went wrong while fetching all service enquiries.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
     if (auth?.token) {
       fetchAllServices();
     }
@@ -224,13 +224,7 @@ const AdminServices = () => {
         }
       );
       if (data?.success) {
-        toast.success(data.message || 'Status Updated successfully!');
-        // Update the status in allServicesData to trigger rerender
-        setAllServicesData(prevAllServices =>
-          prevAllServices.map(enquiry =>
-            enquiry._id === serviceId ? { ...enquiry, status } : enquiry
-          )
-        );
+        fetchAllServices()
       } else {
         toast.error(data?.message || 'Failed to Status Updated .');
       }
@@ -242,18 +236,18 @@ const AdminServices = () => {
     }
   };
 
-  const handleInvoice = (serviceId, employeeName) => {
-    navigate(`../addServiceInvoice?employeeName=${employeeName}&invoiceType=invoice&serviceId=${serviceId}`);
+  const handleInvoice = (serviceId, employeeName, companyId) => {
+    navigate(`../addServiceInvoice?employeeName=${employeeName}&invoiceType=invoice&serviceId=${serviceId}&companyId=${companyId}`);
     handleClose();
   };
 
-  const handleQuotation = (serviceId, employeeName) => {
-    navigate(`../addServiceInvoice?employeeName=${employeeName}&invoiceType=quotation&serviceId=${serviceId}`);
+  const handleQuotation = (serviceId, employeeName, companyId) => {
+    navigate(`../addServiceInvoice?employeeName=${employeeName}&invoiceType=quotation&serviceId=${serviceId}&companyId=${companyId}`);
     handleClose();
   };
 
-  const handleReport = (serviceId, employeeName) => {
-    navigate(`../addServiceReport?employeeName=${employeeName}&reportType=service&serviceId=${serviceId}`);
+  const handleReport = (serviceId, employeeName, companyId) => {
+    navigate(`../addServiceReport?employeeName=${employeeName}&reportType=service&serviceId=${serviceId}&companyId=${companyId}`);
     handleClose();
   };
 
@@ -339,6 +333,12 @@ const AdminServices = () => {
         >
           W&U ({tabCounts.w_u})
         </button> : null} */}
+        {/* {auth?.user?.role === 1 ? <button
+          className={`px-4 py-2 rounded-md text-sm font-medium ${activeTab === 'w_u' ? 'bg-[#019ee3] text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+          onClick={() => setActiveTab('w_u')}
+        >
+          W&U ({tabCounts.w_u})
+        </button> : null} */}
       </div>
 
       <div className="overflow-x-auto bg-white rounded-xl shadow p-4 w-[83%]">
@@ -346,7 +346,7 @@ const AdminServices = () => {
           <thead>
             <tr className="bg-gradient-to-r from-[#019ee3] to-[#afcb09] text-white">
               {hasPermission("serviceEnquiries") ? <th className="py-2 px-3 text-left">Action</th> : null}
-              <th className="py-2 px-3 text-left">Assigned To</th>
+              {/* <th className="py-2 px-3 text-left">Assigned To</th> */}
               <th className="py-2 px-3 text-left">Assigned Employee</th>
               <th className="py-2 px-3 text-left">Customer Type</th>
               <th className="py-2 px-3 text-left">Phone</th>
@@ -400,14 +400,17 @@ const AdminServices = () => {
                       {/* <MenuItem onClick={() => handleEdit(currentServiceIdForMenu)}>
                         <EditIcon sx={{ mr: 1 }} /> Edit
                       </MenuItem> */}
-                      <MenuItem onClick={() => handleInvoice(enquiry._id, enquiry.employeeId)}>
+                      <MenuItem onClick={() => handleInvoice(enquiry._id, enquiry.employeeId, enquiry?.companyId)}>
                         <ReceiptIcon sx={{ mr: 1 }} /> Invoice
                       </MenuItem>
-                      <MenuItem onClick={() => handleQuotation(enquiry._id, enquiry.employeeId)}>
+                      <MenuItem onClick={() => handleQuotation(enquiry._id, enquiry.employeeId, enquiry?.companyId)}>
                         <DescriptionIcon sx={{ mr: 1 }} /> Quotation
                       </MenuItem>
-                      <MenuItem onClick={() => handleReport(enquiry._id, enquiry.employeeId)}>
+                      <MenuItem onClick={() => handleReport(enquiry._id, enquiry.employeeId, enquiry?.companyId)}>
                         <BarChartIcon sx={{ mr: 1 }} /> Report
+                      </MenuItem>
+                      <MenuItem onClick={() => handleMoveStatus(currentServiceIdForMenu, "Cancelled")}>
+                        <ArrowForwardIcon sx={{ mr: 1 }} /> Move To Unwanted Tab
                       </MenuItem>
                       {/* <MenuItem onClick={() => handleMoveStatus(currentServiceIdForMenu, "Cancelled")}>
                         <ArrowForwardIcon sx={{ mr: 1 }} /> Move To Unwanted Tab
@@ -423,7 +426,7 @@ const AdminServices = () => {
                       </MenuItem> */}
                     </Menu>
                   </td> : null}
-                  <td className="py-2 px-3">
+                  {/* <td className="py-2 px-3">
                     {enquiry.employeeId ? (
                       <Link
                         to={`/admin/employee_details/${enquiry.employeeId}`}
@@ -434,7 +437,7 @@ const AdminServices = () => {
                     ) : (
                       "Not Assigned"
                     )}
-                  </td>
+                  </td> */}
                   <td className="py-2 px-3">
                     {updatingServiceId === enquiry._id ? (
                       <Spinner size="sm" />
@@ -469,7 +472,7 @@ const AdminServices = () => {
                       "-"
                     )}
                   </td>
-                  <td className="py-2 px-3">{enquiry.customerComplaint || "-"}</td>
+                  <td className="py-2 px-3">{enquiry.complaint || "-"}</td>
                   <td className="py-2 px-3">{enquiry.serviceType || "-"}</td>
                   <td className="py-2 px-3 text-left">{enquiry.serviceTitle || "-"}</td>
                   <td className="py-2 px-3">{enquiry.oldServiceId || "-"}</td> {/* Display Old Service ID */}

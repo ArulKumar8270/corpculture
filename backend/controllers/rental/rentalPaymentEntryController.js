@@ -13,7 +13,8 @@ export const createRentalPaymentEntry = async (req, res) => {
             countImageUpload,
             assignedTo,
             invoiceType,
-            rentalId
+            rentalId,
+            paymentAmount 
         } = req.body;
 
         // {{ edit_1 }}
@@ -56,6 +57,7 @@ export const createRentalPaymentEntry = async (req, res) => {
             a3Config, // These now include the new fields due to JSON.parse
             a4Config,
             a5Config,
+            paymentAmount
             // {{ edit_3 }}v
         });
 
@@ -284,6 +286,7 @@ export const updateRentalPaymentEntry = async (req, res) => {
             transferDate,
             companyNamePayment,
             otherPaymentMode,
+            paymentAmount,
             invoiceLink,
             invoiceType,
             staus
@@ -349,6 +352,7 @@ export const updateRentalPaymentEntry = async (req, res) => {
         if (pendingAmount) entry.pendingAmount = pendingAmount;
         if (tdsAmount) entry.tdsAmount = tdsAmount;
         if (paymentAmountType) entry.paymentAmountType = paymentAmountType;
+        if (paymentAmount) entry.paymentAmount = paymentAmount;
         entry.companyId = companyId || entry.companyId;
         entry.invoiceLink = invoiceLink || entry.invoiceLink;
         entry.invoiceType = invoiceType || entry.invoiceType;

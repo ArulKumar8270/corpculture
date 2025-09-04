@@ -27,7 +27,8 @@ const serviceInvoiceSchema = new mongoose.Schema({
                 required: true,
             },
             productName: { // Storing name for quick access, can be populated from productId
-                type: String,
+                type:  mongoose.Schema.Types.ObjectId,
+                ref: "Purchase",
                 required: true,
             },
             quantity: {
@@ -85,6 +86,10 @@ const serviceInvoiceSchema = new mongoose.Schema({
     otherPaymentMode: { // New field for 'OTHERS' payment mode
         type: String,
         trim: true,
+    },
+    paymentAmount : {
+        type: String,
+        trim: true
     },
     deliveryAddress: {
         type: String,

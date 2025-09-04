@@ -86,11 +86,11 @@ const AddServiceReport = () => {
 
                 // If reportId exists, fetch report details
                 if (reportId) {
-                    const reportResponse = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/report/${reportId}`, {
+                    const reportResponse = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/report/getById/${reportId}`, {
                         headers: { Authorization: auth?.token }
                     });
                     if (reportResponse.data.success) {
-                        const fetchedReport = reportResponse.data.reports?.[0];
+                        const fetchedReport = reportResponse.data.report;
                         setReportData({
                             reportType: fetchedReport.reportType || 'Service Report',
                             reportFor: fetchedReport.reportFor || 'service',

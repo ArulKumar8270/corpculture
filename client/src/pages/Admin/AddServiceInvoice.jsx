@@ -37,10 +37,11 @@ const AddServiceInvoice = () => {
     const employeeName = searchParams.get("employeeName");
     const invoiceType = searchParams.get("invoiceType");
     const serviceId = searchParams.get("serviceId");
+    const companyId = searchParams.get("companyId");
     const [invoices, setInvoices] = useState(null);
     // State for form fields
     const [invoiceData, setInvoiceData] = useState({
-        companyId: '', // Stores the _id of the selected company
+        companyId: companyId ? companyId : '', // Stores the _id of the selected company
         productId: '', // Stores the _id of the selected product for adding to table
         quantity: '', // Quantity for the product being added
         modeOfPayment: 'Cash',
@@ -58,9 +59,7 @@ const AddServiceInvoice = () => {
     const [companies, setCompanies] = useState([]);
     const [availableProducts, setAvailableProducts] = useState([]);
     const [loading, setLoading] = useState(true); // Loading state for initial data
-
-
-
+    
     useEffect(() => {
         fetchInvoicesCounts();
     }, [serviceId]);
@@ -506,6 +505,7 @@ const AddServiceInvoice = () => {
                                 onChange={(event, newValue) => {
                                     handleChange({ target: { name: 'companyId', value: newValue ? newValue._id : '' } });
                                 }}
+                                loading={loading} // Add loading prop
                                 renderInput={(params) => (
                                     <TextField
                                         {...params}
@@ -513,9 +513,18 @@ const AddServiceInvoice = () => {
                                         variant="outlined"
                                         size="small"
                                         required
+                                        InputProps={{ // Add InputProps to show loader
+                                            ...params.InputProps,
+                                            endAdornment: (
+                                                <>
+                                                    {loading ? <CircularProgress color="inherit" size={20} /> : null}
+                                                    {params.InputProps.endAdornment}
+                                                </>
+                                            ),
+                                        }}
                                     />
                                 )}
-                                disabled={!!invoiceId} // only disable in edit mode
+                                disabled={!!invoiceId || !!companyId} // only disable in edit mode
                             />
                         </FormControl>
                     </Grid>
@@ -525,18 +534,28 @@ const AddServiceInvoice = () => {
                             <Autocomplete
                                 id="productId-autocomplete"
                                 options={availableProducts}
-                                getOptionLabel={(option) => option.productName || ''}
+                                getOptionLabel={(option) => option.productName?.productName?.productName || ''}
                                 isOptionEqualToValue={(option, value) => option._id === value._id}
                                 value={availableProducts.find(prod => prod._id === invoiceData.productId) || null}
                                 onChange={(event, newValue) => {
                                     handleChange({ target: { name: 'productId', value: newValue ? newValue._id : '' } });
                                 }}
+                                loading={loading} // Add loading prop
                                 renderInput={(params) => (
                                     <TextField
                                         {...params}
                                         label="Product Name"
                                         variant="outlined"
                                         size="small"
+                                        InputProps={{ // Add InputProps to show loader
+                                            ...params.InputProps,
+                                            endAdornment: (
+                                                <>
+                                                    {loading ? <CircularProgress color="inherit" size={20} /> : null}
+                                                    {params.InputProps.endAdornment}
+                                                </>
+                                            ),
+                                        }}
                                     />
                                 )}
                                 disabled={!invoiceData.companyId || availableProducts.length === 0}
@@ -707,7 +726,7 @@ const AddServiceInvoice = () => {
                             productsInTable.map((product, index) => (
                                 <TableRow key={product.id}> {/* Use the unique 'id' as key */}
                                     <TableCell>{index + 1}</TableCell>
-                                    <TableCell>{product.productName}</TableCell>
+                                    <TableCell>{product.productName?.productName?.productName}</TableCell>
                                     <TableCell>{product.sku}</TableCell>
                                     <TableCell>{product.hsn}</TableCell>
                                     <TableCell align="right">{product.quantity}</TableCell>

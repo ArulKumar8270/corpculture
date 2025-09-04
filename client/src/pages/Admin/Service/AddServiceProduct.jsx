@@ -5,7 +5,9 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
     TextField, Button, Select, MenuItem, FormControl, InputLabel, Paper, Typography,
     Box, // Added for rendering multiple chips
-    Chip // Added for rendering multiple chips
+    Chip, // Added for rendering multiple chips
+    Autocomplete, // Added for searchable dropdown
+    CircularProgress // Added for loading indicator
 } from '@mui/material';
 import { useAuth } from '../../../context/auth';
 
@@ -15,7 +17,7 @@ const AddServiceProduct = () => {
     const product_id = searchParams.get('product_id');
     const { auth } = useAuth();
     const [company, setCompany] = useState('');
-    const [productName, setProductName] = useState('');
+    const [productName, setProductName] = useState(''); // This will now store the _id of the selected product
     const [sku, setSku] = useState('');
     const [hsn, setHsn] = useState('');
     const [quantity, setQuantity] = useState(1);
@@ -26,11 +28,15 @@ const AddServiceProduct = () => {
 
     const [companies, setCompanies] = useState([]);
     const [gstOptions, setGstOptions] = useState([]); // Stores GST types with their percentages
+    const [purchaseProducts, setPurchaseProducts] = useState([]); // New state for products from purchases API
+    const [loadingProducts, setLoadingProducts] = useState(false); // New state for product loading
+    const [loadingCompanies, setLoadingCompanies] = useState(false); // New state for company loading
 
     // Fetch companies and GST options on component mount
     useEffect(() => {
         fetchCompanies();
         fetchGstOptions();
+        fetchPurchaseProducts(); // Fetch purchase products on mount
     }, []);
 
     // Fetch product data if editing
@@ -46,6 +52,7 @@ const AddServiceProduct = () => {
     }, [quantity, rate, gstTypeIds, gstOptions]); // Depend on gstTypeIds (array)
 
     const fetchCompanies = async () => {
+        setLoadingCompanies(true); // Set loading to true
         try {
             // Replace with your actual API endpoint to fetch companies
             const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/company/all`, {
@@ -63,6 +70,8 @@ const AddServiceProduct = () => {
             toast.error('Something went wrong while fetching companies.');
             // Mock data for development if API is not ready
             setCompanies([]);
+        } finally {
+            setLoadingCompanies(false); // Set loading to false
         }
     };
 
@@ -82,13 +91,44 @@ const AddServiceProduct = () => {
         }
     };
 
+    // New function to fetch products from the purchases API
+    const fetchPurchaseProducts = async () => {
+        setLoadingProducts(true);
+        try {
+            const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/purchases`, {
+                headers: {
+                    Authorization: auth?.token,
+                },
+            });
+            if (data?.success) {
+                // Extract unique product names from purchases
+                // const uniqueProducts = [];
+                // const productIds = new Set();
+                // data.purchases.forEach(purchase => {
+                //     if (purchase.productName && !productIds.has(purchase._id)) {
+                //         uniqueProducts.push(purchase.productName);
+                //         productIds.add(purchase._id);
+                //     }
+                // });
+                setPurchaseProducts(data?.purchases);
+            } else {
+                toast.error(data?.message || 'Failed to fetch purchase products.');
+            }
+        } catch (error) {
+            console.error('Error fetching purchase products:', error);
+            toast.error('Something went wrong while fetching purchase products.');
+        } finally {
+            setLoadingProducts(false);
+        }
+    };
+
     const fetchProduct = async (productId) => {
         try {
             const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/service-products/${productId}`);
             if (data?.success) {
                 const product = data.serviceProduct;
                 setCompany(product.company._id); // Assuming company is populated
-                setProductName(product.productName);
+                setProductName(product.productName?._id || ''); // Set productName to the _id of the product
                 setSku(product.sku);
                 setHsn(product.hsn);
                 setQuantity(product.quantity);
@@ -136,7 +176,7 @@ const AddServiceProduct = () => {
         try {
             const productData = {
                 company,
-                productName,
+                productName, // productName is now the _id
                 sku,
                 hsn,
                 quantity: parseInt(quantity),
@@ -200,30 +240,66 @@ const AddServiceProduct = () => {
 
             <Paper className="p-6 shadow-md">
                 <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <FormControl fullWidth variant="outlined" size="small">
-                        <InputLabel id="company-label">Company</InputLabel>
-                        <Select
-                            labelId="company-label"
-                            value={company}
-                            onChange={(e) => setCompany(e.target.value)}
-                            displayEmpty
-                        >
-                            {companies.map((comp) => (
-                                <MenuItem key={comp._id} value={comp._id}>
-                                    {comp.companyName}
-                                </MenuItem>
-                            ))}
-                        </Select>
-                    </FormControl>
-
-                    <TextField
-                        label="Product Name"
-                        placeholder="Enter Product Name"
-                        value={productName}
-                        onChange={(e) => setProductName(e.target.value)}
+                    {/* Replaced FormControl with Autocomplete for Company */}
+                    <Autocomplete
+                        options={companies}
+                        getOptionLabel={(option) => option.companyName || ''}
+                        isOptionEqualToValue={(option, value) => option._id === value._id}
+                        value={companies.find(c => c._id === company) || null} // Find the object based on stored ID for display
+                        onChange={(event, newValue) => {
+                            setCompany(newValue ? newValue._id : ''); // Set the _id to state
+                        }}
+                        loading={loadingCompanies}
+                        renderInput={(params) => (
+                            <TextField
+                                {...params}
+                                label="Company"
+                                placeholder="Search Company"
+                                variant="outlined"
+                                size="small"
+                                InputProps={{
+                                    ...params.InputProps,
+                                    endAdornment: (
+                                        <>
+                                            {loadingCompanies ? <CircularProgress color="inherit" size={20} /> : null}
+                                            {params.InputProps.endAdornment}
+                                        </>
+                                    ),
+                                }}
+                            />
+                        )}
                         fullWidth
-                        variant="outlined"
-                        size="small"
+                    />
+
+                    {/* Replaced TextField with Autocomplete for Product Name */}
+                    <Autocomplete
+                        options={purchaseProducts}
+                        getOptionLabel={(option) => option?.productName?.productName || ''}
+                        isOptionEqualToValue={(option, value) => option._id === value._id}
+                        value={purchaseProducts.find(p => p._id === productName) || null} // Find the object based on stored ID for display
+                        onChange={(event, newValue) => {
+                            setProductName(newValue ? newValue._id : ''); // Set the _id to state
+                        }}
+                        loading={loadingProducts}
+                        renderInput={(params) => (
+                            <TextField
+                                {...params}
+                                label="Product Name"
+                                placeholder="Search Product Name"
+                                variant="outlined"
+                                size="small"
+                                InputProps={{
+                                    ...params.InputProps,
+                                    endAdornment: (
+                                        <>
+                                            {loadingProducts ? <CircularProgress color="inherit" size={20} /> : null}
+                                            {params.InputProps.endAdornment}
+                                        </>
+                                    ),
+                                }}
+                            />
+                        )}
+                        fullWidth
                     />
 
                     <TextField
