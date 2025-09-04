@@ -91,6 +91,10 @@ const rentalPaymentEntrySchema = new mongoose.Schema({
         type: String,
         trim: true,
     },
+    paymentAmount : {
+        type: String,
+        trim: true
+    },
     transferDate: {
         type: Date,
     },

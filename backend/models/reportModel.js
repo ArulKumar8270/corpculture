@@ -54,6 +54,10 @@ const reportSchema = new mongoose.Schema({
         ref: 'Company', // Reference to the Company model
         required: true,
     },
+    companyId : {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Company'
+    },
     problemReport: {
         type: String,
         required: true,

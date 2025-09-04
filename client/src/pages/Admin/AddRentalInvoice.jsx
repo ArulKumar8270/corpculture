@@ -25,6 +25,7 @@ const RentalInvoiceForm = () => {
     const employeeName = searchParams.get("employeeName");
     const invoiceType = searchParams.get("invoiceType");
     const rentalId = searchParams.get("rentalId");
+    const companyId = searchParams.get("companyId");
     const [loading, setLoading] = useState(true);
     const [companies, setCompanies] = useState([]);
     const [availableProducts, setAvailableProducts] = useState([]);
@@ -34,7 +35,7 @@ const RentalInvoiceForm = () => {
     const [invoices, setInvoices] = useState(null);
     // {{ edit_1 }}
     const [formData, setFormData] = useState({
-        companyId: '',
+        companyId: companyId ? companyId : '',
         machineId: '',
         sendDetailsTo: '',
         countImageFile: null,
@@ -592,6 +593,7 @@ const RentalInvoiceForm = () => {
                                 onChange={(event, newValue) => {
                                     handleChange({ target: { name: 'companyId', value: newValue ? newValue._id : '' } });
                                 }}
+                                loading={loading}
                                 renderInput={(params) => (
                                     <TextField
                                         {...params}
@@ -599,11 +601,20 @@ const RentalInvoiceForm = () => {
                                         variant="outlined"
                                         size="small"
                                         required
+                                        InputProps={{ // Add InputProps to show loader
+                                            ...params.InputProps,
+                                            endAdornment: (
+                                                <>
+                                                    {loading ? <CircularProgress color="inherit" size={20} /> : null}
+                                                    {params.InputProps.endAdornment}
+                                                </>
+                                            ),
+                                        }}
                                         error={!!errors.companyId}
                                         helperText={errors.companyId}
                                     />
                                 )}
-                                disabled={!!id} // Disable if in edit mode
+                                disabled={!!id || !!companyId} // Disable if in edit mode
                             />
                         </FormControl>
                         <FormControl fullWidth margin="normal" size="small" error={!!errors.machineId}>
@@ -616,6 +627,7 @@ const RentalInvoiceForm = () => {
                                 onChange={(event, newValue) => {
                                     handleProductChange(newValue); // Pass the selected object
                                 }}
+                                loading={loading}
                                 renderInput={(params) => (
                                     <TextField
                                         {...params}

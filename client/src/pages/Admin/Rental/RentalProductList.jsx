@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import {
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Button, Typography,
-    Select, MenuItem, FormControl, InputLabel // Added Select, MenuItem, FormControl, InputLabel
+    Select, MenuItem, FormControl, InputLabel, TextField // Added TextField
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -15,6 +15,7 @@ const RentalProductList = () => {
     const navigate = useNavigate();
     const [rentalProducts, setRentalProducts] = useState([]);
     const [employees, setEmployees] = useState([]); // New state for storing employee list
+    const [searchTerm, setSearchTerm] = useState(''); // New state for search term
     const { auth, userPermissions } = useAuth();
 
     useEffect(() => {
@@ -111,6 +112,22 @@ const RentalProductList = () => {
         }
     };
 
+    // Filter products based on search term
+    const filteredProducts = rentalProducts.filter(product => {
+        const companyName = product.company?.companyName?.toLowerCase() || '';
+        const modelName = product.modelName?.toLowerCase() || '';
+        const serialNo = product.serialNo?.toLowerCase() || '';
+        const paymentDate = product.paymentDate ? dayjs(product.paymentDate).format('DD/MM/YYYY').toLowerCase() : '';
+        const lowerCaseSearchTerm = searchTerm.toLowerCase();
+
+        return (
+            companyName.includes(lowerCaseSearchTerm) ||
+            modelName.includes(lowerCaseSearchTerm) ||
+            serialNo.includes(lowerCaseSearchTerm) ||
+            paymentDate.includes(lowerCaseSearchTerm)
+        );
+    });
+
     return (
         <div className="p-4">
             <div className="flex justify-between items-center mb-6">
@@ -124,6 +141,16 @@ const RentalProductList = () => {
                     Add New Rental Product
                 </Button> : null}
             </div>
+
+            {/* Search Input */}
+            <TextField
+                fullWidth
+                label="Search by Company, Model, Serial No, or Payment Date"
+                variant="outlined"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                sx={{ mb: 3 }}
+            />
 
             <Paper className="p-6 shadow-md">
                 <TableContainer>
@@ -144,8 +171,8 @@ const RentalProductList = () => {
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {rentalProducts.length > 0 ? (
-                                rentalProducts.map((product, index) => (
+                            {filteredProducts.length > 0 ? ( // Use filteredProducts here
+                                filteredProducts.map((product, index) => (
                                     <TableRow key={product._id}>
                                         <TableCell>{index + 1}</TableCell>
                                         <TableCell>{product.company?.companyName || 'N/A'}</TableCell>

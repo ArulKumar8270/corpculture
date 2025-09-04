@@ -54,11 +54,47 @@ export const uploadFileController = async (req, res) => {
             fileUrl: `https://pub-48d3e9677d09450a9113bb7bddbe02c8.r2.dev/${file?.name}`, // The public URL of the uploaded file on R2
         });
     } catch (error) {
-        console.error("File Upload Error: ", error);
+        console.error("File Upload Error: ", error); // Added console.error for debugging
         res.status(500).send({
             success: false,
             message: "Error uploading file.",
             error: error.message, // Provide the error message for debugging
+        });
+    }
+};
+
+/**
+ * Controller to handle file deletions from Cloudflare R2.
+ * This function expects the file name (key) to be provided in the request parameters.
+ */
+export const deleteFileController = async (req, res) => {
+    try {
+        const { fileName } = req.params; // Assuming fileName is passed as a URL parameter
+
+        if (!fileName) {
+            return res.status(400).send({
+                success: false,
+                message: "File name is required for deletion.",
+            });
+        }
+
+        const params = {
+            Bucket: process.env.CLOUDFLARE_BUCKET_NAME, // Your R2 bucket name
+            Key: fileName, // The name of the file to delete
+        };
+
+        await s3.deleteObject(params).promise();
+
+        res.status(200).send({
+            success: true,
+            message: `File '${fileName}' deleted successfully from R2.`,
+        });
+    } catch (error) {
+        console.error("File Deletion Error: ", error);
+        res.status(500).send({
+            success: false,
+            message: "Error deleting file.",
+            error: error.message,
         });
     }
 };

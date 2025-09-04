@@ -149,3 +149,39 @@ export const deleteVendorProduct = async (req, res) => {
         res.status(500).send({ success: false, message: 'Error in deleting vendor product', error });
     }
 };
+
+// Get Vendor Products by Vendor ID
+export const getProductsByVendorId = async (req, res) => {
+    try {
+        const { vendorId } = req.params;
+
+        if (!vendorId) {
+            return res.status(400).send({ success: false, message: 'Vendor ID is required.' });
+        }
+
+        const vendorProducts = await VendorProduct.find({ vendorCompanyName: vendorId })
+            .populate('vendorCompanyName', 'companyName')
+            .populate('gstType', 'gstType gstPercentage')
+            .sort({ createdAt: -1 });
+
+        if (!vendorProducts || vendorProducts.length === 0) {
+            return res.status(404).send({
+                success: false,
+                message: 'No products found for this vendor.'
+            });
+        }
+
+        res.status(200).send({
+            success: true,
+            message: 'Vendor products fetched successfully for the vendor',
+            vendorProducts
+        });
+    } catch (error) {
+        console.error("Error in getProductsByVendorId:", error);
+        res.status(500).send({
+            success: false,
+            message: 'Error in fetching vendor products by vendor ID',
+            error
+        });
+    }
+};

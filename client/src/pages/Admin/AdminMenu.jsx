@@ -142,7 +142,7 @@ const AdminMenu = ({ toggleMenu }) => {
                     rentalQuotationRes = await axios.post(quotationInvoiceUrl, { invoiceType: "quotation" }, config);
                 }
                 const rentalQuotationCount = rentalQuotationRes.data?.entries?.length;
-                
+
                 // Fetch Rental Reports count
                 const rentalReportUrl = `${import.meta.env.VITE_SERVER_URL}/api/v1/report/${auth?.user?.role === 3 ? `${auth?.user?._id}/rental` : "rental"}`;
                 const rentalReportRes = await axios.get(rentalReportUrl, config);
@@ -589,7 +589,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                                     </NavLink>
                                                 )}
                                                 <NavLink
-                                                    to="./RentalReportlist"
+                                                    to="./rentalReportlist"
                                                     onClick={scrollToTop}
                                                     className={({ isActive }) =>
                                                         `rounded-lg mx-2 my-1 transition-all ${isActive
@@ -685,7 +685,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                                         }
                                                     >
                                                         <div className="h-10 px-8 flex items-center">
-                                                            Purchase List
+                                                            Material List
                                                         </div>
                                                     </NavLink>
                                                 )}

@@ -65,6 +65,12 @@ export const getAllServiceProducts = async (req, res) => {
         const serviceProducts = await ServiceProduct.find({})
             .populate('company') // Populate company name
             .populate('gstType', 'gstType gstPercentage') // Populate GST details
+            .populate({ // Nested population for productName
+                path: 'productName', // First, populate the Purchase document
+                populate: {
+                    path: 'productName', // Then, populate the VendorProduct within the Purchase document
+                }
+            })
             .sort({ createdAt: -1 });
 
         res.status(200).send({ success: true, message: 'All Service Products fetched', serviceProducts });
@@ -80,7 +86,13 @@ export const getServiceProductById = async (req, res) => {
         const { id } = req.params;
         const serviceProduct = await ServiceProduct.findById(id)
             .populate('company', 'name')
-            .populate('gstType', 'gstType gstPercentage');
+            .populate('gstType', 'gstType gstPercentage')
+            .populate({ // Nested population for productName
+                path: 'productName', // First, populate the Purchase document
+                populate: {
+                    path: 'productName', // Then, populate the VendorProduct within the Purchase document
+                }
+            })
 
         if (!serviceProduct) {
             return res.status(404).send({ success: false, message: 'Service Product not found' });
@@ -104,6 +116,13 @@ export const getServiceProductsByCompany = async (req, res) => {
         const serviceProducts = await ServiceProduct.find({ company: companyId }) // Corrected query
             .populate('company', 'companyName') // Populate company name
             .populate('gstType', 'gstType gstPercentage') // Populate GST details
+            // .populate('productName', "productName")
+            .populate({ // Nested population for productName
+                path: 'productName', // First, populate the Purchase document
+                populate: {
+                    path: 'productName', // Then, populate the VendorProduct within the Purchase document
+                }
+            })
             .sort({ createdAt: -1 });
 
         if (!serviceProducts || serviceProducts.length === 0) {

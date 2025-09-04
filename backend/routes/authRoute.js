@@ -6,7 +6,7 @@ import { forgotPasswordController } from "../controllers/auth/forgotPassword.js"
 import { updateDetailsController } from "../controllers/auth/updateDetails.js";
 import { deactivateController } from "../controllers/auth/deactivateAccount.js";
 import { isAdmin, requireSignIn } from "../middleware/authMiddleware.js";
-import { uploadFileController } from "../controllers/auth/uploadController.js";
+import { deleteFileController, uploadFileController } from "../controllers/auth/uploadController.js";
 //router object
 const router = express.Router();
 
@@ -53,6 +53,10 @@ router.get('/all-users', isAdmin, getAllUsersController); // Add appropriate mid
 router.post(
     "/upload-file", // 'file' is the name of the field in your form data
     uploadFileController
+);
+router.post(
+    "/delete-file/:fileName", // 'file' is the name of the field in your form data
+    deleteFileController
 );
 
 export default router;

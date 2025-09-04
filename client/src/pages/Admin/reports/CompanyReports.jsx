@@ -16,7 +16,8 @@ import {
     FormControl,
     InputLabel,
     Select,
-    MenuItem
+    MenuItem,
+    TextField // Import TextField for search input
 } from '@mui/material';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
@@ -30,7 +31,6 @@ import {
     DialogTitle,
     DialogContent,
     DialogActions,
-    TextField,
     Autocomplete,
     Chip,
     Stack
@@ -42,6 +42,7 @@ const CompanyReports = () => {
     const [companies, setCompanies] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [searchTerm, setSearchTerm] = useState(''); // New state for search term
 
     // State for the Reminder Modal
     const [openReminderModal, setOpenReminderModal] = useState(false);
@@ -216,6 +217,18 @@ const CompanyReports = () => {
         handleOpenReminderModal(companyId, type);
     };
 
+    // Filter companies based on search term
+    const filteredCompanies = companies.filter(company => {
+        const lowerCaseSearchTerm = searchTerm.toLowerCase();
+        const companyName = company.companyName?.toLowerCase() || '';
+        const mobileNumber = company.mobileNumber?.toLowerCase() || '';
+
+        return (
+            companyName.includes(lowerCaseSearchTerm) ||
+            mobileNumber.includes(lowerCaseSearchTerm)
+        );
+    });
+
     if (loading) {
         return (
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '80vh' }}>
@@ -238,6 +251,15 @@ const CompanyReports = () => {
             <Typography variant="h5" component="h1" gutterBottom sx={{ mb: 3, color: '#019ee3', fontWeight: 'bold' }}>
                 Company Reports
             </Typography>
+            {/* Search Input */}
+            <TextField
+                fullWidth
+                label="Search by Company Name or Mobile Number"
+                variant="outlined"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                sx={{ mb: 3 }}
+            />
             <Paper elevation={3} sx={{ p: 2, borderRadius: '8px' }}>
                 <TableContainer>
                     <Table sx={{ minWidth: 1000 }} aria-label="company reports table">
@@ -256,14 +278,14 @@ const CompanyReports = () => {
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {companies.length === 0 ? (
+                            {filteredCompanies.length === 0 ? ( // Use filteredCompanies here
                                 <TableRow>
                                     <TableCell colSpan={11} align="center" sx={{ py: 3, color: 'text.secondary' }}>
                                         No company data found.
                                     </TableCell>
                                 </TableRow>
                             ) : (
-                                companies.map((company) => (
+                                filteredCompanies.map((company) => ( // Use filteredCompanies here
                                     <TableRow key={company._id}>
                                         <TableCell>{company.companyName}</TableCell>
                                         <TableCell>{company.companyAddress}</TableCell>

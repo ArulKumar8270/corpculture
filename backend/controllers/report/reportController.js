@@ -88,7 +88,10 @@ export const getAllReports = async (req, res) => {
         const { reportType, assignedTo } = req.params;
         let query = {};
         if (reportType && assignedTo) {
-            query = { reportType, assignedTo };
+            query = { assignedTo, reportFor: reportType };
+        }
+        if (reportType) {
+            query = { reportFor: reportType };
         }
         const reports = await Report.find(query)
             .populate('company') // Populate company details

@@ -105,7 +105,7 @@ const AdminDashboard = () => {
                             <Route path="vendorProductList" element={<VendorProductList />} />
                             <Route path="addVendorProduct" element={<AddVendorProduct />} />
                             <Route path="purchaseList" element={<PurchaseList />} />
-                            <Route path="purchaseRegister" element={<PurchaseRegister />} />
+                            <Route path="purchaseRegister/:id?" element={<PurchaseRegister />} />
                             <Route path="all-category" element={<AllCategories />} />
                             <Route path="companyList" element={<CompanyList />} />
                             <Route path="addCompany/:companyId?" element={<AddCompany />} />
@@ -116,7 +116,7 @@ const AdminDashboard = () => {
                             <Route path="serviceQuotationList" element={<ServiceInvoiceList invoice={"quotation"} />} />
                             <Route path="addServiceReport/:id?" element={<AddServiceReport />} />
                             <Route path="serviceReportlist" element={<ServiceReportsandGatpass reportType={"service"}/>} />
-                            <Route path="RentalReportlist" element={<ServiceReportsandGatpass reportType={"rental"}/>} />
+                            <Route path="rentalReportlist" element={<ServiceReportsandGatpass reportType={"rental"}/>} />
                             <Route path="addRentalInvoice/:id?" element={<AddRentalInvoice />} />
                             <Route path="rentalInvoiceList" element={<RentalInvoiceList invoice={"invoice"}/>} />
                             <Route path="rentalQuotationList" element={<RentalInvoiceList invoice={"quotation"}/>} />

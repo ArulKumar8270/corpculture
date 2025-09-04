@@ -1,20 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { Typography, Paper, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
+import { Typography, Paper, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField } from '@mui/material'; // Import TextField
 import { useNavigate } from 'react-router-dom';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
-import toast from 'react-hot-toast'; // Assuming you have react-hot-toast for notifications
+import toast from 'react-hot-toast';
 import axios from 'axios';
 import { useAuth } from '../../../context/auth';
 
 const VendorList = () => {
     const navigate = useNavigate();
     const [vendors, setVendors] = useState([]);
+    const [searchTerm, setSearchTerm] = useState(''); // New state for search term
     const { auth, userPermissions } = useAuth();
 
     useEffect(() => {
-        // In a real application, you would fetch data from an API here.
-        // For now, we'll use sample data.
         fetchVendors();
     }, []);
 
@@ -24,7 +23,6 @@ const VendorList = () => {
 
     const fetchVendors = async () => {
         try {
-            // Simulate API call
             const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/vendors`);
             if (data?.success && data.vendors.length > 0) {
                 setVendors(data.vendors);
@@ -35,7 +33,7 @@ const VendorList = () => {
         } catch (error) {
             console.error('Error fetching vendors:', error);
             toast.error('Something went wrong while fetching vendors. Displaying sample data.');
-            setVendors([]); // Fallback to sample data on error
+            setVendors([]);
         }
     };
 
@@ -44,7 +42,6 @@ const VendorList = () => {
     };
 
     const handleEdit = (vendorId) => {
-        // Implement navigation to an edit page for the vendor
         navigate(`../addVendor?vendor_id=${vendorId}`);
         toast.info(`Editing vendor with ID: ${vendorId}`);
     };
@@ -52,7 +49,6 @@ const VendorList = () => {
     const handleDelete = async (vendorId) => {
         if (window.confirm('Are you sure you want to delete this vendor?')) {
             try {
-                // Simulate API call for deletion
                 const { data } = await axios.delete(`${import.meta.env.VITE_SERVER_URL}/api/v1/vendors/${vendorId}`);
                 if (data?.success) {
                     toast.success(data.message || 'Vendor deleted successfully!');
@@ -60,14 +56,31 @@ const VendorList = () => {
                 } else {
                     toast.error(data?.message || 'Failed to delete vendor.');
                 }
-                toast.success(`Vendor with ID: ${vendorId} deleted successfully (simulated)!`);
-                setVendors(vendors.filter(vendor => vendor._id !== vendorId)); // Remove from local state
+                // The line below is redundant if fetchVendors() is called, as it will refresh the state from the server.
+                // toast.success(`Vendor with ID: ${vendorId} deleted successfully (simulated)!`);
+                // setVendors(vendors.filter(vendor => vendor._id !== vendorId));
             } catch (error) {
                 console.error('Error deleting vendor:', error);
-                toast.error('Something went wrong while deleting the vendor (simulated).');
+                toast.error('Something went wrong while deleting the vendor.');
             }
         }
     };
+
+    // Filter vendors based on search term
+    const filteredVendors = vendors.filter(vendor => {
+        const lowerCaseSearchTerm = searchTerm.toLowerCase();
+        const companyName = vendor.companyName?.toLowerCase() || '';
+        const mobileNumber = vendor.mobileNumber?.toLowerCase() || '';
+        const personName = vendor.personName?.toLowerCase() || '';
+        const mailId = vendor.mailId?.toLowerCase() || '';
+
+        return (
+            companyName.includes(lowerCaseSearchTerm) ||
+            mobileNumber.includes(lowerCaseSearchTerm) ||
+            personName.includes(lowerCaseSearchTerm) ||
+            mailId.includes(lowerCaseSearchTerm)
+        );
+    });
 
     return (
         <div className="p-6 bg-gray-100 min-h-screen">
@@ -83,6 +96,16 @@ const VendorList = () => {
                     Add New Vendor
                 </Button> : null}
             </div>
+
+            {/* Search Input */}
+            <TextField
+                fullWidth
+                label="Search by Company, Mobile, Person Name, or Mail ID"
+                variant="outlined"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                sx={{ mb: 3 }}
+            />
 
             <Paper className="p-6 shadow-md">
                 <TableContainer>
@@ -100,8 +123,8 @@ const VendorList = () => {
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {vendors.length > 0 ? (
-                                vendors.map((vendor, index) => (
+                            {filteredVendors.length > 0 ? ( // Use filteredVendors here
+                                filteredVendors.map((vendor, index) => ( // Use filteredVendors here
                                     <TableRow key={vendor._id}>
                                         <TableCell>{index + 1}</TableCell>
                                         <TableCell>{vendor.companyName}</TableCell>

@@ -7,7 +7,8 @@ export const createPurchase = async (req, res) => {
     try {
         const {
             vendorCompanyName, productName, voucherType, purchaseInvoiceNumber, gstinUn, narration,
-            gstType, purchaseDate, quantity, rate, freightCharges, price, grossTotal, roundOff
+            gstType, purchaseDate, quantity, rate, freightCharges, price, grossTotal, roundOff,
+            category,
         } = req.body;
 
         // Validation
@@ -68,6 +69,7 @@ export const createPurchase = async (req, res) => {
             price: parseFloat(price),
             grossTotal: parseFloat(grossTotal),
             roundOff: roundOff !== undefined ? parseFloat(roundOff) : 0,
+            category: category,
         });
 
         await newPurchase.save();
@@ -84,6 +86,8 @@ export const getAllPurchases = async (req, res) => {
         const purchases = await Purchase.find({})
             .populate('vendorCompanyName', 'companyName') // Populate vendor company name
             .populate('gstType', 'gstType gstPercentage') // Populate GST details
+            .populate('productName') // Populate GST details
+            .populate('category') // Populate GST details
             .sort({ createdAt: -1 });
 
         res.status(200).send({ success: true, message: 'All Purchases fetched', purchases });
@@ -98,8 +102,10 @@ export const getPurchaseById = async (req, res) => {
     try {
         const { id } = req.params;
         const purchase = await Purchase.findById(id)
-            .populate('vendorCompanyName', 'companyName')
-            .populate('gstType', 'gstType gstPercentage');
+            .populate('vendorCompanyName')
+            .populate('gstType', 'gstType gstPercentage')
+            .populate('productName') // Populate GST details
+            .populate('category') // Populate GST details
 
         if (!purchase) {
             return res.status(404).send({ success: false, message: 'Purchase not found' });
@@ -117,7 +123,8 @@ export const updatePurchase = async (req, res) => {
         const { id } = req.params;
         const {
             vendorCompanyName, productName, voucherType, purchaseInvoiceNumber, gstinUn, narration,
-            gstType, purchaseDate, quantity, rate, freightCharges, price, grossTotal, roundOff
+            gstType, purchaseDate, quantity, rate, freightCharges, price, grossTotal, roundOff,
+            category
         } = req.body;
 
         // Basic Validation for update
@@ -180,6 +187,7 @@ export const updatePurchase = async (req, res) => {
                 price: parseFloat(price),
                 grossTotal: parseFloat(grossTotal),
                 roundOff: roundOff !== undefined ? parseFloat(roundOff) : 0,
+                category: category
             },
             { new: true, runValidators: true }
         );

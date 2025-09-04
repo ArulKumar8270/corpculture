@@ -33,6 +33,7 @@ import UploadFileIcon from '@mui/icons-material/UploadFile';
 import LinkIcon from '@mui/icons-material/Link'; // Import LinkIcon
 import Stack from '@mui/material/Stack'; // Import Stack for layout
 import Chip from '@mui/material/Chip'; // Import Chip for assignedTo UI
+import DeleteIcon from '@mui/icons-material/Delete'; // Import DeleteIcon
 
 // Row component for each invoice, allowing expansion to show products
 function InvoiceRow(props) {
@@ -41,9 +42,12 @@ function InvoiceRow(props) {
     const [open, setOpen] = useState(false);
     const [openPaymentModal, setOpenPaymentModal] = useState(false); // State for payment modal
     const [loading, setLoading] = useState(false);
+    const [deletingLink, setDeletingLink] = useState(false); // New state for link deletion loading
     const [companyPendingInvoice, setCompanyPendingInvoice] = useState([])
     const [selectedInvliceId, setSelectedInvliceId] = useState(null)
     const [balanceAmount, setBalanceAmount] = useState(0)
+    const [pendingAmount, setPendingAmount] = useState(0)
+    const [isInvoiceSend, setInvoiceSend] = useState(false)
     const [paymentForm, setPaymentForm] = useState({ // State for payment form data
         modeOfPayment: invoice.modeOfPayment || '',
         bankName: invoice.bankName || '',
@@ -149,30 +153,37 @@ function InvoiceRow(props) {
         const { name, value } = e.target;
         setPaymentForm(prev => ({ ...prev, [name]: value }));
 
-        if (name === "paymentAmount" && value > invoice?.grandTotal) {
-            let balanceAmount = value - invoice?.grandTotal;
-            setBalanceAmount(balanceAmount)
-            try {
-                let response = await axios.post(
-                    `${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/all`,
-                    { companyId: invoice?.companyId, tdsAmount: { $eq: null }, status: { $ne: "Paid" } }, // Send invoiceType in the request body
-                    {
-                        headers: {
-                            Authorization: auth.token,
-                        },
-                    }
-                );
-                setCompanyPendingInvoice(response.data?.serviceInvoices)
-            } catch (err) {
-                console.log(err, "Api error")
+        if (name === "paymentAmount") {
+            if (value < invoice?.grandTotal) {
+                let balanceAmount = invoice?.grandTotal - value;
+                setPendingAmount(balanceAmount)
+                setBalanceAmount(0)
+            } else {
+                let balanceAmount = value - invoice?.grandTotal;
+                setBalanceAmount(balanceAmount)
+                setPendingAmount(0)
+                try {
+                    let response = await axios.post(
+                        `${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/all`,
+                        { companyId: invoice?.companyId, tdsAmount: { $eq: null }, status: { $ne: "Paid" } }, // Send invoiceType in the request body
+                        {
+                            headers: {
+                                Authorization: auth.token,
+                            },
+                        }
+                    );
+                    setCompanyPendingInvoice(response.data?.serviceInvoices)
+                } catch (err) {
+                    console.log(err, "Api error")
+                }
             }
+
         }
 
     };
 
     const handleSavePaymentDetails = async (balanceAmount, tsdBalance) => {
         try {
-            let amountCheck = paymentForm.paymentAmount >= paymentForm?.grandTotal
             const payload = {
                 modeOfPayment: paymentForm.modeOfPayment,
                 bankName: paymentForm.bankName,
@@ -182,6 +193,7 @@ function InvoiceRow(props) {
                 companyNamePayment: paymentForm.companyNamePayment,
                 otherPaymentMode: paymentForm.otherPaymentMode,
                 paymentAmountType: paymentForm.paymentAmountType,
+                paymentAmount: paymentForm?.paymentAmount,
                 tdsAmount: 0, // Default to 0, will be updated if type is TDS
                 pendingAmount: 0, // Default to 0, will be updated if type is Pending
                 status: balanceAmount >= paymentForm?.grandTotal || paymentForm.paymentAmount >= paymentForm?.grandTotal || paymentForm.paymentAmountType === 'TDS' ? "Paid" : "Unpaid",
@@ -189,9 +201,9 @@ function InvoiceRow(props) {
 
             // Conditionally set tdsAmount or pendingAmount based on selected type
             if (paymentForm.paymentAmountType === 'TDS') {
-                payload.tdsAmount = balanceAmount ? balanceAmount : amountCheck ? paymentForm?.grandTotal : parseFloat(paymentForm.paymentAmount) || 0;
+                payload.tdsAmount = pendingAmount || 0;
             } else if (paymentForm.paymentAmountType === 'Pending') {
-                payload.pendingAmount = balanceAmount ? balanceAmount : amountCheck ? paymentForm?.grandTotal : parseFloat(paymentForm.paymentAmount) || 0;
+                payload.pendingAmount = pendingAmount || 0;
             }
 
             const res = await axios.put(
@@ -262,14 +274,59 @@ function InvoiceRow(props) {
     }
 
     const onSendInvoice = async (invoice) => {
+        setInvoiceSend(true)
         try {
             const res = await axios.post('https://n8n.nicknameinfo.net/webhook/f8d3ad37-a38e-4a38-a06e-09c74fdc3b91', { invoiceId: invoice?._id });
-            console.log('Webhook successfully triggered.', res);
+            if (res) {
+                setInvoiceSend(false)
+            }
         } catch (webhookError) {
+            setInvoiceSend(false)
             console.error('Error triggering webhook:', webhookError);
             toast.error('Failed to trigger webhook for external notification.');
         }
     }
+
+    const handleDeleteInvoiceLink = async (invoiceId, linkToDelete) => {
+        if (!window.confirm("Are you sure you want to delete this invoice link?")) {
+            return;
+        }
+        const fileName = linkToDelete.split("/").pop();
+        const res = await axios.post(
+            `${import.meta.env.VITE_SERVER_URL}/api/v1/auth/delete-file/${fileName}`,
+            {
+                headers: {
+                    Authorization: auth?.token
+                },
+            }
+        );
+        try {
+            setDeletingLink(true);
+            const updatedLinks = invoice.invoiceLink.filter(link => link !== linkToDelete);
+
+            const res = await axios.put(
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/update/${invoiceId}`,
+                {
+                    invoiceLink: updatedLinks,
+                },
+                {
+                    headers: {
+                        Authorization: auth.token,
+                    },
+                }
+            );
+
+            if (res.data?.success) {
+                props.onInvoiceUpdate(); // Refresh the list
+            } else {
+                toast.error(res.data?.message || 'Failed to delete invoice link.');
+            }
+        } catch (error) {
+            toast.error('Error deleting invoice link.');
+        } finally {
+            setDeletingLink(false);
+        }
+    };
 
     return (
         <>
@@ -290,7 +347,25 @@ function InvoiceRow(props) {
                 <TableCell>{invoice.modeOfPayment}</TableCell>
                 <TableCell>{invoice.deliveryAddress}</TableCell>
                 <TableCell align="right">{invoice.grandTotal.toFixed(2)}</TableCell>
-                <TableCell>{invoice.status}</TableCell>
+                <TableCell>
+                    <Chip
+                        label={invoice.status}
+                        size="small"
+                        color={
+                            invoice.status === 'Paid' ? 'success' :
+                                invoice.status === 'Unpaid' ? 'error' :
+                                    invoice.status === 'Pending' || invoice.status === 'Progress' ? 'warning' :
+                                        'default'
+                        }
+                    />
+                    {invoice?.invoiceLink?.length <= 0 ? <Chip
+                        label={"Invoice Upload Pending"}
+                        size="small"
+                        color={"error"}
+                        className='mt-2'
+                    /> : null}
+                </TableCell>
+                {/* <TableCell>{invoice.status}</TableCell> */}
                 <TableCell>{new Date(invoice.invoiceDate).toLocaleDateString()}</TableCell>
                 <TableCell>
                     {invoice?.assignedTo ? (
@@ -301,7 +376,7 @@ function InvoiceRow(props) {
                 </TableCell>
                 <TableCell>
                     {hasPermission("serviceInvoice") ? <Button variant="outlined" size="small" sx={{ mr: 1 }} onClick={handleEdit}>Edit</Button> : null}
-                    <Button variant="outlined" size="small" sx={{ my: 1 }} onClick={() => onSendInvoice(invoice)}>Send {invoiceType === "quotation" ? "Quotaion" : "Invoice"}</Button>
+                    <Button variant="outlined" size="small" sx={{ my: 1 }} onClick={() => onSendInvoice(invoice)} > {isInvoiceSend ? <CircularProgress size={24} /> : `Send ${invoiceType === "quotation" ? "Quotaion" : "Invoice"}`}</Button>
                     {invoiceType === "quotation" ? <Button variant="outlined" size="small" sx={{ my: 1 }} onClick={() => onMoveToInvoice("invoice")}>Move to invoice</Button>
                         : null}
                     {!invoice?.tdsAmount && invoiceType !== "quotation" ? <Button variant="outlined" size="small" sx={{ my: 1 }} onClick={handleOpenPaymentDetailsModal}>Update Payment Details</Button> : null}
@@ -326,18 +401,29 @@ function InvoiceRow(props) {
                             <Stack direction="row" spacing={1} flexWrap="wrap"> {/* Use Stack for layout */}
                                 {
                                     invoice.invoiceLink?.map((link, index) => (
-                                        <Button
-                                            key={index}
-                                            variant="outlined"
-                                            size="small"
-                                            startIcon={<LinkIcon />}
-                                            href={link}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            sx={{ my: 0.5 }} // Add some vertical margin for wrapping
-                                        >
-                                            Invoice {index + 1}
-                                        </Button>
+                                        <Box key={index} sx={{ display: 'flex', alignItems: 'center', my: 0.5 }}>
+                                            <Button
+                                                variant="outlined"
+                                                size="small"
+                                                startIcon={<LinkIcon />}
+                                                href={link}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                            >
+                                                Invoice {index + 1}
+                                            </Button>
+                                            {hasPermission("serviceInvoice") && ( // Only show delete if user has permission
+                                                <IconButton
+                                                    aria-label={`delete invoice link ${index + 1}`}
+                                                    size="small"
+                                                    onClick={() => handleDeleteInvoiceLink(invoice._id, link)}
+                                                    disabled={deletingLink} // Disable during deletion
+                                                    sx={{ ml: 0.5 }}
+                                                >
+                                                    {deletingLink ? <CircularProgress size={16} /> : <DeleteIcon fontSize="small" />}
+                                                </IconButton>
+                                            )}
+                                        </Box>
                                     ))
                                 }
                             </Stack>
@@ -367,7 +453,7 @@ function InvoiceRow(props) {
                                     {invoice.products.map((product) => (
                                         <TableRow key={product.productId._id || product._id}>
                                             <TableCell component="th" scope="row">
-                                                {product.productId?.productName || product.productName}
+                                                {product.productId?.productName?.productName?.productName || product.productName}
                                             </TableCell>
                                             <TableCell>{product.productId?.sku || 'N/A'}</TableCell>
                                             <TableCell>{product.productId?.hsn || 'N/A'}</TableCell>
@@ -534,8 +620,44 @@ function InvoiceRow(props) {
                             size="small"
                         />
                     )}
+                    {/* New: Single Amount Field, shown only if a type is selected */}
+                    <TextField
+                        fullWidth
+                        margin="normal"
+                        label={`Amount`}
+                        name="paymentAmount"
+                        type="number"
+                        value={paymentForm.paymentAmount}
+                        onChange={handlePaymentFormChange}
+                        size="small"
+                    />
+
+                    {companyPendingInvoice?.length > 0 && balanceAmount > 0 &&
+                        <>
+                            <p>Previous Invoice Balance - Rs {balanceAmount.toFixed(2)}</p>
+                            <FormControl fullWidth margin="normal" size="small">
+                                <InputLabel id="mode-of-payment-label">Select Pending Invoice</InputLabel>
+                                <Select
+                                    labelId="mode-of-payment-label"
+                                    id="selectedInvliceId"
+                                    name="selectedInvliceId"
+                                    value={selectedInvliceId}
+                                    onChange={(e) => setSelectedInvliceId(e.target.value)}
+                                    label="Mode Of Payment"
+                                >
+                                    <MenuItem value="">--select Payment Mode--</MenuItem>
+                                    {companyPendingInvoice
+                                        ?.filter(pendingInv => pendingInv._id !== invoice._id) // Filter out the current invoice
+                                        .map((pendingInv) => {
+                                            return <MenuItem key={pendingInv._id} value={pendingInv._id}>{new Date(pendingInv.invoiceDate).toLocaleDateString() + " - Rs " + pendingInv?.grandTotal}</MenuItem>
+                                        })}
+                                </Select>
+                            </FormControl>
+                        </>
+                    }
+
                     {/* New: Amount Type Selector */}
-                    {paymentForm.modeOfPayment && (
+                    {pendingAmount > 0 && (
                         <FormControl fullWidth margin="normal" size="small">
                             <InputLabel id="payment-amount-type-label">Amount Type</InputLabel>
                             <Select
@@ -552,42 +674,7 @@ function InvoiceRow(props) {
                             </Select>
                         </FormControl>)}
 
-                    {/* New: Single Amount Field, shown only if a type is selected */}
-                    {paymentForm.paymentAmountType && (
-                        <TextField
-                            fullWidth
-                            margin="normal"
-                            label={`${paymentForm.paymentAmountType} Amount`}
-                            name="paymentAmount"
-                            type="number"
-                            value={paymentForm.paymentAmount}
-                            onChange={handlePaymentFormChange}
-                            size="small"
-                        />
-                    )}
 
-                    {companyPendingInvoice?.length > 0 &&
-                        <>
-                            <p>Previous Invoice Balance - Rs {balanceAmount}</p>
-                            <FormControl fullWidth margin="normal" size="small">
-                                <InputLabel id="mode-of-payment-label">Select Pending Invoice</InputLabel>
-                                <Select
-                                    labelId="mode-of-payment-label"
-                                    id="selectedInvliceId"
-                                    name="selectedInvliceId"
-                                    value={selectedInvliceId}
-                                    onChange={(e) => setSelectedInvliceId(e.target.value)}
-                                    label="Mode Of Payment"
-                                >
-                                    <MenuItem value="">--select Payment Mode--</MenuItem>
-                                    {companyPendingInvoice?.map((invoice) => {
-                                        return <MenuItem key={invoice._id} value={invoice._id}>{new Date(invoice.invoiceDate).toLocaleDateString() + " - Rs " + invoice?.grandTotal}</MenuItem>
-                                    })}
-                                </Select>
-                            </FormControl>
-                        </>
-
-                    }
                     {/* For CASH, no specific additional fields are added here */}
 
                 </DialogContent>
