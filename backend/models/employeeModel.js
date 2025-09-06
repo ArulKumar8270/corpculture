@@ -16,6 +16,12 @@ const employeeSchema = new mongoose.Schema(
             type: String,
             required: true,
         },
+        designation: {
+            type: String,
+        },
+        idCradNo: {
+            type: String,
+        },  
         phone: {
             type: String,
             required: true,
@@ -27,7 +33,7 @@ const employeeSchema = new mongoose.Schema(
         employeeType: {
             type: String,
             required: true,
-            enum: ['Service', 'Sales', "Rentals", "Admin"], // Restrict values to 'Service' or 'Sales'
+            enum: ['Service', 'Sales', "Rentals"], // Restrict values to 'Service' or 'Sales'
         },
         hireDate: {
             type: Date,

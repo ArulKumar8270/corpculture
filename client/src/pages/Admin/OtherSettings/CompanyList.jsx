@@ -3,7 +3,7 @@ import axios from 'axios';
 import { useAuth } from '../../../context/auth';
 import {
     Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-    CircularProgress, Box, Button // Added Dialog related imports
+    CircularProgress, Box, Button, TextField // Added TextField for search input
 } from '@mui/material';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
@@ -14,6 +14,7 @@ const CompanyList = () => {
     const [companies, setCompanies] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [searchQuery, setSearchQuery] = useState(''); // New state for search query
 
 
     useEffect(() => {
@@ -50,6 +51,21 @@ const CompanyList = () => {
         return userPermissions.some(p => p.key === key && p.actions.includes('edit')) || auth?.user?.role === 1;
     };
 
+    console.log(companies, "asfd790") // Removed this line
+    // Filter companies based on search query
+    const filteredCompanies = companies.filter(company => {
+        const query = searchQuery.toLowerCase();
+        const contactMobile = company.contactPersons?.[0]?.mobile || '';
+        
+        return (
+            company.companyName.toLowerCase().includes(query) ||
+            company.pincode.includes(query) ||
+            (company.gstNo && company.gstNo.toLowerCase().includes(query)) ||
+            (company.phone && company.phone.includes(query)) ||
+            contactMobile.includes(query)
+        );
+    });
+
     if (loading) {
         return (
             <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
@@ -81,8 +97,20 @@ const CompanyList = () => {
                 </Button> 
                 {/* : null} */}
             </div>
+            {/* Search Input Field */}
+            <div className="mb-4">
+                <TextField
+                    label="Search Companies"
+                    variant="outlined"
+                    fullWidth
+                    size="small"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="bg-white rounded-xl shadow"
+                />
+            </div>
             <Paper className="p-4 shadow-md rounded-xl">
-                {companies.length === 0 ? (
+                {filteredCompanies.length === 0 ? ( // Use filteredCompanies here
                     <Typography variant="body1" className="text-center text-gray-500 py-4">
                         No companies found.
                     </Typography>
@@ -106,7 +134,7 @@ const CompanyList = () => {
                                 </TableRow>
                             </TableHead>
                             <TableBody>
-                                {companies.map((company) => (
+                                {filteredCompanies.map((company) => ( // Use filteredCompanies here
                                     <TableRow key={company._id} className="hover:bg-gray-50">
                                         <TableCell>{company.companyName}</TableCell>
                                         <TableCell>{company.billingAddress}</TableCell>

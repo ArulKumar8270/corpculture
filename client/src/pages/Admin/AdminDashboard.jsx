@@ -27,7 +27,6 @@ import VendorProductList from "./Vendor/VendorProductList";
 import AddVendorProduct from "./Vendor/AddVendorProduct";
 import PurchaseList from "./Purchase/PurchaseList";
 import PurchaseRegister from "./Purchase/PurchaseRegister";
-import ServiceReports from "./reports/ServiceReports";
 import AddServiceQuotation from "./AddServiceQuotation";
 import AddServiceInvoice from "./AddServiceInvoice";
 import AddServiceReport from "./AddServiceReport";
@@ -45,6 +44,9 @@ import ServiceReportsSummary from "./reports/ServiceReportsSummary";
 import RentalReportsSummary from "./reports/RentalReportsSummary";
 import SalesReportsSummary from "./reports/SalesReportsSummary";
 import RentalInvoiceReport from "./Reports/RentalInvoiceReport";
+import ServiceReportsReport from "./Reports/ServiceReportsReport";
+import ServiceEnquiriesReport from "./Reports/ServiceEnquiriesReport";
+import AddEmployee from "./addemployee";
 
 const AdminDashboard = () => {
     const navigate = useNavigate();
@@ -95,6 +97,7 @@ const AdminDashboard = () => {
                             <Route path="all-products" element={<AllProducts />} />
                             <Route path="gst" element={<GST />} />
                             <Route path="employee" element={<AdminEmployees />} />
+                            <Route path="addEmployee/:employeeId?" element={<AddEmployee />} />
                             <Route path="menuSetting" element={<MenuSetting />} />
                             <Route path="addServiceProduct" element={<AddServiceProduct />} />
                             <Route path="serviceProductList" element={<ServiceProductList />} />
@@ -109,7 +112,7 @@ const AdminDashboard = () => {
                             <Route path="all-category" element={<AllCategories />} />
                             <Route path="companyList" element={<CompanyList />} />
                             <Route path="addCompany/:companyId?" element={<AddCompany />} />
-                            <Route path="serviceReports" element={<ServiceReports />} />
+                            {/* <Route path="serviceReports" element={<ServiceReports />} /> */}
                             <Route path="addServiceQuotation/:quotationId?" element={<AddServiceQuotation />} />
                             <Route path="addServiceInvoice/:invoiceId?" element={<AddServiceInvoice />} />
                             <Route path="serviceInvoiceList" element={<ServiceInvoiceList invoice={"invoice"}/>} />
@@ -135,8 +138,12 @@ const AdminDashboard = () => {
                             <Route path="reportsDashboard" element={<ReportsDashboard />} />
                             <Route path="serviceInvoicesReport/:companyId?" element={<ServiceInvoicesReport type={"invoice"}/>} />
                             <Route path="serviceQuotationsReport/:companyId?" element={<ServiceInvoicesReport type={"quotation"}/>} />
+                            <Route path="serviceReportsReport/:companyId?" element={<ServiceReportsReport type={"service"}/>} />
+                            <Route path="serviceEnquiriesReport/:companyId?" element={<ServiceEnquiriesReport type={"service"}/>} />
+                            <Route path="rentalEnquiriesReport/:companyId?" element={<ServiceEnquiriesReport type={"rental"}/>} />
                             <Route path="rantalInvoicesReport/:companyId?" element={<RentalInvoiceReport type={"invoice"}/>} />
                             <Route path="rentalQuotationsReport/:companyId?" element={<RentalInvoiceReport type={"quotation"}/>} />
+                            <Route path="rentalReportsReport/:companyId?" element={<ServiceReportsReport type={"rental"}/>} />
                         </Routes>
                     </div>
                 </div>

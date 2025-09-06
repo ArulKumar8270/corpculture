@@ -17,41 +17,105 @@ import {
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-// import axios from 'axios'; // Uncomment if you fetch real data
-// import { useAuth } from '../../../context/auth'; // Uncomment if you need auth context
+import axios from 'axios'; // Uncommented
+import { useAuth } from '../../../context/auth'; // Uncommented
 
 const ServiceReportsSummary = () => {
     const navigate = useNavigate();
-    // const { auth } = useAuth(); // Uncomment if you need auth context
+    const { auth } = useAuth(); // Uncommented
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    // Sample data for demonstration
-    // In a real application, these counts would be fetched from your backend API
+    // Initialize reportData as an empty array, it will be populated after fetching
     const [reportData, setReportData] = useState([]);
 
     useEffect(() => {
-        setLoading(true);
-        setError(null);
-        try {
-            // Simulate API call delay to fetch data
-            setTimeout(() => {
-                const data = [
-                    { id: 'serviceInvoices', name: 'Service Invoices', count: 120, path: '../serviceInvoicesReport' },
-                    { id: 'serviceQuotations', name: 'Service Quotations', count: 150, path: '../serviceQuotationsReport' },
-                    { id: 'serviceReports', name: 'Service Reports', count: 200, path: '/admin/reports/service/reports-gatpass' },
-                    // { id: 'productsUsed', name: 'Products Used in Service', count: 500, path: '/admin/reports/service/products' },
-                    { id: 'serviceEnquiries', name: 'Service Enquiries', count: 80, path: '/admin/reports/service/enquiries' },
-                ];
-                setReportData(data);
+        const fetchSummaryData = async () => {
+            setLoading(true);
+            setError(null);
+
+            // Ensure auth token is available before making API calls
+            if (!auth?.token) {
+                setError("Authentication token not available. Please log in.");
                 setLoading(false);
-            }, 500);
-        } catch (err) {
-            console.error('Error loading service overview data:', err);
-            setError('Failed to load service overview data.');
-            setLoading(false);
+                return;
+            }
+
+            try {
+                // Use Promise.allSettled to fetch all data concurrently
+                // This allows individual requests to fail without stopping others
+                const [
+                    serviceInvoicesRes,
+                    serviceQuotationsRes,
+                    serviceReportsRes,
+                    serviceEnquiriesRes
+                ] = await Promise.allSettled([
+                    // Service Invoices API call
+                    axios.post(
+                        `${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/all`,
+                        { invoiceType: "invoice" },
+                        { headers: { Authorization: auth.token } }
+                    ),
+                    // Service Quotations API call
+                    axios.post(
+                        `${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/all`,
+                        { invoiceType: "quotation" },
+                        { headers: { Authorization: auth.token } }
+                    ),
+                    // Service Reports API call
+                    axios.get(
+                        `${import.meta.env.VITE_SERVER_URL}/api/v1/report/service`,
+                        { headers: { Authorization: auth.token } }
+                    ),
+                    // Service Enquiries API call
+                    axios.get(
+                        `${import.meta.env.VITE_SERVER_URL}/api/v1/service/all`,
+                        { headers: { Authorization: auth.token } }
+                    )
+                ]);
+                // Construct the new report data based on successful responses
+                const newReportData = [
+                    {
+                        id: 'serviceInvoices',
+                        name: 'Service Invoices',
+                        count:  serviceInvoicesRes?.value?.data?.totalCount ?? 0, // Default to 0 if request failed or data is not successful
+                        path: '../serviceInvoicesReport'
+                    },
+                    {
+                        id: 'serviceQuotations',
+                        name: 'Service Quotations',
+                        count:  serviceQuotationsRes?.value?.data?.totalCount ?? 0,
+                        path: '../serviceQuotationsReport'
+                    },
+                    {
+                        id: 'serviceReports',
+                        name: 'Service Reports',
+                        count:  serviceReportsRes?.value?.data?.totalCount ?? 0,
+                        path: '../serviceReportsReport'
+                    },
+                    {
+                        id: 'serviceEnquiries',
+                        name: 'Service Enquiries',
+                        count: serviceEnquiriesRes?.value?.data?.totalCount ?? 0,
+                        path: '../serviceEnquiriesReport'
+                    },
+                ];
+                setReportData(newReportData);
+
+            } catch (err) {
+                console.error('Error loading service overview data:', err);
+                setError('Failed to load service overview data.');
+                toast.error('Failed to load service overview data.');
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        // Only call fetchSummaryData if auth token is available
+        if (auth?.token) {
+            fetchSummaryData();
         }
-    }, []);
+    }, [auth?.token]); // Re-run effect if auth token changes
 
     const handleViewDetails = (path, categoryName) => {
         navigate(path);

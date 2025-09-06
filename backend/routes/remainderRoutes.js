@@ -23,7 +23,7 @@ router.get("/", getAllRemainders);
 router.get("/:id", getRemainderById);
 
 // Get Remainder by ID
-router.get("/getByToday", getRemaindersByTodayDate);
+router.get("/getByToday/remainder", getRemaindersByTodayDate);
 
 // Get Remainders by Company ID
 router.get("/company/:companyId/:type", getRemaindersByCompany);

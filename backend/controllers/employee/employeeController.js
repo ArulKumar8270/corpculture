@@ -4,13 +4,13 @@ import bcrypt from "bcryptjs"; // Assuming you use bcrypt for password hashing
 // Create a new employee
 export const createEmployeeController = async (req, res) => {
     try {
-        const { name, email, password, phone, address, employeeType, userId } = req.body;
+        const { name, email, password, phone, address, employeeType, userId, designation, idCradNo, department, salary } = req.body;
 
         // Validation
         if (!name || !email || !password || !phone || !address || !employeeType || !userId) {
             return res.status(400).send({
                 success: false,
-                message: "All fields are required",
+                message: "All required fields are missing",
             });
         }
 
@@ -35,7 +35,11 @@ export const createEmployeeController = async (req, res) => {
             phone,
             address,
             employeeType,
-            userId
+            userId,
+            designation, // Added
+            idCradNo,    // Added
+            department,  // Added
+            salary,      // Added
         });
 
         await employee.save();
@@ -107,7 +111,7 @@ export const getSingleEmployeeController = async (req, res) => {
 // Update an employee by ID
 export const updateEmployeeController = async (req, res) => {
     try {
-        const { name, email, phone, address, employeeType } = req.body;
+        const { name, email, phone, address, employeeType, designation, idCradNo, department, salary } = req.body;
         const employeeId = req.params.id;
 
         // Find the employee
@@ -125,6 +129,10 @@ export const updateEmployeeController = async (req, res) => {
         employee.phone = phone || employee.phone;
         employee.address = address || employee.address;
         employee.employeeType = employeeType || employee.employeeType;
+        employee.designation = designation !== undefined ? designation : employee.designation; // Added
+        employee.idCradNo = idCradNo !== undefined ? idCradNo : employee.idCradNo;       // Added
+        employee.department = department !== undefined ? department : employee.department; // Added
+        employee.salary = salary !== undefined ? salary : employee.salary;             // Added
 
         // Note: Password update should ideally be handled in a separate route for security
 

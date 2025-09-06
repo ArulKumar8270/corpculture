@@ -24,7 +24,7 @@ import {
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import axios from 'axios';
 import { useAuth } from '../../../context/auth';
@@ -34,18 +34,18 @@ import { saveAs } from 'file-saver';
 const RentalInvoiceReport = (props) => {
     const navigate = useNavigate();
     const { auth } = useAuth();
-    const [invoices, setInvoices] = useState([]); // Renamed from serviceInvoices to invoices for generality
+    const [rentalInvoices, setRentalInvoices] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [fromDate, setFromDate] = useState('');
     const [toDate, setToDate] = useState('');
     const [companyNameFilter, setCompanyNameFilter] = useState('');
     const [invoiceNumberFilter, setInvoiceNumberFilter] = useState('');
-    const [paymentStatusFilter, setPaymentStatusFilter] = useState('');
+    const [paymentStatusFilter, setPaymentStatusFilter] = useState(''); // This might need backend support
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [totalCount, setTotalCount] = useState(0);
-    const { companyId: filterCompanyId } = useParams();
+    const { companyId: filterCompanyId } = useParams(); // If filtering by company from another page
 
     const fetchRentalInvoices = async (
         from = '',
@@ -60,19 +60,19 @@ const RentalInvoiceReport = (props) => {
         setError(null);
         try {
             const requestBody = {
-                invoiceType: props.type, // Keep invoiceType if rental payments also have this concept
+                invoiceType: props?.type, // Fixed for Rental Invoice Report
                 fromDate: from,
                 toDate: to,
-                ...(filterCompanyId ? {companyId : filterCompanyId} : {}),
-                companyName: companyName,
+                ...(filterCompanyId ? { companyId: filterCompanyId } : {}),
+                companyName: companyName, // Assumes backend can filter by companyName
                 invoiceNumber: invoiceNumber,
-                paymentStatus: paymentStatus,
+                paymentStatus: paymentStatus, // Assumes backend can filter by paymentStatus
                 page: currentPage + 1,
                 limit: currentRowsPerPage,
             };
 
             const response = await axios.post(
-                `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/all`, // Updated API endpoint
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/all/`,
                 requestBody,
                 {
                     headers: { Authorization: auth?.token }
@@ -80,8 +80,8 @@ const RentalInvoiceReport = (props) => {
             );
 
             if (response.data.success) {
-                setInvoices(response.data.entries); // Adjusted to rentalPayments
-                setTotalCount(response.data.totalCount || response.data.rentalPayments?.length); // Adjusted
+                setRentalInvoices(response.data.entries);
+                setTotalCount(response.data.totalCount || response.data.entries?.length);
             } else {
                 toast.error(response.data.message || 'Failed to fetch rental invoices.');
                 setError(response.data.message || 'Failed to fetch rental invoices.');
@@ -101,17 +101,20 @@ const RentalInvoiceReport = (props) => {
     }, [auth?.token, page, rowsPerPage]);
 
     const handleView = (invoiceId) => {
-        navigate(`/admin/rental-payment/${invoiceId}`); // Updated navigation path
+        // Assuming a route for viewing single rental invoice details
+        navigate(`/admin/rental-invoice/${invoiceId}`);
     };
 
     const handleEdit = (invoiceId) => {
-        navigate(`/admin/edit-rental-payment/${invoiceId}`); // Updated navigation path
+        // Assuming a route for editing rental invoices
+        navigate(`/admin/edit-rental-invoice/${invoiceId}`);
     };
 
     const handleDelete = async (invoiceId) => {
         if (window.confirm('Are you sure you want to delete this rental invoice?')) {
             try {
-                const response = await axios.delete(`${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/${invoiceId}`, { // Updated API endpoint
+                // Assuming a delete endpoint for rental payment entries
+                const response = await axios.delete(`${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/${invoiceId}`, {
                     headers: { Authorization: auth?.token }
                 });
                 if (response.data.success) {
@@ -144,26 +147,25 @@ const RentalInvoiceReport = (props) => {
     };
 
     const handleExportExcel = () => {
-        if (invoices.length === 0) {
+        if (rentalInvoices.length === 0) {
             toast.error("No data to export.");
             return;
         }
 
-        const dataToExport = invoices.map(invoice => ({
+        const dataToExport = rentalInvoices.map(invoice => ({
             'Invoice No.': invoice.invoiceNumber,
             'Company': invoice.companyId?.companyName || 'N/A',
-            'Entry Date': new Date(invoice.entryDate).toLocaleDateString(), // Changed to entryDate
-            'Machine Serial No.': invoice.machineId?.serialNo || 'N/A', // Added machine serial no
-            'Pending Amount': invoice.pendingAmount?.toFixed(2) || '0.00', // Changed from Grand Total
-            'TDS Amount': invoice.tdsAmount?.toFixed(2) || '0.00', // Added TDS Amount
-            'Assigned To': invoice.assignedTo?.name || 'N/A',
+            'Machine Model': invoice.machineId?.modelName || 'N/A',
+            'Machine Serial No.': invoice.machineId?.serialNo || 'N/A',
+            'Invoice Date': new Date(invoice.createdAt).toLocaleDateString(), // Using createdAt as invoice date
+            'Grand Total': 'N/A', // Placeholder: Grand Total not in sample response
             'Mode of Payment': invoice.modeOfPayment || 'N/A',
             'Bank Name': invoice.bankName || 'N/A',
-            'Transaction Details': invoice.transactionDetails || 'N/A',
             'Cheque Date': invoice.chequeDate ? new Date(invoice.chequeDate).toLocaleDateString() : 'N/A',
+            'Other Payment Mode': invoice.otherPaymentMode || 'N/A',
+            'Transaction Details': invoice.transactionDetails || 'N/A',
             'Transfer Date': invoice.transferDate ? new Date(invoice.transferDate).toLocaleDateString() : 'N/A',
-            'Payment Type': invoice.paymentAmountType || 'N/A', // Added Payment Type
-            'Status': invoice.status || 'N/A', // Added Status
+            'Status': 'N/A', // Placeholder: Payment Status not in sample response
         }));
 
         const ws = XLSX.utils.json_to_sheet(dataToExport);
@@ -204,9 +206,10 @@ const RentalInvoiceReport = (props) => {
     return (
         <Box sx={{ p: 3, bgcolor: 'background.default', minHeight: '100vh' }}>
             <Typography variant="h5" component="h1" gutterBottom sx={{ mb: 3, color: '#019ee3', fontWeight: 'bold' }}>
-                Rental Invoices Report {/* Updated title */}
+                Rental Invoices Report
             </Typography>
             <Paper elevation={3} sx={{ p: 2, borderRadius: '8px' }}>
+                {/* Filter Options */}
                 <Box sx={{ mb: 3 }}>
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 2, alignItems: 'center' }}>
                         <TextField
@@ -251,6 +254,7 @@ const RentalInvoiceReport = (props) => {
                                 <MenuItem value="Paid">Paid</MenuItem>
                                 <MenuItem value="Unpaid">Unpaid</MenuItem>
                                 <MenuItem value="TDS">TDS</MenuItem>
+                                {/* Add other payment statuses as needed, assuming backend support */}
                             </Select>
                         </FormControl>
                         <Button variant="contained" onClick={handleFilter} sx={{ height: '56px' }}>
@@ -269,48 +273,43 @@ const RentalInvoiceReport = (props) => {
                     <Table sx={{ minWidth: 650 }} aria-label="rental invoices table">
                         <TableHead>
                             <TableRow sx={{ bgcolor: '#f0f0f0' }}>
+                                <TableCell>S.No</TableCell>
                                 <TableCell>Invoice No.</TableCell>
                                 <TableCell>Company</TableCell>
-                                <TableCell>Entry Date</TableCell> {/* Changed to Entry Date */}
-                                <TableCell>Machine Serial No.</TableCell> {/* Added */}
-                                <TableCell>Assigned To</TableCell>
+                                <TableCell>Machine Model / Serial</TableCell>
+                                <TableCell>Invoice Date</TableCell>
+                                <TableCell>Grand Total</TableCell> {/* Placeholder */}
                                 <TableCell>Payment Details</TableCell>
-                                <TableCell>Status</TableCell> {/* Added Status */}
+                                <TableCell>Status</TableCell> {/* Placeholder */}
+                                {/* <TableCell>Actions</TableCell> */}
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {invoices?.length === 0 && !loading ? (
+                            {rentalInvoices.length === 0 && !loading ? (
                                 <TableRow>
-                                    <TableCell colSpan={10} align="center" sx={{ py: 3, color: 'text.secondary' }}> {/* Adjusted colspan */}
+                                    <TableCell colSpan={9} align="center" sx={{ py: 3, color: 'text.secondary' }}>
                                         No rental invoices found.
                                     </TableCell>
                                 </TableRow>
                             ) : (
-                                invoices?.map((invoice) => (
+                                rentalInvoices.map((invoice, index) => (
                                     <TableRow key={invoice._id}>
+                                        <TableCell>{page * rowsPerPage + index + 1}</TableCell>
                                         <TableCell>{invoice.invoiceNumber}</TableCell>
                                         <TableCell>{invoice.companyId?.companyName || 'N/A'}</TableCell>
-                                        <TableCell>{new Date(invoice.entryDate).toLocaleDateString()}</TableCell> {/* Changed to entryDate */}
-                                        <TableCell>{invoice.machineId?.serialNo || 'N/A'}</TableCell> {/* Display machine serial no */}
-                                        
+                                        <TableCell>{`${invoice.machineId?.modelName || 'N/A'} / ${invoice.machineId?.serialNo || 'N/A'}`}</TableCell>
+                                        <TableCell>{new Date(invoice.createdAt).toLocaleDateString()}</TableCell>
+                                        <TableCell>N/A</TableCell> {/* Grand Total placeholder */}
                                         <TableCell>
-                                            {invoice.assignedTo ? (
-                                                <Chip label={invoice.assignedTo?.name} size="small" color="primary" variant="outlined" />
-                                            ) : (
-                                                'N/A'
-                                            )}
+                                            <p>Mode: {invoice?.modeOfPayment || 'N/A'}</p>
+                                            {invoice?.bankName && <p>Bank: {invoice?.bankName}</p>}
+                                            {invoice?.chequeDate && <p>Cheque Date: {new Date(invoice?.chequeDate).toLocaleDateString()}</p>}
+                                            {invoice?.otherPaymentMode && <p>Other Mode: {invoice?.otherPaymentMode}</p>}
+                                            {invoice?.transactionDetails && <p>Transaction: {invoice?.transactionDetails}</p>}
+                                            {invoice?.transferDate && <p>Transfer Date: {new Date(invoice?.transferDate).toLocaleDateString()}</p>}
                                         </TableCell>
                                         <TableCell>
-                                            {invoice?.bankName ? <p>Bank Name : {invoice?.bankName}</p> : null}
-                                            <p>Mode of Payment : {invoice?.modeOfPayment}</p>
-                                            {invoice?.chequeDate ? <p>Cheque Date : {new Date(invoice?.chequeDate).toLocaleDateString()}</p> : null}
-                                            {invoice?.otherPaymentMode ? <p>Other Payment Mode : {invoice?.otherPaymentMode}</p> : null}
-                                            {invoice?.transactionDetails ? <p>Transaction Details : {invoice?.transactionDetails}</p> : null}
-                                            {invoice?.transferDate ? <p>Transfer Date : {new Date(invoice?.transferDate).toLocaleDateString()}</p> : null}
-                                            {invoice?.paymentAmountType ? <p>Payment Type : {invoice?.paymentAmountType}</p> : null}
-                                        </TableCell>
-                                        <TableCell>
-                                            <Chip
+                                        <Chip
                                                 label={invoice.status}
                                                 size="small"
                                                 color={
@@ -321,6 +320,23 @@ const RentalInvoiceReport = (props) => {
                                                 }
                                             />
                                         </TableCell>
+                                        {/* <TableCell>
+                                            <Tooltip title="View Details">
+                                                <IconButton onClick={() => handleView(invoice._id)} color="info">
+                                                    <VisibilityIcon />
+                                                </IconButton>
+                                            </Tooltip>
+                                            <Tooltip title="Edit Invoice">
+                                                <IconButton onClick={() => handleEdit(invoice._id)} color="primary">
+                                                    <EditIcon />
+                                                </IconButton>
+                                            </Tooltip>
+                                            <Tooltip title="Delete Invoice">
+                                                <IconButton onClick={() => handleDelete(invoice._id)} color="error">
+                                                    <DeleteIcon />
+                                                </IconButton>
+                                            </Tooltip>
+                                        </TableCell> */}
                                     </TableRow>
                                 ))
                             )}
