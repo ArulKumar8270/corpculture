@@ -85,20 +85,73 @@ export const createReport = async (req, res) => {
 // Get All Reports
 export const getAllReports = async (req, res) => {
     try {
-        const { reportType, assignedTo } = req.params;
-        let query = {};
-        if (reportType && assignedTo) {
-            query = { assignedTo, reportFor: reportType };
-        }
-        if (reportType) {
-            query = { reportFor: reportType };
-        }
-        const reports = await Report.find(query)
-            .populate('company') // Populate company details
-            .populate('assignedTo')
-            .sort({ createdAt: -1 });
+        const {
+            fromDate,
+            toDate,
+            companyName,
+            assignedTo,
+            reportType,
+            page = 1, // Default to page 1
+            limit = 10 // Default to 10 items per page
+        } = req.query; // Get parameters from query string
 
-        res.status(200).send({ success: true, message: 'All Reports fetched', reports });
+        let findQuery = {};
+
+        // Filter by reportType
+        if (reportType) {
+            findQuery.reportType = reportType;
+        }
+
+        // Filter by assignedTo
+        if (assignedTo) {
+            findQuery.assignedTo = assignedTo;
+        }
+
+        // Filter by companyName
+        if (companyName) {
+            const matchingCompanies = await Company.find({
+                companyName: { $regex: companyName, $options: 'i' } // Case-insensitive partial match
+            }).select('_id');
+
+            const companyIds = matchingCompanies.map(company => company._id);
+
+            if (companyIds.length > 0) {
+                findQuery.company = { $in: companyIds };
+            } else {
+                // If no companies match the name, no reports will match, so return empty
+                return res.status(200).send({ success: true, message: 'No Reports found for the given company name', reports: [], totalCount: 0 });
+            }
+        }
+
+        // Filter by date range (createdAt)
+        if (fromDate || toDate) {
+            findQuery.createdAt = {};
+            if (fromDate) {
+                findQuery.createdAt.$gte = new Date(fromDate);
+            }
+            if (toDate) {
+                // Set to the end of the day for the toDate
+                const endOfDay = new Date(toDate);
+                endOfDay.setHours(23, 59, 59, 999);
+                findQuery.createdAt.$lte = endOfDay;
+            }
+        }
+
+        // Calculate skip for pagination
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+
+        // Get total count of documents matching the filters (before pagination)
+        const totalCount = await Report.countDocuments(findQuery);
+
+        // Fetch reports with pagination and populate necessary fields
+        const reports = await Report.find(findQuery)
+            .populate('company') // Populate company details
+            .populate('assignedTo') // Populate assignedTo user details
+            .sort({ createdAt: -1 }) // Sort by creation date, newest first
+            .skip(skip)
+            .limit(parseInt(limit));
+
+        res.status(200).send({ success: true, message: 'All Reports fetched', reports, totalCount });
     } catch (error) {
         console.error("Error in getAllReports:", error);
         res.status(500).send({ success: false, message: 'Error in getting reports', error });

@@ -36,10 +36,11 @@ const menuStructure = [
                 permissions: ['view', 'add', 'edit', 'delete'],
                 subItems: [
                     { name: "Service Enquiries", key: "serviceEnquiries", permissions: ['view', 'edit'] },
-                    { name: "Commission", key: "serviceCommission", permissions: ['view', 'add', 'edit', 'delete'] },
                     { name: "All Products", key: "serviceProductList", permissions: ['view', 'add', 'edit', 'delete'] },
                     { name: "Invoice", key: "serviceInvoice", permissions: ['view', 'add', 'edit', 'delete'] },
                     { name: "Quotation", key: "serviceQuotation", permissions: ['view', 'add', 'edit', 'delete'] },
+                    { name: "Reports", key: "serviceReport", permissions: ['view', 'add', 'edit', 'delete'] },
+                    { name: "Partners", key: "servicePartner", permissions: ['view', 'add', 'edit', 'delete'] },
                 ]
             },
             {
@@ -51,7 +52,8 @@ const menuStructure = [
                     { name: "All Products", key: "rentalAllProducts", permissions: ['view', 'add', 'edit', 'delete'] },
                     { name: "Invoice", key: "rentalInvoice", permissions: ['view', 'add', 'edit', 'delete'] },
                     { name: "Quotation", key: "rentalQuotation", permissions: ['view', 'add', 'edit', 'delete'] },
-                    { name: "Commission", key: "rentalCommission", permissions: ['view', 'add', 'edit', 'delete'] },
+                    { name: "Reports", key: "rentalReport", permissions: ['view', 'add', 'edit', 'delete'] },
+                    { name: "Partners", key: "rentalPartners", permissions: ['view', 'add', 'edit', 'delete'] },
                 ]
             },
             {
@@ -61,7 +63,7 @@ const menuStructure = [
                 subItems: [
                     { name: "Vendors", key: "vendorList", permissions: ['view', 'add', 'edit', 'delete'] },
                     { name: "Products", key: "vendorProducts", permissions: ['view', 'add', 'edit', 'delete'] },
-                    { name: "Purchase List", key: "vendorPurchaseList", permissions: ['view', 'add', 'edit', 'delete'] },
+                    { name: "Material List", key: "vendorPurchaseList", permissions: ['view', 'add', 'edit', 'delete'] },
                 ]
             },
             {
@@ -69,11 +71,12 @@ const menuStructure = [
                 key: "reports",
                 permissions: ['view'],
                 subItems: [
-                    { name: "Company list", key: "reportsCompanyList", permissions: ['view', 'add', 'edit', 'delete'] },
-                    { name: "Service", key: "reportsService", permissions: ['view', 'add', 'edit', 'delete'] },
-                    { name: "Sales", key: "reportsSales", permissions: ['view', 'add', 'edit', 'delete'] },
-                    { name: "Employee list", key: "reportsEmployeeList", permissions: ['view', 'add', 'edit', 'delete'] },
-                    { name: "User list", key: "reportsUserList", permissions: ['view', 'add', 'edit', 'delete'] },
+                    { name: "Company Details", key: "reportsCompanyReport", permissions: ['view', 'add', 'edit', 'delete'] },
+                    { name: "Service Details", key: "reportsService", permissions: ['view', 'add', 'edit', 'delete'] },
+                    { name: "Rental Details", key: "reportsRental", permissions: ['view', 'add', 'edit', 'delete'] },
+                    { name: "Sales Details", key: "reportsSales", permissions: ['view', 'add', 'edit', 'delete'] },
+                    { name: "Employee", key: "reportsEmployeeList", permissions: ['view', 'add', 'edit', 'delete'] },
+                    { name: "Users", key: "reportsUserList", permissions: ['view', 'add', 'edit', 'delete'] },
                 ]
             }
         ]
@@ -83,8 +86,8 @@ const menuStructure = [
         key: "otherSettings",
         permissions: ['view'],
         subItems: [
+            { name: "All Company", key: "otherSettingsAllCompany", permissions: ['view', 'add', 'edit', 'delete'] },
             { name: "GST", key: "otherSettingsGst", permissions: ['view', 'add', 'edit', 'delete'] },
-            { name: "Employee", key: "otherSettingsEmployee", permissions: ['view', 'add', 'edit', 'delete'] },
             { name: "Menu setting", key: "otherSettingsMenuSetting", permissions: ['view', 'edit'] }, // This page itself
             { name: "Credit", key: "otherSettingsCredit", permissions: ['view', 'add', 'edit', 'delete'] },
             { name: "Gift", key: "otherSettingsGift", permissions: ['view', 'add', 'edit', 'delete'] },
@@ -97,7 +100,7 @@ const MenuSetting = () => {
     const [roles, setRoles] = useState([]);
     const [selectedRole, setSelectedRole] = useState(auth?.user?._id); // Replace with your role selection logic (e.g., dropdown, radio buttons, etc);
     const [permissions, setPermissions] = useState({}); // Stores permissions for the selected role
-
+    const [isLoading, setIsLoading] = useState(false);
     useEffect(() => {
         fetchRoles();
     }, []);
@@ -214,6 +217,7 @@ const MenuSetting = () => {
     };
 
     const handleSubmit = async () => {
+        setIsLoading(true)
         if (!selectedRole) {
             toast.error('Please select a role first.');
             return;
@@ -222,13 +226,15 @@ const MenuSetting = () => {
             // Replace with your actual API endpoint to update permissions
             const { data } = await axios.put(`${import.meta.env.VITE_SERVER_URL}/api/v1/permissions/batch-update`, { userId: selectedRole, permissions });
             if (data?.success) {
-                toast.success(data.message || 'Permissions updated successfully!');
+                setIsLoading(false)
+                alert(data.message || 'Permissions updated successfully!');
             } else {
-                toast.error(data?.message || 'Failed to update permissions.');
+                setIsLoading(false)
+                alert(data?.message || 'Failed to update permissions.');
             }
         } catch (error) {
             console.error('Error updating permissions:', error);
-            toast.error('Something went wrong while updating permissions.');
+            setIsLoading(false)
         }
     };
 
@@ -294,13 +300,15 @@ const MenuSetting = () => {
                             Permissions for {roles.find(r => r._id === selectedRole)?.name}
                         </Typography>
                         {renderPermissions(menuStructure)}
-                        {hasPermission("otherSettingsGst") ? <Button
+                        {hasPermission("otherSettingsGst") ? 
+                        <Button
                             variant="contained"
                             color="primary"
                             onClick={handleSubmit}
                             className="mt-6 bg-blue-500 hover:bg-blue-600"
+                            disabled={isLoading}
                         >
-                            Save Permissions
+                           {isLoading ? "Permission Updating..." : "Save Permissions"}
                         </Button> : null}
                     </div>
                 )}

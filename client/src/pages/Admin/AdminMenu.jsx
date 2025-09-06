@@ -418,7 +418,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                                     </NavLink>
                                                 )}
                                                 {/* All Products under Service */}
-                                                {hasPermission('serviceAllProducts') && (
+                                                {hasPermission('serviceProductList') && (
                                                     <NavLink
                                                         to="./serviceProductList"
                                                         onClick={scrollToTop}
@@ -466,7 +466,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                                         </div>
                                                     </NavLink>
                                                 )}
-                                                <NavLink
+                                                {hasPermission('serviceReport') && (<NavLink
                                                     to="./serviceReportlist"
                                                     onClick={scrollToTop}
                                                     className={({ isActive }) =>
@@ -479,9 +479,9 @@ const AdminMenu = ({ toggleMenu }) => {
                                                     <div className="h-10 px-8 flex items-center">
                                                         Reports <span className="ml-2 text-xs font-normal text-gray-500 bg-gray-200 px-2 py-1 rounded-full">{recordCounts?.serviceReport}</span>
                                                     </div>
-                                                </NavLink>
+                                                </NavLink>)}
                                                 {/* Commission under Service */}
-                                                {hasPermission('serviceCommission') && (
+                                                {hasPermission('servicePartner') && (
                                                     <NavLink
                                                         to="/admin/commission"
                                                         onClick={scrollToTop}
@@ -588,7 +588,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                                         </div>
                                                     </NavLink>
                                                 )}
-                                                <NavLink
+                                                {hasPermission('rentalReport') && (<NavLink
                                                     to="./rentalReportlist"
                                                     onClick={scrollToTop}
                                                     className={({ isActive }) =>
@@ -601,8 +601,8 @@ const AdminMenu = ({ toggleMenu }) => {
                                                     <div className="h-10 px-8 flex items-center">
                                                         Reports <span className="ml-2 text-xs font-normal text-gray-500 bg-gray-200 px-2 py-1 rounded-full">{recordCounts?.rentalReport}</span>
                                                     </div>
-                                                </NavLink>
-                                                {hasPermission('rentalCommission') && (
+                                                </NavLink>)}
+                                                {hasPermission('rentalPartners') && (
                                                     <NavLink
                                                         to="/admin/commission"
                                                         onClick={scrollToTop}
@@ -614,7 +614,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                                         }
                                                     >
                                                         <div className="h-10 px-8 flex items-center">
-                                                            Commissions
+                                                            Partners
                                                         </div>
                                                     </NavLink>
                                                 )}
@@ -713,7 +713,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                         {expandedSections.reports && (
                                             <div className="flex flex-col text-black font-light text-sm mb-2">
 
-                                                {hasPermission('reportsCompanyList') && (
+                                                {hasPermission('reportsCompanyReport') && (
                                                     <NavLink
                                                         to="./companyReports"
                                                         onClick={scrollToTop}
@@ -745,7 +745,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                                         </div>
                                                     </NavLink>
                                                 )}
-                                                <NavLink
+                                                {hasPermission('reportsRental') && (<NavLink
                                                     to="./rentalReportsSummary"
                                                     onClick={scrollToTop}
                                                     className={({ isActive }) =>
@@ -758,7 +758,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                                     <div className="h-10 px-8 flex items-center">
                                                         Rental Over all Details
                                                     </div>
-                                                </NavLink>
+                                                </NavLink>)}
                                                 {hasPermission('reportsSales') && (
                                                     <NavLink
                                                         to="./salesReportsSummary"
@@ -839,7 +839,7 @@ const AdminMenu = ({ toggleMenu }) => {
                             <div className="flex flex-col text-black font-light text-sm mb-2">
                                 {hasPermission('otherSettingsGst') && (
                                     <>
-                                        <NavLink
+                                        {hasPermission('otherSettingsAllCompany') && (<NavLink
                                             to="./companyList"
                                             onClick={scrollToTop}
                                             className={({ isActive }) =>
@@ -852,8 +852,8 @@ const AdminMenu = ({ toggleMenu }) => {
                                             <div className="h-10 px-8 flex items-center">
                                                 Company
                                             </div>
-                                        </NavLink>
-                                        <NavLink
+                                        </NavLink>)}
+                                        {hasPermission('otherSettingsGst') && (<NavLink
                                             to="./gst"
                                             onClick={scrollToTop}
                                             className={({ isActive }) =>
@@ -866,22 +866,8 @@ const AdminMenu = ({ toggleMenu }) => {
                                             <div className="h-10 px-8 flex items-center">
                                                 GST
                                             </div>
-                                        </NavLink>
-                                        <NavLink
-                                            to="./employee"
-                                            onClick={scrollToTop}
-                                            className={({ isActive }) =>
-                                                `rounded-lg mx-2 my-1 transition-all ${isActive
-                                                    ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
-                                                    : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
-                                                }`
-                                            }
-                                        >
-                                            <div className="h-10 px-8 flex items-center">
-                                                Employee
-                                            </div>
-                                        </NavLink>
-                                        <NavLink
+                                        </NavLink>)}
+                                        {hasPermission('otherSettingsMenuSetting') && (<NavLink
                                             to="./menuSetting"
                                             onClick={scrollToTop}
                                             className={({ isActive }) =>
@@ -894,8 +880,8 @@ const AdminMenu = ({ toggleMenu }) => {
                                             <div className="h-10 px-8 flex items-center">
                                                 Menu setting
                                             </div>
-                                        </NavLink>
-                                        <NavLink
+                                        </NavLink>)}
+                                        {hasPermission('otherSettingsCredit') && (<NavLink
                                             to="/admin/settings/credit"
                                             onClick={scrollToTop}
                                             className={({ isActive }) =>
@@ -908,8 +894,8 @@ const AdminMenu = ({ toggleMenu }) => {
                                             <div className="h-10 px-8 flex items-center">
                                                 Credit
                                             </div>
-                                        </NavLink>
-                                        <NavLink
+                                        </NavLink>)}
+                                        {hasPermission('otherSettingsGift') && (<NavLink
                                             to="/admin/settings/gift"
                                             onClick={scrollToTop}
                                             className={({ isActive }) =>
@@ -922,7 +908,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                             <div className="h-10 px-8 flex items-center">
                                                 Gift
                                             </div>
-                                        </NavLink>
+                                        </NavLink>)}
                                     </>
                                 )}
                             </div>

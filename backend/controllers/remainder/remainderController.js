@@ -1,5 +1,7 @@
 import Remainder from "../../models/remainderModel.js";
 import Company from "../../models/companyModel.js"; // Assuming you have a Company model
+import ServiceInvoice from "../../models/serviceInvoiceModel.js"; // Import ServiceInvoice model
+import RentalPaymentEntry from "../../models/rentalPaymentEntryModel.js"; // Import RentalPaymentEntry model
 
 // Create a new remainder
 export const createRemainder = async (req, res) => {
@@ -110,7 +112,7 @@ export const getRemaindersByCompany = async (req, res) => {
             return res.status(400).send({ success: false, message: 'Company ID is required.' });
         }
 
-        const remainders = await Remainder.findOne({ companyId,  remainderType : type})
+        const remainders = await Remainder.findOne({ companyId, remainderType: type })
             .populate('companyId')
             .sort({ createdAt: -1 });
 
@@ -212,14 +214,16 @@ export const deleteRemainder = async (req, res) => {
 export const getRemaindersByTodayDate = async (req, res) => {
     try {
         const today = new Date();
-        // Format today's date as YYYY-MM-DD to match the schema's date string format
-        const todayFormatted = today.toISOString().split('T')[0];
 
+        // Today's date as a number (day of the month)
+        const todayDayOfMonth = today.getDate();
+
+        // Find remainders where today's date is inside remainderDates array
         const remainders = await Remainder.find({
-            remainderDates: todayFormatted
+            remainderDates: { $in: [todayDayOfMonth] }
         })
-        .populate('companyId')
-        .sort({ createdAt: -1 });
+            .populate('companyId', '_id')
+            .sort({ createdAt: -1 });
 
         if (!remainders || remainders.length === 0) {
             return res.status(404).send({
@@ -228,17 +232,48 @@ export const getRemaindersByTodayDate = async (req, res) => {
             });
         }
 
+        // Attach unpaid invoices for each remainder’s company
+        const remaindersWithInvoices = await Promise.all(
+            remainders.map(async (remainder) => {
+                const companyObjectId = remainder.companyId._id;
+
+                const today = new Date();
+                const startOfDay = new Date(today.setHours(0, 0, 0, 0));
+                const endOfDay = new Date(today.setHours(23, 59, 59, 999));
+
+                const unpaidServiceInvoices = await ServiceInvoice.find({
+                    companyId: companyObjectId,
+                    status: "Unpaid",
+                    invoiceType: "invoice",
+                    invoiceDate: { $gte: startOfDay, $lte: endOfDay }
+                }, { _id: 1 });
+
+                const unpaidRentalInvoices = await RentalPaymentEntry.find({
+                    companyId: companyObjectId,
+                    status: "Unpaid",
+                    invoiceType: "invoice",
+                    invoiceDate: { $gte: startOfDay, $lte: endOfDay }
+                }, { _id: 1 });
+
+                return {
+                    ...remainder.toObject(),
+                    unpaidServiceInvoices,
+                    unpaidRentalInvoices
+                };
+            })
+        );
+
         res.status(200).send({
             success: true,
-            message: 'Remainders for today fetched successfully',
-            remainders
+            message: 'Remainders for today fetched successfully with associated unpaid invoices',
+            remainders: remaindersWithInvoices
         });
     } catch (error) {
         console.error("Error in getRemaindersByTodayDate:", error);
         res.status(500).send({
             success: false,
             message: 'Error in fetching remainders for today',
-            error
+            error: error.message
         });
     }
 };

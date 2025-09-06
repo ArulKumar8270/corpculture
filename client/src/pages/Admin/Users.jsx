@@ -19,6 +19,7 @@ const Users = () => {
   const [formData, setFormData] = useState({});
   const [isUpdating, setIsUpdating] = useState(false);
   const [categories, setCategories] = useState([]); // New state for categories
+  const [searchQuery, setSearchQuery] = useState(''); // New state for search query
 
   useEffect(() => {
     fetchUsers();
@@ -180,9 +181,38 @@ const Users = () => {
     }
   };
 
+  // Filter users based on search query
+  const filteredUsers = users.filter(user => {
+    const query = searchQuery.toLowerCase();
+    const roleString = user.role === 1 ? "admin" : "user"; // Convert role to string for search
+
+    return (
+      user.name.toLowerCase().includes(query) ||
+      user.email.toLowerCase().includes(query) ||
+      user.phone.toLowerCase().includes(query) ||
+      roleString.includes(query) ||
+      (user.pan?.number && user.pan.number.toLowerCase().includes(query)) ||
+      (user.pan?.name && user.pan.name.toLowerCase().includes(query))
+    );
+  });
+
   return (
     <div className="p-6 bg-gradient-to-br from-[#e6fbff] to-[#f7fafd] min-h-screen">
       <h1 className="text-2xl font-bold mb-6 text-[#019ee3]">Users</h1>
+
+      {/* Search Input Field */}
+      <div className="mb-4">
+        <TextField
+          label="Search Users"
+          variant="outlined"
+          fullWidth
+          size="small"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="bg-white rounded-xl shadow"
+        />
+      </div>
+
       {loading ? (
         <div className="text-center py-10 text-lg text-gray-500">Loading...</div>
       ) : (
@@ -204,20 +234,20 @@ const Users = () => {
               </tr>
             </thead>
             <tbody>
-              {users?.length === 0 ? (
+              {filteredUsers?.length === 0 ? ( // Use filteredUsers here
                 <tr>
                   <td colSpan={11} className="text-center py-6 text-gray-400">No users found.</td>
                 </tr>
               ) : (
-                users
-                  .filter(user => !user.parentId && user?.role !== 3 && user?.role !== 1)
+                filteredUsers
+                  .filter(user => !user.parentId && user?.role !== 3 && user?.role !== 1) // Filter parents from filteredUsers
                   .map(parent => (
                     <React.Fragment key={parent._id}>
                       <tr
                         className="border-b last:border-b-0 hover:bg-blue-50 font-semibold"
                       >
                         <td className="py-2 px-3 flex items-center gap-2">
-                          {users.some(child => String(child.parentId) === String(parent._id)) && (
+                          {filteredUsers.some(child => String(child.parentId) === String(parent._id)) && ( // Check children from filteredUsers
                             <svg
                               className={`w-4 h-4 transform transition-transform cursor-pointer`}
                               onClick={() => toggleExpand(parent._id)}
@@ -262,7 +292,7 @@ const Users = () => {
                         </td> : null}
                       </tr>
                       {expandedParents.has(parent._id) && (
-                        users
+                        filteredUsers // Use filteredUsers here
                           .filter(child => String(child.parentId) === String(parent._id))
                           .map(child => (
                             <tr key={child._id} className="border-b last:border-b-0 bg-blue-50">
