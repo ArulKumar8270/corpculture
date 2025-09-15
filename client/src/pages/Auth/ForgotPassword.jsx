@@ -101,7 +101,7 @@ const ForgotPassword = () => {
             <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#e6fbff] to-[#f7fafd] py-8">
                 <div className="flex flex-col md:flex-row w-full max-w-3xl bg-white rounded-3xl shadow-2xl overflow-hidden">
                     {/* Left Panel */}
-                    <div className="hidden md:flex flex-col justify-center items-center bg-gradient-to-br from-[#0bbad8] to-[#8b1414] w-full md:w-1/2 p-10">
+                    <div className="hidden md:flex flex-col justify-center items-center bg-gradient-to-br from-[#0bbad8] to-[#0c115d] w-full md:w-1/2 p-10">
                         <h2 className="text-white text-3xl font-bold mb-4 text-center">Forgot Password</h2>
                         <p className="text-cyan-100 text-base mb-6 text-center">
                             Forgot your password? No worries, we've got you covered!
@@ -110,7 +110,7 @@ const ForgotPassword = () => {
                     </div>
                     {/* Right Panel (Form) */}
                     <div className="w-full md:w-1/2 flex flex-col justify-center p-8 md:p-12">
-                        <h3 className="text-2xl font-bold text-[#8b1414] mb-6 text-center">Reset Your Password</h3>
+                        <h3 className="text-2xl font-bold text-[#0c115d] mb-6 text-center">Reset Your Password</h3>
                         {isSubmitting ? (
                             <div className="flex items-center justify-center h-40">
                                 <Spinner />
@@ -186,7 +186,7 @@ const ForgotPassword = () => {
                                     By continuing, you agree to Flipkart's Terms of Use and Privacy Policy.
                                 </div>
                                 <button
-                                    className="w-full bg-gradient-to-r from-[#0bbad8] to-[#8b1414] text-white font-semibold py-2 rounded-lg shadow hover:from-[#8b1414] hover:to-[#0bbad8] transition-all uppercase"
+                                    className="w-full bg-gradient-to-r from-[#0bbad8] to-[#0c115d] text-white font-semibold py-2 rounded-lg shadow hover:from-[#0c115d] hover:to-[#0bbad8] transition-all uppercase"
                                     type="submit"
                                 >
                                     Submit

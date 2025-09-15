@@ -251,6 +251,7 @@ const ServiceSection = ({ services }) => {
       // Replace with your actual API endpoint
       await axios.post(`${import.meta.env.VITE_SERVER_URL}/api/v1/service/create`, {
         ...form,
+        companyId : form.companyId !== '' ? form.companyId : null,
         serviceImage: imageUrl // Use the uploaded image URL
       });
       setSubmitStatus(true);

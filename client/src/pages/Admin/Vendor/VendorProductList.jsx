@@ -111,6 +111,7 @@ const VendorProductList = () => {
                                 <TableCell className="font-semibold">Vendor Company Name</TableCell>
                                 <TableCell className="font-semibold">Product Name</TableCell>
                                 <TableCell className="font-semibold">GST Type</TableCell>
+                                <TableCell className="font-semibold">Product Code</TableCell>
                                 <TableCell className="font-semibold">Price Per Quantity</TableCell>
                                 {hasPermission("vendorProducts") ? <TableCell className="font-semibold">Action</TableCell> : null}
                             </TableRow>
@@ -123,6 +124,7 @@ const VendorProductList = () => {
                                         <TableCell>{product.vendorCompanyName?.companyName || 'N/A'}</TableCell>
                                         <TableCell>{product.productName}</TableCell>
                                         <TableCell>{product.gstType?.gstType || 'N/A'} ({product.gstType?.gstPercentage || 0}%)</TableCell>
+                                        <TableCell>{product.productCode}</TableCell>
                                         <TableCell>{product.pricePerQuantity}</TableCell>
                                         {hasPermission("vendorProducts") ? <TableCell>
                                             <Button

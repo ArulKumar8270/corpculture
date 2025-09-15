@@ -162,7 +162,8 @@ const PurchaseList = () => {
                                     <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#f0f0f0' }}>S.No</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#f0f0f0' }}>Invoice No.</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#f0f0f0' }}>Vendor Company</TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#f0f0f0' }}>Product Name</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#f0f0f0' }}>Material Name</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#f0f0f0' }}>Category Name</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#f0f0f0' }}>Purchase Date</TableCell>
                                     <TableCell align="right" sx={{ fontWeight: 'bold', backgroundColor: '#f0f0f0' }}>Quantity</TableCell>
                                     <TableCell align="right" sx={{ fontWeight: 'bold', backgroundColor: '#f0f0f0' }}>Rate</TableCell>
@@ -180,6 +181,7 @@ const PurchaseList = () => {
                                             <TableCell>{purchase.purchaseInvoiceNumber}</TableCell>
                                             <TableCell>{purchase.vendorCompanyName?.companyName}</TableCell>
                                             <TableCell>{purchase.productName?.productName}</TableCell> {/* Updated this line */}
+                                            <TableCell>{purchase.category?.name}</TableCell> {/* Updated this line */}
                                             <TableCell>{new Date(purchase.purchaseDate).toLocaleDateString()}</TableCell>
                                             <TableCell align="right">{purchase.quantity}</TableCell>
                                             <TableCell align="right">{purchase.rate.toFixed(2)}</TableCell>

@@ -87,7 +87,7 @@ const Header = () => {
     }, []);
 
     return (
-        <header ref={headerRef} className="relative bg-[#8b1414]">
+        <header ref={headerRef} className="relative bg-[#0c115d]">
             <nav className="max-w-7xl mx-auto px-4 py-4 flex flex-col md:flex-row items-center justify-between">
                 {/* Left: Logo */}
                 <div className="flex items-center gap-4 w-full md:w-auto justify-center md:justify-start">

@@ -66,7 +66,7 @@ export const createEmployeeController = async (req, res) => {
 // Get all employees
 export const getAllEmployeesController = async (req, res) => {
     try {
-        const employees = await Employee.find({}).select("-password"); // Exclude passwords
+        const employees = await Employee.find({}).populate('department').select("-password"); // Exclude passwords
         res.status(200).send({
             success: true,
             message: "All employees fetched successfully",
@@ -86,7 +86,7 @@ export const getAllEmployeesController = async (req, res) => {
 // Get a single employee by ID
 export const getSingleEmployeeController = async (req, res) => {
     try {
-        const employee = await Employee.findById(req.params.id).select("-password"); // Exclude password
+        const employee = await Employee.findById(req.params.id).select("-password").populate("department"); // Exclude password
         if (!employee) {
             return res.status(404).send({
                 success: false,

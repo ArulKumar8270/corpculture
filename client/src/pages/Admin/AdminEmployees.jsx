@@ -131,10 +131,7 @@ const AdminEmployees = () => {
                 <th className="py-2 px-3 text-left">Phone</th>
                 <th className="py-2 px-3 text-left">Address</th>
                 <th className="py-2 px-3 text-left">Employee Type</th>
-                <th className="py-2 px-3 text-left">Designation</th>
-                <th className="py-2 px-3 text-left">ID Card No</th>
                 <th className="py-2 px-3 text-left">Department</th>
-                <th className="py-2 px-3 text-left">Salary</th>
                 <th className="py-2 px-3 text-center">Actions</th>
               </tr>
             </thead>
@@ -158,10 +155,7 @@ const AdminEmployees = () => {
                     <td className="py-2 px-3">{employee.phone}</td>
                     <td className="py-2 px-3">{employee.address}</td>
                     <td className="py-2 px-3">{employee.employeeType}</td>
-                    <td className="py-2 px-3">{employee.designation || 'N/A'}</td>
-                    <td className="py-2 px-3">{employee.idCradNo || 'N/A'}</td>
-                    <td className="py-2 px-3">{employee.department || 'N/A'}</td>
-                    <td className="py-2 px-3">{employee.salary ? `₹${employee.salary}` : 'N/A'}</td>
+                    <td className="py-2 px-3">{employee.department?.name || 'N/A'}</td>
                     <td className="py-2 px-3 text-center">
                       {hasPermission("reportsEmployeeList", "edit") && (
                         <IconButton

@@ -4,7 +4,7 @@ import userModel from "../../models/userModel.js";
 export const updateDetailsController = async (req, res) => {
     try {
         // Destructure all potential fields from req.body, including _id for identification
-        const { _id, name, email, phone, address, commission, pan, isCommissionEnabled, commissionCategorys } = req.body;
+        const { _id, name, email, phone, address, commission, pan, isCommissionEnabled, commissionCategorys, department } = req.body;
 
         // Find the user by _id
         const user = await userModel.findById(_id);
@@ -37,6 +37,9 @@ export const updateDetailsController = async (req, res) => {
         }
         if (isCommissionEnabled !== undefined) {
             updateFields.isCommissionEnabled = isCommissionEnabled;
+        }
+        if (department !== undefined) {
+            updateFields.department = department;
         }
         // Handle nested PAN details
         if (pan !== undefined) {

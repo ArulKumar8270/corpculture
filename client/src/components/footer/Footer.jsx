@@ -2,7 +2,7 @@ import React from "react";
 import logo from "../../assets/images/logo.png";
 
 const Footer = () => (
-    <footer className="w-full bg-[#8b1414] text-white relative overflow-hidden pt-16">
+    <footer className="w-full bg-[#0c115d] text-white relative overflow-hidden pt-16">
         {/* Top Wave SVG */}
         <div className="absolute top-[-89px] left-[100px] right-[100px] w-full">
             <svg viewBox="0 0 1440 100" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-24">

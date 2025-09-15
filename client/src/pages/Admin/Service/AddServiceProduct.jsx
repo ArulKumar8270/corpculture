@@ -32,6 +32,8 @@ const AddServiceProduct = () => {
     const [loadingProducts, setLoadingProducts] = useState(false); // New state for product loading
     const [loadingCompanies, setLoadingCompanies] = useState(false); // New state for company loading
 
+    console.log(productName, "v932450723498")
+
     // Fetch companies and GST options on component mount
     useEffect(() => {
         fetchCompanies();
@@ -90,27 +92,30 @@ const AddServiceProduct = () => {
             setGstOptions([]);
         }
     };
-
     // New function to fetch products from the purchases API
     const fetchPurchaseProducts = async () => {
         setLoadingProducts(true);
         try {
-            const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/purchases`, {
+            const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/purchases${auth?.user !== 1 ? '' :`?category=${auth?.user?.department}`}`, {
                 headers: {
                     Authorization: auth?.token,
                 },
             });
             if (data?.success) {
-                // Extract unique product names from purchases
-                // const uniqueProducts = [];
-                // const productIds = new Set();
-                // data.purchases.forEach(purchase => {
-                //     if (purchase.productName && !productIds.has(purchase._id)) {
-                //         uniqueProducts.push(purchase.productName);
-                //         productIds.add(purchase._id);
-                //     }
-                // });
-                setPurchaseProducts(data?.purchases);
+                const uniqueProductsMap = new Map();
+                data.purchases.forEach(purchase => {
+                    // Ensure product exists, has an ID, productCode, and quantity > 0
+                    if (purchase.productName && purchase.productName._id && purchase.productName.productCode && purchase.quantity > 0) {
+                        // Use productCode as the key to group by productCode
+                        // If multiple purchases have the same productCode, we only add one entry for that productCode.
+                        // The value stored will be the product definition object.
+                        if (!uniqueProductsMap.has(purchase.productName.productCode)) {
+                            uniqueProductsMap.set(purchase.productName.productCode, purchase.productName);
+                        }
+                    }
+                });
+                // Convert map values to an array of unique product definition objects
+                setPurchaseProducts(Array.from(uniqueProductsMap.values()));
             } else {
                 toast.error(data?.message || 'Failed to fetch purchase products.');
             }
@@ -224,6 +229,8 @@ const AddServiceProduct = () => {
         navigate('../serviceProductList'); // Navigate back to the list or dashboard
     };
 
+    console.log(auth, "auth4353245")
+
     return (
         <div className="p-4">
             <div className="flex justify-between items-center mb-6">
@@ -274,11 +281,14 @@ const AddServiceProduct = () => {
                     {/* Replaced TextField with Autocomplete for Product Name */}
                     <Autocomplete
                         options={purchaseProducts}
-                        getOptionLabel={(option) => option?.productName?.productName || ''}
+                        // Display both product name and product code
+                        getOptionLabel={(option) => `${option?.productName || ''} (${option?.productCode || ''})`}
                         isOptionEqualToValue={(option, value) => option._id === value._id}
-                        value={purchaseProducts.find(p => p._id === productName) || null} // Find the object based on stored ID for display
+                        // Find the product definition object based on the stored product ID for display
+                        value={purchaseProducts.find(p => p._id === productName) || null}
                         onChange={(event, newValue) => {
-                            setProductName(newValue ? newValue._id : ''); // Set the _id to state
+                            // Set the _id of the selected product definition to state
+                            setProductName(newValue ? newValue._id : '');
                         }}
                         loading={loadingProducts}
                         renderInput={(params) => (
