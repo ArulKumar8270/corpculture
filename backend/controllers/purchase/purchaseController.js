@@ -83,11 +83,18 @@ export const createPurchase = async (req, res) => {
 // Get All Purchases
 export const getAllPurchases = async (req, res) => {
     try {
-        const purchases = await Purchase.find({})
+        const { category } = req.query; // Get category from query parameters
+        let filter = {};
+
+        if (category) {
+            filter.category = category; // Add category to filter if provided
+        }
+
+        const purchases = await Purchase.find(filter) // Apply the filter
             .populate('vendorCompanyName', 'companyName') // Populate vendor company name
             .populate('gstType', 'gstType gstPercentage') // Populate GST details
-            .populate('productName') // Populate GST details
-            .populate('category') // Populate GST details
+            .populate('productName') // Populate product details
+            .populate('category') // Populate category details
             .sort({ createdAt: -1 });
 
         res.status(200).send({ success: true, message: 'All Purchases fetched', purchases });

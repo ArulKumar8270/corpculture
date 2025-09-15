@@ -21,6 +21,10 @@ const vendorProductSchema = new mongoose.Schema({
         required: true,
         min: 0,
     },
+    productCode : {
+        type : String, // Reference to the Product model
+        required: true,
+    },
 }, { timestamps: true });
 
 // Optional: If a product name should be unique per vendor, add a compound index

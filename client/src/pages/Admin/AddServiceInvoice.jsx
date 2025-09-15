@@ -37,11 +37,11 @@ const AddServiceInvoice = () => {
     const employeeName = searchParams.get("employeeName");
     const invoiceType = searchParams.get("invoiceType");
     const serviceId = searchParams.get("serviceId");
-    const companyId = searchParams.get("companyId");
+    const companyIdFromParams = searchParams.get("companyId"); // Renamed to avoid conflict
     const [invoices, setInvoices] = useState(null);
     // State for form fields
     const [invoiceData, setInvoiceData] = useState({
-        companyId: companyId ? companyId : '', // Stores the _id of the selected company
+        companyId: (companyIdFromParams && companyIdFromParams !== 'null') ? companyIdFromParams : '', // Stores the _id of the selected company
         productId: '', // Stores the _id of the selected product for adding to table
         quantity: '', // Quantity for the product being added
         modeOfPayment: 'Cash',
@@ -59,7 +59,7 @@ const AddServiceInvoice = () => {
     const [companies, setCompanies] = useState([]);
     const [availableProducts, setAvailableProducts] = useState([]);
     const [loading, setLoading] = useState(true); // Loading state for initial data
-    
+
     useEffect(() => {
         fetchInvoicesCounts();
     }, [serviceId]);
@@ -97,12 +97,9 @@ const AddServiceInvoice = () => {
                 });
                 if (data?.success) {
                     setCompanies(data.companies);
-                } else {
-                    toast.error(data?.message || 'Failed to fetch companies.');
                 }
             } catch (error) {
                 console.error("Error fetching companies:", error);
-                toast.error('Something went wrong while fetching companies.');
             } finally {
                 setLoading(false);
             }
@@ -112,61 +109,58 @@ const AddServiceInvoice = () => {
 
 
     useEffect(() => {
-        const fetchCompanyData = async () => {
-            if (invoiceData?.companyId) {
-                try {
-                    const { data } = await axios.get(
-                        `${import.meta.env.VITE_SERVER_URL}/api/v1/company/get/${invoiceData?.companyId}`,
-                        {
-                            headers: {
-                                Authorization: auth.token,
-                            },
-                        }
-                    );
-                    if (data?.success && data.company) {
-                        const company = data.company;
-                        setCompanyData(company);
 
-                    } else {
-                        alert(data?.message || 'Failed to fetch company details.');
-                    }
-                } catch (error) {
-                    console.error('Error fetching company details:', error);
-                    alert(error.response?.data?.message || 'Something went wrong while fetching company details.');
-                }
-            }
-        };
-
-        if (auth?.token) {
+        if (auth?.token && invoiceData?.companyId && invoiceData?.companyId !== '') {
+            console.log("Fetching company data and products for companyId:", invoiceData?.companyId); // Log the companyId being used t
             fetchCompanyData();
             fetchProductsByCompany();
         }
     }, [invoiceData?.companyId, auth?.token]);
 
-    const fetchProductsByCompany = async () => {
-        if (invoiceData.companyId) {
-            try {
-                setLoading(true);
-                const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/service-products/getServiceProductsByCompany/${invoiceData.companyId}`, {
+    const fetchCompanyData = async () => {
+        try {
+            const { data } = await axios.get(
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/company/get/${invoiceData?.companyId}`,
+                {
                     headers: {
                         Authorization: auth.token,
                     },
-                });
-                if (data?.success) {
-                    setAvailableProducts(data.serviceProducts);
-                } else {
-                    alert(data?.message || 'Failed to fetch products for the selected company.');
-                    setAvailableProducts([]); // Clear products if fetch fails
                 }
-            } catch (error) {
-                console.error("Error fetching products by company:", error);
-                setAvailableProducts([]); // Clear products on error
-            } finally {
-                setLoading(false);
+            );
+            if (data?.success && data.company) {
+                const company = data.company;
+                setCompanyData(company);
+
+            } else {
+                alert(data?.message || 'Failed to fetch company details.');
             }
-        } else {
-            setAvailableProducts([]); // Clear products if no company is selected
+        } catch (error) {
+            console.error('Error fetching company details:', error);
+            alert(error.response?.data?.message || 'Something went wrong while fetching company details.');
         }
+    };
+
+    const fetchProductsByCompany = async () => {
+        try {
+            setLoading(true);
+            const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/service-products/getServiceProductsByCompany/${invoiceData.companyId}`, {
+                headers: {
+                    Authorization: auth.token,
+                },
+            });
+            if (data?.success) {
+                setAvailableProducts(data.serviceProducts);
+            } else {
+                alert(data?.message || 'Failed to fetch products for the selected company.');
+                setAvailableProducts([]); // Clear products if fetch fails
+            }
+        } catch (error) {
+            console.error("Error fetching products by company:", error);
+            setAvailableProducts([]); // Clear products on error
+        } finally {
+            setLoading(false);
+        }
+
     };
 
     const handleChange = (e) => {
@@ -524,7 +518,7 @@ const AddServiceInvoice = () => {
                                         }}
                                     />
                                 )}
-                                disabled={!!invoiceId || !!companyId} // only disable in edit mode
+                                disabled={invoiceId || invoiceData?.companyId ? true : false} // only disable in edit mode
                             />
                         </FormControl>
                     </Grid>
@@ -534,7 +528,7 @@ const AddServiceInvoice = () => {
                             <Autocomplete
                                 id="productId-autocomplete"
                                 options={availableProducts}
-                                getOptionLabel={(option) => option.productName?.productName?.productName || ''}
+                                getOptionLabel={(option) => option.productName?.productName || ''}
                                 isOptionEqualToValue={(option, value) => option._id === value._id}
                                 value={availableProducts.find(prod => prod._id === invoiceData.productId) || null}
                                 onChange={(event, newValue) => {
@@ -726,7 +720,7 @@ const AddServiceInvoice = () => {
                             productsInTable.map((product, index) => (
                                 <TableRow key={product.id}> {/* Use the unique 'id' as key */}
                                     <TableCell>{index + 1}</TableCell>
-                                    <TableCell>{product.productName?.productName?.productName}</TableCell>
+                                    <TableCell>{product.productName?.productName}</TableCell>
                                     <TableCell>{product.sku}</TableCell>
                                     <TableCell>{product.hsn}</TableCell>
                                     <TableCell align="right">{product.quantity}</TableCell>

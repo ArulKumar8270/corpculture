@@ -8,6 +8,8 @@ import { toast } from 'react-toastify';
 import TextField from "@mui/material/TextField";
 import MenuItem from "@mui/material/MenuItem";
 import Button from "@mui/material/Button";
+import { InputAdornment, Select } from '@mui/material';
+import CategoryIcon from '@mui/icons-material/Category'; // For voucher type
 
 const AddEmployee = () => {
     const { auth } = useAuth();
@@ -29,11 +31,38 @@ const AddEmployee = () => {
     const [errors, setErrors] = useState({});
     const [loading, setLoading] = useState(false);
     const [isEditMode, setIsEditMode] = useState(false); // State to track edit mode
-
+    const [categories, setCategories] = useState([]); // New state for categories
     const employeeTypes = ['Service', 'Sales', "Rentals"];
+
+    // New function to fetch categories
+    const fetchCategories = async () => {
+        try {
+            const res = await axios.get(
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/category/all`,
+                {
+                    headers: {
+                        Authorization: auth?.token,
+                    },
+                }
+            );
+            if (res.status === 200) {
+                setCategories(res.data.categories);
+            }
+        } catch (error) {
+            console.error("Error fetching categories:", error);
+            toast.error(
+                error.response?.data?.message ||
+                "Error fetching categories. Please try again."
+            );
+        }
+    };
 
     // Effect to fetch employee data if in edit mode
     useEffect(() => {
+        if (auth?.token) { // Fetch categories only if authenticated
+            fetchCategories();
+        }
+
         if (employeeId) {
             setIsEditMode(true);
             const fetchEmployee = async () => {
@@ -56,7 +85,8 @@ const AddEmployee = () => {
                         employeeType: employeeData.employeeType || '',
                         designation: employeeData.designation || '',
                         idCradNo: employeeData.idCradNo || '',
-                        department: employeeData.department || '',
+                        // Assuming department might be populated (object with _id) or just an ID string
+                        department: employeeData.department?._id || employeeData.department || '',
                         salary: employeeData.salary || '',
                     });
                 } catch (error) {
@@ -82,6 +112,7 @@ const AddEmployee = () => {
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
+        console.log(name, value, "asdfajslhk");
         setFormData({ ...formData, [name]: value });
         // Clear error for the field when it's being edited
         setErrors({ ...errors, [name]: undefined });
@@ -142,8 +173,6 @@ const AddEmployee = () => {
                         }
                     );
                     registerUser = response?.data?.user;
-                    console.log("registerUser234523", registerUser);
-
                     const employeeCreateResponse = await axios.post(
                         `${import.meta.env.VITE_SERVER_URL}/api/v1/employee/create`,
                         {
@@ -257,15 +286,7 @@ const AddEmployee = () => {
                                 </MenuItem>
                             ))}
                         </TextField>
-                        <TextField
-                            label="Designation"
-                            name="designation"
-                            value={formData.designation}
-                            onChange={handleInputChange}
-                            variant="outlined"
-                            size="small"
-                            fullWidth
-                        />
+
                         <TextField
                             label="ID Card Number"
                             name="idCradNo"
@@ -275,15 +296,22 @@ const AddEmployee = () => {
                             size="small"
                             fullWidth
                         />
-                        <TextField
-                            label="Department"
-                            name="department"
+                        <label>Department</label>
+                        <Select
                             value={formData.department}
+                            name='department'
                             onChange={handleInputChange}
-                            variant="outlined"
-                            size="small"
-                            fullWidth
-                        />
+                            label="Category"
+                            endAdornment={
+                                <InputAdornment position="end">
+                                    <CategoryIcon />
+                                </InputAdornment>
+                            }
+                        >
+                            {categories?.map((cat) => (
+                                <MenuItem key={cat._id} value={cat._id}>{cat.name}</MenuItem>
+                            ))}
+                        </Select>
                         <TextField
                             label="Salary"
                             name="salary"
@@ -329,7 +357,12 @@ const AddEmployee = () => {
                         <p><strong>Employee Type:</strong> {formData.employeeType || 'N/A'}</p>
                         <p><strong>Designation:</strong> {formData.designation || 'N/A'}</p>
                         <p><strong>ID Card No:</strong> {formData.idCradNo || 'N/A'}</p>
-                        <p><strong>Department:</strong> {formData.department || 'N/A'}</p>
+                        <p>
+                            <strong>Department:</strong>
+                            {formData.department
+                                ? categories.find(cat => cat._id === formData.department)?.name || 'N/A'
+                                : 'N/A'}
+                        </p>
                         <p><strong>Salary:</strong> {formData.salary ? `₹${formData.salary}` : 'N/A'}</p>
                     </div>
                 </div>

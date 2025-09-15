@@ -44,6 +44,8 @@ export const loginController = async (req, res) => {
             { expiresIn: "7d" }
         );
 
+        console.log(user, "37540298374")
+
         //SUCCESS RESPONSE
         res.status(200).send({
             success: true,
@@ -55,6 +57,7 @@ export const loginController = async (req, res) => {
                 phone: user.phone,
                 address: user.address,
                 role: user.role,
+                department : user.department,
                 parentId: user.parentId || null,
                 isCommissionEnabled: user.isCommissionEnabled,
             },

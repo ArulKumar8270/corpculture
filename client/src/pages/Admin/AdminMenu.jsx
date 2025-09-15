@@ -653,7 +653,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                                         }
                                                     >
                                                         <div className="h-10 px-8 flex items-center">
-                                                            Vendors
+                                                            Vendors List
                                                         </div>
                                                     </NavLink>
                                                 )}

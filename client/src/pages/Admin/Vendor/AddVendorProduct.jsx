@@ -18,6 +18,7 @@ const AddVendorProduct = () => {
     const [productName, setProductName] = useState('');
     const [gstType, setGstType] = useState('');
     const [pricePerQuantity, setPricePerQuantity] = useState('');
+    const [productCode, setProductCode] = useState(''); // New state for productCode
 
     // Dropdown options
     const [vendorCompanies, setVendorCompanies] = useState([]);
@@ -70,6 +71,7 @@ const AddVendorProduct = () => {
                         setProductName(product.productName || '');
                         setGstType(product.gstType._id || ''); // Assuming it's populated
                         setPricePerQuantity(product.pricePerQuantity.toString() || '');
+                        setProductCode(product.productCode || ''); // Set productCode in edit mode
                     } else {
                         toast.error(data?.message || 'Failed to fetch vendor product details.');
                         handleViewProducts(); // Redirect if product not found
@@ -89,7 +91,7 @@ const AddVendorProduct = () => {
         e.preventDefault();
 
         // Basic validation
-        if (!vendorCompanyName || !productName || !gstType || !pricePerQuantity) {
+        if (!vendorCompanyName || !productName || !gstType || !pricePerQuantity || !productCode) { // Added productCode to validation
             toast.error('Please fill in all required fields.');
             return;
         }
@@ -99,6 +101,7 @@ const AddVendorProduct = () => {
             productName,
             gstType,
             pricePerQuantity: parseFloat(pricePerQuantity),
+            productCode, // Include productCode in the data
         };
 
         try {
@@ -119,6 +122,7 @@ const AddVendorProduct = () => {
                     setProductName('');
                     setGstType('');
                     setPricePerQuantity('');
+                    setProductCode(''); // Clear productCode when creating new
                 }
                 handleViewProducts(); // Navigate to product list after success
             } else {
@@ -188,6 +192,21 @@ const AddVendorProduct = () => {
                                     ),
                                 }}
                             />
+                            <TextField // New TextField for Product Code
+                                label="Product Code"
+                                value={productCode}
+                                onChange={(e) => setProductCode(e.target.value)}
+                                fullWidth
+                                variant="outlined"
+                                size="small"
+                                InputProps={{
+                                    endAdornment: (
+                                        <InputAdornment position="end">
+                                            <DescriptionIcon /> {/* You can choose a different icon if preferred */}
+                                        </InputAdornment>
+                                    ),
+                                }}
+                            />
                             <FormControl fullWidth variant="outlined" size="small">
                                 <InputLabel>GST Type</InputLabel>
                                 <Select
@@ -204,7 +223,7 @@ const AddVendorProduct = () => {
                                         <em>Select GST Type</em>
                                     </MenuItem>
                                     {gstOptions.map((gst) => (
-                                        <MenuItem key={gst._id} value={gst._id}>{gst.gstType}</MenuItem>
+                                        <MenuItem key={gst._id} value={gst._id}>{gst.gstType} ({gst.gstPercentage}%)</MenuItem>
                                     ))}
                                 </Select>
                             </FormControl>
