@@ -194,6 +194,9 @@ const AddServiceInvoice = () => {
             quantity: parseInt(invoiceData.quantity),
             rate: selectedProduct.rate,
             totalAmount: parseInt(invoiceData.quantity) * selectedProduct.totalAmount,
+            otherProducts: invoiceData?.otherProducts,
+            benefitQuantity: invoiceData?.benefitQuantity,
+            reInstall: invoiceData?.reInstall,
         };
 
         setProductsInTable(prevProducts => [...prevProducts, newProduct]);
@@ -202,6 +205,9 @@ const AddServiceInvoice = () => {
             ...prevData,
             productId: '',
             quantity: '',
+            otherProducts: '',
+            benefitQuantity: '',
+            reInstall: '',
         }));
         toast.success('Product added to list!');
     };
@@ -365,21 +371,9 @@ const AddServiceInvoice = () => {
     }
 
     const handleCancel = (invoice) => {
-        setInvoiceData({
-            companyId: '',
-            productId: '',
-            quantity: '',
-            modeOfPayment: 'Cash',
-            deliveryAddress: '',
-            reference: '',
-            description: '',
-            // status: 'draft', // Removed status
-            sendTo: [] // Clear sendTo as an empty array
-        });
-        setProductsInTable([]);
-        setAvailableProducts([]); // Clear available products
         if (!invoiceId && invoiceType !== "quotation") {
             handleUpdateInvoiceCount()
+            updateEmployeeBenefit(invoice)
         }
         updateCommissionDetails(invoice);
         updateStausToService(serviceId, 'Completed');
@@ -457,6 +451,42 @@ const AddServiceInvoice = () => {
             console.log(error);
         }
     }
+    const updateEmployeeBenefit = async (invoice) => {
+        try {
+
+            for (const product of productsInTable) {
+                if (product.reInstall === true || product.otherProducts !== '') {
+                    const apiParams = {
+                        employeeId: invoice?.assignedTo?._id, // or employeeName if needed
+                        invoiceId: invoice?._id,
+                        productId: product.productId,
+                        quantity: product.benefitQuantity,
+                        reInstall: product.reInstall || false,
+                        otherProducts: product.otherProducts || null,
+                    };
+
+                    const { data } = await axios.post(
+                        `${import.meta.env.VITE_SERVER_URL}/api/v1/employee-benefits`,
+                        apiParams, // ✅ send object directly, not wrapped in { apiParams }
+                        {
+                            headers: {
+                                Authorization: auth.token,
+                            },
+                        }
+                    );
+
+                    if (data?.success) {
+                        console.log("Benefit updated:", data.message);
+                    }
+                }
+            }
+            alert("All benefits updated successfully!");
+        } catch (err) {
+            console.error("Error updating benefit:", err);
+        }
+    };
+
+
 
     if (loading) {
         return (
@@ -465,6 +495,8 @@ const AddServiceInvoice = () => {
             </Box>
         );
     }
+
+    console.log(invoiceData, "asd7098534", productsInTable)
 
     return (
         <Box sx={{ p: 3, bgcolor: 'background.default', minHeight: '100vh' }}>
@@ -555,6 +587,52 @@ const AddServiceInvoice = () => {
                                 disabled={!invoiceData.companyId || availableProducts.length === 0}
                             />
                         </FormControl>
+                        {invoiceData.productId && (
+                            <Grid container spacing={3}>
+                                <Grid item xs={12} sm={4}>
+                                    <FormControl fullWidth margin="normal" size="small">
+                                        <InputLabel shrink htmlFor="rework-checkbox">Rework</InputLabel>
+                                        <Select
+                                            id="rework-checkbox"
+                                            name="reInstall"
+                                            value={invoiceData.reInstall || false}
+                                            onChange={e => handleChange({ target: { name: 'reInstall', value: e.target.value } })}
+                                            disabled={invoiceData.otherProducts}
+                                        >
+                                            <MenuItem value={false}>No</MenuItem>
+                                            <MenuItem value={true}>Yes</MenuItem>
+                                        </Select>
+                                    </FormControl>
+                                </Grid>
+                                <Grid item xs={12} sm={4}>
+                                    <TextField
+                                        fullWidth
+                                        margin="normal"
+                                        label="Other Product"
+                                        name="otherProducts"
+                                        value={invoiceData.otherProducts || ''}
+                                        onChange={handleChange}
+                                        placeholder="Specify other product if any"
+                                        size="small"
+                                        disabled={invoiceData.reInstall}
+                                    />
+                                </Grid>
+                                <Grid item xs={12} sm={4}>
+                                    <TextField
+                                        fullWidth
+                                        margin="normal"
+                                        label="Quantity"
+                                        name="benefitQuantity"
+                                        type="number"
+                                        value={invoiceData.benefitQuantity}
+                                        onChange={handleChange}
+                                        placeholder="Enter Quantity"
+                                        size="small"
+                                        disabled={!invoiceData.productId}
+                                    />
+                                </Grid>
+                            </Grid>
+                        )}
                     </Grid>
                     <Grid item xs={12} sm={6}>
                         <TextField
@@ -570,6 +648,8 @@ const AddServiceInvoice = () => {
                             disabled={!invoiceData.productId}
                         />
                     </Grid>
+                    {/* Add Rework, Other Product, and Quantity fields below product selection */}
+
                     {/* <Grid item xs={12} sm={6}>
                         <FormControl fullWidth margin="normal" size="small" required>
                             <InputLabel id="mode-of-payment-label">Mode Of Payment</InputLabel>
