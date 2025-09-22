@@ -31,9 +31,6 @@ const AddServiceProduct = () => {
     const [purchaseProducts, setPurchaseProducts] = useState([]); // New state for products from purchases API
     const [loadingProducts, setLoadingProducts] = useState(false); // New state for product loading
     const [loadingCompanies, setLoadingCompanies] = useState(false); // New state for company loading
-
-    console.log(productName, "v932450723498")
-
     // Fetch companies and GST options on component mount
     useEffect(() => {
         fetchCompanies();
@@ -69,7 +66,6 @@ const AddServiceProduct = () => {
             }
         } catch (error) {
             console.error('Error fetching companies:', error);
-            toast.error('Something went wrong while fetching companies.');
             // Mock data for development if API is not ready
             setCompanies([]);
         } finally {
@@ -105,23 +101,22 @@ const AddServiceProduct = () => {
                 const uniqueProductsMap = new Map();
                 data.purchases.forEach(purchase => {
                     // Ensure product exists, has an ID, productCode, and quantity > 0
-                    if (purchase.productName && purchase.productName._id && purchase.productName.productCode && purchase.quantity > 0) {
+                    if (purchase.productName && purchase.productName.productCode && purchase.quantity > 0) {
                         // Use productCode as the key to group by productCode
                         // If multiple purchases have the same productCode, we only add one entry for that productCode.
                         // The value stored will be the product definition object.
                         if (!uniqueProductsMap.has(purchase.productName.productCode)) {
-                            uniqueProductsMap.set(purchase.productName.productCode, purchase.productName);
+                            uniqueProductsMap.set(purchase.productName.productCode, purchase);
                         }
                     }
                 });
                 // Convert map values to an array of unique product definition objects
                 setPurchaseProducts(Array.from(uniqueProductsMap.values()));
             } else {
-                toast.error(data?.message || 'Failed to fetch purchase products.');
+                console.error(data?.message || 'Failed to fetch purchase products.');
             }
         } catch (error) {
             console.error('Error fetching purchase products:', error);
-            toast.error('Something went wrong while fetching purchase products.');
         } finally {
             setLoadingProducts(false);
         }
@@ -229,8 +224,6 @@ const AddServiceProduct = () => {
         navigate('../serviceProductList'); // Navigate back to the list or dashboard
     };
 
-    console.log(auth, "auth4353245")
-
     return (
         <div className="p-4">
             <div className="flex justify-between items-center mb-6">
@@ -282,7 +275,7 @@ const AddServiceProduct = () => {
                     <Autocomplete
                         options={purchaseProducts}
                         // Display both product name and product code
-                        getOptionLabel={(option) => `${option?.productName || ''} (${option?.productCode || ''})`}
+                        getOptionLabel={(option) => `${option?.productName?.productName || ''} (${option?.productName?.productCode || ''})`}
                         isOptionEqualToValue={(option, value) => option._id === value._id}
                         // Find the product definition object based on the stored product ID for display
                         value={purchaseProducts.find(p => p._id === productName) || null}

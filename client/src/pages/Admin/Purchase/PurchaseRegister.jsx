@@ -32,18 +32,13 @@ const PurchaseRegister = () => {
     const [purchaseInvoiceNumber, setPurchaseInvoiceNumber] = useState('');
     const [gstinUn, setGstinUn] = useState('');
     // Removed: narration
-    const [gstType, setGstType] = useState('');
     const [purchaseDate, setPurchaseDate] = useState(dayjs()); // Default to current date
     const [quantity, setQuantity] = useState('');
     const [rate, setRate] = useState('');
-    // Removed: freightCharges, price, grossTotal, roundOff
-    const [category, setCategory] = useState(''); // New state for category
-
     // Dropdown options (mock data for now, replace with actual API calls)
     const [vendorCompanies, setVendorCompanies] = useState([]);
     const [products, setProducts] = useState([]);
     const [gstOptions, setGstOptions] = useState([]);
-    const [categories, setCategories] = useState([]); // New state for categories
     const voucherTypes = ['Purchase', 'Return', 'Other']; // Example voucher types
 
     // Function to fetch products by vendor ID
@@ -78,29 +73,10 @@ const PurchaseRegister = () => {
                 } else {
                     toast.error(vendorsRes.data?.message || 'Failed to fetch vendor companies.');
                 }
-
-                // Fetch GST Options
-                const gstRes = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/gst`);
-                if (gstRes.data?.success) {
-                    setGstOptions(gstRes.data.gst);
-                } else {
-                    toast.error(gstRes.data?.message || 'Failed to fetch GST options.');
-                }
-
-                // Fetch Categories
-                const categoryRes = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/category/all`);
-                if (categoryRes.data?.success) {
-                    setCategories(categoryRes.data.categories);
-                } else {
-                    toast.error(categoryRes.data?.message || 'Failed to fetch categories.');
-                }
-
             } catch (error) {
                 console.error('Error fetching initial data:', error);
                 toast.error('Something went wrong while fetching initial data.');
                 setVendorCompanies([]);
-                setGstOptions([]);
-                setCategories([]);
             }
         };
         fetchData();
@@ -123,14 +99,9 @@ const PurchaseRegister = () => {
                         setProductName(purchase.productName?._id || '');
                         setVoucherType(purchase.voucherType || 'Purchase');
                         setPurchaseInvoiceNumber(purchase.purchaseInvoiceNumber || '');
-                        setGstinUn(purchase.gstinUn || '');
-                        // Removed: setNarration(purchase.narration || '');
-                        setGstType(purchase.gstType?._id || '');
                         setPurchaseDate(purchase.purchaseDate ? dayjs(purchase.purchaseDate) : dayjs());
                         setQuantity(purchase.quantity || '');
                         setRate(purchase.rate || '');
-                        // Removed: setFreightCharges, setPrice, setGrossTotal, setRoundOff
-                        setCategory(purchase.category?._id || ''); // Set category for edit
                     } else {
                         navigate('../purchaseList'); // Redirect if not found
                     }
@@ -162,6 +133,7 @@ const PurchaseRegister = () => {
             const selectedProduct = products.find(p => p._id === productName);
             if (selectedProduct && selectedProduct.pricePerQuantity !== undefined) {
                 setRate(selectedProduct.pricePerQuantity.toString());
+                setGstOptions(selectedProduct.gstType || []);
             } else {
                 setRate(''); // Clear rate if product not found or price not available
             }
@@ -175,9 +147,10 @@ const PurchaseRegister = () => {
     const parsedRate = parseFloat(rate) || 0;
     const calculatedPrice = parsedQuantity * parsedRate;
 
-    const selectedGstOption = gstOptions.find(gst => gst._id === gstType);
-    const gstPercentage = selectedGstOption ? parseFloat(selectedGstOption.gstPercentage) : 0; // Changed to gstPercentage
-    const calculatedGstAmount = calculatedPrice * (gstPercentage / 100);
+    const totalGstPercentage = Array.isArray(gstOptions) && gstOptions.length > 0
+        ? gstOptions.reduce((sum, option) => sum + parseFloat(option.gstPercentage || 0), 0)
+        : 0;
+    const calculatedGstAmount = calculatedPrice * (totalGstPercentage / 100);
     const calculatedGrossTotal = calculatedPrice + calculatedGstAmount;
 
     const handleSubmit = async (e) => {
@@ -186,8 +159,8 @@ const PurchaseRegister = () => {
 
         // Basic validation (removed freightCharges, grossTotal, roundOff, price as they are calculated)
         // Removed !narration from validation
-        if (!vendorCompanyName || !productName || !voucherType || !purchaseInvoiceNumber || !gstinUn || !gstType || !purchaseDate || !quantity || !rate || !category) {
-            toast.error('Please fill in all required fields.');
+        if (!vendorCompanyName || !productName || !voucherType || !purchaseInvoiceNumber || !purchaseDate || !quantity || !rate) {
+            alert('Please fill in all required fields.');
             setLoading(false);
             return;
         }
@@ -197,17 +170,12 @@ const PurchaseRegister = () => {
             productName,
             voucherType,
             purchaseInvoiceNumber,
-            gstinUn,
-            // Removed: narration,
-            gstType,
             purchaseDate: purchaseDate ? purchaseDate.toISOString() : null,
             quantity: parsedQuantity,
             rate: parsedRate,
             // Use calculated values for price and grossTotal
             price: calculatedPrice,
-            grossTotal: calculatedGrossTotal,
-            // freightCharges and roundOff are removed
-            category,
+            grossTotal: calculatedGrossTotal
         };
 
         try {
@@ -230,7 +198,7 @@ const PurchaseRegister = () => {
                     setPurchaseInvoiceNumber('');
                     setGstinUn('');
                     // Removed: setNarration('');
-                    setGstType('');
+                    setGstType([]);
                     setPurchaseDate(dayjs());
                     setQuantity('');
                     setRate('');
@@ -342,27 +310,6 @@ const PurchaseRegister = () => {
                                     ))}
                                 </Select>
                             </FormControl>
-                            <FormControl fullWidth variant="outlined" size="small"> {/* New Category Field */}
-                                <InputLabel>Category</InputLabel>
-                                <Select
-                                    value={category}
-                                    onChange={(e) => setCategory(e.target.value)}
-                                    label="Category"
-                                    endAdornment={
-                                        <InputAdornment position="end">
-                                            <CategoryIcon />
-                                        </InputAdornment>
-                                    }
-                                >
-                                    <MenuItem value="">
-                                        <em>--select Category--</em>
-                                    </MenuItem>
-                                    {categories.map((cat) => (
-                                        <MenuItem key={cat._id} value={cat._id}>{cat.name}</MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
-
                             <TextField
                                 label="Purchase Invoice Number"
                                 value={purchaseInvoiceNumber}
@@ -374,21 +321,6 @@ const PurchaseRegister = () => {
                                     endAdornment: (
                                         <InputAdornment position="end">
                                             <ReceiptIcon /> {/* Icon as per image */}
-                                        </InputAdornment>
-                                    ),
-                                }}
-                            />
-                            <TextField
-                                label="GSTIN/UN"
-                                value={gstinUn}
-                                onChange={(e) => setGstinUn(e.target.value)}
-                                fullWidth
-                                variant="outlined"
-                                size="small"
-                                InputProps={{
-                                    endAdornment: (
-                                        <InputAdornment position="end">
-                                            <LockIcon /> {/* Icon as per image */}
                                         </InputAdornment>
                                     ),
                                 }}
@@ -411,27 +343,6 @@ const PurchaseRegister = () => {
                                 }}
                             /> */}
                             <div className="col-span-1"></div> {/* Empty div for layout */}
-
-                            <FormControl fullWidth variant="outlined" size="small">
-                                <InputLabel>GST Type</InputLabel>
-                                <Select
-                                    value={gstType}
-                                    onChange={(e) => setGstType(e.target.value)}
-                                    label="GST Type"
-                                    endAdornment={
-                                        <InputAdornment position="end">
-                                            <AttachMoneyIcon /> {/* Using money icon for GST Type */}
-                                        </InputAdornment>
-                                    }
-                                >
-                                    <MenuItem value="">
-                                        <em>Select GST Type</em>
-                                    </MenuItem>
-                                    {gstOptions.map((gst) => (
-                                        <MenuItem key={gst._id} value={gst._id}>{gst.gstType} ({gst.gstPercentage}%)</MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
                             <LocalizationProvider dateAdapter={AdapterDayjs}>
                                 <DatePicker
                                     label="Purchase Date"

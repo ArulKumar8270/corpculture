@@ -5,7 +5,7 @@ import GST from "../../models/gstModel.js"; // Assuming this path is correct
 // Create Vendor Product
 export const createVendorProduct = async (req, res) => {
     try {
-        const { vendorCompanyName, productName, gstType, pricePerQuantity, productCode } = req.body;
+        const { vendorCompanyName, productName, gstType, pricePerQuantity, productCode, category } = req.body;
 
         // Validation
         if (!vendorCompanyName || !productName || !gstType || pricePerQuantity === undefined) {
@@ -38,7 +38,8 @@ export const createVendorProduct = async (req, res) => {
             productName,
             gstType,
             pricePerQuantity: parseFloat(pricePerQuantity),
-            productCode
+            productCode,
+            category
         });
 
         await newVendorProduct.save();
@@ -86,7 +87,7 @@ export const getVendorProductById = async (req, res) => {
 export const updateVendorProduct = async (req, res) => {
     try {
         const { id } = req.params;
-        const { vendorCompanyName, productName, gstType, pricePerQuantity, productCode } = req.body;
+        const { vendorCompanyName, productName, gstType, pricePerQuantity, productCode, category } = req.body;
 
         // Basic Validation for update
         if (!vendorCompanyName || !productName || !gstType || pricePerQuantity === undefined) {
@@ -121,7 +122,8 @@ export const updateVendorProduct = async (req, res) => {
                 productName,
                 gstType,
                 pricePerQuantity: parseFloat(pricePerQuantity),
-                productCode
+                productCode,
+                category
             },
             { new: true, runValidators: true }
         );

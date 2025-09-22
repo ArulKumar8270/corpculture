@@ -6,13 +6,11 @@ import GST from "../../models/gstModel.js"; // Assuming this path is correct
 export const createPurchase = async (req, res) => {
     try {
         const {
-            vendorCompanyName, productName, voucherType, purchaseInvoiceNumber, gstinUn, narration,
-            gstType, purchaseDate, quantity, rate, freightCharges, price, grossTotal, roundOff,
-            category,
+            vendorCompanyName, productName, voucherType, purchaseInvoiceNumber, narration, purchaseDate, quantity, rate, freightCharges, price, grossTotal, roundOff
         } = req.body;
 
         // Validation
-        if (!vendorCompanyName || !productName || !voucherType || !purchaseInvoiceNumber || !gstType ||
+        if (!vendorCompanyName || !productName || !voucherType || !purchaseInvoiceNumber ||
             !purchaseDate || quantity === undefined || rate === undefined || price === undefined || grossTotal === undefined) {
             return res.status(400).send({ success: false, message: 'All required fields must be provided.' });
         }
@@ -42,12 +40,6 @@ export const createPurchase = async (req, res) => {
             return res.status(404).send({ success: false, message: 'Vendor not found.' });
         }
 
-        // Check if GST type exists
-        const existingGstType = await GST.findById(gstType);
-        if (!existingGstType) {
-            return res.status(404).send({ success: false, message: 'GST Type not found.' });
-        }
-
         // Check if purchase invoice number already exists
         const existingPurchase = await Purchase.findOne({ purchaseInvoiceNumber });
         if (existingPurchase) {
@@ -59,9 +51,7 @@ export const createPurchase = async (req, res) => {
             productName,
             voucherType,
             purchaseInvoiceNumber,
-            gstinUn,
             narration,
-            gstType,
             purchaseDate: new Date(purchaseDate),
             quantity: parseFloat(quantity),
             rate: parseFloat(rate),
@@ -69,7 +59,6 @@ export const createPurchase = async (req, res) => {
             price: parseFloat(price),
             grossTotal: parseFloat(grossTotal),
             roundOff: roundOff !== undefined ? parseFloat(roundOff) : 0,
-            category: category,
         });
 
         await newPurchase.save();
@@ -92,9 +81,7 @@ export const getAllPurchases = async (req, res) => {
 
         const purchases = await Purchase.find(filter) // Apply the filter
             .populate('vendorCompanyName', 'companyName') // Populate vendor company name
-            .populate('gstType', 'gstType gstPercentage') // Populate GST details
             .populate('productName') // Populate product details
-            .populate('category') // Populate category details
             .sort({ createdAt: -1 });
 
         res.status(200).send({ success: true, message: 'All Purchases fetched', purchases });
@@ -110,9 +97,7 @@ export const getPurchaseById = async (req, res) => {
         const { id } = req.params;
         const purchase = await Purchase.findById(id)
             .populate('vendorCompanyName')
-            .populate('gstType', 'gstType gstPercentage')
-            .populate('productName') // Populate GST details
-            .populate('category') // Populate GST details
+            .populate('productName') // Populate product details
 
         if (!purchase) {
             return res.status(404).send({ success: false, message: 'Purchase not found' });
@@ -129,46 +114,39 @@ export const updatePurchase = async (req, res) => {
     try {
         const { id } = req.params;
         const {
-            vendorCompanyName, productName, voucherType, purchaseInvoiceNumber, gstinUn, narration,
-            gstType, purchaseDate, quantity, rate, freightCharges, price, grossTotal, roundOff,
-            category
+            vendorCompanyName, productName, voucherType, purchaseInvoiceNumber, narration, purchaseDate, quantity, rate, freightCharges, price, grossTotal, roundOff
         } = req.body;
 
         // Basic Validation for update
-        if (!vendorCompanyName || !productName || !voucherType || !purchaseInvoiceNumber || !gstType ||
-            !purchaseDate || quantity === undefined || rate === undefined || price === undefined || grossTotal === undefined) {
-            return res.status(400).send({ success: false, message: 'All required fields must be provided for update.' });
-        }
+        // if (!productName) {
+        //     return res.status(400).send({ success: false, message: 'All required fields must be provided for update.' });
+        // }
 
-        if (isNaN(parseFloat(quantity)) || parseFloat(quantity) < 0) {
-            return res.status(400).send({ success: false, message: 'Quantity must be a non-negative number.' });
-        }
-        if (isNaN(parseFloat(rate)) || parseFloat(rate) < 0) {
-            return res.status(400).send({ success: false, message: 'Rate must be a non-negative number.' });
-        }
-        if (freightCharges !== undefined && (isNaN(parseFloat(freightCharges)) || parseFloat(freightCharges) < 0)) {
-            return res.status(400).send({ success: false, message: 'Freight Charges must be a non-negative number.' });
-        }
-        if (isNaN(parseFloat(price)) || parseFloat(price) < 0) {
-            return res.status(400).send({ success: false, message: 'Price must be a non-negative number.' });
-        }
-        if (isNaN(parseFloat(grossTotal)) || parseFloat(grossTotal) < 0) {
-            return res.status(400).send({ success: false, message: 'Gross Total must be a non-negative number.' });
-        }
-        if (roundOff !== undefined && isNaN(parseFloat(roundOff))) {
-            return res.status(400).send({ success: false, message: 'Round Off must be a number.' });
-        }
+        // if (isNaN(parseFloat(quantity)) || parseFloat(quantity) < 0) {
+        //     return res.status(400).send({ success: false, message: 'Quantity must be a non-negative number.' });
+        // }
+        // if (isNaN(parseFloat(rate)) || parseFloat(rate) < 0) {
+        //     return res.status(400).send({ success: false, message: 'Rate must be a non-negative number.' });
+        // }
+        // if (freightCharges !== undefined && (isNaN(parseFloat(freightCharges)) || parseFloat(freightCharges) < 0)) {
+        //     return res.status(400).send({ success: false, message: 'Freight Charges must be a non-negative number.' });
+        // }
+        // if (isNaN(parseFloat(price)) || parseFloat(price) < 0) {
+        //     return res.status(400).send({ success: false, message: 'Price must be a non-negative number.' });
+        // }
+        // if (isNaN(parseFloat(grossTotal)) || parseFloat(grossTotal) < 0) {
+        //     return res.status(400).send({ success: false, message: 'Gross Total must be a non-negative number.' });
+        // }
+        // if (roundOff !== undefined && isNaN(parseFloat(roundOff))) {
+        //     return res.status(400).send({ success: false, message: 'Round Off must be a number.' });
+        // }
 
         // Check if vendor exists
-        const existingVendor = await Vendor.findById(vendorCompanyName);
-        if (!existingVendor) {
-            return res.status(404).send({ success: false, message: 'Vendor not found.' });
-        }
-
-        // Check if GST type exists
-        const existingGstType = await GST.findById(gstType);
-        if (!existingGstType) {
-            return res.status(404).send({ success: false, message: 'GST Type not found.' });
+        if (vendorCompanyName) {
+            const existingVendor = await Vendor.findById(vendorCompanyName);
+            if (!existingVendor) {
+                return res.status(404).send({ success: false, message: 'Vendor not found.' });
+            }
         }
 
         // Check for duplicate invoice number, excluding the current document
@@ -177,25 +155,24 @@ export const updatePurchase = async (req, res) => {
             return res.status(409).send({ success: false, message: 'Another Purchase with this invoice number already exists.' });
         }
 
+        const updateFields = {};
+
+        if (vendorCompanyName !== undefined) updateFields.vendorCompanyName = vendorCompanyName;
+        if (productName !== undefined) updateFields.productName = productName;
+        if (voucherType !== undefined) updateFields.voucherType = voucherType;
+        if (purchaseInvoiceNumber !== undefined) updateFields.purchaseInvoiceNumber = purchaseInvoiceNumber;
+        if (narration !== undefined) updateFields.narration = narration;
+        if (purchaseDate !== undefined) updateFields.purchaseDate = new Date(purchaseDate);
+        if (quantity !== undefined) updateFields.quantity = quantity;
+        if (rate !== undefined) updateFields.rate = parseFloat(rate);
+        if (freightCharges !== undefined) updateFields.freightCharges = parseFloat(freightCharges);
+        if (price !== undefined) updateFields.price = parseFloat(price);
+        if (grossTotal !== undefined) updateFields.grossTotal = parseFloat(grossTotal);
+        if (roundOff !== undefined) updateFields.roundOff = parseFloat(roundOff);
+
         const updatedPurchase = await Purchase.findByIdAndUpdate(
             id,
-            {
-                vendorCompanyName,
-                productName,
-                voucherType,
-                purchaseInvoiceNumber,
-                gstinUn,
-                narration,
-                gstType,
-                purchaseDate: new Date(purchaseDate),
-                quantity: parseFloat(quantity),
-                rate: parseFloat(rate),
-                freightCharges: freightCharges !== undefined ? parseFloat(freightCharges) : 0,
-                price: parseFloat(price),
-                grossTotal: parseFloat(grossTotal),
-                roundOff: roundOff !== undefined ? parseFloat(roundOff) : 0,
-                category: category
-            },
+            updateFields,
             { new: true, runValidators: true }
         );
 

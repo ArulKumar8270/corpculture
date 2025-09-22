@@ -42,7 +42,6 @@ const VendorProductList = () => {
 
     const handleEdit = (productId) => {
         navigate(`../addVendorProduct?product_id=${productId}`);
-        toast.info(`Editing vendor product with ID: ${productId}`);
     };
 
     const handleDelete = async (productId) => {
@@ -123,7 +122,15 @@ const VendorProductList = () => {
                                         <TableCell>{index + 1}</TableCell>
                                         <TableCell>{product.vendorCompanyName?.companyName || 'N/A'}</TableCell>
                                         <TableCell>{product.productName}</TableCell>
-                                        <TableCell>{product.gstType?.gstType || 'N/A'} ({product.gstType?.gstPercentage || 0}%)</TableCell>
+                                        <TableCell>
+                                            {product.gstType && product.gstType.length > 0
+                                                ? product.gstType.map((gst, index) => (
+                                                      <span key={gst._id}>
+                                                          {gst.gstType} ({gst.gstPercentage}%){index < product.gstType.length - 1 ? ', ' : ''}
+                                                      </span>
+                                                  ))
+                                                : 'N/A'}
+                                        </TableCell>
                                         <TableCell>{product.productCode}</TableCell>
                                         <TableCell>{product.pricePerQuantity}</TableCell>
                                         {hasPermission("vendorProducts") ? <TableCell>
