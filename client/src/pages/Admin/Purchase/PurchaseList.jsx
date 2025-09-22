@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import {
     Typography, Paper, Button,
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TablePagination,
-    TextField, InputAdornment
+    TextField, InputAdornment,
+    Badge
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -163,7 +164,6 @@ const PurchaseList = () => {
                                     <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#f0f0f0' }}>Invoice No.</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#f0f0f0' }}>Vendor Company</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#f0f0f0' }}>Material Name</TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#f0f0f0' }}>Category Name</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#f0f0f0' }}>Purchase Date</TableCell>
                                     <TableCell align="right" sx={{ fontWeight: 'bold', backgroundColor: '#f0f0f0' }}>Quantity</TableCell>
                                     <TableCell align="right" sx={{ fontWeight: 'bold', backgroundColor: '#f0f0f0' }}>Rate</TableCell>
@@ -181,13 +181,28 @@ const PurchaseList = () => {
                                             <TableCell>{purchase.purchaseInvoiceNumber}</TableCell>
                                             <TableCell>{purchase.vendorCompanyName?.companyName}</TableCell>
                                             <TableCell>{purchase.productName?.productName}</TableCell> {/* Updated this line */}
-                                            <TableCell>{purchase.category?.name}</TableCell> {/* Updated this line */}
                                             <TableCell>{new Date(purchase.purchaseDate).toLocaleDateString()}</TableCell>
-                                            <TableCell align="right">{purchase.quantity}</TableCell>
+                                            <TableCell align="right">
+                                                {purchase.quantity ? <Badge
+                                                    badgeContent={purchase.quantity}
+                                                    color={purchase.quantity <= 0 ? "error" : "primary"}
+                                                    sx={{
+                                                        '& .MuiBadge-badge': {
+                                                            right: -3,
+                                                            top: 13,
+                                                            padding: '0 4px',
+                                                            height: 20,
+                                                            minWidth: 20,
+                                                            borderRadius: '10px',
+                                                            fontSize: '0.75rem',
+                                                        },
+                                                    }}
+                                                /> : '0'}
+                                            </TableCell>
                                             <TableCell align="right">{purchase.rate.toFixed(2)}</TableCell>
                                             <TableCell align="right">{purchase.price.toFixed(2)}</TableCell>
                                             <TableCell align="right">{purchase.grossTotal.toFixed(2)}</TableCell>
-                                           {hasPermission("vendorPurchaseList") ? <TableCell align="center">
+                                            {hasPermission("vendorPurchaseList") ? <TableCell align="center">
                                                 <div className="flex justify-center space-x-2">
                                                     <Button
                                                         variant="contained"

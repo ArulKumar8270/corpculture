@@ -11,9 +11,14 @@ const vendorProductSchema = new mongoose.Schema({
         required: true,
         trim: true,
     },
-    gstType: {
+    gstType: [{ // Changed to an array of ObjectIds
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'GST', // Reference to the GST model
+        ref: 'GST', // Reference to the GST model we created earlier
+        required: true,
+    }],
+    category: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Category', // Reference to the Category model
         required: true,
     },
     pricePerQuantity: {
@@ -21,8 +26,8 @@ const vendorProductSchema = new mongoose.Schema({
         required: true,
         min: 0,
     },
-    productCode : {
-        type : String, // Reference to the Product model
+    productCode: {
+        type: String, // Reference to the Product model
         required: true,
     },
 }, { timestamps: true });

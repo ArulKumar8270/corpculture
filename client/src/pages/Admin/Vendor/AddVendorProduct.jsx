@@ -8,6 +8,12 @@ import {
 import EventIcon from '@mui/icons-material/Event'; // Calendar icon for Vendor Company Name
 import DescriptionIcon from '@mui/icons-material/Description'; // Document icon for Product Name and Price
 import CalculateIcon from '@mui/icons-material/Calculate'; // Calculator icon for GST Type
+import CategoryIcon from '@mui/icons-material/Category'; // For voucher type
+import {
+  OutlinedInput,
+  Box,
+  Chip,
+} from "@mui/material";
 
 const AddVendorProduct = () => {
     const navigate = useNavigate();
@@ -16,16 +22,17 @@ const AddVendorProduct = () => {
     // Form states
     const [vendorCompanyName, setVendorCompanyName] = useState('');
     const [productName, setProductName] = useState('');
-    const [gstType, setGstType] = useState('');
+    const [gstType, setGstType] = useState([]);
     const [pricePerQuantity, setPricePerQuantity] = useState('');
     const [productCode, setProductCode] = useState(''); // New state for productCode
-
+    const [categories, setCategories] = useState([]); // New state for categories
     // Dropdown options
     const [vendorCompanies, setVendorCompanies] = useState([]);
     const [gstOptions, setGstOptions] = useState([]);
+    const [category, setCategory] = useState(''); // New state for category
 
     useEffect(() => {
-        // Fetch vendor companies
+        // Fetch vendor companies 
         const fetchVendorCompanies = async () => {
             try {
                 const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/vendors`);
@@ -54,9 +61,24 @@ const AddVendorProduct = () => {
                 toast.error('Something went wrong while fetching GST options.');
             }
         };
+        // Fetch Categories
+        const fetchCategories = async () => {
+            try {
+                const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/category/all`);
+                if (data?.success) {
+                    setCategories(data.categories);
+                } else {
+                    toast.error(data?.message || 'Failed to fetch categories.');
+                }
+            } catch (error) {
+                console.error('Error fetching categories:', error);
+                toast.error('Something went wrong while fetching categories.');
+            }
+        };
 
         fetchVendorCompanies();
         fetchGstOptions();
+        fetchCategories();
     }, []);
 
     // Effect to fetch product data if in edit mode
@@ -69,9 +91,10 @@ const AddVendorProduct = () => {
                         const product = data.vendorProduct;
                         setVendorCompanyName(product.vendorCompanyName._id || ''); // Assuming it's populated
                         setProductName(product.productName || '');
-                        setGstType(product.gstType._id || ''); // Assuming it's populated
+                        setGstType(product.gstType ? product.gstType.map(gst => gst._id) : []); // Map to array of _id's
                         setPricePerQuantity(product.pricePerQuantity.toString() || '');
                         setProductCode(product.productCode || ''); // Set productCode in edit mode
+                        setCategory(product.category || ''); // Set category in edit mode
                     } else {
                         toast.error(data?.message || 'Failed to fetch vendor product details.');
                         handleViewProducts(); // Redirect if product not found
@@ -91,7 +114,7 @@ const AddVendorProduct = () => {
         e.preventDefault();
 
         // Basic validation
-        if (!vendorCompanyName || !productName || !gstType || !pricePerQuantity || !productCode) { // Added productCode to validation
+        if (!vendorCompanyName || !productName || gstType.length === 0 || !pricePerQuantity || !productCode) { // Added productCode to validation
             toast.error('Please fill in all required fields.');
             return;
         }
@@ -99,9 +122,10 @@ const AddVendorProduct = () => {
         const productData = {
             vendorCompanyName,
             productName,
-            gstType,
+            gstType, // gstType is already an array
             pricePerQuantity: parseFloat(pricePerQuantity),
             productCode, // Include productCode in the data
+            category, // Include category in the data
         };
 
         try {
@@ -120,7 +144,7 @@ const AddVendorProduct = () => {
                 if (!id) {
                     setVendorCompanyName('');
                     setProductName('');
-                    setGstType('');
+                    setGstType([]);
                     setPricePerQuantity('');
                     setProductCode(''); // Clear productCode when creating new
                 }
@@ -192,6 +216,26 @@ const AddVendorProduct = () => {
                                     ),
                                 }}
                             />
+                            <FormControl fullWidth variant="outlined" size="small"> {/* New Category Field */}
+                                <InputLabel>Category</InputLabel>
+                                <Select
+                                    value={category}
+                                    onChange={(e) => setCategory(e.target.value)}
+                                    label="Category"
+                                    endAdornment={
+                                        <InputAdornment position="end">
+                                            <CategoryIcon />
+                                        </InputAdornment>
+                                    }
+                                >
+                                    <MenuItem value="">
+                                        <em>--select Category--</em>
+                                    </MenuItem>
+                                    {categories.map((cat) => (
+                                        <MenuItem key={cat._id} value={cat._id}>{cat.name}</MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
                             <TextField // New TextField for Product Code
                                 label="Product Code"
                                 value={productCode}
@@ -208,16 +252,21 @@ const AddVendorProduct = () => {
                                 }}
                             />
                             <FormControl fullWidth variant="outlined" size="small">
-                                <InputLabel>GST Type</InputLabel>
+                                <InputLabel id="gst-type-label">GST Type</InputLabel>
                                 <Select
+                                    labelId="gst-type-label"
+                                    multiple
                                     value={gstType}
                                     onChange={(e) => setGstType(e.target.value)}
-                                    label="GST Type"
-                                    endAdornment={
-                                        <InputAdornment position="end">
-                                            <CalculateIcon />
-                                        </InputAdornment>
-                                    }
+                                    input={<OutlinedInput label="GST Type" />}
+                                    renderValue={(selected) => (
+                                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                                            {selected.map((value) => {
+                                                const gst = gstOptions.find(option => option._id === value);
+                                                return gst ? <Chip key={value} label={`${gst.gstType} (${gst.gstPercentage}%)`} /> : null;
+                                            })}
+                                        </Box>
+                                    )}
                                 >
                                     <MenuItem value="">
                                         <em>Select GST Type</em>

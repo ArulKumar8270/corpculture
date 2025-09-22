@@ -8,7 +8,7 @@ const serviceProductSchema = new mongoose.Schema({
     },
     productName: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'VendorProduct',
+        ref: 'Purchase',
         trim: true,
     },
     sku: {

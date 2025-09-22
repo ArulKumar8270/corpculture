@@ -177,9 +177,8 @@ const AddServiceInvoice = () => {
             return newData;
         });
     };
-
     const handleAddProduct = () => {
-        const selectedProduct = availableProducts.find(p => p._id === invoiceData.productId);
+        const selectedProduct = availableProducts.find(p => p?.productName?._id === invoiceData.productId);
 
         if (!selectedProduct || !invoiceData.quantity || invoiceData.quantity <= 0) {
             toast.error('Please select a product and enter a valid quantity.');
@@ -187,8 +186,10 @@ const AddServiceInvoice = () => {
         }
         const newProduct = {
             id: Date.now() + Math.random(), // Assign a unique ID for this table entry
-            productId: selectedProduct._id, // Store the actual product ID from DB
-            productName: selectedProduct.productName,
+            productId: selectedProduct?._id || '', // Store the actual product ID from DB
+            productName: selectedProduct.productName?.productName || '',
+            purchaseId: selectedProduct?.productName?._id || '',
+            purchaseQuantity: selectedProduct?.productName?.quantity || 0,
             sku: selectedProduct.sku,
             hsn: selectedProduct.hsn,
             quantity: parseInt(invoiceData.quantity),
@@ -374,6 +375,7 @@ const AddServiceInvoice = () => {
         if (!invoiceId && invoiceType !== "quotation") {
             handleUpdateInvoiceCount()
             updateEmployeeBenefit(invoice)
+            updateProductQuantity()
         }
         updateCommissionDetails(invoice);
         updateStausToService(serviceId, 'Completed');
@@ -485,7 +487,22 @@ const AddServiceInvoice = () => {
             console.error("Error updating benefit:", err);
         }
     };
-
+    console.log(productsInTable, "35234dfgsdfsdg")
+    const updateProductQuantity = async () => {
+        for (const product of productsInTable) {
+            if (product?.purchaseId) {
+                try {
+                    let updatedQuantity = product?.purchaseQuantity - product?.quantity;
+                    const { data } = await axios.put(`${import.meta.env.VITE_SERVER_URL}/api/v1/purchases/${product?.purchaseId}`, { quantity: updatedQuantity });
+                    if (data?.success) {
+                        console.log("Product quantity updated:", data.message);
+                    }
+                } catch (error) {
+                    console.error("Error updating product quantity:", error);
+                }
+            }
+        }
+    }
 
 
     if (loading) {
@@ -495,8 +512,6 @@ const AddServiceInvoice = () => {
             </Box>
         );
     }
-
-    console.log(invoiceData, "asd7098534", productsInTable)
 
     return (
         <Box sx={{ p: 3, bgcolor: 'background.default', minHeight: '100vh' }}>
@@ -560,11 +575,11 @@ const AddServiceInvoice = () => {
                             <Autocomplete
                                 id="productId-autocomplete"
                                 options={availableProducts}
-                                getOptionLabel={(option) => option.productName?.productName || ''}
-                                isOptionEqualToValue={(option, value) => option._id === value._id}
-                                value={availableProducts.find(prod => prod._id === invoiceData.productId) || null}
+                                getOptionLabel={(option) => option.productName?.productName?.productName || ''}
+                                isOptionEqualToValue={(option, value) => option?.productName?._id === value._id}
+                                value={availableProducts.find(prod => prod?.productName?._id === invoiceData.productId) || null}
                                 onChange={(event, newValue) => {
-                                    handleChange({ target: { name: 'productId', value: newValue ? newValue._id : '' } });
+                                    handleChange({ target: { name: 'productId', value: newValue?.productName?._id || '' } });
                                 }}
                                 loading={loading} // Add loading prop
                                 renderInput={(params) => (
@@ -591,7 +606,7 @@ const AddServiceInvoice = () => {
                             <Grid container spacing={3}>
                                 <Grid item xs={12} sm={4}>
                                     <FormControl fullWidth margin="normal" size="small">
-                                        <InputLabel shrink htmlFor="rework-checkbox">Rework</InputLabel>
+                                        <InputLabel shrink htmlFor="rework-checkbox">Benefit</InputLabel>
                                         <Select
                                             id="rework-checkbox"
                                             name="reInstall"

@@ -116,7 +116,7 @@ const ServiceProductList = () => {
                                     <TableRow key={product._id}>
                                         <TableCell>{index + 1}</TableCell>
                                         <TableCell>{product.company?.companyName || 'N/A'}</TableCell>
-                                        <TableCell>{product.productName?.productName}</TableCell>
+                                        <TableCell>{product.productName?.productName?.productName || 'N/A'}</TableCell>
                                         <TableCell>{product.sku}</TableCell>
                                         <TableCell>{product.hsn}</TableCell>
                                         <TableCell>{product.quantity}</TableCell>

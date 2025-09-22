@@ -17,29 +17,15 @@ const purchaseSchema = new mongoose.Schema({
         required: true,
         trim: true,
     },
-    category: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Category', // Reference to the Category model
-        required: true,
-    },
     purchaseInvoiceNumber: {
         type: String,
         required: true,
         unique: true, // Invoice number should be unique
         trim: true,
     },
-    gstinUn: {
-        type: String,
-        trim: true,
-    },
     narration: {
         type: String,
         trim: true,
-    },
-    gstType: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'GST', // Reference to the GST model
-        required: true,
     },
     purchaseDate: {
         type: Date,
@@ -48,7 +34,6 @@ const purchaseSchema = new mongoose.Schema({
     quantity: {
         type: Number,
         required: true,
-        min: 0,
     },
     rate: {
         type: Number,
