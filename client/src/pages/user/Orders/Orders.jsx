@@ -43,7 +43,7 @@ const Orders = () => {
         <>
             <SeoData title="My Orders | Flipkart" />
 
-            <MinCategory />
+            {/* <MinCategory /> */}
             <main className="w-full px-4 sm:px-10 py-4 bg-gradient-to-br from-[#e6fbff] to-[#f7fafd] min-h-screen">
                 {/* <!-- row --> */}
                 {/* <!-- orders column --> */}

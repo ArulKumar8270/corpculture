@@ -12,46 +12,41 @@ const productSchema = new mongoose.Schema({
     },
     installationCost : {
         type: Number,
-        required: [true, "Please enter installation cost"],
     },
     deliveryCharge : {
         type: Number,
-        required: [true, "Please enter delivery charge"],
     },
     highlights: [
         {
             type: String,
-            required: true,
         },
     ],
     specifications: [
         {
             title: {
                 type: String,
-                required: true,
             },
             description: {
                 type: String,
-                required: true,
             },
         },
     ],
-    commission: [
-        {
-            from: {
-                type: String,
-                required: true,
-            },
-            to: {
-                type: String,
-                required: true,
-            },
-            commission: {
-                type: String,
-                required: true,
-            },
-        },
-    ],
+    // commission: [
+    //     {
+    //         from: {
+    //             type: String,
+    //             required: true,
+    //         },
+    //         to: {
+    //             type: String,
+    //             required: true,
+    //         },
+    //         commission: {
+    //             type: String,
+    //             required: true,
+    //         },
+    //     },
+    // ],
     priceRange: [
         {
             from: {
@@ -65,6 +60,9 @@ const productSchema = new mongoose.Schema({
             price: {
                 type: String,
                 required: true,
+            },
+            commission: {
+                type: String,
             },
         },
     ],
@@ -111,7 +109,6 @@ const productSchema = new mongoose.Schema({
     stock: {
         type: Number,
         required: [true, "Please enter product stock"],
-        maxLength: [4, "Stock cannot exceed limit"],
         default: 1,
     },
     warranty: {
@@ -159,7 +156,6 @@ const productSchema = new mongoose.Schema({
     seller: {
         type: mongoose.Schema.ObjectId,
         ref: "User",
-        required: true,
     },
     createdAt: {
         type: Date,

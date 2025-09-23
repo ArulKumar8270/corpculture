@@ -1,11 +1,17 @@
 import mongoose from "mongoose";
 
+const deliveryAddressSchema = new mongoose.Schema({
+    address: { type: String, required: true },
+    pincode: { type: String, required: true },
+}, { _id: false });
+
 const userSchema = new mongoose.Schema({
     name: { type: String, required: true },
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
     phone: { type: String },
     address: { type: String, required: false },
+    serviceDeliveryAddresses: [deliveryAddressSchema], // Added serviceDeliveryAddresses field
     role: { type: Number, default: 0 },
     companyId: { type: mongoose.Schema.Types.ObjectId, ref: "Company" },
     commission: { type: Number, default: 0, min: 0 },

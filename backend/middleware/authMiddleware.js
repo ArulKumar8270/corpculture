@@ -5,17 +5,19 @@ import UserModel from "../models/userModel.js";
 const requireSignIn = asyncHandler(async (req, res, next) => {
     try {
         const token = req.headers.authorization;
-
+       console.log(token, "token23");
         if (!token) {
             return res.status(401).json({ message: "JWT must be provided" });
         }
 
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
+        console.log(decoded, "decoded234");
+
         // Attach user information to the request
         req.user = await UserModel.findById(decoded._id);
 
-        if (!req.user || !req.user.role) {
+        if (!req.user) {
             return res.status(401).json({ message: "Unauthorised User" });
         }
 

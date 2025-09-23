@@ -81,7 +81,7 @@ const Wishlist = () => {
     return (
         <>
             <SeoData title="My Wishlist" />
-            <MinCategory />
+            {/* <MinCategory /> */}
 
             {isLoading && page === 1 ? (
                 <Spinner />

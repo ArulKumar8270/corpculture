@@ -41,7 +41,7 @@ const AddCompany = () => {
     // Changed to array of objects { address: '', pincode: '' }
     const [serviceDeliveryAddresses, setServiceDeliveryAddresses] = useState([{ address: '', pincode: '' }]);
     const [contactPersons, setContactPersons] = useState([
-        { name: '', mobile: '', email: '' }
+        { name: auth?.user?.role === 0 ? auth?.user?.name : '', mobile: auth?.user?.role === 0 ? auth?.user?.phone : '', email: auth?.user?.role === 0 ? auth?.user?.email : '' }
     ]); // Array of objects for contact persons
 
     const [loading, setLoading] = useState(false); // For form submission loading
@@ -202,14 +202,17 @@ const AddCompany = () => {
 
 
             if (response.data?.success) {
-                toast.success(response.data.message || `Company ${companyId ? 'updated' : 'added'} successfully!`);
-                navigate('../companyList'); // Redirect to company list
+                if (auth?.user?.role === 0) {
+                    location.reload()
+                } else {
+                    navigate('../companyList');
+                }
+                // Redirect to company list
             } else {
-                toast.error(response.data?.message || `Failed to ${companyId ? 'update' : 'add'} company.`);
+                console.log(response.data?.message || `Failed to ${companyId ? 'update' : 'add'} company.`);
             }
         } catch (error) {
             console.error(`Error ${companyId ? 'updating' : 'adding'} company:`, error);
-            toast.error(error.response?.data?.message || `Something went wrong while ${companyId ? 'updating' : 'adding'} the company.`);
         } finally {
             setLoading(false);
         }

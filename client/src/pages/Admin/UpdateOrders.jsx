@@ -76,7 +76,7 @@ const UpdateOrders = () => {
         <>
             <SeoData title="Order Details | Flipkart" />
 
-            <MinCategory />
+            {/* <MinCategory /> */}
             <main className="w-full py-2 sm:py-8">
                 {loading ? (
                     <Spinner />

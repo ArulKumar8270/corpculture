@@ -169,7 +169,7 @@ export const getCompanyByUser = async (req, res) => {
     try {
         // Assuming user ID is available in req.user._id from authentication middleware
         const userId = req.params.id;
-        const company = await companyModel.find({ userId: userId }); // Find company by user ID
+        const company = await companyModel.find({ "contactPersons.mobile": userId }); // Find company by user ID
 
         if (!company) {
             return res.status(404).send({

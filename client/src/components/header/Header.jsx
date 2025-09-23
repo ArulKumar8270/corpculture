@@ -20,8 +20,34 @@ const Header = () => {
     const [isDropdownOpen, setDropdownOpen] = useState(false);
     const headerRef = useRef(null);
     const [commissions, setCommissions] = useState([]);
-    const { auth, setAuth, LogOut, setIsCompanyEnabled, isCompanyEnabled, companyDetails, setSelectedCompany, selectedCompany } = useAuth();
+    const { auth, setAuth, LogOut, isCompanyEnabled, setIsCompanyEnabled, companyDetails, setSelectedCompany, selectedCompany } = useAuth();
     const [cartItems, setCartItems] = useCart();
+
+    // Initialize isCompanyEnabled from localStorage
+    useEffect(() => {
+        const storedCompanyEnabled = localStorage.getItem('isCompanyEnabled');
+        if (storedCompanyEnabled !== null) {
+            setIsCompanyEnabled(JSON.parse(storedCompanyEnabled));
+        }
+    }, []);
+
+    // Update localStorage whenever isCompanyEnabled changes
+    useEffect(() => {
+        localStorage.setItem('isCompanyEnabled', JSON.stringify(isCompanyEnabled));
+    }, [isCompanyEnabled]);
+
+    // Initialize selectedCompany from localStorage
+    useEffect(() => {
+        const storedSelectedCompany = localStorage.getItem('selectedCompany');
+        if (storedSelectedCompany !== null) {
+            setSelectedCompany(storedSelectedCompany);
+        }
+    }, []);
+
+    // Update localStorage whenever selectedCompany changes
+    useEffect(() => {
+        localStorage.setItem('selectedCompany', selectedCompany);
+    }, [selectedCompany]);
 
     useEffect(() => {
         if (auth?.token) {
@@ -141,57 +167,57 @@ const Header = () => {
                                             .toFixed(2)}
                                     </span>{/* {{ edit_1 }} */}
                                 </div> {/* {{ edit_1 }} */}
-
-                                {/* Company Select */} {/* {{ edit_1 }} */}
-                                {/* You might need to adjust the styling of the MUI Select component itself */} {/* {{ edit_1 }} */}
-                                {isCompanyEnabled && <FormControl sx={{ m: 1, minWidth: 120 }} size="small"> {/* Adjusted FormControl styling */} {/* {{ edit_1 }} */}
-                                    <InputLabel id="company-select-label" sx={{ color: 'white' }}>Companies</InputLabel> {/* Styled label */} {/* {{ edit_1 }} */}
-                                    <Select
-                                        labelId="company-select-label" // Use the correct labelId
-                                        id="company-select" // Use a more specific ID
-                                        value={selectedCompany} // Assuming 'age' state is used for company selection
-                                        onChange={handleChange} // Keep the change handler
-                                        autoWidth
-                                        label="Companies"
-                                        sx={{ // Add styling for the Select component
-                                            color: 'white',
-                                            '.MuiOutlinedInput-notchedOutline': {
-                                                borderColor: 'rgba(255, 255, 255, 0.5)', // White border
-                                            },
-                                            '&:hover .MuiOutlinedInput-notchedOutline': {
-                                                borderColor: 'white', // White border on hover
-                                            },
-                                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                                                borderColor: 'white', // White border when focused
-                                            },
-                                            '.MuiSvgIcon-root': { // Style the dropdown arrow
-                                                color: 'white',
-                                            },
-                                        }} // {{ edit_1 }}
-                                    >
-                                        <MenuItem value="">
-                                            <em>New Company</em>
-                                        </MenuItem>
-                                        {companyDetails?.map((res) =>
-                                            <MenuItem key={res?._id} value={res?._id}> {res?.companyName}</MenuItem> // {{ edit_1 }} Corrected value and added key
-                                        )}
-
-                                    </Select>
-                                </FormControl>}
-
-                                {/* Enable Company Account Checkbox */} {/* {{ edit_1 }} */}
-                                <label className="flex items-center gap-1 text-white text-sm font-medium cursor-pointer"> {/* Styled label */} {/* {{ edit_1 }} */}
-                                    <input
-                                        type="checkbox"
-                                        value={null} // You might want to use a boolean state here
-                                        className="accent-cyan-300 w-4 h-4" // Styled checkbox
-                                        onChange={() => setIsCompanyEnabled(!isCompanyEnabled)} // Add handler if you want to track selection
-                                    />
-                                    Enable Company account
-                                </label> {/* {{ edit_1 }} */}
                             </div> {/* {{ edit_1 }} */}
                         </>
                     ) : null}
+
+                    {/* Company Select */} {/* {{ edit_1 }} */}
+                    {/* You might need to adjust the styling of the MUI Select component itself */} {/* {{ edit_1 }} */}
+                    {isCompanyEnabled ? <FormControl sx={{ m: 1, minWidth: 120 }} size="small"> {/* Adjusted FormControl styling */} {/* {{ edit_1 }} */}
+                        <InputLabel id="company-select-label" sx={{ color: 'white' }}>Companies</InputLabel> {/* Styled label */} {/* {{ edit_1 }} */}
+                        <Select
+                            labelId="company-select-label" // Use the correct labelId
+                            id="company-select" // Use a more specific ID
+                            value={selectedCompany} // Assuming 'age' state is used for company selection
+                            onChange={handleChange} // Keep the change handler
+                            autoWidth
+                            label="Companies"
+                            sx={{ // Add styling for the Select component
+                                color: 'white',
+                                '.MuiOutlinedInput-notchedOutline': {
+                                    borderColor: 'rgba(255, 255, 255, 0.5)', // White border
+                                },
+                                '&:hover .MuiOutlinedInput-notchedOutline': {
+                                    borderColor: 'white', // White border on hover
+                                },
+                                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                    borderColor: 'white', // White border when focused
+                                },
+                                '.MuiSvgIcon-root': { // Style the dropdown arrow
+                                    color: 'white',
+                                },
+                            }} // {{ edit_1 }}
+                        >
+                            <MenuItem value="new">
+                                <em>New Company</em>
+                            </MenuItem>
+                            {companyDetails?.map((res) =>
+                                <MenuItem key={res?._id} value={res?._id}> {res?.companyName}</MenuItem> // {{ edit_1 }} Corrected value and added key
+                            )}
+
+                        </Select>
+                    </FormControl> : null}
+
+                    {/* Enable Company Account Checkbox */} {/* {{ edit_1 }} */}
+                    {auth?.user?.role !== 1 && <label className="flex items-center gap-1 text-white text-sm font-medium cursor-pointer"> {/* Styled label */} {/* {{ edit_1 }} */}
+                        <input
+                            type="checkbox"
+                            checked={isCompanyEnabled} // Changed from value to checked
+                            className="accent-cyan-300 w-4 h-4" // Styled checkbox
+                            onChange={() => setIsCompanyEnabled(!isCompanyEnabled)} // Add handler if you want to track selection
+                        />
+                        Enable Company account
+                    </label>} {/* {{ edit_1 }} */}
                     {/* Account */}
                     <div
                         className={`relative group`}

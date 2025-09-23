@@ -232,7 +232,7 @@ const ProductDetails = () => {
                 <>
                     <SeoData title={product?.name} />
                     <ScrollToTopOnRouteChange />
-                    <MinCategory />
+                    {/* <MinCategory /> */}
                     <main className="mt-5 sm:mt-0 min-h-screen bg-gradient-to-br from-[#e6fbff] to-[#f7fafd]">
                         {/* <!-- product image & description container --> */}
                         <div className="w-full flex flex-col lg:flex-row bg-white sm:p-2 relative rounded-2xl shadow-xl border border-[#e6fbff]">
@@ -391,12 +391,12 @@ const ProductDetails = () => {
                                                 ? "No Warranty"
                                                 : `${product?.warranty} Year Brand Warranty`}
                                         </span>
-                                        <Link
+                                        {/* <Link
                                             className="font-semibold text-[#019ee3] hover:underline -ml-5"
                                             to="/"
                                         >
                                             Know More
-                                        </Link>
+                                        </Link> */}
                                     </div>
                                     {/* <!-- warranty & brand --> */}
 
@@ -410,7 +410,7 @@ const ProductDetails = () => {
                                     {/* <!-- delivery details --> */}
 
                                     {/* <!-- seller details --> */}
-                                    <div className="flex gap-16 mt-4 items-center text-sm font-medium">
+                                    {/* <div className="flex gap-16 mt-4 items-center text-sm font-medium">
                                         <p className="text-gray-500">Seller</p>
                                         <Link
                                             className="font-semibold text-[#019ee3] ml-3 hover:underline"
@@ -418,7 +418,7 @@ const ProductDetails = () => {
                                         >
                                             {product?.brand?.name}
                                         </Link>
-                                    </div>
+                                    </div> */}
                                     {/* <!-- seller details --> */}
 
                                     {/* <!-- description details --> */}
@@ -431,7 +431,7 @@ const ProductDetails = () => {
                                     {/* <!-- description details --> */}
 
                                     {/* <!-- specifications border box --> */}
-                                    <div className="w-full rounded-2xl border border-[#e6fbff] shadow-lg flex flex-col bg-white">
+                                   {product?.specifications?.length > 0 ? <div className="w-full rounded-2xl border border-[#e6fbff] shadow-lg flex flex-col bg-white">
                                         <h1 className="px-6 py-4 border-b text-2xl font-bold text-gray-800">
                                             Specifications
                                         </h1>
@@ -456,7 +456,7 @@ const ProductDetails = () => {
                                             )
                                         )}
                                         {/* <!-- specs list --> */}
-                                    </div>
+                                    </div> : null}
                                     {/* <!-- specifications border box --> */}
 
                                     {/* <!-- reviews border box --> */}
