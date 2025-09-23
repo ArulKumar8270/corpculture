@@ -40,16 +40,35 @@ const newProduct = async (req, res) => {
         req.body.seller = req.user._id;
 
         let specs = [];
-        req.body.specifications.forEach((s) => {
-            specs.push(JSON.parse(s));
-        });
+        if (req.body.specifications) {
+            if (typeof req.body.specifications === 'string') {
+                try {
+                    // If it's a single JSON string, parse it and wrap in an array
+                    specs.push(JSON.parse(req.body.specifications));
+                } catch (e) {
+                    console.error("Error parsing single specification string:", e);
+                }
+            } else if (Array.isArray(req.body.specifications)) {
+                // If it's an array, iterate and parse each element if they are strings
+                req.body.specifications.forEach((s) => {
+                    try {
+                        specs.push(typeof s === 'string' ? JSON.parse(s) : s);
+                    } catch (e) {
+                        console.error("Error parsing specification in array:", e);
+                    }
+                });
+            } else if (typeof req.body.specifications === 'object') {
+                // If it's already a parsed object, and not an array, wrap it in an array.
+                specs.push(req.body.specifications);
+            }
+        }
         req.body.specifications = specs;
 
-        let commission = [];
-        req.body.commission.forEach((s) => {
-            commission.push(JSON.parse(s));
-        });
-        req.body.commission = commission;
+        // let commission = [];
+        // req.body.commission.forEach((s) => {
+        //     commission.push(JSON.parse(s));
+        // });
+        // req.body.commission = commission;
 
         let priceRange = [];
         req.body.priceRange.forEach((s) => {

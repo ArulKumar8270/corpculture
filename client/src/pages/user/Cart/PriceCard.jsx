@@ -80,7 +80,7 @@ const PriceCard = ({ cartItems }) => {
                                 .reduce((sum, item) => {
                                     const quantity = item.quantity || 0;
                                     // Find matching price range
-                                    const rangePrice = item?.priceRange.find(
+                                    const rangePrice = item?.priceRange?.find(
                                         (range) =>
                                             quantity >= parseInt(range.from) &&
                                             quantity <= parseInt(range.to)

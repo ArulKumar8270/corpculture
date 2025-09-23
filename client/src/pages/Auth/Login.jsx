@@ -19,8 +19,6 @@ const Login = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const location = useLocation();
 
-    console.log(auth, "auth97034582374")
-
     const handlePasswordToggle = () => {
         setShowPassword(!showPassword);
     };
@@ -51,10 +49,7 @@ const Login = () => {
                     password,
                 }
             );
-            // console.log(response);
-
             if (response.status === 200) {
-                toast.success("Logged in Successfully!");
                 setAuth({
                     ...auth,
                     user: response.data.user,

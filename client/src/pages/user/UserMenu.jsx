@@ -72,7 +72,7 @@ const UserMenu = ({ toggleMenu }) => {
                             </div>
                         </NavLink>
 
-                        <NavLink
+                        {/* <NavLink
                             to="./address"
                             onClick={scrollToTop}
                             className={({ isActive }) =>
@@ -85,9 +85,9 @@ const UserMenu = ({ toggleMenu }) => {
                             <div className="h-10 px-8 flex items-center">
                                 Manage Addresses
                             </div>
-                        </NavLink>
+                        </NavLink> */}
 
-                        <NavLink
+                        {/* <NavLink
                             to="./pan"
                             onClick={scrollToTop}
                             className={({ isActive }) =>
@@ -100,7 +100,7 @@ const UserMenu = ({ toggleMenu }) => {
                             <div className="h-10 px-8 flex items-center">
                                 Pan Card
                             </div>
-                        </NavLink>
+                        </NavLink> */}
                     </div>
                 </div>
 
@@ -143,7 +143,7 @@ const UserMenu = ({ toggleMenu }) => {
                             </div>
                         </NavLink>
 
-                        <NavLink
+                        {/* <NavLink
                             to="./payment-cards"
                             onClick={scrollToTop}
                             className={({ isActive }) =>
@@ -156,9 +156,9 @@ const UserMenu = ({ toggleMenu }) => {
                             <div className="h-10 px-8 flex items-center">
                                 Saved Cards
                             </div>
-                        </NavLink>
+                        </NavLink> */}
 
-                        <NavLink
+                        {/* <NavLink
                             to="./user-review"
                             onClick={scrollToTop}
                             className={({ isActive }) =>
@@ -171,7 +171,7 @@ const UserMenu = ({ toggleMenu }) => {
                             <div className="h-10 px-8 flex items-center">
                                 My Reviews
                             </div>
-                        </NavLink>
+                        </NavLink> */}
                     </div>
                 </div>
 
@@ -196,7 +196,7 @@ const UserMenu = ({ toggleMenu }) => {
                     <div className="flex gap-3 text-xs text-[#019ee3] font-semibold">
                         <Link to="/forgot-password" className="hover:underline">Change Password</Link>
                         <Link to="/user/orders" className="hover:underline">Track Order</Link>
-                        <Link to="/" className="hover:underline">Help Center</Link>
+                        {/* <Link to="/" className="hover:underline">Help Center</Link> */}
                     </div>
                 </div>
             </div>

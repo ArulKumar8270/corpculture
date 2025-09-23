@@ -27,7 +27,7 @@ router.get("/getByPhone/:phone", getCompanyByPhone);
 router.get('/user-company/:id', getCompanyByUser); 
 
 // Update company
-router.put("/update/:id", isAdmin, updateCompany);
+router.put("/update/:id", updateCompany);
 
 // Delete company
 router.delete("/delete/:id", isAdmin, deleteCompany);

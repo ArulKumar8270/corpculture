@@ -212,7 +212,7 @@ const Register = () => {
                                         required
                                     />
                                 </div>
-                                <div className="flex items-center">
+                                {/* <div className="flex items-center">
                                     <Checkbox
                                         size="small"
                                         onChange={handleCheckbox}
@@ -223,7 +223,7 @@ const Register = () => {
                                     <span className="text-sm text-gray-700 font-medium">
                                         Register as Seller
                                     </span>
-                                </div>
+                                </div> */}
                                 <button
                                     className="w-full bg-gradient-to-r from-[#0bbad8] to-[#0c115d] text-white font-semibold py-2 rounded-lg shadow hover:from-[#0c115d] hover:to-[#0bbad8] transition-all uppercase"
                                     type="submit"

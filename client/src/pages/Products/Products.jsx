@@ -153,7 +153,7 @@ const Products = () => {
         <>
             <SeoData title="All Products | Flipkart" />
 
-            <MinCategory />
+            {/* <MinCategory categories={categories} /> */}
             <main className="w-full pt-2 pb-5 sm:mt-0 min-h-screen bg-gradient-to-br from-[#e6fbff] to-[#f7fafd]">
                 {/* <!-- row --> */}
                 <div className="flex gap-3 mt-2 sm:mt-2 sm:mx-3 m-auto ">

@@ -16,7 +16,7 @@ import CompanyRegistrationForm from '../CompanyRegistration/CompanyRegistrationF
 
 
 const Cart = () => {
-    const { auth, isCompanyEnabled, companyDetails, setRefetch, refetch, selectedCompany } = useAuth();
+    const { auth, isCompanyEnabled, setSelectedCompany, companyDetails, setRefetch, refetch, selectedCompany } = useAuth();
     //stripe details
     const publishKey = import.meta.env.VITE_STRIPE_PUBLISH_KEY;
     const secretKey = import.meta.env.VITE_STRIPE_SECRET_KEY;
@@ -41,31 +41,24 @@ const Cart = () => {
     }, [])
 
     useEffect(() => {
-        if (selectedCompany) {
+        if (selectedCompany !== "new") {
             getCompanyUsers()
         } else {
             setShowCompanyModal(true)
         }
-    }, [selectedCompany, isLoading, isCompanyEnabled])
+    }, [selectedCompany, isLoading, isCompanyEnabled, companyDetails, refetch])
 
     const getCompanyUsers = async () => {
         try {
             // 1. Check for user's company details
             // You need a backend endpoint that returns the company details for the logged-in user
-            const companyResponse = await axios.get(
-                `${import.meta.env.VITE_SERVER_URL}/api/v1/user/byComapny/${selectedCompany}`, // *** Create this backend endpoint ***
-                {
-                    headers: {
-                        Authorization: auth?.token,
-                    },
-                }
-            );
-
+            const companyResponse = companyDetails?.filter((company) => company._id === selectedCompany);
             // Assuming the backend returns company data if it exists, or null/empty if not found
-            if (companyResponse?.data?.success && Array.isArray(companyResponse.data.data)) {
-                setExistingUsers(companyResponse.data.data.map((user) => ({
-                    id: user._id,
+            if (companyResponse?.length > 0) {
+                setExistingUsers(companyResponse[0].contactPersons.map((user) => ({
+                    mobile: user.mobile,
                     email: user.email,
+                    name: user.name,
                 })));
             }
         } catch (error) {
@@ -97,14 +90,11 @@ const Cart = () => {
             }
         );
         const session = response.data.session;
-        console.log("session: ", session);
         //storing session id to retrieve payment details after successful
         localStorage.setItem("sessionId", session.id);
         const result = stripe.redirectToCheckout({
             sessionId: session.id,
         });
-        console.log("result: ", result);
-
         if (result.error) {
             console.log(result.error);
         }
@@ -123,6 +113,7 @@ const Cart = () => {
     // Function to close the modal
     const handleCloseCompanyModal = () => { // {{ edit_4 }}
         setShowCompanyModal(false);
+        setSelectedCompany("");
         // Optionally, refetch cart items or company details after closing if needed
         // fetchCartItems();
         // checkCompanyDetails(); // You might want a separate function for this
@@ -135,35 +126,52 @@ const Cart = () => {
             password: newUserEmail,
             phone: newUserPhone,
             isSeller: false,
-            address: auth?.user?.address,
+            // address: auth?.user?.address, // Removed as serviceDeliveryAddresses will handle it
             companyId: selectedCompany,
-            parentId : auth?.user?._id,
+            parentId: auth?.user?._id,
+            serviceDeliveryAddresses: auth?.user?.address ? [{ address: auth.user.address, pincode: "000000" }] : [], // Using auth.user.address and a placeholder pincode
         };
+        let companyPaylod = {
+            contactPersons: [...existingUsers, { name: newUserName, mobile: newUserPhone, email: newUserEmail }],
+        }
         setIsLoading(true);
         try {
             const response = await axios.post(
                 `${import.meta.env.VITE_SERVER_URL}/api/v1/auth/register`, newUserPrams
             );
-            // Registration successful
-            response.status === 201 &&
-                toast.success(
-                    "User Registered Successfully! Please Login..."
-                )
+
+            // Only attempt to update company if a company is selected (and not "new") and company account is enabled
+            if (isCompanyEnabled && selectedCompany && selectedCompany !== "new") {
+                await axios.put(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/company/update/${selectedCompany}`,
+                    companyPaylod, // Use companyPaylod here
+                    {
+                        headers: {
+                            Authorization: auth.token,
+                        },
+                    }
+                );
+            }
+
             setNewUserEmail("");
             setNewUserName("");
             setNewUserPhone("");
             setIsLoading(false);
+            setRefetch(true)
             // Email already registered
-            response.status === 200 &&
-                alert("Email is already registered! Please Login...")
+            if (response.status === 200) { // Assuming 200 for existing user
+                alert("Email is already registered! Please Login...");
+            } else if (response.status === 201) { // Assuming 201 for new user created
+                toast.success("New user registered successfully!");
+            }
         } catch (error) {
             setIsLoading(false);
             console.error("Error:", error);
-            //server error
-            error.response.status === 500 &&
-                toast.error(
-                    "Something went wrong! Please try after sometime."
-                )
+            if (error.response) {
+                toast.error(error.response.data.message || "Something went wrong!");
+            } else {
+                toast.error("An unexpected error occurred.");
+            }
         }
     }
 
@@ -199,20 +207,20 @@ const Cart = () => {
                                     {isCompanyEnabled && <>
                                         <label className="font-semibold text-sm mb-1">Send Invoice To Existing Users:</label>
                                         <div className="flex flex-wrap gap-3 mb-2">
-                                            {existingUsers.map((user) => (
+                                            {existingUsers?.map((user) => (
                                                 <label
                                                     key={user.id}
                                                     className="flex items-center gap-2 bg-blue-50 px-3 py-2 rounded-lg border border-blue-200 cursor-pointer"
                                                 >
                                                     <input
                                                         type="checkbox"
-                                                        value={String(user.id)}
-                                                        checked={selectedUserIds.includes(String(user.id))}
+                                                        value={String(user.email)}
+                                                        checked={selectedUserIds.includes(String(user.email))}
                                                         onChange={(e) => {
                                                             if (e.target.checked) {
-                                                                setSelectedUserIds([...selectedUserIds, String(user.id)]);
+                                                                setSelectedUserIds([...selectedUserIds, String(user.email)]);
                                                             } else {
-                                                                setSelectedUserIds(selectedUserIds.filter(id => id !== String(user.id)));
+                                                                setSelectedUserIds(selectedUserIds.filter(id => id !== String(user.email)));
                                                             }
                                                         }}
                                                         className="accent-primaryBlue"
@@ -223,11 +231,11 @@ const Cart = () => {
                                         </div>
                                         {/* Show selected users as chips */}
                                         <div className="flex flex-wrap gap-2 mb-2">
-                                            {selectedUserIds.map((id) => {
-                                                const user = existingUsers.find(u => String(u.id) === id);
+                                            {selectedUserIds?.map((id) => {
+                                                const user = existingUsers?.find(u => String(u.email) === id);
                                                 return user ? (
                                                     <span
-                                                        key={user.id}
+                                                        key={user.email}
                                                         className="bg-primaryBlue/10 text-primaryBlue px-3 py-1 rounded-full flex items-center gap-2 text-sm font-semibold"
                                                     >
                                                         {user.email}
@@ -333,9 +341,9 @@ const Cart = () => {
             </main>
 
             {/* Company Registration Modal */}
-            {showCompanyModal && isCompanyEnabled && ( // {{ edit_5 }}
+            {showCompanyModal ? ( // {{ edit_5 }}
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto relative">
+                    <div className="bg-white rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto relative">
                         {/* Close button */}
                         <button
                             onClick={handleCloseCompanyModal}
@@ -347,7 +355,7 @@ const Cart = () => {
                         <CompanyRegistrationForm onClose={handleCloseCompanyModal} />
                     </div>
                 </div>
-            )} {/* {{ edit_5 }} */}
+            ) : null} {/* {{ edit_5 }} */}
         </>
     );
 };

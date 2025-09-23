@@ -29,6 +29,7 @@ const CreateProduct = () => {
         from: "",
         to: "",
         price: "",
+        commission: "",
     });
 
     const [commission, setCommission] = useState([]);
@@ -123,7 +124,7 @@ const CreateProduct = () => {
     const addPriceRange = () => {
         if (!priceRangeInput.from.trim() && !priceRangeInput.to.trim() && !priceRangeInput.price.trim()) return;
         setPriceRange([...priceRange, priceRangeInput]);
-        setPriceRangeInput({ from: "", to: "", price: "" });
+        setPriceRangeInput({ from: "", to: "", price: "", commission: "" });
     };
 
     const addHighlight = () => {
@@ -332,7 +333,6 @@ const CreateProduct = () => {
                                         min: 0,
                                     },
                                 }}
-                                required
                                 value={deliveryCharge}
                                 onChange={(e) => setDeliveryCharge(e.target.value)}
                             />
@@ -346,7 +346,6 @@ const CreateProduct = () => {
                                         min: 0,
                                     },
                                 }}
-                                required
                                 value={installationCost}
                                 onChange={(e) => setInstallationCost(e.target.value)}
                             />
@@ -360,7 +359,6 @@ const CreateProduct = () => {
                                         min: 0,
                                     },
                                 }}
-                                required
                                 value={discountPrice}
                                 onChange={(e) =>
                                     setDiscountPrice(e.target.value)
@@ -409,7 +407,6 @@ const CreateProduct = () => {
                                         min: 0,
                                     },
                                 }}
-                                required
                                 value={warranty}
                                 onChange={(e) => setWarranty(e.target.value)}
                             />
@@ -547,7 +544,7 @@ const CreateProduct = () => {
                             ))}
                         </div>
 
-                        <h2 className="font-medium">
+                        {/* <h2 className="font-medium">
                             Set Commission Range
                         </h2>
                         <div className="flex justify-between gap-2 items-center">
@@ -584,8 +581,8 @@ const CreateProduct = () => {
                             >
                                 Add
                             </span>
-                        </div>
-                        <div className="flex flex-col gap-2">
+                        </div> */}
+                        {/* <div className="flex flex-col gap-2">
                             {commission?.map((commisson, i) => (
                                 <div
                                     key={i}
@@ -604,7 +601,7 @@ const CreateProduct = () => {
                                     </span>
                                 </div>
                             ))}
-                        </div>
+                        </div> */}
                         <h2 className="font-medium">
                             Set Product Price Range
                         </h2>
@@ -636,6 +633,15 @@ const CreateProduct = () => {
                                 variant="outlined"
                                 size="small"
                             />
+                            <TextField
+                                value={priceRangeInput.commission}
+                                onChange={handlerpiceRange}
+                                name="commission"
+                                label="Commission"
+                                placeholder="WJDK42DF5"
+                                variant="outlined"
+                                size="small"
+                            />
                             <span
                                 onClick={() => addPriceRange()}
                                 className="py-2 px-6 bg-gradient-to-r from-[#019ee3] to-[#afcb09] text-white rounded-2xl hover:shadow-lg cursor-pointer font-semibold transition"
@@ -654,6 +660,7 @@ const CreateProduct = () => {
                                     </p>
                                     <p>{priceRange.to}</p>
                                     <p>{priceRange.price}</p>
+                                    <p>{priceRange.commission}</p>
                                     <span
                                         onClick={() => deletePriceRange(i)}
                                         className="text-red-600 hover:bg-red-200 bg-red-100 p-1 rounded-full cursor-pointer"

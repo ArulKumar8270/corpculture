@@ -23,7 +23,7 @@ const AuthProvider = ({ children }) => {
         if (auth?.user?._id || refetch) {
             getCompanyDetails();
         }
-    }, [auth, isCompanyEnabled, refetch])
+    }, [auth, isCompanyEnabled, refetch, selectedCompany])
 
     useEffect(() => {
         const fetchPermissions = async () => {
@@ -79,7 +79,7 @@ const AuthProvider = ({ children }) => {
             // 1. Check for user's company details
             // You need a backend endpoint that returns the company details for the logged-in user
             const companyResponse = await axios.get(
-                `${import.meta.env.VITE_SERVER_URL}/api/v1/company/user-company/${auth?.user?._id}`, // *** Create this backend endpoint ***
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/company/user-company/${auth?.user?.phone}`, // *** Create this backend endpoint ***
                 {
                     headers: {
                         Authorization: auth?.token,

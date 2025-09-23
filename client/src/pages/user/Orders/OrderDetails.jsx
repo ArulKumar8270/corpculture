@@ -55,7 +55,7 @@ const OrderDetails = () => {
         <>
             <SeoData title="Order Details | Flipkart" />
 
-            <MinCategory />
+            {/* <MinCategory /> */}
             <main className="w-full py-2 sm:py-8 bg-gradient-to-br from-[#e6fbff] to-[#f7fafd] min-h-screen">
                 {loading ? (
                     <Spinner />
