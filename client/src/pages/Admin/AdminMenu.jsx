@@ -323,27 +323,10 @@ const AdminMenu = ({ toggleMenu }) => {
                                                         </div>
                                                     </NavLink>
                                                 )}
-                                                {hasPermission('salesAllCategory') && (
-                                                    <NavLink
-                                                        to="./all-category"
-                                                        onClick={scrollToTop}
-                                                        className={({ isActive }) =>
-                                                            `rounded-lg mx-2 my-1 transition-all ${isActive
-                                                                ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
-                                                                : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
-                                                            }`
-                                                        }
-                                                    >
-                                                        <div className="h-10 px-8 flex items-center">
-                                                            Category
-                                                        </div>
-                                                    </NavLink>
-                                                )}
-
                                                 {/* Orders Link */}
                                                 {hasPermission('salesOrders') && (
                                                     <NavLink
-                                                        to="/admin/orders"
+                                                        to="./orders"
                                                         onClick={scrollToTop}
                                                         className={({ isActive }) =>
                                                             `rounded-lg mx-2 my-1 transition-all ${isActive
@@ -362,7 +345,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                                 {/* Commission Link (Direct) */}
                                                 {hasPermission('salesCommission') && (
                                                     <NavLink
-                                                        to="/admin/commission"
+                                                        to="./commission"
                                                         onClick={scrollToTop}
                                                         className={({ isActive }) =>
                                                             `rounded-lg mx-2 my-1 transition-all ${isActive
@@ -372,8 +355,8 @@ const AdminMenu = ({ toggleMenu }) => {
                                                         }
                                                     >
                                                         <div className="h-10 px-8 flex items-center gap-3">
-                                                            <BarChartIcon sx={{ fontSize: "20px" }} /> {/* Reusing BarChartIcon for Commission */}
-                                                            Commission
+                                                            <BarChartIcon sx={{ fontSize: "20px" }} /> {/* Reusing BarChartIcon for Partners */}
+                                                            Partners
                                                         </div>
                                                     </NavLink>
                                                 )}
@@ -881,6 +864,22 @@ const AdminMenu = ({ toggleMenu }) => {
                                                 Menu setting
                                             </div>
                                         </NavLink>)}
+                                        {hasPermission('salesAllCategory') && (
+                                            <NavLink
+                                                to="./all-category"
+                                                onClick={scrollToTop}
+                                                className={({ isActive }) =>
+                                                    `rounded-lg mx-2 my-1 transition-all ${isActive
+                                                        ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
+                                                        : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
+                                                    }`
+                                                }
+                                            >
+                                                <div className="h-10 px-8 flex items-center">
+                                                    Category
+                                                </div>
+                                            </NavLink>
+                                        )}
                                         {hasPermission('otherSettingsCredit') && (<NavLink
                                             to="/admin/settings/credit"
                                             onClick={scrollToTop}

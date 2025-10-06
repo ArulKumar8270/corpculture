@@ -14,6 +14,8 @@ const Orders = () => {
     const [loading, setLoading] = useState(false);
     const [orders, setOrders] = useState([]);
 
+    console.log(orders, "orders32534523")
+
     useEffect(() => {
         // fetch orders from server
         const fetchOrders = async () => {

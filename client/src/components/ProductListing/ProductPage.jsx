@@ -358,18 +358,18 @@ const ProductDetails = () => {
                                         </span>
                                         <div className="flex items-baseline gap-3 text-3xl font-bold">
                                             <span className="text-gray-900">
-                                                ₹{product?.discountPrice?.toLocaleString()}
+                                                ₹ {product?.price?.toLocaleString()} 
                                             </span>
                                             <span className="text-lg text-gray-400 line-through font-medium">
-                                                ₹{product?.price?.toLocaleString()}
+                                                ₹ {product?.discountPrice?.toLocaleString()}
                                             </span>
-                                            <span className="text-base text-[#019ee3] font-semibold">
+                                            {/* <span className="text-base text-[#019ee3] font-semibold">
                                                 {getDiscount(
                                                     product?.price,
                                                     product?.discountPrice
                                                 )}
                                                 %&nbsp;off
-                                            </span>
+                                            </span> */}
                                         </div>
                                     </div>
                                     {product?.stock <= 10 && product?.stock > 0 && (

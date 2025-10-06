@@ -3,9 +3,9 @@ import orderModel from "../../models/orderModel.js";
 // Get Orders by Employee ID
 const getOrdersByEmployeeId = async (req, res) => {
     try {
-        const { employeeId } = req.params; // Get employeeId from URL parameters
+        const { id } = req.params;
         // Find all orders assigned to this employee
-        const orders = await orderModel.find({ employeeId: employeeId })
+        const orders = await orderModel.find({ employeeId: id })
         if (!orders || orders.length === 0) {
             return res.status(404).send({
                 success: false,

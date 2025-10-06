@@ -37,7 +37,7 @@ const updateProduct = async (req, res) => {
 
         if (images && images.length > 0) {
             for (const image of images) {
-                const result = await cloudinary.v2.uploader.upload(image, {
+                const result = await cloudinary.v2.uploader.upload(image, { 
                     folder: "products",
                 });
                 imagesLink.push({
@@ -88,6 +88,15 @@ const updateProduct = async (req, res) => {
             product.specifications = req.body.specifications.map((s) =>
                 JSON.parse(s)
             );
+        }
+
+        // Update priceRange
+        if (Array.isArray(req.body.priceRange)) {
+            let priceRange = [];
+            req.body.priceRange.forEach((s) => {
+                priceRange.push(JSON.parse(s));
+            });
+            product.priceRange = priceRange;
         }
 
         // Save the updated product

@@ -100,8 +100,8 @@ const AddServiceProduct = () => {
             if (data?.success) {
                 const uniqueProductsMap = new Map();
                 data.purchases.forEach(purchase => {
-                    // Ensure product exists, has an ID, productCode, and quantity > 0
-                    if (purchase.productName && purchase.productName.productCode && purchase.quantity > 0) {
+                    // Ensure product exists, has an ID, productCode, and productCode is a non-empty string
+                    if (purchase.productName && typeof purchase.productName.productCode === 'string' && purchase.productName.productCode.length > 0) {
                         // Use productCode as the key to group by productCode
                         // If multiple purchases have the same productCode, we only add one entry for that productCode.
                         // The value stored will be the product definition object.
@@ -275,7 +275,7 @@ const AddServiceProduct = () => {
                     <Autocomplete
                         options={purchaseProducts}
                         // Display both product name and product code
-                        getOptionLabel={(option) => `${option?.productName?.productName || ''} (${option?.productName?.productCode || ''})`}
+                        getOptionLabel={(option) => `${option?.productName?.productName || ''}`}
                         isOptionEqualToValue={(option, value) => option._id === value._id}
                         // Find the product definition object based on the stored product ID for display
                         value={purchaseProducts.find(p => p._id === productName) || null}

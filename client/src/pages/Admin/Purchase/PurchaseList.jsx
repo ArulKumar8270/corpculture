@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     Typography, Paper, Button,
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TablePagination,
-    TextField, InputAdornment,
-    Badge
+    TextField, InputAdornment, Box, Divider, Chip
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -23,7 +22,7 @@ const PurchaseList = () => {
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [searchTerm, setSearchTerm] = useState('');
-
+    const [materials, setMaterials] = useState([]); // New state for materials
 
     const hasPermission = (key) => {
         return userPermissions.some(p => p.key === key && p.actions.includes('edit')) || auth?.user?.role === 1;
@@ -48,8 +47,23 @@ const PurchaseList = () => {
         }
     };
 
+    const fetchMaterials = async () => { // New function to fetch materials
+        try {
+            const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/materials`);
+            if (data?.success) {
+                setMaterials(data.materials);
+            } else {
+                toast.error(data?.message || 'Failed to fetch materials.');
+            }
+        } catch (err) {
+            console.error('Error fetching materials:', err);
+            toast.error('Something went wrong while fetching materials.');
+        }
+    };
+
     useEffect(() => {
         fetchPurchases();
+        fetchMaterials(); // Call fetchMaterials on component mount
     }, []);
 
     const handleAddPurchase = () => {
@@ -101,6 +115,16 @@ const PurchaseList = () => {
         );
     });
 
+    // Sort product groups by totalQuantity (highest first)
+    const sortedProductGroups = useMemo(() => {
+        // Transform materials data to fit the expected structure for Material Summary
+        return materials.map(material => ({
+            name: material.name,
+            count: 1, // Each material from the API is a unique entry
+            totalQuantity: material.unit,
+        })).sort((a, b) => b.totalQuantity - a.totalQuantity);
+    }, [materials]);
+
     if (loading) {
         return (
             <div className="p-6 bg-gray-100 min-h-screen flex justify-center items-center">
@@ -121,7 +145,7 @@ const PurchaseList = () => {
         <div className="p-6 bg-gray-100 min-h-screen">
             <div className="flex justify-between items-center mb-6 w-[95%]">
                 <Typography variant="h5" className="font-semibold text-blue-600">
-                    Materital List
+                    Material List
                 </Typography>
                 {hasPermission("vendorPurchaseList") ? <Button
                     variant="contained"
@@ -131,6 +155,43 @@ const PurchaseList = () => {
                     Add New Purchase
                 </Button> : null}
             </div>
+
+            {/* Product Summary Section */}
+            <Paper className="p-4 mb-4 shadow-md w-[95%]" elevation={3}>
+                <Typography variant="h6" className="font-semibold mb-3">
+                    Material Summary
+                </Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 2 }}>
+                    {sortedProductGroups.map((group) => (
+                        <Chip
+                            key={group.name}
+                            label={`${group.name}: ${group.totalQuantity}`}
+                            color="primary"
+                            variant="outlined"
+                            sx={{ fontWeight: 'medium' }}
+                        />
+                    ))}
+                </Box>
+                {/* <Divider sx={{ my: 2 }} />
+                <TableContainer sx={{ maxHeight: 250 }}>
+                    <Table stickyHeader size="small">
+                        <TableHead>
+                            <TableRow>
+                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#f0f0f0' }}>Material Name</TableCell>
+                                <TableCell align="right" sx={{ fontWeight: 'bold', backgroundColor: '#f0f0f0' }}>Total Quantity</TableCell>
+                            </TableRow>
+                        </TableHead>
+                        <TableBody>
+                            {sortedProductGroups.map((group) => (
+                                <TableRow key={group.name} hover>
+                                    <TableCell>{group.name}</TableCell>
+                                    <TableCell align="right">{group.totalQuantity}</TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </TableContainer> */}
+            </Paper>
 
             <Paper className="p-6 shadow-md w-[95%]" elevation={3}> {/* Increased elevation for a modern look */}
                 <div className="mb-4">
@@ -182,27 +243,11 @@ const PurchaseList = () => {
                                             <TableCell>{purchase.vendorCompanyName?.companyName}</TableCell>
                                             <TableCell>{purchase.productName?.productName}</TableCell> {/* Updated this line */}
                                             <TableCell>{new Date(purchase.purchaseDate).toLocaleDateString()}</TableCell>
-                                            <TableCell align="right">
-                                                {purchase.quantity ? <Badge
-                                                    badgeContent={purchase.quantity}
-                                                    color={purchase.quantity <= 0 ? "error" : "primary"}
-                                                    sx={{
-                                                        '& .MuiBadge-badge': {
-                                                            right: -3,
-                                                            top: 13,
-                                                            padding: '0 4px',
-                                                            height: 20,
-                                                            minWidth: 20,
-                                                            borderRadius: '10px',
-                                                            fontSize: '0.75rem',
-                                                        },
-                                                    }}
-                                                /> : '0'}
-                                            </TableCell>
+                                            <TableCell align="right" style={{ color: purchase.quantity < 0 ? 'red' : 'inherit' }}>{purchase.quantity}</TableCell>
                                             <TableCell align="right">{purchase.rate.toFixed(2)}</TableCell>
                                             <TableCell align="right">{purchase.price.toFixed(2)}</TableCell>
                                             <TableCell align="right">{purchase.grossTotal.toFixed(2)}</TableCell>
-                                            {hasPermission("vendorPurchaseList") ? <TableCell align="center">
+                                           {hasPermission("vendorPurchaseList") ? <TableCell align="center">
                                                 <div className="flex justify-center space-x-2">
                                                     <Button
                                                         variant="contained"

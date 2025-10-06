@@ -6,8 +6,8 @@ const getOrders = async (req, res) => {
         const order = await orderModel
             .find({ buyer: req.user._id })
             .populate({ path: "buyer", model: userModel })
-            .populate({ path: "products.seller", model: userModel });
-
+            // .populate({ path: "products.seller", model: userModel })
+            .populate("employeeId", "name _id")
         res.status(200).send({
             success: true,
             orders: order,

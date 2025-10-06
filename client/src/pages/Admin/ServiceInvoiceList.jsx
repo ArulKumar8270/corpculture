@@ -454,7 +454,7 @@ function InvoiceRow(props) {
                                         console.log(product, "product54234"),
                                         <TableRow key={product?.productId?._id || product._id}>
                                             <TableCell component="th" scope="row">
-                                                {product.productId?.productName?.productName || product.productName}
+                                                {product.productId?.productName?.productName?.productName || product.productName}
                                             </TableCell>
                                             <TableCell>{product.productId?.sku || 'N/A'}</TableCell>
                                             <TableCell>{product.productId?.hsn || 'N/A'}</TableCell>

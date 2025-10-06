@@ -114,25 +114,20 @@ const CartItem = ({ product, inCart }) => {
                     {/* <!-- price desc --> */}
                     <div className="flex items-baseline gap-2 text-xl font-semibold">
                         <span className="text-sm text-gray-400 line-through font-normal">
-                            ₹
-                            {(
-                                product?.price * product?.quantity
-                            ).toLocaleString()}
+                            ₹ {(product?.discountPrice).toLocaleString()}
                         </span>
                         <span className="text-[#019ee3]">
                             ₹
-                            {(
-                                product?.discountPrice * product?.quantity
-                            ).toLocaleString()}
+                            {(product?.price).toLocaleString()}
                         </span>
-
+{/* 
                         <span className="text-sm font-bold text-primaryGreen">
                             {getDiscount(
                                 product?.price,
                                 product?.discountPrice
                             )}
                             %&nbsp;off
-                        </span>
+                        </span> */}
                     </div>
                     {/* <!-- price desc --> */}
                 </div>

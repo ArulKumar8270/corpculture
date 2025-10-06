@@ -28,24 +28,43 @@ const handleSuccess = async (req, res) => {
         let session = {
             payment_intent: "pi_3N7qf3Lw5q2q7Xw5720Y3720",
             // Calculate total amount from order items
-            amount_total: orderItems.reduce((sum, item) => {
-                const quantity = item.quantity || 0;
-                // Find matching price range
-                const rangePrice = item?.priceRange.find(
-                    (range) =>
-                        quantity >= parseInt(range.from) &&
-                        quantity <= parseInt(range.to)
-                );
+            amount_total: (() => {
+                // Helper function to get the correct price for an item based on quantity
+                const getPrice = (item) => {
+                    const quantity = item.quantity || 0;
+                    const priceRange = item.priceRange?.find(
+                        (range) => quantity >= parseFloat(range.from) && quantity <= parseFloat(range.to)
+                    );
+                    // Return the price from the matching range, otherwise, fall back to discountPrice
+                    return priceRange ? parseFloat(priceRange.price) : (item.discountPrice || 0);
+                };
 
-                const rangeCost = rangePrice ? quantity * parseFloat(rangePrice.price) : 0;
+                // Calculate total price based on priceRange
+                const subtotal = orderItems.reduce((sum, item) => {
+                    const itemPrice = getPrice(item);
+                    return sum + itemPrice * (item.quantity || 0);
+                }, 0);
 
-                const deliveryCost = quantity ? item.deliveryCharge || 0 : 0;
-                const installationCost = item.isInstalation ? item.installationCost || 0 : 0;
+                // Calculate total discount
+                const totalDiscount = orderItems.reduce((sum, item) => {
+                    const regularPrice = item.price * (item.quantity || 0);
+                    const actualPrice = getPrice(item) * (item.quantity || 0);
+                    return sum + (regularPrice - actualPrice);
+                }, 0);
 
-                return sum + rangeCost + deliveryCost + installationCost;
-            }, 0)
-                .toLocaleString(),
+                // Calculate total delivery charges
+                const totalDeliveryCharges = orderItems.reduce((sum, item) => {
+                    return sum + (item.deliveryCharge || 0);
+                }, 0);
 
+                // Calculate total installation charges
+                const totalInstallationCharges = orderItems.reduce((sum, item) => {
+                    return sum + (item.isInstalation ? (item.installationCost || 0) : 0);
+                }, 0);
+
+                const totalAmount = subtotal + totalDeliveryCharges + totalInstallationCharges;
+                return totalAmount.toLocaleString();
+            })(),
             customer_details: {
                 address: {
                     line1: "123 Main Street",
@@ -59,7 +78,6 @@ const handleSuccess = async (req, res) => {
                 email: "arulkumar8270@gmail.com"
             },
         }
-        console.log("session: ", session);
 
         // Extract the payment intent ID from the retrieved session
         const paymentIntentId = session?.payment_intent;
@@ -72,7 +90,16 @@ const handleSuccess = async (req, res) => {
             sendInvoice: product.sendInvoice,
             isInstalation: product.isInstalation,
             brandName: product.brandName,
-            price: product.price,
+            price: (() => {
+                const quantity = product.quantity || 0;
+                const priceRange = product.priceRange?.find(
+                    (range) => quantity >= parseFloat(range.from) && quantity <= parseFloat(range.to)
+                );
+                const basePrice = priceRange ? parseFloat(priceRange.price) : (product.discountPrice || 0);
+                const deliveryCost = product.deliveryCharge || 0;
+                const installationCost = product.isInstalation ? (product.installationCost || 0) : 0;
+                return basePrice + deliveryCost + installationCost;
+            })(),
             discountPrice: product.discountPrice,
             deliveryCharge: product.deliveryCharge,
             installationCost: product.installationCost,

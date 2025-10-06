@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import MinCategory from "../../components/MinCategory";
 import axios from "axios";
 import Tracker from "./../user/Orders/Tracker";
@@ -12,7 +12,7 @@ import SeoData from "../../SEO/SeoData";
 const UpdateOrders = () => {
     const params = useParams();
     const orderId = params.id;
-
+    const negative = useNavigate()
     const [loading, setLoading] = useState(false);
     const [UpdateOrders, setUpdateOrders] = useState([]);
     const [status, setStatus] = useState("");
@@ -112,7 +112,7 @@ const UpdateOrders = () => {
                                                 Update Status
                                             </h3>
                                             <Link
-                                                to="/admin/orders"
+                                                onClick={() => negative(-1)}
                                                 className="ml-1 flex items-center gap-0 font-medium text-primaryBlue uppercase"
                                             >
                                                 <ArrowBackIosIcon
@@ -202,6 +202,7 @@ const UpdateOrders = () => {
                                     installationCost,
                                     sendInvoice,
                                     isInstalation,
+                                    price
                                 } = item;
 
                                 return (
@@ -245,11 +246,7 @@ const UpdateOrders = () => {
                                                 </p>
                                                 <span className="font-medium">
                                                     ₹
-                                                    {(
-                                                        quantity * discountPrice +
-                                                        deliveryCharge +
-                                                        installationCost
-                                                    ).toLocaleString()}
+                                                    {price}
                                                 </span>
                                                 <span className="text-xs text-gray-600">
                                                     Payment Id: {paymentId}

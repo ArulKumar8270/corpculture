@@ -93,7 +93,7 @@ const orderSchema = new mongoose.Schema({
     },
     employeeId: {
         type: mongoose.Schema.ObjectId,
-        ref: "User",
+        ref: "Employee",
     },
     amount: {
         type: Number,

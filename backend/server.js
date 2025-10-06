@@ -29,6 +29,7 @@ import commonDetailsRoutes from "./routes/commonDetailsRoutes.js"; // Import the
 import rentalPaymentEntryRoutes from './routes/rentalPaymentEntryRoutes.js'; // Import new routes
 import remainderRoutes from "./routes/remainderRoutes.js"; // Import new routes
 import employeeBenefitsRoute from "./routes/employeeBenefitsRoute.js";
+import materialRoutes from "./routes/materialRoutes.js"; // Import material routes
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
@@ -40,7 +41,7 @@ import userRoute from "./routes/userRoute.js";
 
 //rest object
 const app = express();
- 
+
 //configure env
 dotenv.config();
 
@@ -113,6 +114,7 @@ app.use("/api/v1/report", reportRoutes); // Or choose your desired base path
 app.use("/api/v1/common-details", commonDetailsRoutes); // Add the new common details routes
 app.use("/api/v1/remainders", remainderRoutes);
 app.use("/api/v1/employee-benefits", employeeBenefitsRoute);
+app.use("/api/v1/materials", materialRoutes); // Material routes
 
 app.listen(PORT, () => {
     console.log(`SERVER RUNNING ON PORT ${PORT}`);

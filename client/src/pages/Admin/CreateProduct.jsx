@@ -637,7 +637,7 @@ const CreateProduct = () => {
                                 value={priceRangeInput.commission}
                                 onChange={handlerpiceRange}
                                 name="commission"
-                                label="Commission"
+                                label="Commission" 
                                 placeholder="WJDK42DF5"
                                 variant="outlined"
                                 size="small"

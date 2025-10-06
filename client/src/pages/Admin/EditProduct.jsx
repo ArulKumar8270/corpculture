@@ -30,6 +30,7 @@ const EditProduct = () => {
         from: "",
         to: "",
         price: "",
+        commission: "",
     });
 
     const [commission, setCommission] = useState([]);
@@ -54,6 +55,10 @@ const EditProduct = () => {
     const [logo, setLogo] = useState(null);
     const [logoPreview, setLogoPreview] = useState("");
     const [categories, setCategories] = useState([]);
+
+    const [deliveryCharge, setDeliveryCharge] = useState();
+    const [installationCost, setInstallationCost] = useState();
+
 
 
     // max image size 500kb
@@ -119,7 +124,7 @@ const EditProduct = () => {
     const addPriceRange = () => {
         if (!priceRangeInput.from.trim() && !priceRangeInput.to.trim() && !priceRangeInput.price.trim()) return;
         setPriceRange([...priceRange, priceRangeInput]);
-        setPriceRangeInput({ from: "", to: "", price: "" });
+        setPriceRangeInput({ from: "", to: "", price: "", commission: "" });
     };
 
     const addHighlight = () => {
@@ -202,10 +207,6 @@ const EditProduct = () => {
 
         const validationErrors = [];
 
-        if (specs.length <= 1) {
-            validationErrors.push("Please Add Minimum 2 Specifications");
-        }
-
         if (oldImages.length <= 0 && images.length <= 0) {
             validationErrors.push("Please Add Atleast 1 Product Image");
         }
@@ -227,6 +228,9 @@ const EditProduct = () => {
             formData.append("brandName", brand);
             formData.append("logo", logo);
             formData.append("oldLogo", JSON.stringify(oldLogo));
+            // Append new fields to formData
+            formData.append("installationCost", installationCost);
+            formData.append("deliveryCharge", deliveryCharge);
 
             images.forEach((image) => {
                 formData.append("images", image);
@@ -303,6 +307,8 @@ const EditProduct = () => {
                 setSpecs(res.data.product.specifications || []);
                 setCommission(res.data.product.commission || []);
                 setPriceRange(res.data.product.priceRange || []);
+                setInstallationCost(res.data.product.installationCost || 0);
+                setDeliveryCharge(res.data.product.deliveryCharge || 0);
                 setOldLogo(() => {
                     return {
                         url: res.data.product.brand.logo.url,
@@ -383,6 +389,32 @@ const EditProduct = () => {
                                     required
                                     value={price}
                                     onChange={(e) => setPrice(e.target.value)}
+                                />
+                                <TextField
+                                    label="deliveryCharge"
+                                    type="number"
+                                    variant="outlined"
+                                    size="small"
+                                    InputProps={{
+                                        inputProps: {
+                                            min: 0,
+                                        },
+                                    }}
+                                    value={deliveryCharge}
+                                    onChange={(e) => setDeliveryCharge(e.target.value)}
+                                />
+                                <TextField
+                                    label="installationCose"
+                                    type="number"
+                                    variant="outlined"
+                                    size="small"
+                                    InputProps={{
+                                        inputProps: {
+                                            min: 0,
+                                        },
+                                    }}
+                                    value={installationCost}
+                                    onChange={(e) => setInstallationCost(e.target.value)}
                                 />
                                 <TextField
                                     label="Discount Price"
@@ -587,7 +619,7 @@ const EditProduct = () => {
                                     </div>
                                 ))}
                             </div>
-                            <h2 className="font-medium">
+                            {/* <h2 className="font-medium">
                                 Set Commission Range
                             </h2>
                             <div className="flex justify-between gap-2 items-center">
@@ -644,7 +676,7 @@ const EditProduct = () => {
                                         </span>
                                     </div>
                                 ))}
-                            </div>
+                            </div> */}
                             <h2 className="font-medium">
                                 Set Product Price Range
                             </h2>
@@ -676,6 +708,15 @@ const EditProduct = () => {
                                     variant="outlined"
                                     size="small"
                                 />
+                                <TextField
+                                    value={priceRangeInput.commission}
+                                    onChange={handlerpiceRange}
+                                    name="commission"
+                                    label="Commission"
+                                    placeholder="WJDK42DF5"
+                                    variant="outlined"
+                                    size="small"
+                                />
                                 <span
                                     onClick={() => addPriceRange()}
                                     className="py-2 px-6 bg-gradient-to-r from-[#019ee3] to-[#afcb09] text-white rounded-2xl hover:shadow-lg cursor-pointer font-semibold transition"
@@ -694,6 +735,7 @@ const EditProduct = () => {
                                         </p>
                                         <p>{priceRange.to}</p>
                                         <p>{priceRange.price}</p>
+                                        <p>{priceRange.commission}</p>
                                         <span
                                             onClick={() => deletePriceRange(i)}
                                             className="text-red-600 hover:bg-red-200 bg-red-100 p-1 rounded-full cursor-pointer"
