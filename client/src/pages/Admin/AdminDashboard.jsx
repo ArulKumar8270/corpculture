@@ -47,6 +47,10 @@ import RentalInvoiceReport from "./Reports/RentalInvoiceReport";
 import ServiceReportsReport from "./Reports/ServiceReportsReport";
 import ServiceEnquiriesReport from "./Reports/ServiceEnquiriesReport";
 import AddEmployee from "./addemployee";
+import AdminOrders from "./AdminOrders";
+import UpdateOrders from "./UpdateOrders";
+import AdminCommission from "./AdminCommission";
+import EmployeeDetails from "./EmployeeDetails";
 
 const AdminDashboard = () => {
     const navigate = useNavigate();
@@ -95,8 +99,12 @@ const AdminDashboard = () => {
                             <Route path="pan" element={<PanCardComponent />} />
                             <Route path="add-product" element={<CreateProduct />} />
                             <Route path="all-products" element={<AllProducts />} />
+                            <Route path="orders" element={<AdminOrders />} />
+                            <Route path="order_details/:id?" element={<UpdateOrders />} />
+                            <Route path="commission" element={<AdminCommission />} />
                             <Route path="gst" element={<GST />} />
                             <Route path="employee" element={<AdminEmployees />} />
+                            <Route path="employee_details/:id?" element={<EmployeeDetails />} />
                             <Route path="addEmployee/:employeeId?" element={<AddEmployee />} />
                             <Route path="menuSetting" element={<MenuSetting />} />
                             <Route path="addServiceProduct" element={<AddServiceProduct />} />

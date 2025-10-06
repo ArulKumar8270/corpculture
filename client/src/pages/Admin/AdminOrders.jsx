@@ -145,7 +145,6 @@ const AdminOrders = () => {
         // Add more fields to search if needed
     );
 
-
     return (
         <>
             <SeoData title="Admin Orders | Flipkart" />
@@ -180,34 +179,35 @@ const AdminOrders = () => {
                             {/* <!-- search bar --> */}
 
                             {/* Assignment Controls */}
-                            {hasPermission("salesOrders") ? <div className="flex flex-col sm:flex-row items-center gap-4 mb-4 p-4 bg-white rounded-xl shadow">
+                            {hasPermission("salesOrders") ? <div className="flex flex-col sm:flex-row items-center gap-4 mb-4 p-4 bg-white rounded-xl shadow justify-between">
                                 <span className="font-semibold text-gray-700">Assign Selected Orders:</span>
-                                <select
-                                    value={selectedEmployeeId}
-                                    onChange={(e) => setSelectedEmployeeId(e.target.value)}
-                                    className="p-2 border rounded-md text-sm w-full sm:w-auto"
-                                >
-                                    <option value="">-- Select Employee --</option>
-                                    {employees
-                                        ?.filter(employee => employee.employeeType === 'Service') // {{ edit_1 }} Filter employees by type 'Service'
-                                        .map(employee => (
-                                            <option key={employee._id} value={employee._id}>
-                                                {employee.name} ({employee.employeeType})
-                                            </option>
-                                        ))}
-                                </select>
-                                <button
-                                    onClick={handleAssignOrders}
-                                    disabled={selectedOrderIds.length === 0 || !selectedEmployeeId}
-                                    className={`p-2 px-4 rounded-md text-white font-semibold transition w-full sm:w-auto
+                                <div className="flex items-center gap-2">
+                                    <select
+                                        value={selectedEmployeeId}
+                                        onChange={(e) => setSelectedEmployeeId(e.target.value)}
+                                        className="p-2 border rounded-md text-sm w-full sm:w-auto"
+                                    >
+                                        <option value="">-- Select Employee --</option>
+                                        {employees
+                                            ?.filter(employee => employee.employeeType === 'Sales') // {{ edit_1 }} Filter employees by type 'Service'
+                                            .map(employee => (
+                                                <option key={employee._id} value={employee._id}>
+                                                    {employee.name} ({employee.employeeType})
+                                                </option>
+                                            ))}
+                                    </select>
+                                    <button
+                                        onClick={handleAssignOrders}
+                                        disabled={selectedOrderIds.length === 0 || !selectedEmployeeId}
+                                        className={`p-2 px-4 rounded-md text-white font-semibold transition w-full sm:w-auto
                                         ${selectedOrderIds.length === 0 || !selectedEmployeeId
-                                            ? 'bg-gray-400 cursor-not-allowed'
-                                            : 'bg-gradient-to-r from-[#019ee3] to-[#afcb09] hover:from-[#afcb09] hover:to-[#019ee3]'
-                                        }`}
-                                >
-                                    Assign
-                                </button>
-                            </div> : null}
+                                                ? 'bg-gray-400 cursor-not-allowed'
+                                                : 'bg-gradient-to-r from-[#019ee3] to-[#afcb09] hover:from-[#afcb09] hover:to-[#019ee3]'
+                                            }`}
+                                    >
+                                        Assign
+                                    </button>
+                                </div> </div> : null}
 
 
                             {filteredOrders?.length === 0 && (
@@ -257,7 +257,7 @@ const AdminOrders = () => {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {filteredOrders.map(order => (
+                                            {filteredOrders?.map(order => (
                                                 <tr key={order._id} className="border-b last:border-b-0 hover:bg-gray-50">
                                                     {hasPermission("salesOrders") ? <td className="py-2 px-3">
                                                         <input
@@ -268,22 +268,22 @@ const AdminOrders = () => {
                                                         />
                                                     </td> : null}
                                                     <td className="py-2 px-3">
-                                                        <Link to={`./order_details/${order._id}`} className="text-blue-600 hover:underline">
+                                                        <Link to={`../order_details/${order._id}`} className="text-blue-600 hover:underline">
                                                             {order._id}
                                                         </Link>
                                                     </td>
                                                     <td className="py-2 px-3">{order.orderStatus}</td>
                                                     <td className="py-2 px-3">
                                                         <Link // {{ edit_2 }}
-                                                            to={`/admin/employee_details/${order.employeeId}`} // Link to employee details page // {{ edit_2 }}
+                                                            to={`../employee_details/${order.employeeId?._id}`} // Link to employee details page // {{ edit_2 }}
                                                             className="text-blue-600 hover:underline" // Add styling to make it look like a link // {{ edit_2 }}
                                                         > {/* {{ edit_2 }} */}
-                                                            {order.employeeId} {/* {{ edit_2 }} */}
+                                                            {order.employeeId?.name} {/* {{ edit_2 }} */}
                                                         </Link>
                                                     </td>
                                                     <td className="py-2 px-3">{order.buyer?.name || 'N/A'}</td>
                                                     <td className="py-2 px-3">
-                                                    ₹ {order.amount || '0'}
+                                                        ₹ {order.amount || '0'}
                                                     </td>
                                                     <td className="py-2 px-3">
                                                         {/* Display product count or list */}

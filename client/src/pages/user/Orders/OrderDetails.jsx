@@ -116,6 +116,7 @@ const OrderDetails = () => {
                                     isInstalation,
                                     deliveryCharge,
                                     installationCost,
+                                    price
                                 } = item;
 
                                 return (
@@ -149,13 +150,11 @@ const OrderDetails = () => {
                                                 </p>
                                                 <span className="font-bold text-[#019ee3] text-lg">
                                                     ₹
-                                                    {(
-                                                        quantity * discountPrice + deliveryCharge + installationCost
-                                                    ).toLocaleString()}
+                                                    {price}
                                                 </span>
                                                 <div className="flex items-center justify-between">
                                                     <span className="text-[15px] text-gray-700">
-                                                        Send Invoice : 
+                                                        Send Invoice :
                                                     </span>
                                                     <span>
                                                         {sendInvoice
@@ -165,7 +164,7 @@ const OrderDetails = () => {
                                                 </div>
                                                 <div className="flex items-center justify-between">
                                                     <span className="text-[15px] text-gray-700">
-                                                        Instalation :  
+                                                        Instalation :
                                                     </span>
                                                     <span>
                                                         {isInstalation

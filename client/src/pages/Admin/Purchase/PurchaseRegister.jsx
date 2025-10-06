@@ -28,6 +28,7 @@ const PurchaseRegister = () => {
     // Form states
     const [vendorCompanyName, setVendorCompanyName] = useState('');
     const [productName, setProductName] = useState('');
+    const [selectedProductId, setSelectedProductId] = useState('');
     const [voucherType, setVoucherType] = useState('Purchase'); // Default as per image
     const [purchaseInvoiceNumber, setPurchaseInvoiceNumber] = useState('');
     const [gstinUn, setGstinUn] = useState('');
@@ -96,7 +97,8 @@ const PurchaseRegister = () => {
                         if (purchase.vendorCompanyName?._id) {
                             await fetchVendorProducts(purchase.vendorCompanyName._id);
                         }
-                        setProductName(purchase.productName?._id || '');
+                        setProductName(purchase.productName || '');
+                        setSelectedProductId(purchase.productName?._id || '');
                         setVoucherType(purchase.voucherType || 'Purchase');
                         setPurchaseInvoiceNumber(purchase.purchaseInvoiceNumber || '');
                         setPurchaseDate(purchase.purchaseDate ? dayjs(purchase.purchaseDate) : dayjs());
@@ -124,13 +126,14 @@ const PurchaseRegister = () => {
             setProducts([]); // Clear products if vendorCompanyName is cleared
         }
         setProductName(''); // Reset product name when vendor changes
+        setSelectedProductId('')
         setRate(''); // Clear rate when vendor changes
     }, [vendorCompanyName]);
 
     // Effect to set rate based on selected product's pricePerQuantity
     useEffect(() => {
         if (productName && products.length > 0) {
-            const selectedProduct = products.find(p => p._id === productName);
+            const selectedProduct = products.find(p => p._id === productName?._id);
             if (selectedProduct && selectedProduct.pricePerQuantity !== undefined) {
                 setRate(selectedProduct.pricePerQuantity.toString());
                 setGstOptions(selectedProduct.gstType || []);
@@ -167,7 +170,7 @@ const PurchaseRegister = () => {
 
         const purchaseData = {
             vendorCompanyName,
-            productName,
+            productName: productName?._id || '',
             voucherType,
             purchaseInvoiceNumber,
             purchaseDate: purchaseDate ? purchaseDate.toISOString() : null,
@@ -189,11 +192,23 @@ const PurchaseRegister = () => {
             }
 
             if (response.data?.success) {
-                toast.success(response.data.message || `Purchase ${id ? 'updated' : 'registered'} successfully!`);
+                // Call the new API to update or create material
+                let materialResponse = await axios.post(`${import.meta.env.VITE_SERVER_URL}/api/v1/materials/update-or-create`, {
+                    name: productName.productName,
+                    unit: purchaseData.quantity,
+                });
+                if (materialResponse.data?.success) {
+                    alert('Material entry updated/created successfully');
+                } else {
+                    alert(materialResponse.data?.message || 'Failed to update/create material entry.');
+                }
+                alert(response.data.message || `Purchase ${id ? 'updated' : 'registered'} successfully!`);
+
                 // Clear form fields after successful submission if creating new
                 if (!id) {
                     setVendorCompanyName('');
                     setProductName('');
+                    setSelectedProductId('')
                     setVoucherType('Purchase');
                     setPurchaseInvoiceNumber('');
                     setGstinUn('');
@@ -203,6 +218,7 @@ const PurchaseRegister = () => {
                     setQuantity('');
                     setRate('');
                     setCategory(''); // Clear category after submission
+                    navigate('../purchaseList');
                 } else {
                     // Optionally navigate back to list or view page after update
                     navigate('../purchaseList');
@@ -255,6 +271,7 @@ const PurchaseRegister = () => {
                                     onChange={(e) => {
                                         setVendorCompanyName(e.target.value);
                                         setProductName(''); // Clear product when vendor changes
+                                        setSelectedProductId('')
                                     }}
                                     label="Vendor Company Name"
                                     endAdornment={
@@ -274,8 +291,8 @@ const PurchaseRegister = () => {
                             <FormControl fullWidth variant="outlined" size="small">
                                 <InputLabel>Product Name</InputLabel>
                                 <Select
-                                    value={productName}
-                                    onChange={(e) => setProductName(e.target.value)}
+                                    value={selectedProductId || ''}
+                                    onChange={(e) => setSelectedProductId(e.target.value)}
                                     label="Product Name"
                                     endAdornment={
                                         <InputAdornment position="end">
@@ -287,7 +304,7 @@ const PurchaseRegister = () => {
                                     <MenuItem value="">
                                         <em>--select Product Name--</em>
                                     </MenuItem>
-                                    {products.map((product) => (
+                                    {products?.map((product) => (
                                         <MenuItem key={product._id} value={product._id}>{product.productName}</MenuItem>
                                     ))}
                                 </Select>

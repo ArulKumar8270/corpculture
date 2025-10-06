@@ -3,12 +3,13 @@ import userModel from "../../models/userModel.js";
 
 const getAdminOrders = async (req, res) => {
     try {
-        const order = await orderModel.find();
-
-        res.status(200).send({
-            success: true,
-            orders: order,
-        });
+        const populatedOrder = await orderModel.find().populate("buyer", "name _id")
+            .populate({ path: "products.seller", model: userModel })
+            .populate("employeeId", "name _id")
+                res.status(200).send({
+                    success: true,
+                    orders: populatedOrder,
+                });
     } catch (error) {
         console.error("Error in getting Orders:", error);
         res.status(500).send("Error in getting orders");

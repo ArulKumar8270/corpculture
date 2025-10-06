@@ -68,7 +68,7 @@ const AdminCommission = () => {
 
     // Group commissions by userId
     const groupedCommissions = filteredCommissions.reduce((acc, commission) => {
-        const userId = commission.userId || 'Unassigned'; // Use 'Unassigned' for commissions without a userId
+        const userId = commission.userId?.name || 'Unassigned'; // Use 'Unassigned' for commissions without a userId
         if (!acc[userId]) {
             acc[userId] = [];
         }
@@ -172,14 +172,14 @@ const AdminCommission = () => {
                                                         userCommissions.map(commission => (
                                                             <tr key={commission._id} className="border-b last:border-b-0 hover:bg-gray-50">
                                                                 <td className="py-2 px-3">
-                                                                    <Link to={`#`} className="text-blue-600 hover:underline">
-                                                                        {commission.userId}
-                                                                    </Link>
+                                                                    {/* <Link to={`#`} className="text-blue-600 hover:underline"> */}
+                                                                        {commission.userId?.name}
+                                                                    {/* </Link> */}
                                                                 </td>
                                                                 <td className="py-2 px-3">
                                                                     {/* Link to order details if commission is tied to an order */}
                                                                     {commission.orderId ? (
-                                                                        <Link to={`/admin/orders/order_details/${commission.orderId}`} className="text-blue-600 hover:underline">
+                                                                        <Link to={`../order_details/${commission.orderId}`} className="text-blue-600 hover:underline">
                                                                             {commission.orderId}
                                                                         </Link>
                                                                     ) : 'N/A'}

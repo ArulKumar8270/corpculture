@@ -177,8 +177,9 @@ const AddServiceInvoice = () => {
             return newData;
         });
     };
+
     const handleAddProduct = () => {
-        const selectedProduct = availableProducts.find(p => p?.productName?._id === invoiceData.productId);
+        const selectedProduct = availableProducts.find(p => p._id === invoiceData.productId);
 
         if (!selectedProduct || !invoiceData.quantity || invoiceData.quantity <= 0) {
             toast.error('Please select a product and enter a valid quantity.');
@@ -186,10 +187,8 @@ const AddServiceInvoice = () => {
         }
         const newProduct = {
             id: Date.now() + Math.random(), // Assign a unique ID for this table entry
-            productId: selectedProduct?._id || '', // Store the actual product ID from DB
-            productName: selectedProduct.productName?.productName || '',
-            purchaseId: selectedProduct?.productName?._id || '',
-            purchaseQuantity: selectedProduct?.productName?.quantity || 0,
+            productId: selectedProduct._id, // Store the actual product ID from DB
+            productName: selectedProduct.productName,
             sku: selectedProduct.sku,
             hsn: selectedProduct.hsn,
             quantity: parseInt(invoiceData.quantity),
@@ -375,7 +374,7 @@ const AddServiceInvoice = () => {
         if (!invoiceId && invoiceType !== "quotation") {
             handleUpdateInvoiceCount()
             updateEmployeeBenefit(invoice)
-            updateProductQuantity()
+            updateMatrialDta()
         }
         updateCommissionDetails(invoice);
         updateStausToService(serviceId, 'Completed');
@@ -455,7 +454,6 @@ const AddServiceInvoice = () => {
     }
     const updateEmployeeBenefit = async (invoice) => {
         try {
-
             for (const product of productsInTable) {
                 if (product.reInstall === true || product.otherProducts !== '') {
                     const apiParams = {
@@ -487,23 +485,26 @@ const AddServiceInvoice = () => {
             console.error("Error updating benefit:", err);
         }
     };
-    console.log(productsInTable, "35234dfgsdfsdg")
-    const updateProductQuantity = async () => {
-        for (const product of productsInTable) {
-            if (product?.purchaseId) {
-                try {
-                    let updatedQuantity = product?.purchaseQuantity - product?.quantity;
-                    const { data } = await axios.put(`${import.meta.env.VITE_SERVER_URL}/api/v1/purchases/${product?.purchaseId}`, { quantity: updatedQuantity });
+
+    const updateMatrialDta = async () => {
+        try {
+            for (const product of productsInTable) {
+                if (product.reInstall === true || product.otherProducts !== '') {
+                    const { data } = await axios.post(`${import.meta.env.VITE_SERVER_URL}/api/v1/materials/updateMaterial/${product.productName?.productName?.productName}`, {
+                        name: product.productName?.productName?.productName,
+                        unit: product.quantity,
+                    });
+
                     if (data?.success) {
-                        console.log("Product quantity updated:", data.message);
+                        console.log("Benefit updated:", data.message);
                     }
-                } catch (error) {
-                    console.error("Error updating product quantity:", error);
                 }
             }
+            alert("All benefits updated successfully!");
+        } catch (err) {
+            console.error("Error updating benefit:", err);
         }
     }
-
 
     if (loading) {
         return (
@@ -576,10 +577,10 @@ const AddServiceInvoice = () => {
                                 id="productId-autocomplete"
                                 options={availableProducts}
                                 getOptionLabel={(option) => option.productName?.productName?.productName || ''}
-                                isOptionEqualToValue={(option, value) => option?.productName?._id === value._id}
-                                value={availableProducts.find(prod => prod?.productName?._id === invoiceData.productId) || null}
+                                isOptionEqualToValue={(option, value) => option._id === value._id}
+                                value={availableProducts.find(prod => prod._id === invoiceData.productId) || null}
                                 onChange={(event, newValue) => {
-                                    handleChange({ target: { name: 'productId', value: newValue?.productName?._id || '' } });
+                                    handleChange({ target: { name: 'productId', value: newValue ? newValue._id : '' } });
                                 }}
                                 loading={loading} // Add loading prop
                                 renderInput={(params) => (
@@ -606,7 +607,7 @@ const AddServiceInvoice = () => {
                             <Grid container spacing={3}>
                                 <Grid item xs={12} sm={4}>
                                     <FormControl fullWidth margin="normal" size="small">
-                                        <InputLabel shrink htmlFor="rework-checkbox">Benefit</InputLabel>
+                                        <InputLabel shrink htmlFor="rework-checkbox">Rework</InputLabel>
                                         <Select
                                             id="rework-checkbox"
                                             name="reInstall"
@@ -812,10 +813,10 @@ const AddServiceInvoice = () => {
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            productsInTable.map((product, index) => (
+                            productsInTable?.map((product, index) => (
                                 <TableRow key={product.id}> {/* Use the unique 'id' as key */}
                                     <TableCell>{index + 1}</TableCell>
-                                    <TableCell>{product.productName?.productName}</TableCell>
+                                    <TableCell>{product?.productName?.productName?.productName}</TableCell>
                                     <TableCell>{product.sku}</TableCell>
                                     <TableCell>{product.hsn}</TableCell>
                                     <TableCell align="right">{product.quantity}</TableCell>

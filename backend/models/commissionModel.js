@@ -3,7 +3,6 @@ import mongoose from "mongoose";
 const commissionSchema = new mongoose.Schema({
     commissionFrom: {
         type: String,
-        required: true,
     },
     userId: {
         type: mongoose.Schema.Types.ObjectId,

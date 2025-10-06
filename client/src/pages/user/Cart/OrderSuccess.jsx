@@ -66,18 +66,22 @@ const OrderSuccess = () => {
     const commissionCalculation = (cartItems, amount) => {
         const totalCommission = cartItems.reduce((sum, item) => {
             const quantity = item.quantity || 0;
-            // Find matching commission range
-            const commissionRange = item.commissionRange?.find(
-                (range) => quantity >= parseInt(range.from) && quantity <= parseInt(range.to)
-            );
-            const commissionPercent = commissionRange ? parseFloat(commissionRange.commission) : 0;
 
+            // Find the matching price range, which contains the commission value
+            const priceRange = item.priceRange?.find(
+                (range) => quantity >= parseFloat(range.from) && quantity <= parseFloat(range.to)
+            );
+
+            // Extract commission percentage from the found range, or default to 0
+            const commissionPercent = priceRange ? parseFloat(priceRange.commission) : 0;
+
+            // Calculate the commission for the current item
+            // Note: This uses the 'amount' parameter from your original function.
             const commissionAmount = (amount * commissionPercent) / 100;
 
             return sum + commissionAmount;
         }, 0);
-
-        return Number(totalCommission.toFixed(2));
+        return Number(totalCommission);
     };
 
     const afterPaymentSuccess = async (data, cartItems) => {

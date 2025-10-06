@@ -114,7 +114,7 @@ const EmployeeDetails = () => {
             <SeoData title={`${employee.name} Details - Admin`} />
             <h1 className="text-2xl font-bold mb-6 text-[#019ee3]">Employee Details</h1>
 
-            <div className="bg-white rounded-xl shadow p-6 max-w-2xl mx-auto">
+            <div className="bg-white rounded-xl shadow p-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                     <div>
                         <p className="text-gray-600 font-semibold">Name:</p>
@@ -137,7 +137,6 @@ const EmployeeDetails = () => {
                         <p className="text-gray-800">{employee.address}</p>
                     </div>
                 </div>
-
                 <div>
                     <h2 className="text-xl font-bold mb-3 text-[#019ee3]">Assigned Orders</h2>
                     {assignedOrderDetails && assignedOrderDetails.length > 0 ? ( // Use assignedOrderDetails state {{ edit_4 }}
@@ -145,7 +144,7 @@ const EmployeeDetails = () => {
                             {assignedOrderDetails.map((order) => ( // Map over order objects {{ edit_4 }}
                                 <li key={order._id}> {/* Use order._id as key {{ edit_4 }} */}
                                     <Link
-                                        to={`/admin/orders/order_details/${order._id}`} // Link to individual order details {{ edit_4 }}
+                                        to={`../order_details/${order._id}`} // Link to individual order details {{ edit_4 }}
                                         className="text-blue-600 hover:underline"
                                     >
                                         Order ID: {order._id}
@@ -158,7 +157,6 @@ const EmployeeDetails = () => {
                     )
                 }
                 </div>
-
                 {/* Add more sections for other details if needed */}
             </div>
         </div>

@@ -45,7 +45,7 @@ const OrderItem = ({
 
                 <div className="flex flex-col sm:flex-row mt-1 sm:mt-0 gap-2 sm:gap-20 sm:w-1/2">
                     <p className="text-lg w-[100px] font-bold text-[#019ee3]">
-                        ₹{(item?.discountPrice + item?.deliveryCharge +item?.installationCost).toLocaleString()}
+                        ₹ {(item?.price)}
                     </p>
 
                     <div className="flex flex-col gap-2">

@@ -98,7 +98,14 @@ export const getPurchaseById = async (req, res) => {
         const purchase = await Purchase.findById(id)
             .populate('vendorCompanyName')
             .populate('productName') // Populate product details
-
+            .populate({
+                path: "productName",
+                populate: [
+                    {
+                        path: "gstType", // populate gstType inside productId
+                    }
+                ]
+            })
         if (!purchase) {
             return res.status(404).send({ success: false, message: 'Purchase not found' });
         }
