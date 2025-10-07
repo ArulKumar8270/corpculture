@@ -9,6 +9,11 @@ const rentalSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+    companyId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Company',
+        required: false
+    },  
     companyName: {
         type: String,
         required: true

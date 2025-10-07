@@ -4,12 +4,16 @@ import Spinner from "../../components/Spinner";
 import axios from "axios";
 import { useAuth } from "../../context/auth";
 import SeoData from "../../SEO/SeoData";
-import { Link } from "react-router-dom"; // Keep Link if you plan to link to commission/employee/order details
+import { Link, useParams, useLocation } from "react-router-dom"; // Keep Link if you plan to link to commission/employee/order details
 // import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown'; // Removed {{ edit_1 }}
 // import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp'; // Removed {{ edit_1 }}
 
 const AdminCommission = () => {
     const { auth } = useAuth();
+    const params = useParams();
+    const location = useLocation();
+    const queryParams = new URLSearchParams(location.search);
+    const commissionFrom = queryParams.get("commissionFrom") || "Sales";
     const [search, setSearch] = useState("");
     const [loading, setLoading] = useState(false);
     const [commissions, setCommissions] = useState([]); // State to store commissions
@@ -22,14 +26,14 @@ const AdminCommission = () => {
             setCommissions([]); // Clear commissions if no token
             setLoading(false);
         }
-    }, [auth?.token]); // Re-run effect if auth token changes
+    }, [auth?.token, commissionFrom]); // Re-run effect if auth token changes
 
     // fetch commissions from server
     const fetchCommissions = async () => {
         try {
             setLoading(true);
             const response = await axios.get(
-                `${import.meta.env.VITE_SERVER_URL}/api/v1/commissions`, // *** IMPORTANT: You need to implement this backend API endpoint ***
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/commissions?commissionFrom=${commissionFrom}`, // *** IMPORTANT: You need to implement this backend API endpoint ***
                 {
                     headers: {
                         Authorization: auth?.token,
@@ -75,6 +79,8 @@ const AdminCommission = () => {
         acc[userId].push(commission);
         return acc;
     }, {});
+
+    console.log(groupedCommissions, "groupedCommissions3424");
 
     // {{ edit_1 }} Function to toggle expand/collapse for a user ID
     const toggleExpand = (userId) => {
@@ -173,14 +179,18 @@ const AdminCommission = () => {
                                                             <tr key={commission._id} className="border-b last:border-b-0 hover:bg-gray-50">
                                                                 <td className="py-2 px-3">
                                                                     {/* <Link to={`#`} className="text-blue-600 hover:underline"> */}
-                                                                        {commission.userId?.name}
+                                                                        {commission.userId?.name || commission?.userId}
                                                                     {/* </Link> */}
                                                                 </td>
                                                                 <td className="py-2 px-3">
                                                                     {/* Link to order details if commission is tied to an order */}
                                                                     {commission.orderId ? (
-                                                                        <Link to={`../order_details/${commission.orderId}`} className="text-blue-600 hover:underline">
-                                                                            {commission.orderId}
+                                                                        <Link to={`../order_details/${commission.orderId || commission?.serviceInvoiceId || commission?.rentalInvoiceId}`} className="text-blue-600 hover:underline">
+                                                                            {commission.orderId }
+                                                                        </Link>
+                                                                    ) : commission?.serviceInvoiceId || commission?.rentalInvoiceId ? (
+                                                                        <Link to={`../addServiceInvoice/${commission?.serviceInvoiceId || commission?.rentalInvoiceId}`} className="text-blue-600 hover:underline">
+                                                                            {commission?.serviceInvoiceId || commission?.rentalInvoiceId}
                                                                         </Link>
                                                                     ) : 'N/A'}
                                                                 </td>

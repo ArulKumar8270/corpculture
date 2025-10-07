@@ -244,6 +244,7 @@ const AdminRental
     };
 
     const handleInvoice = (rentalId, employeeName, companyId) => {
+      console.log(rentalId, employeeName, companyId, "asdf6a9s8d6f7");
       navigate(`../addRentalInvoice?employeeName=${employeeName}&invoiceType=invoice&rentalId=${rentalId}&companyId=${companyId}`);
       handleClose();
     };

@@ -1,5 +1,6 @@
 import RentalPaymentEntry from "../../models/rentalPaymentEntryModel.js";
 import cloudinary from "cloudinary";
+import rentalProductModel from "../../models/rentalProductModel.js";
 
 // Create a new rental payment entry
 export const createRentalPaymentEntry = async (req, res) => {
@@ -14,67 +15,134 @@ export const createRentalPaymentEntry = async (req, res) => {
             assignedTo,
             invoiceType,
             rentalId,
-            paymentAmount 
         } = req.body;
 
-        // {{ edit_1 }}
-        // Parse the JSON strings for config objects
+        console.log(req.body, "Incoming Rental Entry Request");
+
+        // Parse config JSON strings
         const a3Config = req.body.a3Config ? JSON.parse(req.body.a3Config) : {};
         const a4Config = req.body.a4Config ? JSON.parse(req.body.a4Config) : {};
         const a5Config = req.body.a5Config ? JSON.parse(req.body.a5Config) : {};
-        // {{ edit_1 }}
 
-        // Basic Validation
-        // {{ edit_2 }}
-        // Expanded validation to include new required fields if necessary,
-        // for now, keeping it focused on bwNewCount as per previous logic.
-        // You might want to add validation for colorNewCount and colorScanningNewCount here if they are mandatory.
+        // Basic validation
         if (!machineId || !sendDetailsTo) {
-            return res.status(400).send({ success: false, message: 'Missing required fields (machineId, sendDetailsTo, a4Config.bwNewCount).' });
+            return res.status(400).send({
+                success: false,
+                message: "Missing required fields (machineId, sendDetailsTo)",
+            });
         }
-        // {{ edit_2 }}
 
-
+        // Upload count image
         const result = await cloudinary.v2.uploader.upload(countImageUpload, {
             folder: "rental_payment_entries",
         });
+
         const countImageUploadUrl = {
             public_id: result.public_id,
             url: result.secure_url,
         };
 
+        // Fetch machine details
+        const machine = await rentalProductModel.findById(machineId).populate("gstType");
+        if (!machine) {
+            return res.status(404).send({
+                success: false,
+                message: "rentalProductModel not found",
+            });
+        }
+
+        // Helper to calculate counts
+        const calculateCountAmount = (machineOld, entryNew, freeC, extraAmt) => {
+            machineOld = parseFloat(machineOld) || 0;
+            entryNew = parseFloat(entryNew) || 0;
+            freeC = parseFloat(freeC) || 0;
+            extraAmt = parseFloat(extraAmt) || 0;
+
+            const copiesUsed = entryNew - machineOld;
+            if (copiesUsed <= 0) return 0;
+            const billableCopies = Math.max(0, copiesUsed - freeC);
+            return billableCopies * extraAmt;
+        };
+
+        // Base price
+        let totalBillableAmount = parseFloat(machine.basePrice) || 0;
+
+        // A3 calculation
+        if (machine.a3Config && a3Config) {
+            totalBillableAmount += calculateCountAmount(machine.a3Config.bwOldCount, a3Config.bwNewCount, machine.a3Config.freeCopiesBw, machine.a3Config.extraAmountBw);
+            totalBillableAmount += calculateCountAmount(machine.a3Config.colorOldCount, a3Config.colorNewCount, machine.a3Config.freeCopiesColor, machine.a3Config.extraAmountColor);
+            totalBillableAmount += calculateCountAmount(machine.a3Config.colorScanningOldCount, a3Config.colorScanningNewCount, machine.a3Config.freeCopiesColorScanning, machine.a3Config.extraAmountColorScanning);
+        }
+
+        // A4 calculation
+        if (machine.a4Config && a4Config) {
+            totalBillableAmount += calculateCountAmount(machine.a4Config.bwOldCount, a4Config.bwNewCount, machine.a4Config.freeCopiesBw, machine.a4Config.extraAmountBw);
+            totalBillableAmount += calculateCountAmount(machine.a4Config.colorOldCount, a4Config.colorNewCount, machine.a4Config.freeCopiesColor, machine.a4Config.extraAmountColor);
+            totalBillableAmount += calculateCountAmount(machine.a4Config.colorScanningOldCount, a4Config.colorScanningNewCount, machine.a4Config.freeCopiesColorScanning, machine.a4Config.extraAmountColorScanning);
+        }
+
+        // A5 calculation
+        if (machine.a5Config && a5Config) {
+            totalBillableAmount += calculateCountAmount(machine.a5Config.bwOldCount, a5Config.bwNewCount, machine.a5Config.freeCopiesBw, machine.a5Config.extraAmountBw);
+            totalBillableAmount += calculateCountAmount(machine.a5Config.colorOldCount, a5Config.colorNewCount, machine.a5Config.freeCopiesColor, machine.a5Config.extraAmountColor);
+            totalBillableAmount += calculateCountAmount(machine.a5Config.colorScanningOldCount, a5Config.colorScanningNewCount, machine.a5Config.freeCopiesColorScanning, machine.a5Config.extraAmountColorScanning);
+        }
+
+        // Calculate GST
+        let totalGSTPercentage = 0;
+        if (machine.gstType && machine.gstType.length > 0) {
+            totalGSTPercentage = machine.gstType.reduce(
+                (sum, gst) => sum + (parseFloat(gst.gstPercentage) || 0),
+                0
+            );
+        }
+
+        const totalWithGST = totalBillableAmount * (1 + totalGSTPercentage / 100);
+
+        // Commission (machine-level or assigned user)
+        const commissionRate = parseFloat(machine.commission || 0);
+        const commissionAmount = (totalWithGST * commissionRate) / 100;
+
+        const grandTotal = totalWithGST + commissionAmount;
+
+        // Create new entry
         const newEntry = new RentalPaymentEntry({
             machineId,
             invoiceNumber,
             rentalId,
-            companyId: companyId, // Get companyId from the machine
+            companyId,
             sendDetailsTo,
             countImageUpload: countImageUploadUrl,
             assignedTo,
             invoiceType,
             remarks,
-            // {{ edit_3 }}
-            a3Config, // These now include the new fields due to JSON.parse
+            a3Config,
             a4Config,
             a5Config,
-            paymentAmount
-            // {{ edit_3 }}v
+            grandTotal: grandTotal.toFixed(2),
         });
 
         await newEntry.save();
 
-        // Fetch the newly created invoice and populate necessary fields
         const populatedInvoice = await RentalPaymentEntry.findById(newEntry._id)
-            .populate('companyId') // Populate company details
+            .populate("companyId")
             .populate("machineId")
-            .populate('assignedTo') // Populate assignedTo user details
-            .populate('machineId.gstType'); 
+            .populate("assignedTo")
+            .populate("machineId.gstType");
 
-        res.status(201).send({ success: true, message: 'Rental Payment Entry created successfully', entry: populatedInvoice });
+        res.status(201).send({
+            success: true,
+            message: "Rental Payment Entry created successfully",
+            entry: populatedInvoice,
+        });
 
     } catch (error) {
         console.error("Error in createRentalPaymentEntry:", error);
-        res.status(500).send({ success: false, message: 'Error in creating rental payment entry', error });
+        res.status(500).send({
+            success: false,
+            message: "Error in creating rental payment entry",
+            error,
+        });
     }
 };
 
@@ -279,7 +347,7 @@ export const updateRentalPaymentEntry = async (req, res) => {
             modeOfPayment,
             bankName,
             transactionDetails,
-            chequeDate,// New field
+            chequeDate,
             pendingAmount,
             tdsAmount,
             paymentAmountType,
@@ -292,7 +360,6 @@ export const updateRentalPaymentEntry = async (req, res) => {
             staus
         } = req.body;
 
-        // Parse the JSON strings for config objects
         const a3Config = req.body.a3Config ? JSON.parse(req.body.a3Config) : undefined;
         const a4Config = req.body.a4Config ? JSON.parse(req.body.a4Config) : undefined;
         const a5Config = req.body.a5Config ? JSON.parse(req.body.a5Config) : undefined;
@@ -306,7 +373,6 @@ export const updateRentalPaymentEntry = async (req, res) => {
         // Handle image upload if a new one is provided
         let countImageUploadUrl = entry.countImageUpload;
         if (countImageUpload) {
-            // Delete old image from cloudinary if it exists
             if (entry.countImageUpload && entry.countImageUpload.public_id) {
                 await cloudinary.v2.uploader.destroy(entry.countImageUpload.public_id);
             }
@@ -324,31 +390,33 @@ export const updateRentalPaymentEntry = async (req, res) => {
         entry.machineId = machineId || entry.machineId;
         entry.sendDetailsTo = sendDetailsTo || entry.sendDetailsTo;
         entry.remarks = remarks || entry.remarks;
-        // Update nested config objects, merging new values with existing ones
+
+        // Update nested config objects
         if (a3Config) {
-            entry.a3Config.bwOldCount = a3Config.bwOldCount !== undefined ? a3Config.bwOldCount : entry.a3Config.bwOldCount;
-            entry.a3Config.bwNewCount = a3Config.bwNewCount !== undefined ? a3Config.bwNewCount : entry.a3Config.bwNewCount;
-            entry.a3Config.colorOldCount = a3Config.colorOldCount !== undefined ? a3Config.colorOldCount : entry.a3Config.colorOldCount;
-            entry.a3Config.colorNewCount = a3Config.colorNewCount !== undefined ? a3Config.colorNewCount : entry.a3Config.colorNewCount;
-            entry.a3Config.colorScanningOldCount = a3Config.colorScanningOldCount !== undefined ? a3Config.colorScanningOldCount : entry.a3Config.colorScanningOldCount;
-            entry.a3Config.colorScanningNewCount = a3Config.colorScanningNewCount !== undefined ? a3Config.colorScanningNewCount : entry.a3Config.colorScanningNewCount;
+            entry.a3Config.bwOldCount = a3Config.bwOldCount ?? entry.a3Config.bwOldCount;
+            entry.a3Config.bwNewCount = a3Config.bwNewCount ?? entry.a3Config.bwNewCount;
+            entry.a3Config.colorOldCount = a3Config.colorOldCount ?? entry.a3Config.colorOldCount;
+            entry.a3Config.colorNewCount = a3Config.colorNewCount ?? entry.a3Config.colorNewCount;
+            entry.a3Config.colorScanningOldCount = a3Config.colorScanningOldCount ?? entry.a3Config.colorScanningOldCount;
+            entry.a3Config.colorScanningNewCount = a3Config.colorScanningNewCount ?? entry.a3Config.colorScanningNewCount;
         }
         if (a4Config) {
-            entry.a4Config.bwOldCount = a4Config.bwOldCount !== undefined ? a4Config.bwOldCount : entry.a4Config.bwOldCount;
-            entry.a4Config.bwNewCount = a4Config.bwNewCount !== undefined ? a4Config.bwNewCount : entry.a4Config.bwNewCount;
-            entry.a4Config.colorOldCount = a4Config.colorOldCount !== undefined ? a4Config.colorOldCount : entry.a4Config.colorOldCount;
-            entry.a4Config.colorNewCount = a4Config.colorNewCount !== undefined ? a4Config.colorNewCount : entry.a4Config.colorNewCount;
-            entry.a4Config.colorScanningOldCount = a4Config.colorScanningOldCount !== undefined ? a4Config.colorScanningOldCount : entry.a4Config.colorScanningOldCount;
-            entry.a4Config.colorScanningNewCount = a4Config.colorScanningNewCount !== undefined ? a4Config.colorScanningNewCount : entry.a4Config.colorScanningNewCount;
+            entry.a4Config.bwOldCount = a4Config.bwOldCount ?? entry.a4Config.bwOldCount;
+            entry.a4Config.bwNewCount = a4Config.bwNewCount ?? entry.a4Config.bwNewCount;
+            entry.a4Config.colorOldCount = a4Config.colorOldCount ?? entry.a4Config.colorOldCount;
+            entry.a4Config.colorNewCount = a4Config.colorNewCount ?? entry.a4Config.colorNewCount;
+            entry.a4Config.colorScanningOldCount = a4Config.colorScanningOldCount ?? entry.a4Config.colorScanningOldCount;
+            entry.a4Config.colorScanningNewCount = a4Config.colorScanningNewCount ?? entry.a4Config.colorScanningNewCount;
         }
         if (a5Config) {
-            entry.a5Config.bwOldCount = a5Config.bwOldCount !== undefined ? a5Config.bwOldCount : entry.a5Config.bwOldCount;
-            entry.a5Config.bwNewCount = a5Config.bwNewCount !== undefined ? a5Config.bwNewCount : entry.a5Config.bwNewCount;
-            entry.a5Config.colorOldCount = a5Config.colorOldCount !== undefined ? a5Config.colorOldCount : entry.a5Config.colorOldCount;
-            entry.a5Config.colorNewCount = a5Config.colorNewCount !== undefined ? a5Config.colorNewCount : entry.a5Config.colorNewCount;
-            entry.a5Config.colorScanningOldCount = a5Config.colorScanningOldCount !== undefined ? a5Config.colorScanningOldCount : entry.a5Config.colorScanningOldCount;
-            entry.a5Config.colorScanningNewCount = a5Config.colorScanningNewCount !== undefined ? a5Config.colorScanningNewCount : entry.a5Config.colorScanningNewCount;
+            entry.a5Config.bwOldCount = a5Config.bwOldCount ?? entry.a5Config.bwOldCount;
+            entry.a5Config.bwNewCount = a5Config.bwNewCount ?? entry.a5Config.bwNewCount;
+            entry.a5Config.colorOldCount = a5Config.colorOldCount ?? entry.a5Config.colorOldCount;
+            entry.a5Config.colorNewCount = a5Config.colorNewCount ?? entry.a5Config.colorNewCount;
+            entry.a5Config.colorScanningOldCount = a5Config.colorScanningOldCount ?? entry.a5Config.colorScanningOldCount;
+            entry.a5Config.colorScanningNewCount = a5Config.colorScanningNewCount ?? entry.a5Config.colorScanningNewCount;
         }
+
         if (pendingAmount) entry.pendingAmount = pendingAmount;
         if (tdsAmount) entry.tdsAmount = tdsAmount;
         if (paymentAmountType) entry.paymentAmountType = paymentAmountType;
@@ -359,35 +427,66 @@ export const updateRentalPaymentEntry = async (req, res) => {
         entry.invoiceNumber = invoiceNumber || entry.invoiceNumber;
         entry.countImageUpload = countImageUploadUrl;
         if (staus) entry.staus = staus;
-        if (invoiceNumber) entry.invoiceNumber = invoiceNumber;
-        entry.modeOfPayment = modeOfPayment !== undefined ? modeOfPayment : entry.modeOfPayment;
-        entry.bankName = bankName !== undefined ? bankName : entry.bankName;
-        entry.transactionDetails = transactionDetails !== undefined ? transactionDetails : entry.transactionDetails;
-        entry.chequeDate = chequeDate !== undefined ? chequeDate : entry.chequeDate;
-        entry.transferDate = transferDate !== undefined ? transferDate : entry.transferDate;
-        entry.companyNamePayment = companyNamePayment !== undefined ? companyNamePayment : entry.companyNamePayment;
-        entry.otherPaymentMode = otherPaymentMode !== undefined ? otherPaymentMode : entry.otherPaymentMode;
-        // {{ edit_2 }}
+        entry.modeOfPayment = modeOfPayment ?? entry.modeOfPayment;
+        entry.bankName = bankName ?? entry.bankName;
+        entry.transactionDetails = transactionDetails ?? entry.transactionDetails;
+        entry.chequeDate = chequeDate ?? entry.chequeDate;
+        entry.transferDate = transferDate ?? entry.transferDate;
+        entry.companyNamePayment = companyNamePayment ?? entry.companyNamePayment;
+        entry.otherPaymentMode = otherPaymentMode ?? entry.otherPaymentMode;
+
+        // 🧮 Calculate grand total
+        const a3Total = entry.a3Config
+            ? ((entry.a3Config.bwNewCount - entry.a3Config.bwOldCount) +
+                (entry.a3Config.colorNewCount - entry.a3Config.colorOldCount) +
+                (entry.a3Config.colorScanningNewCount - entry.a3Config.colorScanningOldCount))
+            : 0;
+
+        const a4Total = entry.a4Config
+            ? ((entry.a4Config.bwNewCount - entry.a4Config.bwOldCount) +
+                (entry.a4Config.colorNewCount - entry.a4Config.colorOldCount) +
+                (entry.a4Config.colorScanningNewCount - entry.a4Config.colorScanningOldCount))
+            : 0;
+
+        const a5Total = entry.a5Config
+            ? ((entry.a5Config.bwNewCount - entry.a5Config.bwOldCount) +
+                (entry.a5Config.colorNewCount - entry.a5Config.colorOldCount) +
+                (entry.a5Config.colorScanningNewCount - entry.a5Config.colorScanningOldCount))
+            : 0;
+
+        const totalBeforeTDS = a3Total + a4Total + a5Total;
+        const tds = parseFloat(entry.tdsAmount) || 0;
+
+        entry.grandTotal = (tds - totalBeforeTDS).toFixed(2);
 
         await entry.save();
 
         const populatedInvoice = await RentalPaymentEntry.findById(id)
-            .populate('companyId') // Populate company details
+            .populate('companyId')
             .populate({
-                path: 'machineId', // Populate machineId
+                path: 'machineId',
                 populate: {
-                    path: 'gstType', // Then populate gstType inside the machineId document
-                }
+                    path: 'gstType',
+                },
             })
-            .populate('assignedTo'); // Populate assignedTo user details
+            .populate('assignedTo');
 
-        res.status(200).send({ success: true, message: 'Rental Payment Entry updated successfully', entry: populatedInvoice });
+        res.status(200).send({
+            success: true,
+            message: 'Rental Payment Entry updated successfully',
+            entry: populatedInvoice,
+        });
 
     } catch (error) {
         console.error("Error in updateRentalPaymentEntry:", error);
-        res.status(500).send({ success: false, message: 'Error in updating rental payment entry', error });
+        res.status(500).send({
+            success: false,
+            message: 'Error in updating rental payment entry',
+            error,
+        });
     }
 };
+
 
 // You might also need a way to get "Send Details To" options.
 // For now, I'll assume a hardcoded list or fetch from a separate model if it exists.

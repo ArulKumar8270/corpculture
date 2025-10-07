@@ -60,7 +60,8 @@ export const createCommission = async (req, res) => {
 // Get All Commissions
 export const getAllCommissions = async (req, res) => {
     try {
-        const commissions = await commissionModel.find().populate("userId")
+        const commissionFrom = req.query.commissionFrom || "Sales";
+        const commissions = await commissionModel.find({commissionFrom}).populate("userId").populate("companyId")
             .sort({ createdAt: -1 });
 
         res.status(200).send({

@@ -124,6 +124,10 @@ const rentalPaymentEntrySchema = new mongoose.Schema({
         type: String,
         trim: true,
     },
+    grandTotal: {
+        type: Number,
+        trim: true,
+    },
 }, { timestamps: true });
 
 // Check if the model already exists before defining it
