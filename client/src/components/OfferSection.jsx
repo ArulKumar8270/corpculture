@@ -203,6 +203,7 @@ const BookShowcase = () => {
 
   // New function to handle company selection
   const handleCompanySelect = (company) => {
+    console.log(company, "company7549023784")
     setForm(prevForm => ({
       ...prevForm,
       customerType: "New", // Assuming a new service request for an existing company

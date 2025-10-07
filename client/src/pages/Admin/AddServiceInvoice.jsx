@@ -135,7 +135,6 @@ const AddServiceInvoice = () => {
                 alert(data?.message || 'Failed to fetch company details.');
             }
         } catch (error) {
-            console.error('Error fetching company details:', error);
             alert(error.response?.data?.message || 'Something went wrong while fetching company details.');
         }
     };
@@ -155,7 +154,6 @@ const AddServiceInvoice = () => {
                 setAvailableProducts([]); // Clear products if fetch fails
             }
         } catch (error) {
-            console.error("Error fetching products by company:", error);
             setAvailableProducts([]); // Clear products on error
         } finally {
             setLoading(false);
@@ -182,7 +180,6 @@ const AddServiceInvoice = () => {
         const selectedProduct = availableProducts.find(p => p._id === invoiceData.productId);
 
         if (!selectedProduct || !invoiceData.quantity || invoiceData.quantity <= 0) {
-            toast.error('Please select a product and enter a valid quantity.');
             return;
         }
         const newProduct = {
@@ -432,7 +429,8 @@ const AddServiceInvoice = () => {
 
             const apiParams = {
                 commissionFrom: "Service",
-                userId: invoice?.companyId?._id,
+                userId: auth?.user?._id,
+                companyId: invoice?.companyId?._id,
                 serviceInvoiceId: invoice?._id,
                 commissionAmount: totalCommissionAmount, // Calculated dynamically
                 percentageRate: percentageRate, // Derived from first product's commission

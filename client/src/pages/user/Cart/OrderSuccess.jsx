@@ -92,6 +92,7 @@ const OrderSuccess = () => {
                 orderId: data?._id,
                 commissionAmount: commissionCalculation(cartItems, data?.amount),
                 percentageRate: data?.percentageRate,
+                commissionFrom: "Sales"
             }
             const payment = await axios.post(
                 `${import.meta.env.VITE_SERVER_URL

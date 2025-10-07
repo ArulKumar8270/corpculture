@@ -6,7 +6,7 @@ import cloudinary from "cloudinary";
 const calculateInvoiceTotals = (products) => {
     let subtotal = 0;
     for (const item of products) {
-        subtotal += item.quantity * item.totalAmount;
+        subtotal += item.totalAmount;
     }
     // For simplicity, tax is assumed to be 0 for now or handled externally.
     // You can add tax calculation logic here if needed.
@@ -84,7 +84,7 @@ export const createServiceInvoice = async (req, res) => {
                 productName: serviceProduct.productName, // Store product name from fetched product
                 quantity: item.quantity,
                 rate: item.rate,
-                totalAmount: item.quantity * item.totalAmount,
+                totalAmount: item.totalAmount,
             });
         }
 
@@ -208,22 +208,22 @@ export const getAllServiceInvoices = async (req, res) => {
         const totalCount = await ServiceInvoice.countDocuments(query);
 
         const serviceInvoices = await ServiceInvoice.find(query)
-        .populate({
-            path: "products.productId",
-            populate: [
-              {
-                path: "gstType", // populate gstType inside productId
-              },
-              {
-                path: "productName", // populate productName inside productId
+            .populate({
+                path: "products.productId",
                 populate: [
-                  {
-                    path: "productName", // also go deeper if productName itself references another model
-                  },
+                    {
+                        path: "gstType", // populate gstType inside productId
+                    },
+                    {
+                        path: "productName", // populate productName inside productId
+                        populate: [
+                            {
+                                path: "productName", // also go deeper if productName itself references another model
+                            },
+                        ],
+                    },
                 ],
-              },
-            ],
-          })
+            })
             .populate('companyId')
             .populate('assignedTo')
             .sort({ createdAt: -1 })
@@ -265,19 +265,19 @@ export const getServiceInvoicesAssignedTo = async (req, res) => {
             .populate({
                 path: "products.productId",
                 populate: [
-                  {
-                    path: "gstType", // populate gstType inside productId
-                  },
-                  {
-                    path: "productName", // populate productName inside productId
-                    populate: [
-                      {
-                        path: "productName", // also go deeper if productName itself references another model
-                      },
-                    ],
-                  },
+                    {
+                        path: "gstType", // populate gstType inside productId
+                    },
+                    {
+                        path: "productName", // populate productName inside productId
+                        populate: [
+                            {
+                                path: "productName", // also go deeper if productName itself references another model
+                            },
+                        ],
+                    },
                 ],
-              })
+            })
             .populate('assignedTo') // Populate product details
             .sort({ createdAt: -1 }); // Find services by phone number
 
@@ -312,19 +312,19 @@ export const getServiceInvoiceById = async (req, res) => {
             .populate({
                 path: "products.productId",
                 populate: [
-                  {
-                    path: "gstType", // populate gstType inside productId
-                  },
-                  {
-                    path: "productName", // populate productName inside productId
-                    populate: [
-                      {
-                        path: "productName", // also go deeper if productName itself references another model
-                      },
-                    ],
-                  },
+                    {
+                        path: "gstType", // populate gstType inside productId
+                    },
+                    {
+                        path: "productName", // populate productName inside productId
+                        populate: [
+                            {
+                                path: "productName", // also go deeper if productName itself references another model
+                            },
+                        ],
+                    },
                 ],
-              })
+            })
             .populate('assignedTo') // Populate product details
         if (!serviceInvoice) {
             return res.status(404).send({ success: false, message: 'Service Invoice not found.' });
@@ -336,6 +336,7 @@ export const getServiceInvoiceById = async (req, res) => {
     }
 };
 
+// Update Service Invoice
 // Update Service Invoice
 export const updateServiceInvoice = async (req, res) => {
     try {
@@ -408,10 +409,11 @@ export const updateServiceInvoice = async (req, res) => {
                     productName: serviceProduct.productName,
                     quantity: item.quantity,
                     rate: item.rate,
-                    totalAmount: item.quantity * item.totalAmount,
+                    totalAmount: item.totalAmount,
                 });
             }
             serviceInvoice.products = processedProducts;
+            // Assuming calculateInvoiceTotals is a separate function
             const { subtotal, grandTotal } = calculateInvoiceTotals(processedProducts);
             serviceInvoice.subtotal = subtotal;
             serviceInvoice.grandTotal = grandTotal;
@@ -443,7 +445,31 @@ export const updateServiceInvoice = async (req, res) => {
         if (invoiceLink !== undefined) serviceInvoice.invoiceLink = invoiceLink; // Update invoiceLink
 
         await serviceInvoice.save();
-        res.status(200).send({ success: true, message: 'Service Invoice updated successfully', serviceInvoice });
+
+        // Populate the products field after saving
+        // This will replace the `productName` ID with the actual document
+        const updatedInvoice = await serviceInvoice.populate({
+            path: "products.productId",
+            populate: [
+                {
+                    path: "gstType", // populate gstType inside productId
+                },
+                {
+                    path: "productName", // populate productName inside productId
+                    populate: [
+                        {
+                            path: "productName", // also go deeper if productName itself references another model
+                        },
+                    ],
+                },
+            ],
+        })
+
+        res.status(200).send({
+            success: true,
+            message: 'Service Invoice updated successfully',
+            serviceInvoice: updatedInvoice // Send the populated invoice
+        });
 
     } catch (error) {
         console.error("Error in updateServiceInvoice:", error);

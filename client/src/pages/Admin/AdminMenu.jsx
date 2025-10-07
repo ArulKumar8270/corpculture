@@ -345,8 +345,8 @@ const AdminMenu = ({ toggleMenu }) => {
                                                 {/* Commission Link (Direct) */}
                                                 {hasPermission('salesCommission') && (
                                                     <NavLink
-                                                        to="./commission"
-                                                        onClick={scrollToTop}
+                                                        to="./commission?commissionFrom=Sales"
+                                                        onClick={scrollToTop}   
                                                         className={({ isActive }) =>
                                                             `rounded-lg mx-2 my-1 transition-all ${isActive
                                                                 ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
@@ -466,7 +466,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                                 {/* Commission under Service */}
                                                 {hasPermission('servicePartner') && (
                                                     <NavLink
-                                                        to="/admin/commission"
+                                                        to="./commission?commissionFrom=Service"
                                                         onClick={scrollToTop}
                                                         className={({ isActive }) =>
                                                             `rounded-lg mx-2 my-1 transition-all ${isActive
@@ -587,7 +587,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                                 </NavLink>)}
                                                 {hasPermission('rentalPartners') && (
                                                     <NavLink
-                                                        to="/admin/commission"
+                                                        to="./commission?commissionFrom=Rental"
                                                         onClick={scrollToTop}
                                                         className={({ isActive }) =>
                                                             `rounded-lg mx-2 my-1 transition-all ${isActive
@@ -742,7 +742,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                                         Rental Over all Details
                                                     </div>
                                                 </NavLink>)}
-                                                {hasPermission('reportsSales') && (
+                                                {/* {hasPermission('reportsSales') && (
                                                     <NavLink
                                                         to="./salesReportsSummary"
                                                         onClick={scrollToTop}
@@ -757,7 +757,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                                             Sales Over all Details
                                                         </div>
                                                     </NavLink>
-                                                )}
+                                                )} */}
                                                 {hasPermission('reportsEmployeeList') && (
                                                     <NavLink
                                                         to="./employee"

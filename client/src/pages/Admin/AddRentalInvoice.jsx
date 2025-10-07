@@ -18,6 +18,7 @@ import toast from 'react-hot-toast';
 import { useAuth } from '../../context/auth';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import ImageIcon from "@mui/icons-material/Image";
+import { getTotalRentalInvoicePayment } from '../../utils/functions';
 const MAX_IMAGE_SIZE = 500 * 1024;
 
 const RentalInvoiceForm = () => {
@@ -117,7 +118,7 @@ const RentalInvoiceForm = () => {
                         setFormData({
                             companyId: entry.companyId?._id || '',
                             machineId: entry.machineId?._id || '',
-                            sendDetailsTo: entry.sendDetailsTo || '',
+                            sendDetailsTo: entry?.sendDetailsTo || '',
                             countImageFile: null,
                             remarks: entry.remarks || '',
                             a3Config: {
@@ -231,7 +232,7 @@ const RentalInvoiceForm = () => {
             setContactOptions([]);
         }
         // Reset sendDetailsTo when company changes, unless in edit mode and it's already set
-        if (!id || (id && formData.companyId !== companies.find(c => c._id === formData.companyId)?._id)) { // {{ edit_4 }}
+        if (!id) { // {{ edit_4 }}
             setFormData(prev => ({ ...prev, sendDetailsTo: '' })); // {{ edit_4 }}
         } // {{ edit_4 }}
     }, [formData.companyId, companies, id]); // Added id to dependencies // {{ edit_4 }}
@@ -433,8 +434,8 @@ const RentalInvoiceForm = () => {
                 if (!id) {
                     updateStausToRental(rentalId, "Completed")
                 }
-                onUpdateRentalProduct()
                 updateCommissionDetails(res.data?.entry)
+                onUpdateRentalProduct()
                 console.log("Rental entry created successfully!", res.data);
             } else {
                 toast.error(res.data?.message || `Failed to ${id ? 'update' : 'create'} rental payment entry.`);
@@ -455,14 +456,14 @@ const RentalInvoiceForm = () => {
                 bwOldCount: Number(formData.a3Config.bwNewCount) || 0,
                 colorOldCount: Number(formData.a3Config.colorNewCount) || 0,
                 colorScanningOldCount: Number(formData.a3Config.colorScanningNewCount) || 0,
-               
+
             },
             a4Config: {
                 ...selectedProduct?.a4Config,
                 bwOldCount: Number(formData.a4Config.bwNewCount) || 0,
                 colorOldCount: Number(formData.a4Config.colorNewCount) || 0,
                 colorScanningOldCount: Number(formData.a4Config.colorScanningNewCount) || 0,
-                
+
             },
             a5Config: {
                 ...selectedProduct?.a5Config,
@@ -499,80 +500,29 @@ const RentalInvoiceForm = () => {
     };
 
 
-    const updateCommissionDetails = async (entry, auth) => {
+    const updateCommissionDetails = async (entry) => {
         try {
-            let totalBillableAmount = 0;
-            const machine = entry.machineId;
-    
-            // Helper to calculate amount
-            const calculateCountAmount = (machineOld, entryNew, freeC, extraAmt) => {
-                machineOld = parseFloat(machineOld) || 0;
-                entryNew = parseFloat(entryNew) || 0;
-                freeC = parseFloat(freeC) || 0;
-                extraAmt = parseFloat(extraAmt) || 0;
-    
-                const copiesUsed = entryNew - machineOld;
-                if (copiesUsed <= 0) return 0;
-                const billableCopies = Math.max(0, copiesUsed - freeC);
-                return billableCopies * extraAmt;
-            };
-    
-            // A3
-            if (machine.a3Config && entry.a3Config) {
-                totalBillableAmount += calculateCountAmount(machine.a3Config.bwOldCount, entry.a3Config.bwNewCount, machine.a3Config.freeCopiesBw, machine.a3Config.extraAmountBw);
-                totalBillableAmount += calculateCountAmount(machine.a3Config.colorOldCount, entry.a3Config.colorNewCount, machine.a3Config.freeCopiesColor, machine.a3Config.extraAmountColor);
-                totalBillableAmount += calculateCountAmount(machine.a3Config.colorScanningOldCount, entry.a3Config.colorScanningNewCount, machine.a3Config.freeCopiesColorScanning, machine.a3Config.extraAmountColorScanning);
-            }
-    
-            // A4
-            if (machine.a4Config && entry.a4Config) {
-                totalBillableAmount += calculateCountAmount(machine.a4Config.bwOldCount, entry.a4Config.bwNewCount, machine.a4Config.freeCopiesBw, machine.a4Config.extraAmountBw);
-                totalBillableAmount += calculateCountAmount(machine.a4Config.colorOldCount, entry.a4Config.colorNewCount, machine.a4Config.freeCopiesColor, machine.a4Config.extraAmountColor);
-                totalBillableAmount += calculateCountAmount(machine.a4Config.colorScanningOldCount, entry.a4Config.colorScanningNewCount, machine.a4Config.freeCopiesColorScanning, machine.a4Config.extraAmountColorScanning);
-            }
-    
-            // A5
-            if (machine.a5Config && entry.a5Config) {
-                totalBillableAmount += calculateCountAmount(machine.a5Config.bwOldCount, entry.a5Config.bwNewCount, machine.a5Config.freeCopiesBw, machine.a5Config.extraAmountBw);
-                totalBillableAmount += calculateCountAmount(machine.a5Config.colorOldCount, entry.a5Config.colorNewCount, machine.a5Config.freeCopiesColor, machine.a5Config.extraAmountColor);
-                totalBillableAmount += calculateCountAmount(machine.a5Config.colorScanningOldCount, entry.a5Config.colorScanningNewCount, machine.a5Config.freeCopiesColorScanning, machine.a5Config.extraAmountColorScanning);
-            }
-    
-            // GST
-            let totalGSTPercentage = 0;
-            if (machine.gstType && machine.gstType.length > 0) {
-                totalGSTPercentage = machine.gstType.reduce(
-                    (sum, gst) => sum + (parseFloat(gst.gstPercentage) || 0),
-                    0
-                );
-            }
-    
-            const totalAmountIncludingGST = totalBillableAmount * (1 + totalGSTPercentage / 100);
-    
-            // Commission
-            const commissionPercentage = parseFloat(machine.commission) || 0;
-            const totalCommissionAmount = totalAmountIncludingGST * (commissionPercentage / 100);
-    
+            const totalAmountIncludingGST = getTotalRentalInvoicePayment(entry);
             const apiParams = {
                 commissionFrom: "Rental",
-                userId: entry?.companyId?._id,
+                userId: auth?.user?._id,
+                companyId: entry?.companyId?._id,
                 rentalInvoiceId: entry?._id,
-                commissionAmount: totalCommissionAmount.toFixed(2),
-                percentageRate: commissionPercentage,
+                commissionAmount: totalAmountIncludingGST.commissionAmount,
+                percentageRate: totalAmountIncludingGST?.commissionRate,
             };
-    
+
             // Send commission API
             const payment = await axios.post(
                 `${import.meta.env.VITE_SERVER_URL}/api/v1/commissions`,
                 apiParams,
                 { headers: { Authorization: auth?.token } }
             );
-    
+
         } catch (error) {
             console.error("Commission calc error ❌", error);
         }
     };
-    
 
     return (
         <Box sx={{ p: 3, bgcolor: 'background.default', minHeight: '100vh' }}>
