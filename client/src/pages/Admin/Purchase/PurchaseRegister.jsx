@@ -159,10 +159,10 @@ const PurchaseRegister = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
-
+        console.log('vendorCompanyName', vendorCompanyName, selectedProductId, rate, purchaseDate);
         // Basic validation (removed freightCharges, grossTotal, roundOff, price as they are calculated)
         // Removed !narration from validation
-        if (!vendorCompanyName || !productName || !voucherType || !purchaseInvoiceNumber || !purchaseDate || !quantity || !rate) {
+        if (!vendorCompanyName || !selectedProductId ||!purchaseDate || !rate) {
             alert('Please fill in all required fields.');
             setLoading(false);
             return;
@@ -170,7 +170,7 @@ const PurchaseRegister = () => {
 
         const purchaseData = {
             vendorCompanyName,
-            productName: productName?._id || '',
+            productName: selectedProductId || '',
             voucherType,
             purchaseInvoiceNumber,
             purchaseDate: purchaseDate ? purchaseDate.toISOString() : null,
@@ -194,7 +194,7 @@ const PurchaseRegister = () => {
             if (response.data?.success) {
                 // Call the new API to update or create material
                 let materialResponse = await axios.post(`${import.meta.env.VITE_SERVER_URL}/api/v1/materials/update-or-create`, {
-                    name: productName.productName,
+                    name: productName,
                     unit: purchaseData.quantity,
                 });
                 if (materialResponse.data?.success) {
@@ -292,7 +292,14 @@ const PurchaseRegister = () => {
                                 <InputLabel>Product Name</InputLabel>
                                 <Select
                                     value={selectedProductId || ''}
-                                    onChange={(e) => setSelectedProductId(e.target.value)}
+                                    onChange={(e) => {
+                                        const productId = e.target.value;
+                                        setSelectedProductId(productId);
+                                        const selectedProduct = products.find(p => p._id === productId);
+                                        if (selectedProduct) {
+                                            setProductName(selectedProduct.productName);
+                                        }
+                                    }}
                                     label="Product Name"
                                     endAdornment={
                                         <InputAdornment position="end">
