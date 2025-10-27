@@ -185,7 +185,7 @@ export const updateOrCreateMaterial = async (req, res) => {
 
         if (material) {
             // If material exists, update its unit
-            material.unit += unit;
+            material.unit = Number(material.unit) + Number(unit);
             await material.save();
             res.status(200).json({
                 success: true,
