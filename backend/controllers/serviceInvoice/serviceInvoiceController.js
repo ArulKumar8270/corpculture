@@ -148,11 +148,15 @@ export const getAllServiceInvoices = async (req, res) => {
             invoiceType, // Assuming this can also be a filter
             page = 1, // Default to page 1
             limit = 10, // Default to 10 items per page
+            status, // Add status filter
             ...otherFilters // Catch any other direct filters
         } = req.body;
 
         let query = {};
 
+        if (status) {
+            query.status = status;
+        }
         // Add invoiceType filter if provided
         if (invoiceType) {
             query.invoiceType = invoiceType;

@@ -15,7 +15,7 @@ const router = express.Router();
 router.post("/create", isAdmin, createServiceInvoice);
 
 // Get all service invoices
-router.post("/all", isAdmin, getAllServiceInvoices);
+router.post("/all", getAllServiceInvoices);
 
 // Get single service invoice
 router.get("/get/:id", getServiceInvoiceById);
