@@ -15,7 +15,7 @@ const router = express.Router();
 router.post('/create-rental-entry', createRentalPaymentEntry);
 
 // Get all Rental Payment Entries || GET
-router.post('/all', isAdmin, getAllRentalPaymentEntries);
+router.post('/all', getAllRentalPaymentEntries);
 
 // Get single Rental Payment Entry by ID || GET
 router.get('/:id', getRentalPaymentEntryById);
