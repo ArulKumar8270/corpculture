@@ -5,7 +5,8 @@ import {
     getRentalProductById,
     updateRentalProduct,
     deleteRentalProduct,
-    getRentalProductsByCompany
+    getRentalProductsByCompany,
+    getTodaysRentalProducts
 } from "../controllers/rentalProduct/rentalProductController.js";
 // You might want to add authentication/authorization middleware here, e.g., isAdmin, requireSignIn
 // import { requireSignIn, isAdmin } from "../middleware/authMiddleware.js";
@@ -21,6 +22,9 @@ router.get("/", getAllRentalProducts);
 // Get Rental Product by ID
 router.get("/:id", getRentalProductById);
 router.get("/getServiceProductsByCompany/:companyId", getRentalProductsByCompany);
+
+// Get Today's Rental Products
+router.get("/payment/today", getTodaysRentalProducts);
 
 // Update Rental Product
 router.put("/:id", updateRentalProduct); // Consider adding isAdmin middleware here
