@@ -221,3 +221,28 @@ export const deleteRentalProduct = async (req, res) => {
         res.status(500).send({ success: false, message: 'Error in deleting rental product', error });
     }
 };
+
+// Get Today's Rental Products
+export const getTodaysRentalProducts = async (req, res) => {
+    try {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const endOfDay = new Date();
+        endOfDay.setHours(23, 59, 59, 999);
+
+        const rentalProducts = await RentalProduct.find({
+            paymentDate: {
+                $gte: today,
+                $lte: endOfDay
+            }
+        })
+            .populate('company')
+            .populate('gstType')
+            .sort({ createdAt: -1 });
+
+        res.status(200).json(rentalProducts);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
