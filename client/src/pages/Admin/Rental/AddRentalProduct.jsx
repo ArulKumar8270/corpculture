@@ -88,6 +88,7 @@ const AddRentalProduct = () => {
     const [paymentDate, setPaymentDate] = useState(null); // dayjs object
     const [commission, setCommission] = useState(''); // New state for commission
 
+
     // Model Specifications checkboxes
     const [modelSpecs, setModelSpecs] = useState({
         isA3Selected: false,
