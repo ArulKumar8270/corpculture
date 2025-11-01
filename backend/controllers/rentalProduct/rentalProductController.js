@@ -240,7 +240,7 @@ export const getTodaysRentalProducts = async (req, res) => {
             .populate('gstType')
             .sort({ createdAt: -1 });
 
-        res.status(200).json(rentalProducts);
+        res.status(200).json({products : rentalProducts});
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server Error' });
