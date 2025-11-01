@@ -226,9 +226,9 @@ export const deleteRentalProduct = async (req, res) => {
 export const getTodaysRentalProducts = async (req, res) => {
     try {
         const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        today.setUTCHours(0, 0, 0, 0);
         const endOfDay = new Date();
-        endOfDay.setHours(23, 59, 59, 999);
+        endOfDay.setUTCHours(23, 59, 59, 999);
 
         const rentalProducts = await RentalProduct.find({
             paymentDate: {
