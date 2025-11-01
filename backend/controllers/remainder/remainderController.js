@@ -214,14 +214,21 @@ export const deleteRemainder = async (req, res) => {
 export const getRemaindersByTodayDate = async (req, res) => {
     try {
         const today = new Date();
+        const { remainderType } = req.query;
 
         // Today's date as a number (day of the month)
         const todayDayOfMonth = today.getDate();
 
-        // Find remainders where today's date is inside remainderDates array
-        const remainders = await Remainder.find({
+        const query = {
             remainderDates: { $in: [todayDayOfMonth] }
-        })
+        };
+
+        if (remainderType) {
+            query.remainderType = remainderType;
+        }
+
+        // Find remainders where today's date is inside remainderDates array
+        const remainders = await Remainder.find(query)
             .populate('companyId', '_id')
             .sort({ createdAt: -1 });
 
