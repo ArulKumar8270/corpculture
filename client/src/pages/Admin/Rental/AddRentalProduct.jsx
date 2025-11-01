@@ -10,6 +10,8 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+dayjs.extend(utc);
 import { useAuth } from '../../../context/auth';
 
 // Helper component for A3/A4/A5 configurations
@@ -229,7 +231,7 @@ const AddRentalProduct = () => {
             hsn,
             basePrice: parseFloat(basePrice),
             gstType: gstTypeIds, // Send as array
-            paymentDate: paymentDate ? paymentDate.toISOString() : null, // Convert dayjs object to ISO string
+            paymentDate: paymentDate ? dayjs(paymentDate).utc().startOf('day').toISOString() : null, // Convert dayjs object to ISO string
             commission: parseFloat(commission), // Include commission in payload
             modelSpecs,
             a3Config: modelSpecs.isA3Selected ? a3Config : {},
