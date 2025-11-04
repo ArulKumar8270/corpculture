@@ -1,0 +1,139 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "fromEmail": "info@akcn.in",
+        "toEmail": "akconsultancy19@gmail.com",
+        "subject": "New Travel Inquiry",
+        "html": "=<p>New travel inquiry received:</p>\n<p><b>Full Name:</b> {{ $json.body.fullName }}</p>\n<p><b>Mobile Number:</b> {{ $json.body.mobileNumber }}</p>\n<p><b>Email Address:</b> {{ $json.body.emailAddress }}</p>\n<p><b>From:</b> {{ $json.body.from }}</p>\n<p><b>To:</b> {{ $json.body.to }}</p>\n<p><b>Date of Journey:</b> {{ $json.body.dateOfJourney }}</p>\n<p><b>One Way/Round Trip:</b> {{ $json.body.oneWay }}</p>\n<p><b>Adults:</b> {{ $json.body.adults }}</p>\n<p><b>Children:</b> {{ $json.body.children }}</p>\n<p><b>Booking for Women:</b> {{ $json.body.bookingForWomen }}</p>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        300,
+        120
+      ],
+      "id": "595a4e75-9362-4283-b55e-e4f445d4a1b4",
+      "name": "Send Email1",
+      "webhookId": "ec2e6891-54b0-4f41-b7d7-e7fb3ea1213d",
+      "credentials": {
+        "smtp": {
+          "id": "4otoSBYlmwvLZkjm",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "74384e68-e206-4458-8f90-d1e2eef57bea",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "05b70700-6ca4-4673-a553-2e637eab9565",
+      "name": "Start",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        100,
+        120
+      ],
+      "webhookId": "74384e68-e206-4458-8f90-d1e2eef57bea"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        500,
+        120
+      ],
+      "id": "ffd3b560-6cbc-46bd-86ea-019beb1e89d7",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        100,
+        -100
+      ],
+      "id": "1c7d4bd4-e75a-4b4a-8cc7-ff0060b2dd5f",
+      "name": "When clicking ‘Test workflow’",
+      "disabled": true
+    }
+  ],
+  "connections": {
+    "Send Email1": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Send Email1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Test workflow’": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "pinData": {
+    "When clicking ‘Test workflow’": [
+      {
+        "headers": {
+          "host": "n8n.nicknameinfo.net",
+          "connection": "upgrade",
+          "x-real-ip": "106.222.221.116",
+          "x-forwarded-for": "106.222.221.116",
+          "x-forwarded-proto": "https",
+          "content-length": "278",
+          "content-type": "application/json",
+          "user-agent": "PostmanRuntime/7.45.0",
+          "accept": "*/*",
+          "cache-control": "no-cache",
+          "postman-token": "c2b1a03c-0cd1-4922-9096-7a5782dcb015",
+          "accept-encoding": "gzip, deflate, br"
+        },
+        "params": {},
+        "query": {},
+        "body": {
+          "firstName": "John",
+          "lastName": "Doe",
+          "phone": "555-123-4567",
+          "city": "Anytown",
+          "email": "john.doe@example.com",
+          "length": "10",
+          "width": "5",
+          "unitOfMeasurement": "Feet",
+          "service": "Civil Construction Services",
+          "message": "This is a test message."
+        },
+        "webhookUrl": "https://n8n.nicknameinfo.net/webhook/98f0cb09-8c82-4599-8f7b-c3f442b0128f",
+        "executionMode": "production"
+      }
+    ]
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "235053518bf9031a263747520a70e8a017a1f969482c9a8f3bfed484de40f70f"
+  }
+}

@@ -1,0 +1,146 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://nicknameinfo.net/corpculture/api/v1/rental/create",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n    \"customerType\": \"New\",\n    \"phone\": \"{{ $json.company.contactPersons[0].name }}\",\n    \"companyName\": \"{{ $json.company.companyName }}\",\n    \"companyId\": \"{{ $json.company._id }}\",\n    \"complaint\": \"\",\n    \"contactPerson\": \"{{ $json.company.contactPersons[0].name }}\",\n    \"email\": \"{{ $json.company.contactPersons[0].email }}\",\n    \"address\": \"{{ $json.company.billingAddress }}\",\n    \"location\": \"{{ $json.company.city }}\",\n    \"oldServiceId\": \"{{ $json._id }}\",\n    \"serviceImage\": \"\",\n    \"rentalType\": 1\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -140,
+        -480
+      ],
+      "id": "991528bc-c4d7-4f9a-8c31-550e61f0050f",
+      "name": "Get All Unpaid Invoices"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 1
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -980,
+        -200
+      ],
+      "id": "334ad651-6b19-4f0e-8d43-df00e60017bf",
+      "name": "Schedule Trigger",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "products",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -600,
+        -200
+      ],
+      "id": "41798f71-3c44-400c-b80e-182f78527800",
+      "name": "Split Out1"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -400,
+        -540
+      ],
+      "id": "0b9b4250-db7c-4ed1-9b63-41f00bc86e58",
+      "name": "Loop Over Items1"
+    },
+    {
+      "parameters": {
+        "url": "https://nicknameinfo.net/corpculture/api/v1/rental-products/payment/today",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -820,
+        -380
+      ],
+      "id": "72ab5bef-7225-4d3c-a847-c1178e386322",
+      "name": "Get toady payment products",
+      "alwaysOutputData": true
+    }
+  ],
+  "connections": {
+    "Get All Unpaid Invoices": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get toady payment products",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out1": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items1": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Get All Unpaid Invoices",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get toady payment products": {
+      "main": [
+        [
+          {
+            "node": "Split Out1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "235053518bf9031a263747520a70e8a017a1f969482c9a8f3bfed484de40f70f"
+  }
+}

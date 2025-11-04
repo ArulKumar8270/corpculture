@@ -39,7 +39,7 @@ router.get("/ordersByEmpId/:id", getOrdersByEmployeeId);
 
 //get admin orders
 router.get("/admin-orders", requireSignIn, getAdminOrders);
-router.get("/admin-order-detail", requireSignIn, getOrderDetail);
+router.get("/admin-order-detail", getOrderDetail);
 
 //update order status
 router.patch("/update/order-status", requireSignIn, updateOrder);

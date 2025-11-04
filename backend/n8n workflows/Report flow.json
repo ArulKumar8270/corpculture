@@ -1,0 +1,393 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "toBinary",
+        "sourceProperty": "data",
+        "options": {
+          "fileName": "=report_{{ $('Format Html').item.json.data_time }}.pdf"
+        }
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        120,
+        160
+      ],
+      "id": "34693d4a-33d9-461e-aad8-159ee954681b",
+      "name": "Convert to File"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Format Html').item.json.emails.join(',') }}\n",
+        "subject": "=Report - {{ $('Format Html').item.json.data_time }}",
+        "emailType": "text",
+        "message": "=Your {{ $('Get Details').item.json.serviceInvoice.invoiceType }} is here",
+        "options": {
+          "appendAttribution": false,
+          "attachmentsUi": {
+            "attachmentsBinary": [
+              {}
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        300,
+        160
+      ],
+      "id": "9b553190-7e41-4958-af94-e81b51315cab",
+      "name": "Send a message",
+      "webhookId": "ecf492fd-8e31-4e72-b2b1-8121b96185ba",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "QCcM0ghDlKcgTgtF",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "88ed0a9b-ee21-43e0-9684-f5c5859f9734",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -600,
+        80
+      ],
+      "id": "eea77443-2312-40ef-90b3-eb736195f88e",
+      "name": "Webhook",
+      "webhookId": "88ed0a9b-ee21-43e0-9684-f5c5859f9734"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -600,
+        220
+      ],
+      "id": "5d986a45-e8ad-45bb-b9ea-da5f680edc82",
+      "name": "When clicking ‘Execute workflow’",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get the first report object from the input array.\nconst report = $input.item.json.reports[0];\n\n// Error check to ensure a report object exists.\nif (!report) {\n  throw new Error(\"Could not find a report object in the input JSON. Please check the previous node's output.\");\n}\n\n// Helper function to format date and time in DD-MM-YYYY & HH:MM:SS format.\nfunction formatDateTime(isoString) {\n  if (!isoString) return 'N/A';\n  const date = new Date(isoString);\n  const day = String(date.getDate()).padStart(2, '0');\n  const month = String(date.getMonth() + 1).padStart(2, '0');\n  const year = date.getFullYear();\n  const time = date.toTimeString().split(' ')[0];\n  return `${day}-${month}-${year} & ${time}`;\n}\n\n// --- Dynamic HTML Generation for each Material Group ---\nfunction generateMaterialHtml(group, mainReport, groupIndex) {\n    if (!group) return '';\n    let productsHtml = '';\n    let groupTotalAmount = 0;\n    if (group.products && group.products.length > 0) {\n        group.products.forEach((product, index) => {\n            productsHtml += `\n                <tr>\n                    <td>PRODUCT NAME ${index + 1}</td>\n                    <td>:</td>\n                    <td>${product.productName || 'N/A'}</td>\n                </tr>\n            `;\n            groupTotalAmount += product.totalAmount || 0;\n        });\n    }\n    return `\n        <div class=\"material-box\">\n            <div class=\"material-title\">Material ${groupIndex + 1}</div>\n            <table class=\"details-table\">\n                <tr><td>MODEL NO</td><td>:</td><td>${mainReport.modelNo || 'N/A'}</td></tr>\n                <tr><td>SERIEL NO</td><td>:</td><td>${mainReport.serialNo || 'N/A'}</td></tr>\n                ${productsHtml}\n                <tr><td>AMOUNT</td><td>:</td><td>${groupTotalAmount.toFixed(0)}</td></tr>\n                <tr><td>ACCESS SERVICE</td><td>:</td><td>${mainReport.accessService || 'N/A'}</td></tr>\n                <tr><td>USAGE DATA</td><td>:</td><td>${mainReport.usageData || 'N/A'}</td></tr>\n                <tr><td>DESCRIPTION</td><td>:</td><td>${mainReport.description || 'N/A'}</td></tr>\n                <tr><td>CUSTOMER NAME</td><td>:</td><td>${mainReport.company.contactPersons[0]?.name || 'N/A'}</td></tr>\n                <tr><td>ENGINEER NAME</td><td>:</td><td>${$input.first().json.reports[1].assignedTo.name || 'N/A'}</td></tr>\n            </table>\n        </div>\n    `;\n}\n\n// Generate the HTML for the first two material groups.\nconst material1Html = report.materialGroups && report.materialGroups[0] ? generateMaterialHtml(report.materialGroups[0], report, 0) : '';\nconst material2Html = report.materialGroups && report.materialGroups[1] ? generateMaterialHtml(report.materialGroups[1], report, 1) : '';\n\n\n// --- Main HTML Structure ---\nconst finalHtml = `\n<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n    <meta charset=\"UTF-8\">\n    <title>Service Report - ${report._id}</title>\n    <style>\n        @import url('https://fonts.googleapis.com/css2?family=Arial, sans-serif');\n        body { font-family: Arial, sans-serif; font-size: 11px; color: #000; }\n        .report-container { width: 800px; margin: 20px auto; padding: 20px; border: 1px solid #ddd; }\n        \n        .header { display: flex; align-items: flex-start; margin-bottom: 20px; }\n        .header-left { width: 15%; }\n        .geometric-logo { width: 80px; height: 60px; background-color: #555; clip-path: polygon(0 0, 100% 0, 0 100%); }\n        .header-center { width: 55%; text-align: center; padding-top: 10px; }\n        .logo-img { width: 220px; margin-bottom: 5px; }\n        .address { font-size: 10px; margin-top: 5px; }\n        .header-right { width: 30%; text-align: right; font-weight: bold; font-size: 11px; padding-top: 10px; }\n\n        .content-row { display: flex; margin-top: 20px; }\n        .content-left { width: 55%; padding-right: 15px; border-right: 2px solid #ddd; }\n        .content-right { width: 45%; padding-left: 15px; }\n        \n        .section-title { position: relative; background-color: #2980b9; color: white; padding: 5px 12px; font-weight: bold; display: inline-block; margin-bottom: 10px; font-size: 11px; border-radius: 15px; z-index: 1; }\n        .section-title.problem { padding-right: 20px; border-top-right-radius: 0; }\n        .section-title.problem::after { content: ''; position: absolute; top: 0; right: -15px; width: 15px; height: 100%; background-color: #2980b9; clip-path: polygon(0 0, 100% 0, 0 100%); }\n        \n        .details-table { width: 100%; margin-bottom: 15px; font-size: 11px; }\n        .details-table td { padding: 3px 0; vertical-align: top; }\n        .details-table td:first-child { width: 120px; font-weight: bold; }\n        .details-table td:nth-child(2) { width: 10px; }\n        \n        .material-box { margin-top: 0; }\n        .material-title { background-color: #e0e0e0; padding: 3px 6px; font-weight: bold; font-size: 9px; display: inline-block; margin-bottom: 8px; border-radius: 5px; }\n        \n        .info-box { background-color: #2980b9; color: white; border: 1px solid #333; padding: 15px; min-height: 60px; border-radius: 8px; margin-bottom: 15px; }\n        .enquiry-box { display: flex; justify-content: space-between; background-color: #2980b9; color: white; padding: 5px 15px; font-weight: bold; border-radius: 15px; margin-top: 10px; }\n        \n        .satisfaction-level { margin-top: 20px; border: 1px solid #ccc; padding: 10px; border-radius: 5px; }\n        .satisfaction-level .cust-details { font-size: 10px; margin-bottom: 10px; }\n        .satisfaction-level .buttons { text-align: center; }\n        .satisfaction-level .buttons span { margin: 0 5px; padding: 4px 8px; border-radius: 5px; background-color: #ecf0f1; font-weight: bold; font-size: 9px; }\n        \n        .qr-section { margin-top: 10px; }\n        .qr-section img { width: 60px; height: 60px; }\n        \n        .footer-section { padding-top: 15px; border-top: 1px solid #ccc; margin-top: 15px; }\n        .footer-title { text-align: center; font-size: 16px; font-weight: bold; color: #34495e; margin-bottom: 15px; }\n        .verified-section { display: flex; justify-content: space-between; }\n        .verified-box { width: 48%; }\n    </style>\n</head>\n<body>\n    <div class=\"report-container\">\n        <div class=\"header\">\n             <div class=\"header-left\"><div class=\"geometric-logo\"></div></div>\n            <div class=\"header-center\">\n                <img src=\"https://corpculture.nicknameinfotech.com/assets/logo-d579b0da.png\" alt=\"Corp Culture Logo\" class=\"logo-img\">\n                <div class=\"address\">NO.12/30, Vada Agaram, Street Mehta Nagar, Aminjikarai, Chennai - 29. | customer@corpculture.in</div>\n            </div>\n            <div class=\"header-right\">\n                CSR : CSR_No:${report._id} <br>\n                DATE & TIME : ${formatDateTime(report.createdAt)}\n            </div>\n        </div>\n\n        <div class=\"content-row\">\n            <div class=\"content-left\">\n                <div class=\"section-title\">CUSTOMER DETAILS</div>\n                <table class=\"details-table\">\n                    <tr><td>COMPANY NAME</td><td>:</td><td>${report.company.companyName || 'N/A'}</td></tr>\n                    <tr><td>ADDRESS</td><td>:</td><td style=\"white-space: pre-wrap;\">${report.branch || report.company.billingAddress || 'N/A'}</td></tr>\n                    <tr><td>CONTACT PERSON</td><td>:</td><td>${report.company.contactPersons[0]?.name || 'N/A'}</td></tr>\n                    <tr><td>CONTACT NUMBER</td><td>:</td><td>${report.company.contactPersons[0]?.mobile || 'N/A'}</td></tr>\n                    <tr><td>MAIL ID</td><td>:</td><td>${report.company.contactPersons[0]?.email || 'N/A'}</td></tr>\n                    <tr><td>TYPE OF CALLS</td><td>:</td><td>${report.reportType || 'N/A'}</td></tr>\n                </table>\n            </div>\n            <div class=\"content-right\">\n                <div class=\"section-title problem\">NATURE OF PROBLEM</div>\n                <div style=\"margin-bottom: 20px; min-height: 20px;\">${report.problemReport || ''}</div>\n                <div class=\"section-title\">REMARKS / PENDING WORKS</div>\n                <div class=\"info-box\">${report.remarksPendingWorks || 'NO'}</div>\n                <div class=\"enquiry-box\">\n                    <span>ENQUIRY TYPE</span>\n                    <span>${$input.first().json.reports[1].reportFor || 'N/A'}</span>\n                </div>\n            </div>\n        </div>\n        \n        <div class=\"content-row\">\n            <div class=\"content-left\">\n                ${material1Html}\n                <div class=\"qr-section\">\n                    <img src=\"https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=Report:${report._id}\" alt=\"QR Code\">\n                </div>\n            </div>\n            <div class=\"content-right\">\n                ${material2Html}\n                <div class=\"satisfaction-level\">\n                    <div class=\"section-title\">CUSTOMER SATISFACTION LEVEL</div>\n                    <table class=\"details-table cust-details\">\n                        <tr><td>CUSTOMER NAME</td><td>:</td><td>${report.company.contactPersons[0]?.name || 'N/A'}</td></tr>\n                        <tr><td>CUSTOMER NUMBER</td><td>:</td><td>${report.company.contactPersons[0]?.mobile || 'N/A'}</td></tr>\n                    </table>\n                    <div class=\"buttons\">\n                        <span>EXCELLENT</span><span>VERY GOOD</span><span>GOOD</span><span>BAD</span>\n                    </div>\n                </div>\n            </div>\n        </div>\n        \n        <div class=\"footer-section\">\n            <div class=\"footer-title\">SERVICE REPORT & GATE PASS</div>\n            <div class=\"verified-section\">\n                <div class=\"verified-box\">\n                    <table class=\"details-table\">\n                        <tr><td>SERVICE ENGINEER ID NO</td><td>:</td><td>${$input.first().json.reports[1].assignedTo.name || 'N/A'}</td></tr>\n\n                        <tr><td>Verified By</td><td>:</td><td>${$input.first().json.reports[1].assignedTo.name || 'N/A'}</td></tr>\n                        <tr><td>CALLS COMPLETED</td><td>:</td><td>${formatDateTime(report.updatedAt)}</td></tr>\n                    </table>\n                </div>\n                <div class=\"verified-box\">\n                    <table class=\"details-table\">\n                         <tr><td colspan=\"3\" style=\"visibility:hidden;\">dummy</td></tr>\n                         <tr><td colspan=\"3\" style=\"visibility:hidden;\">dummy</td></tr>\n                         <tr><td colspan=\"3\" style=\"visibility:hidden;\">dummy</td></tr>\n                    </table>\n                </div>\n            </div>\n        </div>\n    </div>\n</body>\n</html>\n`;\nconst contactEmails = report.company.contactPersons.map(person => person.email);\n\nconst time_now = DateTime.now()\n\nreturn [{\n  json: {\n    html: finalHtml,\n    emails: contactEmails, \n    data_time: time_now\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -200,
+        160
+      ],
+      "id": "00600410-c2f6-4fd6-801d-ece1d9019590",
+      "name": "Format Html"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Load the puppeteer library\nconst puppeteer = require('puppeteer');\n\n// Define our main function\nasync function generatePdf(html) {\n  if (typeof html !== 'string' || html.length < 10) {\n    throw new Error('The input HTML is empty or invalid. Please check the \"Set\" node and the input connection.');\n  }\n\n  let browser;\n  try {\n    // --- THIS IS THE KEY FIX ---\n    // Launch the browser with the necessary arguments for a stable Docker environment\n    browser = await puppeteer.launch({\n      headless: true, // It's good practice to be explicit\n      args: [\n        '--no-sandbox',\n        '--disable-setuid-sandbox',\n        '--disable-dev-shm-usage', // Prevents hanging by avoiding limited shared memory\n        '--disable-gpu'            // Disables GPU hardware acceleration\n      ]\n    });\n    // --- END OF FIX ---\n\n    const page = await browser.newPage();\n    await page.setContent(html, { waitUntil: 'networkidle0' });\n\n    const pdfBuffer = await page.pdf({\n      format: 'A4',\n      printBackground: true,\n      margin: { top: '20px', right: '20px', bottom: '20px', left: '20px' }\n    });\n\n    return pdfBuffer;\n\n  } catch (error) {\n    // Adding more detailed logging to see where it fails\n    console.error('An error occurred during PDF Generation with Puppeteer:', error);\n    throw error;\n  } finally {\n    if (browser) {\n      await browser.close();\n    }\n  }\n}\n\n// --- Main execution starts here ---\n\nconst htmlContent = $input.item.json.html;\n\nconst rawPdfData = await generatePdf(htmlContent);\n\nconst base64String = Buffer.from(rawPdfData).toString('base64');\n\nreturn [\n  {\n    json: {\n      data: base64String\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -40,
+        160
+      ],
+      "id": "d0d74e56-b2ea-400a-bec7-bba3e29d1cc9",
+      "name": "Html to Pdf"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        500,
+        160
+      ],
+      "id": "2edee35d-5f68-4bab-b840-424968049c7c",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "url": "=https://nicknameinfo.net/corpculture/api/v1/report/{{ $json.body.reportId }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -400,
+        160
+      ],
+      "id": "38636ed8-4794-4ed5-9764-c808ca664371",
+      "name": "Get Details"
+    }
+  ],
+  "connections": {
+    "Convert to File": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Get Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        []
+      ]
+    },
+    "Format Html": {
+      "main": [
+        [
+          {
+            "node": "Html to Pdf",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Html to Pdf": {
+      "main": [
+        [
+          {
+            "node": "Convert to File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Details": {
+      "main": [
+        [
+          {
+            "node": "Format Html",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {
+    "When clicking ‘Execute workflow’": [
+      {
+        "success": true,
+        "message": "All Reports fetched",
+        "reports": [
+          {
+            "_id": "68aeb6d9ce60cffc4133374d",
+            "reportType": "Service Report",
+            "reportFor": null,
+            "company": {
+              "_id": "68aeb1c7ce60cffc41333604",
+              "customerType": "New",
+              "userId": "689086f8cc95bff225b107fe",
+              "companyName": "Arul test",
+              "billingAddress": "test",
+              "serviceDeliveryAddresses": [
+                {
+                  "address": "sdfa",
+                  "pincode": "34523"
+                },
+                {
+                  "address": "34235432",
+                  "pincode": "5234"
+                }
+              ],
+              "invoiceType": "Corpculture Invoice",
+              "city": "test",
+              "state": "test",
+              "pincode": "3425",
+              "gstNo": "543234",
+              "contactPersons": [
+                {
+                  "name": "arul",
+                  "mobile": "8270564998",
+                  "email": "arulkumar8270@gmail.com"
+                },
+                {
+                  "name": "test",
+                  "mobile": "34523452",
+                  "email": "test@1232.com"
+                }
+              ],
+              "customerComplaint": "",
+              "createdAt": "2025-08-27T07:20:39.514Z",
+              "__v": 0
+            },
+            "problemReport": "test",
+            "remarksPendingWorks": "test",
+            "accessService": "test",
+            "modelNo": "24354",
+            "serialNo": "32452",
+            "branch": "34235432",
+            "reference": "234523",
+            "usageData": "324",
+            "description": "2345",
+            "assignedTo": null,
+            "materialGroups": [
+              {
+                "name": "Materials1",
+                "products": [
+                  {
+                    "productName": "88A BIG BLADE CHANGE",
+                    "quantity": 2345,
+                    "rate": 200,
+                    "totalAmount": 469000
+                  },
+                  {
+                    "productName": "88A BIG BLADE CHANGE",
+                    "quantity": 234,
+                    "rate": 200,
+                    "totalAmount": 46800
+                  }
+                ]
+              },
+              {
+                "name": "Materials2",
+                "products": [
+                  {
+                    "productName": "88A BIG BLADE CHANGE",
+                    "quantity": 3,
+                    "rate": 200,
+                    "totalAmount": 600
+                  }
+                ]
+              }
+            ],
+            "createdAt": "2025-08-27T07:42:17.421Z",
+            "updatedAt": "2025-10-14T14:22:18.508Z",
+            "__v": 0
+          },
+          {
+            "_id": "68a9bed3ce60cffc41332d3f",
+            "reportType": "Service Report",
+            "reportFor": "service",
+            "company": {
+              "_id": "68a06be73c4dbac16a419271",
+              "customerType": "New",
+              "userId": "689c3fa9beef60de85b81abf",
+              "companyName": "WITAMY INTERNATIONAL PVT LTD ",
+              "billingAddress": "#52/41, CHENGALVARAYAN STREET,\nTRIPLICANE.",
+              "serviceDeliveryAddresses": [
+                {
+                  "address": "#52/41, CHENGALVARAYAN STREET,\nTRIPLICANE.",
+                  "pincode": "6000003"
+                }
+              ],
+              "invoiceType": "Corpculture Invoice",
+              "city": "CHENNAI",
+              "state": "TAMIL NADU",
+              "pincode": "6000003",
+              "gstNo": "33AADCW3559N1ZV",
+              "contactPersons": [
+                {
+                  "name": "DIJINDAS",
+                  "mobile": "9961259705",
+                  "email": "dijin@witamyinternational.com"
+                }
+              ],
+              "customerComplaint": "",
+              "createdAt": "2025-08-16T11:30:47.060Z",
+              "__v": 0
+            },
+            "problemReport": "test",
+            "remarksPendingWorks": "test",
+            "accessService": "test",
+            "modelNo": "test",
+            "serialNo": "4325234",
+            "branch": "#52/41, CHENGALVARAYAN STREET,\nTRIPLICANE.",
+            "reference": "",
+            "usageData": "4",
+            "description": "324",
+            "assignedTo": {
+              "_id": "6898d973f0f88e0585b27498",
+              "name": "babu ",
+              "email": "rvps@gmail.com",
+              "password": "$2b$10$HdIh6KDHtpuSVWfT7yGC9.AeUVShJPJ/WadqXlhSf9n4a9LfnX27e",
+              "phone": "9171558818",
+              "address": "29,vaidya nathan street",
+              "role": 3,
+              "commission": 0,
+              "isCommissionEnabled": 0,
+              "wishlist": [],
+              "commissionCategorys": [],
+              "createdAt": "2025-08-10T17:40:03.341Z",
+              "updatedAt": "2025-08-10T17:40:03.341Z",
+              "__v": 0,
+              "serviceDeliveryAddresses": []
+            },
+            "materialGroups": [
+              {
+                "name": "Materials2",
+                "products": [
+                  {
+                    "productName": "12A PCR ROLLER CHANGE",
+                    "quantity": 4,
+                    "rate": 200,
+                    "totalAmount": 800
+                  }
+                ]
+              },
+              {
+                "name": "Materials3",
+                "products": [
+                  {
+                    "productName": "COMPATIBLE BROTHER NEW TONER",
+                    "quantity": 3,
+                    "rate": 1400,
+                    "totalAmount": 4200
+                  }
+                ]
+              }
+            ],
+            "createdAt": "2025-08-23T13:14:59.054Z",
+            "updatedAt": "2025-08-23T13:14:59.054Z",
+            "__v": 0
+          }
+        ],
+        "totalCount": 2
+      }
+    ]
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "235053518bf9031a263747520a70e8a017a1f969482c9a8f3bfed484de40f70f"
+  }
+}
