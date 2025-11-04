@@ -1,0 +1,139 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "fromEmail": "info@akcn.in",
+        "toEmail": "akconsultancy19@gmail.com",
+        "subject": "New Service Inquiry",
+        "html": "=<p>New inquiry received from the service inquiry form:</p>\n<p><b>First Name:</b> {{ $json.body.firstName }}</p>\n<p><b>Last Name:</b> {{ $json.body.lastName }}</p>\n<p><b>Phone:</b> {{ $json.body.phone }}</p>\n<p><b>City:</b> {{ $json.body.city }}</p>\n<p><b>Email:</b> {{ $json.body.email }}</p>\n<p><b>Length:</b> {{ $json.body.length }}</p>\n<p><b>Width:</b> {{ $json.body.width }}</p>\n<p><b>Unit of Measurement:</b> {{ $json.body.unitOfMeasurement }}</p>\n<p><b>Service:</b> {{ $json.body.service }}</p>\n<p><b>Message:</b> {{ $json.body.message }}</p>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        300,
+        120
+      ],
+      "id": "67a7e504-81a7-4509-8af0-92f69a66da55",
+      "name": "Send Email1",
+      "webhookId": "c8aabdfd-b82b-476c-b455-2507f5c7a76e",
+      "credentials": {
+        "smtp": {
+          "id": "4otoSBYlmwvLZkjm",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "98f0cb09-8c82-4599-8f7b-c3f442b0128f",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "d4f8a09e-9df0-4da6-b447-c1a7fde34aca",
+      "name": "Start",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        100,
+        120
+      ],
+      "webhookId": "98f0cb09-8c82-4599-8f7b-c3f442b0128f"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        500,
+        120
+      ],
+      "id": "0d0708a5-2b72-486b-b1cb-67f3f0ef5fb4",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        100,
+        -100
+      ],
+      "id": "43386db1-e634-4c06-ad81-6b68e7fb7225",
+      "name": "When clicking ‘Test workflow’",
+      "disabled": true
+    }
+  ],
+  "connections": {
+    "Send Email1": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Send Email1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Test workflow’": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "pinData": {
+    "When clicking ‘Test workflow’": [
+      {
+        "headers": {
+          "host": "n8n.nicknameinfo.net",
+          "connection": "upgrade",
+          "x-real-ip": "106.222.221.116",
+          "x-forwarded-for": "106.222.221.116",
+          "x-forwarded-proto": "https",
+          "content-length": "278",
+          "content-type": "application/json",
+          "user-agent": "PostmanRuntime/7.45.0",
+          "accept": "*/*",
+          "cache-control": "no-cache",
+          "postman-token": "c2b1a03c-0cd1-4922-9096-7a5782dcb015",
+          "accept-encoding": "gzip, deflate, br"
+        },
+        "params": {},
+        "query": {},
+        "body": {
+          "firstName": "John",
+          "lastName": "Doe",
+          "phone": "555-123-4567",
+          "city": "Anytown",
+          "email": "john.doe@example.com",
+          "length": "10",
+          "width": "5",
+          "unitOfMeasurement": "Feet",
+          "service": "Civil Construction Services",
+          "message": "This is a test message."
+        },
+        "webhookUrl": "https://n8n.nicknameinfo.net/webhook/98f0cb09-8c82-4599-8f7b-c3f442b0128f",
+        "executionMode": "production"
+      }
+    ]
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "235053518bf9031a263747520a70e8a017a1f969482c9a8f3bfed484de40f70f"
+  }
+}

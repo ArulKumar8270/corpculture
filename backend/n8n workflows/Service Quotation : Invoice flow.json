@@ -1,0 +1,247 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "toBinary",
+        "sourceProperty": "data",
+        "options": {
+          "fileName": "={{ $('Get Details').item.json.serviceInvoice.invoiceType }}_{{ $('Get Details').item.json.serviceInvoice._id }}_{{ $('Format Html').item.json.data_time }}.pdf"
+        }
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        300,
+        160
+      ],
+      "id": "45c78c83-2772-48a7-8ace-9d2ff00c8164",
+      "name": "Convert to File"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Format Html').item.json.emails.join(',') }}",
+        "subject": "={{ $('Get Details').item.json.serviceInvoice.invoiceType }}",
+        "emailType": "text",
+        "message": "=Your {{ $('Get Details').item.json.serviceInvoice.invoiceType }} is here",
+        "options": {
+          "appendAttribution": false,
+          "attachmentsUi": {
+            "attachmentsBinary": [
+              {}
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        460,
+        160
+      ],
+      "id": "226bbc82-fc81-4ec2-9bf2-879b34a822d9",
+      "name": "Send a message",
+      "webhookId": "f3c9759d-53cf-444e-a310-61549c03237a",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "QCcM0ghDlKcgTgtF",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "f8d3ad37-a38e-4a38-a06e-09c74fdc3b91",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -380,
+        160
+      ],
+      "id": "daafd736-9945-4796-b250-a71a1585b44a",
+      "name": "Webhook",
+      "webhookId": "f8d3ad37-a38e-4a38-a06e-09c74fdc3b91"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -360,
+        -100
+      ],
+      "id": "57846131-b8c2-4a42-be72-de6625981c4d",
+      "name": "When clicking ‘Execute workflow’",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get the nested serviceInvoice object from the input.\nconst data = $input.item.json.serviceInvoice;\n\n// --- CONFIGURATION ---\n// Set your company's static GST number here.\nconst SELLER_GST_NUMBER = '33BBFPG9210H2ZZ';\n\n\n// Error check to ensure data exists before we proceed.\nif (!data) {\n  throw new Error(\"CRITICAL: Could not find 'serviceInvoice' object inside the input JSON. Please check the previous node's output.\");\n}\n\n// --- 1. Helper Functions for Data Formatting ---\n\nfunction formatDate(isoString) {\n  if (!isoString) return 'N/A';\n  const date = new Date(isoString);\n  const day = String(date.getDate()).padStart(2, '0');\n  const month = String(date.getMonth() + 1).padStart(2, '0');\n  const year = date.getFullYear();\n  return `${year}-${month}-${day}`;\n}\n\nfunction formatTime(isoString) {\n    if (!isoString) return 'N/A';\n    const date = new Date(isoString);\n    return date.toTimeString().split(' ')[0];\n}\n\nfunction formatCurrency(num) {\n    return (typeof num === 'number') ? num.toFixed(2) : '0.00';\n}\n\nfunction formatCurrencyNoDecimal(num) {\n    return (typeof num === 'number') ? Math.round(num) : '0';\n}\n\nfunction numberToWords(num) {\n    const number = Number(num);\n    if (isNaN(number) || number === null) return '';\n    if (number === 0) return 'Zero Rupees /-';\n    const a = ['', 'One ', 'Two ', 'Three ', 'Four ', 'Five ', 'Six ', 'Seven ', 'Eight ', 'Nine ', 'Ten ', 'Eleven ', 'Twelve ', 'Thirteen ', 'Fourteen ', 'Fifteen ', 'Sixteen ', 'Seventeen ', 'Eighteen ', 'Nineteen '];\n    const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];\n    const n = ('000000000' + Math.round(number)).substr(-9).match(/^(\\d{2})(\\d{2})(\\d{2})(\\d{1})(\\d{2})$/);\n    if (!n) return '';\n    let str = '';\n    str += (n[1] != 0) ? (a[Number(n[1])] || b[n[1][0]] + ' ' + a[n[1][1]]) + 'Crore ' : '';\n    str += (n[2] != 0) ? (a[Number(n[2])] || b[n[2][0]] + ' ' + a[n[2][1]]) + 'Lakh ' : '';\n    str += (n[3] != 0) ? (a[Number(n[3])] || b[n[3][0]] + ' ' + a[n[3][1]]) + 'Thousand ' : '';\n    str += (n[4] != 0) ? (a[Number(n[4])] || b[n[4][0]] + ' ' + a[n[4][1]]) + 'Hundred ' : '';\n    str += (n[5] != 0) ? ((str != '') ? '' : '') + (a[Number(n[5])] || b[n[5][0]] + ' ' + a[n[5][1]]) : '';\n    return str.trim() + ' Rupees /-';\n}\n\n// --- 2. DYNAMIC & RELIABLE CALCULATIONS ---\nlet recalculatedSubtotal = 0;\nlet totalTaxAmount = 0;\nlet totalCgstAmount = 0;\nlet totalSgstAmount = 0;\n\ndata.products.forEach(p => {\n    const itemTaxableAmount = p.rate * p.quantity;\n    recalculatedSubtotal += itemTaxableAmount;\n\n    if (p.productId.gstType && Array.isArray(p.productId.gstType)) {\n        p.productId.gstType.forEach(taxComponent => {\n            const itemComponentTax = itemTaxableAmount * (taxComponent.gstPercentage / 100);\n            totalTaxAmount += itemComponentTax;\n\n            if (taxComponent.gstType === 'CGST') {\n                totalCgstAmount += itemComponentTax;\n            } else if (taxComponent.gstType === 'SGST') {\n                totalSgstAmount += itemComponentTax;\n            }\n        });\n    }\n});\n\nconst finalTaxableValue = recalculatedSubtotal;\nconst finalGrandTotal = recalculatedSubtotal + totalTaxAmount;\nconst amountInWords = numberToWords(finalGrandTotal);\n\nlet representativeCgstRate = 0;\nlet representativeSgstRate = 0;\nif (data.products.length > 0 && data.products[0].productId.gstType) {\n    const firstProductTaxes = data.products[0].productId.gstType;\n    const cgstInfo = firstProductTaxes.find(t => t.gstType === 'CGST');\n    const sgstInfo = firstProductTaxes.find(t => t.gstType === 'SGST');\n    if (cgstInfo) representativeCgstRate = cgstInfo.gstPercentage;\n    if (sgstInfo) representativeSgstRate = sgstInfo.gstPercentage;\n}\n\n\n// --- 3. Dynamic HTML Generation for Product Rows ---\n// The .map() function below is a loop. It will create a new table row <tr> for EACH product in the products array.\nconst productRows = data.products.map(p => {\n    // These values are calculated for each row individually.\n    const itemTaxableAmount = p.rate * p.quantity;\n    let itemTotalTax = 0;\n    let totalGstPercentage = 0;\n\n    if (p.productId.gstType && Array.isArray(p.productId.gstType)) {\n        p.productId.gstType.forEach(taxComponent => {\n            itemTotalTax += itemTaxableAmount * (taxComponent.gstPercentage / 100);\n            totalGstPercentage += taxComponent.gstPercentage;\n        });\n    }\n    \n    const itemNetRate = itemTaxableAmount + itemTotalTax;\n    \n    // This HTML block is created for each product, with its specific values mapped directly from the payload.\n    return `\n      <tr>\n        <!-- Field: productName -->\n        <td style=\"text-align: left;\">${p.productName || 'N/A'}</td>\n\n        <!-- Field: hsn (from nested productId object) -->\n        <td>${p.productId.hsn || 'N/A'}</td>\n\n        <!-- Field: quantity (top-level, invoice-specific) -->\n        <td>${p.quantity}</td>\n\n        <!-- Field: rate (top-level, invoice-specific) -->\n        <td>${formatCurrency(p.rate)}</td>\n\n        <!-- Field: totalAmount (CALCULATED, not from payload) -->\n        <td>${formatCurrency(itemTaxableAmount)}</td>\n\n        <!-- Field: gst (CALCULATED from nested gstType array) -->\n        <td>${totalGstPercentage}%</td>\n        \n        <!-- Field: Tax Rate (CALCULATED tax amount for the row) -->\n        <td>${formatCurrencyNoDecimal(itemTotalTax)}</td>\n        \n        <!-- Field: Net Rate (CALCULATED net total for the row) -->\n        <td>${formatCurrencyNoDecimal(itemNetRate)}</td>\n      </tr>`;\n}).join('');\n\n// --- 4. The Complete HTML Template ---\nconst finalHtml = `\n<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n    <meta charset=\"UTF-8\">\n    <title>Tax Invoice ${data.invoiceNumber}</title>\n    <style>\n        @import url('https://fonts.googleapis.com/css2?family=Arial, Helvetica, sans-serif');\n        body { font-family: Arial, Helvetica, sans-serif; font-size: 10.5px; color: #000; }\n        .invoice-container { width: 800px; margin: 0 auto; padding: 25px; }\n        .bold { font-weight: bold; }\n        .top-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;}\n        .logo-section { flex-basis: 70%; }\n        .qr-code img { width: 100px; height: 100px; }\n        .details-section { display: flex; align-items: flex-start; width: 100%; padding-bottom: 10px; }\n        .billing-column { width: 35%; }\n        .delivery-column { width: 35%; border-left: 1px solid #ccc; padding-left: 15px; min-height: 100px;}\n        .invoice-info-column { width: 28%; border-left: 1px solid #ccc; padding-left: 15px; min-height: 100px;}\n        .section-title { font-size: 13px; font-weight: bold; margin-bottom: 8px; }\n        .address-block { line-height: 1.5; font-weight: bold; white-space: pre-wrap; }\n        .tax-invoice-title { font-size: 12px; font-weight: bold; margin-bottom: 3px; }\n        .tax-invoice-subtitle { font-size: 10px; margin-bottom: 8px; }\n        .invoice-info-list { list-style: none; padding: 0; margin: 0; }\n        .invoice-info-list li { margin-bottom: 3px; }\n        .items-table { width: 100%; border-collapse: collapse; margin-top: 5px; }\n        .items-table th, .items-table td { border: 1px solid #000; padding: 6px; text-align: center; }\n        .items-table thead th { background-color: #00AEEF; color: #000; font-weight: bold; font-size: 11px; border-left: none; border-right: none; }\n        .items-table thead th:first-child { border-left: 1px solid #000; }\n        .items-table thead th:last-child { border-right: 1px solid #000; }\n        .items-table td:first-child { text-align: left; }\n        .tax-summary-table { border-collapse: collapse; width: 100%; margin-top: 20px; }\n        .tax-summary-table th, .tax-summary-table td { border: 1px solid #ccc; padding: 6px; text-align: center; vertical-align: middle; }\n        .tax-summary-table th { background-color: transparent; font-weight: bold; color: #000; }\n        .tax-summary-table .sub-header { font-weight: bold; }\n        .final-details-section { display: flex; justify-content: space-between; align-items: flex-start; margin-top: 20px; }\n        .final-details-left { width: 66%; vertical-align: top; }\n        .final-details-right { width: 33%; vertical-align: top; text-align: right; }\n        .account-info table { width: 100%; }\n        .account-info td { padding: 1.5px 0; }\n        .account-info td:first-child { width: 120px; font-weight: bold; }\n        .amount-in-words { margin-top: 10px; font-weight: bold; text-transform: capitalize; }\n        .totals-summary { padding-right: 5px;}\n        .totals-summary table { width: 100%; }\n        .totals-summary td { padding: 2.5px 5px; }\n        .totals-summary td:first-child { text-align: left; width: 70%;}\n        .totals-summary td:nth-child(2) { width: 5px; }\n        .grand-total-block { font-weight: bold; font-size: 14px; margin-top: 8px; border-top: 1px solid #000; padding-top: 8px;}\n        .signature-section { display: flex; justify-content: space-between; align-items: flex-end; padding-top: 10px; margin-top: 15px; }\n        .signature-left { padding-bottom: 5px; }\n        .signature-right { text-align: center; }\n        .footer { margin-top: 25px; padding-top: 10px; border-top: 1px solid #000; display: flex; }\n        .footer-col { padding: 0 10px; line-height: 1.5; }\n        .footer-col.location { width: 40%; }\n        .footer-col.web { width: 30%; border-left: 1px solid #ccc; padding-left: 20px;}\n        .footer-col.contact { width: 30%; border-left: 1px solid #ccc; padding-left: 20px;}\n        .footer-col h4 { margin: 0 0 5px 0; font-size: 11px; font-weight: bold; }\n        .footer-col ul { list-style: none; padding: 0; margin: 0; }\n        .final-declaration { margin-top: 15px; }\n        .final-declaration p { margin: 4px 0; }\n    </style>\n</head>\n<body>\n    <div class=\"invoice-container\">\n    \n        <div class=\"top-header\">\n            <div class=\"logo-section\"><img src=\"https://corpculture.nicknameinfotech.com/assets/logo-d579b0da.png\" alt=\"Corp Culture Logo\" style=\"width: 250px;\"></div>\n            <div class=\"qr-code\"><img src=\"https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=Invoice:${data.invoiceNumber}\" alt=\"QR Code\"></div>\n        </div>\n        \n        <div class=\"details-section\">\n            <div class=\"billing-column\"><div class=\"section-title\">INVOICE TO :</div><div class=\"address-block\"><strong>Billing Address :</strong><br>${data.companyId.companyName}<br>${data.companyId.billingAddress}<br>GSTIN/UIN: ${data.companyId.gstNo}</div></div>\n            <div class=\"delivery-column\"><div class=\"address-block\" style=\"margin-top: 26px;\"><strong>Service / Delivery Address:</strong><br>${data.companyId.companyName}<br>${data.deliveryAddress}</div></div>\n            <div class=\"invoice-info-column\">\n                <div class=\"tax-invoice-title\">TAX INVOICE</div>\n                <div class=\"tax-invoice-subtitle\">GST #${SELLER_GST_NUMBER}<br>( ORIGINAL FOR RECIPIENT )</div>\n                <ul class=\"invoice-info-list\">\n                    <li>• Invoice No : <strong>${data.invoiceNumber}</strong></li>\n                    <li>• Date : <strong>${formatDate(data.invoiceDate)}</strong></li>\n                    <li>• Time : <strong>${formatTime(data.invoiceDate)}</strong></li>\n                    <li>• Mode of Payment : <strong>${data.modeOfPayment}</strong></li>\n                    <li>• service Enquiry No : <strong>${data.reference}</strong></li>\n                </ul>\n            </div>\n        </div>\n        \n        <table class=\"items-table\">\n            <thead><tr><th>DESCRIPTION OF GOODS</th><th>HSN</th><th>QTY</th><th>RATE PER ITEM</th><th>AMOUNT</th><th>GST</th><th>Tax Rate</th><th>NET RATE</th></tr></thead>\n            <tbody>${productRows}</tbody>\n        </table>\n        \n        <table class=\"tax-summary-table\">\n            <tbody>\n                <tr><th rowspan=\"2\">Taxable Value</th><th>Central Tax</th><th>State Tax</th><th rowspan=\"2\">Total Tax Amount</th></tr>\n                <tr><td class=\"sub-header\">Amount</td><td class=\"sub-header\">Amount</td></tr>\n                <tr>\n                    <td>${formatCurrencyNoDecimal(finalTaxableValue)}</td>\n                    <td>${formatCurrencyNoDecimal(totalCgstAmount)}</td>\n                    <td>${formatCurrencyNoDecimal(totalSgstAmount)}</td>\n                    <td>${formatCurrencyNoDecimal(totalTaxAmount)}</td>\n                </tr>\n            </tbody>\n        </table>\n\n        <div class=\"final-details-section\">\n            <div class=\"final-details-left\">\n                <div class=\"account-info\">\n                    <div class=\"bold\">Account Information :</div>\n                    <table>\n                        <tbody>\n                            <tr><td>Bank Name</td><td>:</td><td class=\"bold\">HDFC BANK</td></tr>\n                            <tr><td>A/C NO</td><td>:</td><td class=\"bold\">50200041713896</td></tr>\n                            <tr><td>A/C Name</td><td>:</td><td class=\"bold\">CORPCULTURE</td></tr>\n                            <tr><td>IFSC Code</td><td>:</td><td class=\"bold\">HDFC0000492</td></tr>\n                            <tr><td>Branch</td><td>:</td><td class=\"bold\">Kilpauk</td></tr>\n                        </tbody>\n                    </table>\n                </div>\n                <div class=\"amount-in-words\">Amount in Words : ${amountInWords}</div>\n            </div>\n            <div class=\"final-details-right\">\n                <div class=\"totals-summary\">\n                    <table>\n                        <tbody>\n                            <tr><td>SUB TOTAL</td><td>:</td><td class=\"bold\">${formatCurrencyNoDecimal(finalTaxableValue)}</td></tr>\n                            <tr><td>OUTPUT CGST @ ${representativeCgstRate}%</td><td>:</td><td class=\"bold\">${formatCurrencyNoDecimal(totalCgstAmount)}</td></tr>\n                            <tr><td>OUTPUT SGST @ ${representativeSgstRate}%</td><td>:</td><td class=\"bold\">${formatCurrencyNoDecimal(totalSgstAmount)}</td></tr>\n                        </tbody>\n                    </table>\n                    <div class=\"grand-total-block\">\n                        <table>\n                            <tbody>\n                                <tr><td>Grand Total<br>(rounded total)</td><td>:</td><td>${formatCurrencyNoDecimal(finalGrandTotal)}/-</td></tr>\n                            </tbody>\n                        </table>\n                    </div>\n                </div>\n            </div>\n        </div>\n        \n        <div class=\"signature-section\">\n            <div class=\"signature-left\"><span class=\"bold\">ADMIN (7358****140)</span><br>Customer Signatory</div>\n            <div class=\"signature-right\">\n                Verified By :\n                <div style=\"height: 70px;\"></div>\n                Authorized Signatory\n            </div>\n        </div>\n        \n        <div class=\"footer\">\n            <div class=\"footer-col location\">\n                <h4>Location</h4><span class=\"bold\">Head Office :</span><br>A Block, liberty Plaza, No. 12/30, Vada Agaram Road, Mehta Nagar, Aminjikarai, Chennai- 600 002\n            </div>\n            <div class=\"footer-col web\">\n                <h4>Web</h4><ul><li>• customer@corpculture.in</li><li>• www.corpculture.in</li></ul>\n            </div>\n            <div class=\"footer-col contact\">\n                <h4>Contact</h4><ul><li>• 044-48522973</li><li>• +91-9171558818</li><li>• +91-7397724205</li></ul>\n            </div>\n        </div>\n        \n        <div class=\"final-declaration\">\n            <p><span class=\"bold\">SUBJECT TO CHENNAI JURISDICTION.</span> This is a Computer Generated Invoice.</p>\n            <p><span class=\"bold\">Declaration :</span> We declare that this invoice shows the actual price of the goods. Described and that all particulars are true and correct.</p>\n        </div>\n        \n    </div>\n</body>\n</html>\n`;\nconst contactEmails = $input.first().json.serviceInvoice.companyId.contactPersons.map(person => person.email);\n\nconst time_now = DateTime.now()\n\nreturn [{\n  json: {\n    html: finalHtml,\n    emails: contactEmails, \n    data_time: time_now\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -20,
+        160
+      ],
+      "id": "86cb14fd-aa14-4b68-b404-364aa579af0a",
+      "name": "Format Html"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Load the puppeteer library\nconst puppeteer = require('puppeteer');\n\n// Define our main function\nasync function generatePdf(html) {\n  if (typeof html !== 'string' || html.length < 10) {\n    throw new Error('The input HTML is empty or invalid. Please check the \"Set\" node and the input connection.');\n  }\n\n  let browser;\n  try {\n    // --- THIS IS THE KEY FIX ---\n    // Launch the browser with the necessary arguments for a stable Docker environment\n    browser = await puppeteer.launch({\n      headless: true, // It's good practice to be explicit\n      args: [\n        '--no-sandbox',\n        '--disable-setuid-sandbox',\n        '--disable-dev-shm-usage', // Prevents hanging by avoiding limited shared memory\n        '--disable-gpu'            // Disables GPU hardware acceleration\n      ]\n    });\n    // --- END OF FIX ---\n\n    const page = await browser.newPage();\n    await page.setContent(html, { waitUntil: 'networkidle0' });\n\n    const pdfBuffer = await page.pdf({\n      format: 'A4',\n      printBackground: true,\n      margin: { top: '20px', right: '20px', bottom: '20px', left: '20px' }\n    });\n\n    return pdfBuffer;\n\n  } catch (error) {\n    // Adding more detailed logging to see where it fails\n    console.error('An error occurred during PDF Generation with Puppeteer:', error);\n    throw error;\n  } finally {\n    if (browser) {\n      await browser.close();\n    }\n  }\n}\n\n// --- Main execution starts here ---\n\nconst htmlContent = $input.item.json.html;\n\nconst rawPdfData = await generatePdf(htmlContent);\n\nconst base64String = Buffer.from(rawPdfData).toString('base64');\n\nreturn [\n  {\n    json: {\n      data: base64String\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        140,
+        160
+      ],
+      "id": "1a1e2a35-a090-4344-b4b7-dab44f2514b4",
+      "name": "Html to Pdf"
+    },
+    {
+      "parameters": {
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        640,
+        160
+      ],
+      "id": "47181bfe-af51-4614-904c-706b37efa696",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "url": "=https://nicknameinfo.net/corpculture/api/v1/service-invoice/get/{{ $json.body.invoiceId }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -180,
+        160
+      ],
+      "id": "568512c0-080f-42f3-bacb-5d29279dada4",
+      "name": "Get Details"
+    }
+  ],
+  "connections": {
+    "Convert to File": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Get Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        []
+      ]
+    },
+    "Format Html": {
+      "main": [
+        [
+          {
+            "node": "Html to Pdf",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Html to Pdf": {
+      "main": [
+        [
+          {
+            "node": "Convert to File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Details": {
+      "main": [
+        [
+          {
+            "node": "Format Html",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {
+    "When clicking ‘Execute workflow’": [
+      {
+        "headers": {
+          "host": "n8n.nicknameinfo.net",
+          "connection": "upgrade",
+          "x-real-ip": "106.222.222.95",
+          "x-forwarded-for": "106.222.222.95",
+          "x-forwarded-proto": "https",
+          "content-length": "40",
+          "sec-ch-ua-platform": "\"macOS\"",
+          "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36",
+          "accept": "application/json, text/plain, */*",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"99\", \"Google Chrome\";v=\"139\", \"Chromium\";v=\"139\"",
+          "content-type": "application/json",
+          "sec-ch-ua-mobile": "?0",
+          "origin": "http://localhost:5173",
+          "sec-fetch-site": "cross-site",
+          "sec-fetch-mode": "cors",
+          "sec-fetch-dest": "empty",
+          "referer": "http://localhost:5173/",
+          "accept-encoding": "gzip, deflate, br, zstd",
+          "accept-language": "en-US,en;q=0.9"
+        },
+        "params": {},
+        "query": {},
+        "body": {
+          "invoiceId": "68aea827ca68ad28def5d769"
+        },
+        "webhookUrl": "https://n8n.nicknameinfo.net/webhook/f8d3ad37-a38e-4a38-a06e-09c74fdc3b91",
+        "executionMode": "production"
+      }
+    ]
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "235053518bf9031a263747520a70e8a017a1f969482c9a8f3bfed484de40f70f"
+  }
+}

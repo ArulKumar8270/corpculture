@@ -1,0 +1,390 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "toBinary",
+        "sourceProperty": "data",
+        "options": {
+          "fileName": "={{ $('Get Details').item.json.serviceInvoice.invoiceType }}_{{ $('Get Details').item.json.serviceInvoice._id }}_{{ $('Format Html').item.json.data_time }}.pdf"
+        }
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        580,
+        220
+      ],
+      "id": "2a8870dc-0c02-43b5-8bba-fa9628da438b",
+      "name": "Convert to File"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Format Html').item.json.emails.join(',') }}",
+        "subject": "={{ $('Get Details').item.json.serviceInvoice.invoiceType }}",
+        "emailType": "text",
+        "message": "=Your {{ $('Get Details').item.json.serviceInvoice.invoiceType }} is here",
+        "options": {
+          "appendAttribution": false,
+          "attachmentsUi": {
+            "attachmentsBinary": [
+              {}
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        740,
+        220
+      ],
+      "id": "61d2e536-8270-4d4d-9523-b8df7db86f2e",
+      "name": "Send a message",
+      "webhookId": "f3c9759d-53cf-444e-a310-61549c03237a",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "QCcM0ghDlKcgTgtF",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "f8d3ad37-a38e-4a38-a06e-09c74fdc3b91",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -160,
+        120
+      ],
+      "id": "949da70a-050f-43c8-af0a-eaa8208ce1f8",
+      "name": "Webhook",
+      "webhookId": "f8d3ad37-a38e-4a38-a06e-09c74fdc3b91"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -140,
+        360
+      ],
+      "id": "f1f1363a-facb-43af-8374-e07318db1684",
+      "name": "When clicking ‘Execute workflow’",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// This code is designed to run in an n8n Function node and utilizes \n// the latest JSON payload structure provided by the user.\n\nconst inputData = $input.first().json.entry; \n\n// --- CONFIGURATION ---\nconst SELLER_GST_NUMBER = '33BBFPG9210H2ZZ'; \n\nif (!inputData) {\n    throw new Error(\"CRITICAL: Input data 'entry' object is missing from the payload.\");\n}\n\n// Map the dynamic input data to the structure the HTML template expects.\nconst data = {\n    invoiceNumber: inputData.invoiceNumber,\n    invoiceDate: inputData.entryDate,\n    reference: inputData.rentalId,\n    modeOfPayment: 'N/A', \n    companyId: {\n        companyName: inputData.companyId.companyName,\n        billingAddress: `${inputData.companyId.billingAddress}, ${inputData.companyId.city}, ${inputData.companyId.state}, ${inputData.companyId.pincode}`,\n        gstNo: inputData.companyId.gstNo,\n        contactPersons: inputData.companyId.contactPersons || [],\n    },\n    deliveryAddress: `${inputData.companyId.billingAddress}, ${inputData.companyId.city}, ${inputData.companyId.state}, ${inputData.companyId.pincode}`, \n    products: [] \n};\n\n// Machine and Configuration Pointers\nconst machine = inputData.machineId || {};\nconst machineBasePrice = (typeof machine.basePrice === 'number') ? machine.basePrice : 0;\nconst machineGstType = machine.gstType || [];\nconst machineHsn = machine.hsn || '';\nconst entryA3Config = inputData.a3Config || {};\nconst entryA4Config = inputData.a4Config || {};\nconst entryA5Config = inputData.a5Config || {};\n\n/**\n * Helper: safeNumeric - returns number or null if not numeric\n */\nfunction safeNumeric(value) {\n    if (value === undefined || value === null) return null;\n    const n = Number(value);\n    return Number.isFinite(n) ? n : null;\n}\n\n/**\n * Calculates a single line item for extra copies based on meter readings.\n * Returns a product object if activity (totalCopies) > 0, otherwise returns null.\n */\nfunction calculateLineItem(configName, entryConfig = {}, machineSizeConfig = {}, copyType) {\n    let typeName = '';\n    let oldKey = '';\n    let newKey = '';\n    let freeKey = '';\n    let extraAmtKey = '';\n\n    // Determine config keys based on copyType\n    if (copyType === 'bw') {\n        typeName = 'B/W Copy';\n        oldKey = 'bwOldCount';\n        newKey = 'bwNewCount';\n        freeKey = 'freeCopiesBw';\n        extraAmtKey = 'extraAmountBw';\n    } else if (copyType === 'color') {\n        typeName = 'Color Copy';\n        oldKey = 'colorOldCount';\n        newKey = 'colorNewCount';\n        freeKey = 'freeCopiesColor';\n        extraAmtKey = 'extraAmountColor';\n    } else if (copyType === 'colorScanning') {\n        typeName = 'Color Scanning';\n        oldKey = 'colorScanningOldCount';\n        newKey = 'colorScanningNewCount';\n        freeKey = 'freeCopiesColorScanning';\n        extraAmtKey = 'extraAmountColorScanning';\n    } else {\n        return null;\n    }\n\n    // Read counts from entryConfig; preserve zeros\n    const oldCountRaw = (entryConfig && Object.prototype.hasOwnProperty.call(entryConfig, oldKey)) ? entryConfig[oldKey] : null;\n    const newCountRaw = (entryConfig && Object.prototype.hasOwnProperty.call(entryConfig, newKey)) ? entryConfig[newKey] : null;\n    \n    // Convert to numeric where possible, otherwise keep null\n    const oldCountNum = safeNumeric(oldCountRaw);\n    const newCountNum = safeNumeric(newCountRaw);\n\n    // If both counts are missing, skip\n    if (oldCountNum === null && newCountNum === null) return null;\n\n    // Free copies and extra amount (defaults to 0)\n    const freeCopies = safeNumeric(machineSizeConfig && machineSizeConfig[freeKey]) || 0;\n    const extraAmountPerCopy = safeNumeric(machineSizeConfig && machineSizeConfig[extraAmtKey]) || 0;\n\n    // Calculate difference (copies made since last reading) - only if both numeric\n    const totalCopies = (newCountNum !== null && oldCountNum !== null) ? (newCountNum - oldCountNum) : 0;\n\n    // Calculate extra paper count: Copies made above zero, less the free copies.\n    const extraPaperCount = (totalCopies > 0) ? Math.max(0, totalCopies - freeCopies) : 0;\n    \n    // Total taxable amount for this line item (Extra Paper Count * Rate Per Item)\n    const totalLineCharge = extraPaperCount * extraAmountPerCopy;\n\n    // Show line if any copies were made (totalCopies > 0)\n    if (totalCopies > 0) {\n        return {\n            productName: `COPIES CHARGE - ${configName} ${typeName} (Used: ${totalCopies}, Free: ${freeCopies})`,\n            quantity: extraPaperCount, // QTY is now the Extra Paper Count (0 in sample)\n            rate: extraAmountPerCopy, // RATE PER ITEM is the cost per extra copy\n            productId: {\n                hsn: machineHsn,\n                gstType: machineGstType\n            },\n            oldCount: oldCountNum,\n            newCount: newCountNum,\n            extraPaperCount: extraPaperCount,\n        };\n    }\n    return null;\n}\n\n// 1. Add the Base Price (Ensures 'None' counts for the required columns)\ndata.products.push({\n    productName: `MACHINE RENTAL - ${machine.modelName || ''} (S/N: ${machine.serialNo || ''}) - Base Price`,\n    quantity: 1,\n    rate: machineBasePrice, \n    productId: {\n        hsn: machineHsn,\n        gstType: machineGstType\n    },\n    // Explicitly set to 'None' to match the visual requirement for the Base Price row\n    oldCount: 'None', \n    newCount: 'None',\n    extraPaperCount: 'None',\n});\n\n// 2. Calculate and Add Extra Copy Charges for all configs (A3, A4, A5, B/W, Color, Scanning)\nconst configTypes = [\n    { size: 'A3', entry: entryA3Config, machine: machine.a3Config || {} },\n    { size: 'A4', entry: entryA4Config, machine: machine.a4Config || {} },\n    { size: 'A5', entry: entryA5Config, machine: machine.a5Config || {} }\n];\nconst copyTypes = ['bw', 'color', 'colorScanning'];\n\nconfigTypes.forEach(conf => {\n    copyTypes.forEach(type => {\n        const item = calculateLineItem(conf.size, conf.entry, conf.machine, type);\n        if (item) data.products.push(item);\n    });\n});\n\n\n// --- 1. Helper Functions for Data Formatting ---\n\nfunction formatDate(isoString) {\n    if (!isoString) return 'N/A';\n    const date = new Date(isoString);\n    if (isNaN(date.getTime())) return 'N/A';\n    const day = String(date.getDate()).padStart(2, '0');\n    const month = String(date.getMonth() + 1).padStart(2, '0');\n    const year = date.getFullYear();\n    return `${year}-${month}-${day}`;\n}\n\nfunction formatTime(isoString) {\n    if (!isoString) return 'N/A';\n    const date = new Date(isoString);\n    if (isNaN(date.getTime())) return 'N/A';\n    return date.toTimeString().split(' ')[0];\n}\n\nfunction formatCurrency(num) {\n    return (typeof num === 'number') ? num.toFixed(2) : '0.00';\n}\n\nfunction formatCurrencyNoDecimal(num) {\n    return (typeof num === 'number') ? Math.round(num) : '0';\n}\n\nfunction numberToWords(num) {\n    const number = Number(num);\n    if (isNaN(number) || number === null) return '';\n    if (number === 0) return 'Zero Rupees Only /-';\n    const a = ['', 'One ', 'Two ', 'Three ', 'Four ', 'Five ', 'Six ', 'Seven ', 'Eight ', 'Nine ', 'Ten ', 'Eleven ', 'Twelve ', 'Thirteen ', 'Fourteen ', 'Fifteen ', 'Sixteen ', 'Seventeen ', 'Eighteen ', 'Nineteen '];\n    const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];\n    const n = ('000000000' + Math.round(number)).substr(-9).match(/^(\\d{2})(\\d{2})(\\d{2})(\\d{1})(\\d{2})$/);\n    if (!n) return '';\n    let str = '';\n    str += (n[1] != 0) ? (a[Number(n[1])] || b[n[1][0]] + ' ' + a[n[1][1]]) + 'Crore ' : '';\n    str += (n[2] != 0) ? (a[Number(n[2])] || b[n[2][0]] + ' ' + a[n[2][1]]) + 'Lakh ' : '';\n    str += (n[3] != 0) ? (a[Number(n[3])] || b[n[3][0]] + ' ' + a[n[3][1]]) + 'Thousand ' : '';\n    str += (n[4] != 0) ? (a[Number(n[4])] || b[n[4][0]] + ' ' + a[n[4][1]]) + 'Hundred ' : '';\n    str += (n[5] != 0) ? ((str != '') ? 'And ' : '') + (a[Number(n[5])] || b[n[5][0]] + ' ' + a[n[5][1]]) : '';\n    return str.trim() + ' Rupees Only /-';\n}\n\n// --- 2. DYNAMIC & RELIABLE CALCULATIONS ---\nlet recalculatedSubtotal = 0;\nlet totalIgstAmount = 0;\nlet totalCgstAmount = 0;\nlet totalSgstAmount = 0;\nlet totalTaxAmount = 0;\nlet representativeIgstRate = 0;\nlet representativeCgstRate = 0;\nlet representativeSgstRate = 0;\n\ndata.products.forEach(p => {\n    // QTY is now Extra Paper Count. For Base Price, QTY is 1.\n    const qty = (typeof p.quantity === 'number') ? p.quantity : Number(p.quantity) || 0; \n    const rate = (typeof p.rate === 'number') ? p.rate : Number(p.rate) || 0;\n    const itemTaxableAmount = rate * qty; // Total Taxable Amount for the line\n    recalculatedSubtotal += itemTaxableAmount;\n\n    if (p.productId && p.productId.gstType && Array.isArray(p.productId.gstType)) {\n        p.productId.gstType.forEach(taxComponent => {\n            const pct = safeNumeric(taxComponent.gstPercentage) || 0;\n            const itemComponentTax = itemTaxableAmount * (pct / 100);\n            totalTaxAmount += itemComponentTax;\n\n            if (taxComponent.gstType === 'IGST') {\n                totalIgstAmount += itemComponentTax;\n                representativeIgstRate = Math.max(representativeIgstRate, pct);\n            } else if (taxComponent.gstType === 'CGST') {\n                totalCgstAmount += itemComponentTax;\n                representativeCgstRate = Math.max(representativeCgstRate, pct);\n            } else if (taxComponent.gstType === 'SGST') {\n                totalSgstAmount += itemComponentTax;\n                representativeSgstRate = Math.max(representativeSgstRate, pct);\n            }\n        });\n    }\n});\n\nconst finalTaxableValue = recalculatedSubtotal;\nconst finalGrandTotal = finalTaxableValue + totalTaxAmount;\nconst amountInWords = numberToWords(finalGrandTotal);\n\n\n// --- 3. Dynamic HTML Generation for Product Rows ---\nconst productRows = data.products.map(p => {\n    // QTY is now Extra Paper Count. For Base Price, QTY is 1.\n    const qty = (typeof p.quantity === 'number') ? p.quantity : Number(p.quantity) || 0; \n    const rate = (typeof p.rate === 'number') ? p.rate : Number(p.rate) || 0;\n    const itemTaxableAmount = rate * qty;  \n    let itemTotalTax = 0;\n    let totalGstPercentage = 0;\n\n    if (p.productId && p.productId.gstType && Array.isArray(p.productId.gstType)) {\n        p.productId.gstType.forEach(taxComponent => {\n            const pct = safeNumeric(taxComponent.gstPercentage) || 0;\n            itemTotalTax += itemTaxableAmount * (pct / 100);\n            totalGstPercentage += pct;\n        });\n    }\n    \n    // Custom fields for display \n    const oldC = p.oldCount || 'None';\n    const newC = p.newCount || 'None';\n    // Logic for EXTRA PAPER COUNT: \n    // If it's the Base Price row ('None'), keep 'None'. \n    // If it's a numeric 0 (zero extra copies), display 'None'.\n    // Otherwise, display the number of extra copies (QTY).\n    let extraP = p.extraPaperCount;\n\n    if (extraP === 'None') {\n        extraP = 'None';\n    } else {\n        extraP = (extraP === 0 || extraP === '0') ? 'None' : extraP;\n    }\n    \n    // For the extra copies lines, QTY and EXTRA PAPER COUNT should be the same, \n    // but the Base Price QTY is 1, while its EXTRA PAPER COUNT is 'None'.\n    const displayQty = (p.productName.includes('Base Price')) ? 1 : (qty || 'None');\n    \n    return `\n      <tr>\n        <td style=\"text-align: left;\">${p.productName || p.productName === '' ? (p.productName) : (p.description || 'N/A')}</td>\n\n        <td>${(p.productId && p.productId.hsn) ? p.productId.hsn : 'N/A'}</td>\n\n        <td>${displayQty}</td>\n\n        <td>${formatCurrency(rate)}</td>\n\n        <td>${oldC}</td>\n\n        <td>${newC}</td>\n\n        <td>${extraP}</td>\n        \n        <td>${totalGstPercentage}%</td>\n\n        <td>${formatCurrencyNoDecimal(itemTotalTax)}</td>\n        \n        <td>${formatCurrencyNoDecimal(itemTaxableAmount)}</td>\n      </tr>`;\n}).join('');\n\n\n// --- 4. The Complete HTML Template (Adapted to be dynamic) ---\nconst finalHtml = `\n<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n    <meta charset=\"UTF-8\">\n    <title>Tax Invoice ${data.invoiceNumber}</title>\n    <style>\n        @import url('https://fonts.googleapis.com/css2?family=Arial, Helvetica, sans-serif');\n        body { font-family: Arial, Helvetica, sans-serif; font-size: 10.5px; color: #000; }\n        .invoice-container { width: 800px; margin: 0 auto; padding: 25px; }\n        .bold { font-weight: bold; }\n        .top-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;}\n        .logo-section { flex-basis: 70%; }\n        .qr-code img { width: 100px; height: 100px; }\n        .details-section { display: flex; align-items: flex-start; width: 100%; padding-bottom: 10px; }\n        .billing-column { width: 35%; }\n        .delivery-column { width: 35%; border-left: 1px solid #ccc; padding-left: 15px; min-height: 100px;}\n        .invoice-info-column { width: 28%; border-left: 1px solid #ccc; padding-left: 15px; min-height: 100px;}\n        .section-title { font-size: 13px; font-weight: bold; margin-bottom: 8px; }\n        .address-block { line-height: 1.5; font-weight: bold; white-space: pre-wrap; }\n        .tax-invoice-title { font-size: 12px; font-weight: bold; margin-bottom: 3px; }\n        .tax-invoice-subtitle { font-size: 10px; margin-bottom: 8px; }\n        .invoice-info-list { list-style: none; padding: 0; margin: 0; }\n        .invoice-info-list li { margin-bottom: 3px; }\n        .items-table { width: 100%; border-collapse: collapse; margin-top: 5px; }\n        .items-table th, .items-table td { border: 1px solid #000; padding: 6px; text-align: center; }\n        .items-table thead th { background-color: #00AEEF; color: #000; font-weight: bold; font-size: 11px; border-left: none; border-right: none; }\n        .items-table thead th:first-child { border-left: 1px solid #000; }\n        .items-table thead th:last-child { border-right: 1px solid #000; }\n        .items-table td:first-child { text-align: left; }\n        .tax-summary-table { border-collapse: collapse; width: 100%; margin-top: 20px; }\n        .tax-summary-table th, .tax-summary-table td { border: 1px solid #ccc; padding: 6px; text-align: center; vertical-align: middle; }\n        .tax-summary-table th { background-color: transparent; font-weight: bold; color: #000; }\n        .tax-summary-table .sub-header { font-weight: bold; }\n        .final-details-section { display: flex; justify-content: space-between; align-items: flex-start; margin-top: 20px; }\n        .final-details-left { width: 66%; vertical-align: top; }\n        .final-details-right { width: 33%; vertical-align: top; text-align: right; }\n        .account-info table { width: 100%; }\n        .account-info td { padding: 1.5px 0; }\n        .account-info td:first-child { width: 120px; font-weight: bold; }\n        .amount-in-words { margin-top: 10px; font-weight: bold; text-transform: capitalize; }\n        .totals-summary { padding-right: 5px;}\n        .totals-summary table { width: 100%; }\n        .totals-summary td { padding: 2.5px 5px; }\n        .totals-summary td:first-child { text-align: left; width: 70%;}\n        .totals-summary td:nth-child(2) { width: 5px; }\n        .grand-total-block { font-weight: bold; font-size: 14px; margin-top: 8px; border-top: 1px solid #000; padding-top: 8px;}\n        .signature-section { display: flex; justify-content: space-between; align-items: flex-end; padding-top: 10px; margin-top: 15px; }\n        .signature-left { padding-bottom: 5px; }\n        .signature-right { text-align: center; }\n        .footer { margin-top: 25px; padding-top: 10px; border-top: 1px solid #000; display: flex; }\n        .footer-col { padding: 0 10px; line-height: 1.5; }\n        .footer-col.location { width: 40%; }\n        .footer-col.web { width: 30%; border-left: 1px solid #ccc; padding-left: 20px;}\n        .footer-col.contact { width: 30%; border-left: 1px solid #ccc; padding-left: 20px;}\n        .footer-col h4 { margin: 0 0 5px 0; font-size: 11px; font-weight: bold; }\n        .footer-col ul { list-style: none; padding: 0; margin: 0; }\n        .final-declaration { margin-top: 15px; }\n        .final-declaration p { margin: 4px 0; }\n    </style>\n</head>\n<body>\n    <div class=\"invoice-container\">\n    \n        <div class=\"top-header\">\n            <div class=\"logo-section\"><img src=\"https://corpculture.nicknameinfotech.com/assets/logo-d579b0da.png\" alt=\"Corp Culture Logo\" style=\"width: 250px;\"></div>\n            <div class=\"qr-code\"><img src=\"https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=Invoice:${data.invoiceNumber}\" alt=\"QR Code\"></div>\n        </div>\n        \n        <div class=\"details-section\">\n            <div class=\"billing-column\"><div class=\"section-title\">INVOICE TO :</div><div class=\"address-block\"><strong>Billing Address :</strong><br>${data.companyId.companyName}<br>${data.companyId.billingAddress}<br>GSTIN/UIN: ${data.companyId.gstNo}</div></div>\n            <div class=\"delivery-column\"><div class=\"address-block\" style=\"margin-top: 26px;\"><strong>Service / Delivery Address:</strong><br>${data.companyId.companyName}<br>${data.deliveryAddress}</div></div>\n            <div class=\"invoice-info-column\">\n                <div class=\"tax-invoice-title\">TAX INVOICE</div>\n                <div class=\"tax-invoice-subtitle\">GST #${SELLER_GST_NUMBER}<br>( ORIGINAL FOR RECIPIENT )</div>\n                <ul class=\"invoice-info-list\">\n                    <li>• Invoice No : <strong>${data.invoiceNumber}</strong></li>\n                    <li>• Date : <strong>${formatDate(data.invoiceDate)}</strong></li>\n                    <li>• Time : <strong>${formatTime(data.invoiceDate)}</strong></li>\n                    <li>• Mode of Payment : <strong>${data.modeOfPayment}</strong></li>\n                    <li>• service Enquiry No : <strong>${data.reference}</strong></li>\n                </ul>\n            </div>\n        </div>\n        \n        <table class=\"items-table\">\n            <thead><tr><th>DESCRIPTION OF GOODS</th><th>HSN</th><th>QTY</th><th>RATE PER ITEM</th><th>OLD COUNT</th><th>NEW COUNT</th><th>EXTRA PAPER COUNT</th><th>GST</th><th>TAX AMOUNT</th><th>AMOUNT</th></tr></thead>\n            <tbody>${productRows}</tbody>\n        </table>\n        \n        <table class=\"tax-summary-table\">\n            <tbody>\n                <tr><th rowspan=\"2\">Taxable Value</th>${representativeIgstRate > 0 ? '<th>Integrated Tax</th>' : '<th>Central Tax</th><th>State Tax</th>'}<th rowspan=\"2\">Total Tax Amount</th></tr>\n                <tr>${representativeIgstRate > 0 ? '<td class=\"sub-header\">Amount</td>' : '<td class=\"sub-header\">Amount</td><td class=\"sub-header\">Amount</td>'}</tr>\n                <tr>\n                    <td>${formatCurrencyNoDecimal(finalTaxableValue)}</td>\n                    ${representativeIgstRate > 0 ? `<td>${formatCurrencyNoDecimal(totalIgstAmount)}</td>` : `<td>${formatCurrencyNoDecimal(totalCgstAmount)}</td><td>${formatCurrencyNoDecimal(totalSgstAmount)}</td>`}\n                    <td>${formatCurrencyNoDecimal(totalTaxAmount)}</td>\n                </tr>\n            </tbody>\n        </table>\n\n        <div class=\"final-details-section\">\n            <div class=\"final-details-left\">\n                <div class=\"account-info\">\n                    <div class=\"bold\">Account Information :</div>\n                    <table>\n                        <tbody>\n                            <tr><td>Bank Name</td><td>:</td><td class=\"bold\">HDFC BANK</td></tr>\n                            <tr><td>A/C NO</td><td>:</td><td class=\"bold\">50200041713896</td></tr>\n                            <tr><td>A/C Name</td><td>:</td><td class=\"bold\">CORPCULTURE</td></tr>\n                            <tr><td>IFSC Code</td><td>:</td><td class=\"bold\">HDFC0000492</td></tr>\n                            <tr><td>Branch</td><td>:</td><td class=\"bold\">Kilpauk</td></tr>\n                        </tbody>\n                    </table>\n                </div>\n                <div class=\"amount-in-words\">Amount in Words : ${amountInWords}</div>\n            </div>\n            <div class=\"final-details-right\">\n                <div class=\"totals-summary\">\n                    <table>\n                        <tbody>\n                            <tr><td>SUB TOTAL</td><td>:</td><td class=\"bold\">${formatCurrencyNoDecimal(finalTaxableValue)}</td></tr>\n                            ${representativeIgstRate > 0 ? `<tr><td>OUTPUT IGST @ ${representativeIgstRate}%</td><td>:</td><td class=\"bold\">${formatCurrencyNoDecimal(totalIgstAmount)}</td></tr>` : \n                             `<tr><td>OUTPUT CGST @ ${representativeCgstRate}%</td><td>:</td><td class=\"bold\">${formatCurrencyNoDecimal(totalCgstAmount)}</td></tr>\n                              <tr><td>OUTPUT SGST @ ${representativeSgstRate}%</td><td>:</td><td class=\"bold\">${formatCurrencyNoDecimal(totalSgstAmount)}</td></tr>`}\n                        </tbody>\n                    </table>\n                    <div class=\"grand-total-block\">\n                        <table>\n                            <tbody>\n                                <tr><td>Grand Total<br>(rounded total)</td><td>:</td><td>${formatCurrencyNoDecimal(finalGrandTotal)}/-</td></tr>\n                            </tbody>\n                        </table>\n                    </div>\n                </div>\n            </div>\n        </div>\n        \n        <div class=\"signature-section\">\n            <div class=\"signature-left\"><span class=\"bold\">${inputData.assignedTo.name} (Mobile: ${inputData.assignedTo.phone})</span><br>Customer Signatory</div>\n            <div class=\"signature-right\">\n                Verified By : ${inputData.assignedTo.name}\n                <div style=\"height: 70px;\"></div>\n                Authorized Signatory\n            </div>\n        </div>\n        \n        <div class=\"footer\">\n            <div class=\"footer-col location\">\n                <h4>Location</h4><span class=\"bold\">Head Office :</span><br>A Block, liberty Plaza, No. 12/30, Vada Agaram Road, Mehta Nagar, Aminjikarai, Chennai- 600 002\n            </div>\n            <div class=\"footer-col web\">\n                <h4>Web</h4><ul><li>• customer@corpculture.in</li><li>• www.corpculture.in</li></ul>\n            </div>\n            <div class=\"footer-col contact\">\n                <h4>Contact</h4><ul><li>• 044-48522973</li><li>• +91-9171558818</li><li>• +91-7397724205</li></ul>\n            </div>\n        </div>\n        \n        <div class=\"final-declaration\">\n            <p><span class=\"bold\">SUBJECT TO CHENNAI JURISDICTION.</span> This is a Computer Generated Invoice.</p>\n            <p><span class=\"bold\">Declaration :</span> We declare that this invoice shows the actual price of the goods. Described and that all particulars are true and correct.</p>\n        </div>\n        \n    </div>\n</body>\n</html>\n`;\n\n// Extract contact emails for the output array (e.g., for use in a subsequent email node)\nconst contactEmails = (data.companyId.contactPersons || []).map(person => person.email).filter(Boolean);\n\nconst time_now = new Date().toISOString();\n\nreturn [{\n    json: {\n        html: finalHtml,\n        emails: contactEmails,\n        data_time: time_now\n    }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        260,
+        220
+      ],
+      "id": "b75af358-fc14-4e4b-b6f6-89fb09ef311d",
+      "name": "Format Html"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Load the puppeteer library\nconst puppeteer = require('puppeteer');\n\n// Define our main function\nasync function generatePdf(html) {\n  if (typeof html !== 'string' || html.length < 10) {\n    throw new Error('The input HTML is empty or invalid. Please check the \"Set\" node and the input connection.');\n  }\n\n  let browser;\n  try {\n    // --- THIS IS THE KEY FIX ---\n    // Launch the browser with the necessary arguments for a stable Docker environment\n    browser = await puppeteer.launch({\n      headless: true, // It's good practice to be explicit\n      args: [\n        '--no-sandbox',\n        '--disable-setuid-sandbox',\n        '--disable-dev-shm-usage', // Prevents hanging by avoiding limited shared memory\n        '--disable-gpu'            // Disables GPU hardware acceleration\n      ]\n    });\n    // --- END OF FIX ---\n\n    const page = await browser.newPage();\n    await page.setContent(html, { waitUntil: 'networkidle0' });\n\n    const pdfBuffer = await page.pdf({\n      format: 'A4',\n      printBackground: true,\n      margin: { top: '20px', right: '20px', bottom: '20px', left: '20px' }\n    });\n\n    return pdfBuffer;\n\n  } catch (error) {\n    // Adding more detailed logging to see where it fails\n    console.error('An error occurred during PDF Generation with Puppeteer:', error);\n    throw error;\n  } finally {\n    if (browser) {\n      await browser.close();\n    }\n  }\n}\n\n// --- Main execution starts here ---\n\nconst htmlContent = $input.item.json.html;\n\nconst rawPdfData = await generatePdf(htmlContent);\n\nconst base64String = Buffer.from(rawPdfData).toString('base64');\n\nreturn [\n  {\n    json: {\n      data: base64String\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        420,
+        220
+      ],
+      "id": "91d6cadf-8c78-43ea-a9b4-f9fada2902b2",
+      "name": "Html to Pdf"
+    },
+    {
+      "parameters": {
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        920,
+        220
+      ],
+      "id": "db367538-0988-4294-82df-f75ce3008cce",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "url": "=https://nicknameinfo.net/corpculture/api/v1/rental-payment/{{ $json.body.invoiceId}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        100,
+        220
+      ],
+      "id": "a67804c5-af17-4964-87f8-e15eb0dcd8ef",
+      "name": "Get Details"
+    }
+  ],
+  "connections": {
+    "Convert to File": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Get Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        []
+      ]
+    },
+    "Format Html": {
+      "main": [
+        [
+          {
+            "node": "Html to Pdf",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Html to Pdf": {
+      "main": [
+        [
+          {
+            "node": "Convert to File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Details": {
+      "main": [
+        [
+          {
+            "node": "Format Html",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {
+    "When clicking ‘Execute workflow’": [
+      {
+        "success": true,
+        "message": "Rental Payment Entry fetched successfully",
+        "entry": {
+          "countImageUpload": {
+            "public_id": "rental_payment_entries/k2ybr3ziskdepqiciowb",
+            "url": "https://res.cloudinary.com/drr32pp8j/image/upload/v1761592152/rental_payment_entries/k2ybr3ziskdepqiciowb.png"
+          },
+          "_id": "68ffc359ef4653814f36411d",
+          "rentalId": "68ffc2fcef4653814f363cf4",
+          "invoiceNumber": "8",
+          "machineId": {
+            "modelSpecs": {
+              "isA3Selected": true,
+              "isA4Selected": true,
+              "isA5Selected": true
+            },
+            "_id": "68ffaaa3f0c712b4e6f4cfde",
+            "company": "68aeb1c7ce60cffc41333604",
+            "branch": "Chennai",
+            "department": "Cse",
+            "modelName": "01",
+            "serialNo": "011",
+            "hsn": "09876",
+            "basePrice": 100,
+            "gstType": [
+              {
+                "_id": "689c8de1beef60de85b8216d",
+                "gstType": "IGST",
+                "gstPercentage": 18,
+                "createdAt": "2025-08-13T13:06:41.151Z",
+                "updatedAt": "2025-08-13T13:06:41.151Z",
+                "__v": 0
+              }
+            ],
+            "paymentDate": "2025-10-26T18:30:00.000Z",
+            "commission": 1,
+            "a3Config": {
+              "bwOldCount": 50,
+              "freeCopiesBw": 10,
+              "extraAmountBw": 1,
+              "bwUnlimited": false,
+              "colorOldCount": 50,
+              "freeCopiesColor": 10,
+              "extraAmountColor": 2,
+              "colorUnlimited": false,
+              "colorScanningOldCount": 39,
+              "freeCopiesColorScanning": 10,
+              "extraAmountColorScanning": 3,
+              "colorScanningUnlimited": false
+            },
+            "a4Config": {
+              "bwOldCount": 50,
+              "freeCopiesBw": 5,
+              "extraAmountBw": 1,
+              "bwUnlimited": false,
+              "colorOldCount": 50,
+              "freeCopiesColor": 5,
+              "extraAmountColor": 2,
+              "colorUnlimited": false,
+              "colorScanningOldCount": 50,
+              "freeCopiesColorScanning": 5,
+              "extraAmountColorScanning": 3,
+              "colorScanningUnlimited": false
+            },
+            "a5Config": {
+              "bwOldCount": 47,
+              "freeCopiesBw": 5,
+              "extraAmountBw": 1,
+              "bwUnlimited": false,
+              "colorOldCount": 50,
+              "freeCopiesColor": 5,
+              "extraAmountColor": 2,
+              "colorUnlimited": false,
+              "colorScanningOldCount": 48,
+              "freeCopiesColorScanning": 5,
+              "extraAmountColorScanning": 3,
+              "colorScanningUnlimited": false
+            },
+            "createdAt": "2025-10-27T17:23:47.825Z",
+            "updatedAt": "2025-10-27T19:09:13.268Z",
+            "__v": 0,
+            "employeeId": "6898d973f0f88e0585b2749c"
+          },
+          "companyId": {
+            "_id": "68aeb1c7ce60cffc41333604",
+            "customerType": "New",
+            "userId": "689086f8cc95bff225b107fe",
+            "companyName": "Arul test",
+            "billingAddress": "test",
+            "serviceDeliveryAddresses": [
+              {
+                "address": "sdfa",
+                "pincode": "34523"
+              },
+              {
+                "address": "34235432",
+                "pincode": "5234"
+              }
+            ],
+            "invoiceType": "Corpculture Invoice",
+            "city": "test",
+            "state": "test",
+            "pincode": "3425",
+            "gstNo": "543234",
+            "contactPersons": [
+              {
+                "name": "arul",
+                "mobile": "8270564998",
+                "email": "arulkumar8270@gmail.com"
+              },
+              {
+                "name": "test",
+                "mobile": "34523452",
+                "email": "test@1232.com"
+              }
+            ],
+            "customerComplaint": "",
+            "createdAt": "2025-08-27T07:20:39.514Z",
+            "__v": 0
+          },
+          "sendDetailsTo": "arul (Mobile: 8270564998, Email: arulkumar8270@gmail.com)",
+          "remarks": "50",
+          "a3Config": {
+            "bwOldCount": 30,
+            "bwNewCount": 50,
+            "colorOldCount": 30,
+            "colorNewCount": 50,
+            "colorScanningOldCount": 30,
+            "colorScanningNewCount": 39
+          },
+          "a4Config": {
+            "bwOldCount": 10,
+            "bwNewCount": 50,
+            "colorOldCount": 10,
+            "colorNewCount": 50,
+            "colorScanningOldCount": 10,
+            "colorScanningNewCount": 50
+          },
+          "a5Config": {
+            "bwOldCount": 10,
+            "bwNewCount": 47,
+            "colorOldCount": 10,
+            "colorNewCount": 50,
+            "colorScanningOldCount": 10,
+            "colorScanningNewCount": 48
+          },
+          "assignedTo": {
+            "_id": "6898d973f0f88e0585b27498",
+            "name": "babu ",
+            "email": "rvps@gmail.com",
+            "password": "$2b$10$HdIh6KDHtpuSVWfT7yGC9.AeUVShJPJ/WadqXlhSf9n4a9LfnX27e",
+            "phone": "9171558818",
+            "address": "29,vaidya nathan street",
+            "role": 3,
+            "commission": 0,
+            "isCommissionEnabled": 0,
+            "wishlist": [],
+            "commissionCategorys": [],
+            "createdAt": "2025-08-10T17:40:03.341Z",
+            "updatedAt": "2025-08-10T17:40:03.341Z",
+            "__v": 0,
+            "serviceDeliveryAddresses": []
+          },
+          "invoiceType": "invoice",
+          "invoiceLink": [],
+          "status": "Unpaid",
+          "grandTotal": 644.76,
+          "entryDate": "2025-10-27T19:09:13.079Z",
+          "createdAt": "2025-10-27T19:09:13.081Z",
+          "updatedAt": "2025-10-27T19:09:13.081Z",
+          "__v": 0
+        }
+      }
+    ]
+  },
+  "meta": {
+    "instanceId": "235053518bf9031a263747520a70e8a017a1f969482c9a8f3bfed484de40f70f"
+  }
+}
