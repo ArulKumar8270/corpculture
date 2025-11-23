@@ -12,7 +12,7 @@
     "dev": "concurrently \"npm run start\" \"npm run client\""
   },
   "keywords": [],
-  "author": "Aashish Dhiman",
+  "author": "Arul kumar",
   "license": "ISC",
   "dependencies": {
     "aws-sdk": "^2.1692.0",
