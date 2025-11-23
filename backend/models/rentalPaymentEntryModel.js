@@ -9,6 +9,47 @@ const configSchema = new mongoose.Schema({
     colorScanningNewCount: { type: Number, default: 0 },
 }, { _id: false });
 
+// Schema for individual product entry in the products array
+const productEntrySchema = new mongoose.Schema({
+    basePrice: {
+        type: Number,
+        default: 0,
+    },
+    machineId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'RentalProduct',
+        required: true,
+    },
+    serialNo: {
+        type: String,
+        trim: true,
+    },
+    a3Config: {
+        type: configSchema,
+        default: () => ({}),
+    },
+    a4Config: {
+        type: configSchema,
+        default: () => ({}),
+    },
+    a5Config: {
+        type: configSchema,
+        default: () => ({}),
+    },
+    countImageUpload: {
+        public_id: {
+            type: String,
+        },
+        url: {
+            type: String,
+        },
+    },
+    productTotal: {
+        type: Number,
+        default: 0,
+    },
+}, { _id: true });
+
 const rentalPaymentEntrySchema = new mongoose.Schema({
     rentalId: {
         type: mongoose.Schema.Types.ObjectId,
@@ -22,7 +63,12 @@ const rentalPaymentEntrySchema = new mongoose.Schema({
     machineId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'RentalProduct',
-        required: true,
+        required: false, // Made optional to support products array
+    },
+    // Array of products - supports multiple products in single entry
+    products: {
+        type: [productEntrySchema],
+        default: [],
     },
     companyId: {
         type: mongoose.Schema.Types.ObjectId,
@@ -37,11 +83,11 @@ const rentalPaymentEntrySchema = new mongoose.Schema({
     countImageUpload: {
         public_id: {
             type: String,
-            required: true,
+            required: false, // Made optional as each product can have its own image
         },
         url: {
             type: String,
-            required: true,
+            required: false,
         },
     },
     remarks: {
