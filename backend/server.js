@@ -30,6 +30,7 @@ import rentalPaymentEntryRoutes from './routes/rentalPaymentEntryRoutes.js'; // 
 import remainderRoutes from "./routes/remainderRoutes.js"; // Import new routes
 import employeeBenefitsRoute from "./routes/employeeBenefitsRoute.js";
 import materialRoutes from "./routes/materialRoutes.js"; // Import material routes
+import oldInvoiceRoutes from "./routes/oldInvoiceRoute.js"; // Import old invoice routes
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
@@ -83,6 +84,7 @@ app.use("/api/v1/user", userRoute);
 app.use("/api/v1/service", serviceRoute);
 app.use("/api/v1/rental", rentalRoute);
 app.use("/api/v1/invoice", invoiceRoutes);
+app.use("/api/v1/old-invoice", oldInvoiceRoutes); // Old invoice routes
 app.use('/api/v1/category', categoryRoutes);
 app.use('/api/v1/company', companyRoutes);
 app.use('/api/v1/employee', employeeRoutes);
