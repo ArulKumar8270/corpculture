@@ -675,6 +675,19 @@ export const updateOldInvoice = async (req, res) => {
             updateData.remainderDate = parseInt(updateData.remainderDate) || null;
         }
 
+        // Validate and normalize sentEmailList
+        if (updateData.sentEmailList !== undefined) {
+            if (Array.isArray(updateData.sentEmailList)) {
+                // Normalize emails: trim, lowercase, and filter out empty values
+                updateData.sentEmailList = updateData.sentEmailList
+                    .map(email => email ? email.trim().toLowerCase() : null)
+                    .filter(email => email && email.includes('@'));
+            } else {
+                // If not an array, set to empty array
+                updateData.sentEmailList = [];
+            }
+        }
+
         const invoice = await OldInvoice.findByIdAndUpdate(
             req.params.id,
             updateData,

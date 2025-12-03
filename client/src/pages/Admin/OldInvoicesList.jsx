@@ -63,8 +63,10 @@ function OldInvoicesList() {
         paymentAmount: 0,
         dueAmount: 0,
         remainderDate: '',
+        sentEmailList: [],
         notes: ''
     });
+    const [newEmail, setNewEmail] = useState('');
 
     useEffect(() => {
         fetchOldInvoices();
@@ -146,8 +148,10 @@ function OldInvoicesList() {
             paymentAmount: invoice.paymentAmount || 0,
             dueAmount: invoice.dueAmount || 0,
             remainderDate: invoice.remainderDate || '',
+            sentEmailList: invoice.sentEmailList || [],
             notes: invoice.notes || ''
         });
+        setNewEmail('');
         setUpdateDialogOpen(true);
     };
 
@@ -181,6 +185,7 @@ function OldInvoicesList() {
                 paymentAmount: parseFloat(updateForm.paymentAmount) || 0,
                 dueAmount: parseFloat(updateForm.dueAmount) || 0,
                 remainderDate: updateForm.remainderDate ? parseInt(updateForm.remainderDate) : undefined,
+                sentEmailList: updateForm.sentEmailList && updateForm.sentEmailList.length > 0 ? updateForm.sentEmailList : undefined,
                 notes: updateForm.notes || undefined
             };
 
@@ -204,6 +209,8 @@ function OldInvoicesList() {
             if (response.data?.success) {
                 toast.success('Invoice updated successfully');
                 setUpdateDialogOpen(false);
+                setSelectedInvoice(null);
+                setNewEmail('');
                 fetchOldInvoices(); // Refresh the list
             } else {
                 toast.error(response.data?.message || 'Failed to update invoice');
@@ -636,6 +643,22 @@ function OldInvoicesList() {
                                         </Typography>
                                     </Box>
                                 )}
+                                {selectedInvoice.sentEmailList && selectedInvoice.sentEmailList.length > 0 && (
+                                    <Box>
+                                        <Typography variant="subtitle2" color="textSecondary">Sent Email List</Typography>
+                                        <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                                            {selectedInvoice.sentEmailList.map((email, index) => (
+                                                <Chip
+                                                    key={index}
+                                                    label={email}
+                                                    color="primary"
+                                                    variant="outlined"
+                                                    size="small"
+                                                />
+                                            ))}
+                                        </Box>
+                                    </Box>
+                                )}
                                 {selectedInvoice.notes && (
                                     <Box>
                                         <Typography variant="subtitle2" color="textSecondary">Notes</Typography>
@@ -665,6 +688,7 @@ function OldInvoicesList() {
                 onClose={() => {
                     setUpdateDialogOpen(false);
                     setSelectedInvoice(null);
+                    setNewEmail('');
                 }}
                 maxWidth="md"
                 fullWidth
@@ -781,6 +805,80 @@ function OldInvoicesList() {
                                     // helperText="Enter number of days (e.g., 1, 2, 3, 4, 5) for remainder notification"
                                 />
 
+                                {/* Sent Email List */}
+                                <Box>
+                                    <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>
+                                        Sent Email List
+                                    </Typography>
+                                    {updateForm.sentEmailList && updateForm.sentEmailList.length > 0 && (
+                                        <Box sx={{ mb: 2, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                                            {updateForm.sentEmailList.map((email, index) => (
+                                                <Chip
+                                                    key={index}
+                                                    label={email}
+                                                    onDelete={() => {
+                                                        const newList = updateForm.sentEmailList.filter((_, i) => i !== index);
+                                                        handleUpdateFormChange('sentEmailList', newList);
+                                                    }}
+                                                    color="primary"
+                                                    variant="outlined"
+                                                    size="small"
+                                                />
+                                            ))}
+                                        </Box>
+                                    )}
+                                    <Stack direction="row" spacing={1}>
+                                        <TextField
+                                            label="Add Email"
+                                            type="email"
+                                            variant="outlined"
+                                            value={newEmail}
+                                            onChange={(e) => setNewEmail(e.target.value)}
+                                            placeholder="email@example.com"
+                                            size="small"
+                                            fullWidth
+                                            onKeyPress={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    e.preventDefault();
+                                                    if (newEmail.trim() && newEmail.includes('@')) {
+                                                        const emailList = updateForm.sentEmailList || [];
+                                                        if (!emailList.includes(newEmail.trim().toLowerCase())) {
+                                                            handleUpdateFormChange('sentEmailList', [...emailList, newEmail.trim().toLowerCase()]);
+                                                            setNewEmail('');
+                                                        } else {
+                                                            toast.error('Email already in the list');
+                                                        }
+                                                    } else {
+                                                        toast.error('Please enter a valid email address');
+                                                    }
+                                                }
+                                            }}
+                                        />
+                                        <Button
+                                            variant="outlined"
+                                            onClick={() => {
+                                                if (newEmail.trim() && newEmail.includes('@')) {
+                                                    const emailList = updateForm.sentEmailList || [];
+                                                    if (!emailList.includes(newEmail.trim().toLowerCase())) {
+                                                        handleUpdateFormChange('sentEmailList', [...emailList, newEmail.trim().toLowerCase()]);
+                                                        setNewEmail('');
+                                                    } else {
+                                                        toast.error('Email already in the list');
+                                                    }
+                                                } else {
+                                                    toast.error('Please enter a valid email address');
+                                                }
+                                            }}
+                                            disabled={!newEmail.trim() || !newEmail.includes('@')}
+                                        >
+                                            Add
+                                        </Button>
+                                    </Stack>
+                                    <Typography variant="caption" color="textSecondary" sx={{ mt: 0.5, display: 'block' }}>
+                                        Track email addresses where remainder notifications have been sent
+                                    </Typography>
+                                </Box>
+
                                 {/* Notes */}
                                 <TextField
                                     label="Notes"
@@ -801,6 +899,7 @@ function OldInvoicesList() {
                         onClick={() => {
                             setUpdateDialogOpen(false);
                             setSelectedInvoice(null);
+                            setNewEmail('');
                         }}
                         disabled={updating}
                     >
