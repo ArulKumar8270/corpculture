@@ -51,6 +51,7 @@ import AdminOrders from "./AdminOrders";
 import UpdateOrders from "./UpdateOrders";
 import AdminCommission from "./AdminCommission";
 import EmployeeDetails from "./EmployeeDetails";
+import OldInvoicesList from "./OldInvoicesList";
 
 const AdminDashboard = () => {
     const navigate = useNavigate();
@@ -152,6 +153,7 @@ const AdminDashboard = () => {
                             <Route path="rantalInvoicesReport/:companyId?" element={<RentalInvoiceReport type={"invoice"}/>} />
                             <Route path="rentalQuotationsReport/:companyId?" element={<RentalInvoiceReport type={"quotation"}/>} />
                             <Route path="rentalReportsReport/:companyId?" element={<ServiceReportsReport type={"rental"}/>} />
+                            <Route path="oldInvoices" element={<OldInvoicesList />} />
                         </Routes>
                     </div>
                 </div>

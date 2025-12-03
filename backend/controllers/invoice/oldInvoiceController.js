@@ -562,7 +562,10 @@ export const getAllOldInvoices = async (req, res) => {
             customerName,
             paymentStatus,
             startDate,
-            endDate
+            endDate,
+            remainderDate,
+            minRemainderDate,
+            maxRemainderDate
         } = req.query;
 
         // Build query
@@ -584,6 +587,21 @@ export const getAllOldInvoices = async (req, res) => {
             }
             if (endDate) {
                 query.date.$lte = new Date(endDate);
+            }
+        }
+        
+        // Filter by remainderDate (days)
+        if (remainderDate !== undefined && remainderDate !== null && remainderDate !== '') {
+            // Exact match
+            query.remainderDate = parseInt(remainderDate);
+        } else if (minRemainderDate !== undefined || maxRemainderDate !== undefined) {
+            // Range query
+            query.remainderDate = {};
+            if (minRemainderDate !== undefined && minRemainderDate !== '') {
+                query.remainderDate.$gte = parseInt(minRemainderDate);
+            }
+            if (maxRemainderDate !== undefined && maxRemainderDate !== '') {
+                query.remainderDate.$lte = parseInt(maxRemainderDate);
             }
         }
 
@@ -733,6 +751,52 @@ export const deleteAllOldInvoices = async (req, res) => {
         res.status(500).send({
             success: false,
             message: "Error deleting old invoices",
+            error: error.message
+        });
+    }
+};
+
+/**
+ * Get invoices by remainderDate (days)
+ * Useful for finding invoices that need remainder notifications
+ */
+export const getInvoicesByRemainderDate = async (req, res) => {
+    try {
+        const { remainderDate, hasRemainderDate } = req.query;
+
+        // Build query
+        const query = {};
+
+        if (remainderDate !== undefined && remainderDate !== null && remainderDate !== '') {
+            // Get invoices with specific remainder date (days)
+            query.remainderDate = parseInt(remainderDate);
+        } else if (hasRemainderDate === 'true' || hasRemainderDate === true) {
+            // Get all invoices that have a remainderDate set (not null/undefined)
+            query.remainderDate = { $exists: true, $ne: null };
+        } else if (hasRemainderDate === 'false' || hasRemainderDate === false) {
+            // Get all invoices that don't have a remainderDate set
+            query.$or = [
+                { remainderDate: { $exists: false } },
+                { remainderDate: null }
+            ];
+        }
+
+        // Fetch invoices
+        const invoices = await OldInvoice.find(query)
+            .sort({ remainderDate: 1, date: -1 })
+            .limit(1000); // Limit to prevent too many results
+
+        res.status(200).send({
+            success: true,
+            count: invoices.length,
+            invoices
+        });
+
+    } catch (error) {
+        console.error("Error in getInvoicesByRemainderDate:", error);
+        res.status(500).send({
+            success: false,
+            message: "Error fetching invoices by remainder date",
             error: error.message
         });
     }
