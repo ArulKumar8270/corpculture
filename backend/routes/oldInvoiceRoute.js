@@ -6,7 +6,8 @@ import {
     getOldInvoiceById,
     updateOldInvoice,
     deleteOldInvoice,
-    deleteAllOldInvoices
+    deleteAllOldInvoices,
+    getInvoicesByRemainderDate
 } from "../controllers/invoice/oldInvoiceController.js";
 
 const router = express.Router();
@@ -16,6 +17,9 @@ router.post("/upload", uploadOldInvoices);
 
 // Get all old invoices with pagination and filters
 router.get("/all",  getAllOldInvoices);
+
+// Get invoices by remainderDate (days)
+router.get("/by-remainder-date", getInvoicesByRemainderDate);
 
 // Get single old invoice by ID
 router.get("/get/:id", getOldInvoiceById);

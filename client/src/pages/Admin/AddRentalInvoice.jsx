@@ -28,6 +28,7 @@ const RentalInvoiceForm = () => {
     const rentalId = searchParams.get("rentalId");
     const companyId = searchParams.get("companyId");
     const [loading, setLoading] = useState(true);
+    const [loadingCompanies, setLoadingCompanies] = useState(false);
     const [companies, setCompanies] = useState([]);
     const [availableProducts, setAvailableProducts] = useState([]);
     const [logoPreview, setLogoPreview] = useState("");
@@ -45,6 +46,21 @@ const RentalInvoiceForm = () => {
         a4Config: { bwOldCount: '', bwNewCount: '' },
         a5Config: { bwOldCount: '', bwNewCount: '' },
     });
+    // Multiple products support
+    const [products, setProducts] = useState([
+        {
+            id: Date.now(),
+            machineId: '',
+            serialNo: '',
+            selectedProduct: null,
+            countImageFile: null,
+            imagePreview: '',
+            basePrice: '',
+            a3Config: { bwOldCount: '', bwNewCount: '', colorOldCount: '', colorNewCount: '', colorScanningOldCount: '', colorScanningNewCount: '' },
+            a4Config: { bwOldCount: '', bwNewCount: '', colorOldCount: '', colorNewCount: '', colorScanningOldCount: '', colorScanningNewCount: '' },
+            a5Config: { bwOldCount: '', bwNewCount: '', colorOldCount: '', colorNewCount: '', colorScanningOldCount: '', colorScanningNewCount: '' },
+        }
+    ]);
     // {{ edit_1 }}
     const [errors, setErrors] = useState({});
     const { auth } = useAuth();
@@ -80,6 +96,7 @@ const RentalInvoiceForm = () => {
     useEffect(() => {
         const fetchCompanies = async () => {
             try {
+                setLoadingCompanies(true);
                 setLoading(true);
                 const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/company/all`, {
                     headers: {
@@ -95,6 +112,7 @@ const RentalInvoiceForm = () => {
                 console.error("Error fetching companies:", error);
                 toast.error('Something went wrong while fetching companies.');
             } finally {
+                setLoadingCompanies(false);
                 setLoading(false);
             }
         };
@@ -114,7 +132,8 @@ const RentalInvoiceForm = () => {
                     });
                     if (data?.success) {
                         const entry = data.entry;
-                        setSelectedProduct(entry.machineId);
+                        
+                        // Set basic form data
                         setFormData({
                             companyId: entry.companyId?._id || '',
                             machineId: entry.machineId?._id || '',
@@ -146,7 +165,96 @@ const RentalInvoiceForm = () => {
                                 colorScanningNewCount: entry.a5Config?.colorScanningNewCount ?? 0,
                             },
                         });
-                        // {{ edit_1 }}
+
+                        // Check if entry has products array (new format) or single machineId (old format)
+                        if (entry.products && Array.isArray(entry.products) && entry.products.length > 0) {
+                            // New format - multiple products
+                            const productsData = entry.products.map((product, index) => {
+                                // Handle both populated (object) and unpopulated (string) machineId
+                                const machineIdValue = typeof product.machineId === 'object' && product.machineId?._id 
+                                    ? product.machineId._id 
+                                    : (product.machineId || '');
+                                const machineObject = typeof product.machineId === 'object' ? product.machineId : null;
+                                
+                                return {
+                                    id: Date.now() + index, // Generate unique ID
+                                    machineId: machineIdValue,
+                                    serialNo: product.serialNo || machineObject?.serialNo || '',
+                                    selectedProduct: machineObject, // Store the populated object if available
+                                    countImageFile: null,
+                                    imagePreview: product.countImageUpload?.url || '',
+                                    basePrice: product.basePrice || '',
+                                    a3Config: {
+                                        bwOldCount: product.a3Config?.bwOldCount ?? 0,
+                                        bwNewCount: product.a3Config?.bwNewCount ?? 0,
+                                        colorOldCount: product.a3Config?.colorOldCount ?? 0,
+                                        colorNewCount: product.a3Config?.colorNewCount ?? 0,
+                                        colorScanningOldCount: product.a3Config?.colorScanningOldCount ?? 0,
+                                        colorScanningNewCount: product.a3Config?.colorScanningNewCount ?? 0,
+                                    },
+                                    a4Config: {
+                                        bwOldCount: product.a4Config?.bwOldCount ?? 0,
+                                        bwNewCount: product.a4Config?.bwNewCount ?? 0,
+                                        colorOldCount: product.a4Config?.colorOldCount ?? 0,
+                                        colorNewCount: product.a4Config?.colorNewCount ?? 0,
+                                        colorScanningOldCount: product.a4Config?.colorScanningOldCount ?? 0,
+                                        colorScanningNewCount: product.a4Config?.colorScanningNewCount ?? 0,
+                                    },
+                                    a5Config: {
+                                        bwOldCount: product.a5Config?.bwOldCount ?? 0,
+                                        bwNewCount: product.a5Config?.bwNewCount ?? 0,
+                                        colorOldCount: product.a5Config?.colorOldCount ?? 0,
+                                        colorNewCount: product.a5Config?.colorNewCount ?? 0,
+                                        colorScanningOldCount: product.a5Config?.colorScanningOldCount ?? 0,
+                                        colorScanningNewCount: product.a5Config?.colorScanningNewCount ?? 0,
+                                    },
+                                };
+                            });
+                            setProducts(productsData);
+                        } else if (entry.machineId) {
+                            // Old format - single product
+                            // Handle both populated (object) and unpopulated (string) machineId
+                            const machineIdValue = typeof entry.machineId === 'object' && entry.machineId?._id 
+                                ? entry.machineId._id 
+                                : (entry.machineId || '');
+                            const machineObject = typeof entry.machineId === 'object' ? entry.machineId : null;
+                            
+                            setSelectedProduct(machineObject);
+                            setProducts([{
+                                id: Date.now(),
+                                machineId: machineIdValue,
+                                serialNo: machineObject?.serialNo || '',
+                                selectedProduct: machineObject,
+                                countImageFile: null,
+                                imagePreview: entry.countImageUpload?.url || '',
+                                a3Config: {
+                                    bwOldCount: entry.a3Config?.bwOldCount ?? 0,
+                                    bwNewCount: entry.a3Config?.bwNewCount ?? 0,
+                                    colorOldCount: entry.a3Config?.colorOldCount ?? 0,
+                                    colorNewCount: entry.a3Config?.colorNewCount ?? 0,
+                                    colorScanningOldCount: entry.a3Config?.colorScanningOldCount ?? 0,
+                                    colorScanningNewCount: entry.a3Config?.colorScanningNewCount ?? 0,
+                                },
+                                a4Config: {
+                                    bwOldCount: entry.a4Config?.bwOldCount ?? 0,
+                                    bwNewCount: entry.a4Config?.bwNewCount ?? 0,
+                                    colorOldCount: entry.a4Config?.colorOldCount ?? 0,
+                                    colorNewCount: entry.a4Config?.colorNewCount ?? 0,
+                                    colorScanningOldCount: entry.a4Config?.colorScanningOldCount ?? 0,
+                                    colorScanningNewCount: entry.a4Config?.colorScanningNewCount ?? 0,
+                                },
+                                a5Config: {
+                                    bwOldCount: entry.a5Config?.bwOldCount ?? 0,
+                                    bwNewCount: entry.a5Config?.bwNewCount ?? 0,
+                                    colorOldCount: entry.a5Config?.colorOldCount ?? 0,
+                                    colorNewCount: entry.a5Config?.colorNewCount ?? 0,
+                                    colorScanningOldCount: entry.a5Config?.colorScanningOldCount ?? 0,
+                                    colorScanningNewCount: entry.a5Config?.colorScanningNewCount ?? 0,
+                                },
+                            }]);
+                        }
+
+                        // Set main image preview if exists (for backward compatibility)
                         if (entry.countImageUpload?.url) {
                             setLogoPreview(entry.countImageUpload.url);
                         }
@@ -156,6 +264,7 @@ const RentalInvoiceForm = () => {
                     }
                 } catch (error) {
                     console.error("Error fetching rental entry:", error);
+                    toast.error('Failed to fetch rental entry details.');
                     navigate('/admin/rental-invoices');
                 } finally {
                     setLoading(false);
@@ -182,7 +291,25 @@ const RentalInvoiceForm = () => {
                     });
                     if (data?.success) {
                         setAvailableProducts(data.rentalProducts);
-                        // If in edit mode and machineId is already set, ensure it's still valid
+                        
+                        // If in edit mode, populate selectedProduct for each product in the products array
+                        if (id && products.length > 0) {
+                            setProducts(prevProducts => prevProducts.map(product => {
+                                if (product.machineId) {
+                                    const foundProduct = data.rentalProducts.find(p => p._id === product.machineId);
+                                    if (foundProduct) {
+                                        return {
+                                            ...product,
+                                            selectedProduct: foundProduct,
+                                            serialNo: foundProduct.serialNo || product.serialNo,
+                                        };
+                                    }
+                                }
+                                return product;
+                            }));
+                        }
+                        
+                        // If in edit mode and machineId is already set (old format), ensure it's still valid
                         if (id && formData.machineId && !data.rentalProducts.some(p => p._id === formData.machineId)) {
                             setFormData(prev => ({ ...prev, machineId: '' })); // Clear if machineId is not in the list
                         }
@@ -309,30 +436,154 @@ const RentalInvoiceForm = () => {
         }
     };
 
+    // Functions for managing multiple products
+    const addProduct = () => {
+        setProducts(prev => [...prev, {
+            id: Date.now(),
+            machineId: '',
+            serialNo: '',
+            selectedProduct: null,
+            countImageFile: null,
+            imagePreview: '',
+            basePrice: '',
+            a3Config: { bwOldCount: '', bwNewCount: '', colorOldCount: '', colorNewCount: '', colorScanningOldCount: '', colorScanningNewCount: '' },
+            a4Config: { bwOldCount: '', bwNewCount: '', colorOldCount: '', colorNewCount: '', colorScanningOldCount: '', colorScanningNewCount: '' },
+            a5Config: { bwOldCount: '', bwNewCount: '', colorOldCount: '', colorNewCount: '', colorScanningOldCount: '', colorScanningNewCount: '' },
+        }]);
+    };
+
+    const removeProduct = (productId) => {
+        if (products.length > 1) {
+            setProducts(prev => prev.filter(p => p.id !== productId));
+        } else {
+            toast.error('At least one product is required');
+        }
+    };
+
+    const handleProductSelect = (productId, newValue) => {
+        const selectedProduct = availableProducts.find(prod => prod._id === newValue?._id);
+        setProducts(prev => prev.map(p => {
+            if (p.id === productId) {
+                return {
+                    ...p,
+                    machineId: newValue ? newValue._id : '',
+                    serialNo: newValue ? newValue.serialNo : '',
+                    selectedProduct: selectedProduct,
+                    basePrice: selectedProduct ? selectedProduct.basePrice : '',
+                    a3Config: selectedProduct ? {
+                        ...p.a3Config,
+                        bwOldCount: selectedProduct.a3Config?.bwOldCount ?? 0,
+                        colorOldCount: selectedProduct.a3Config?.colorOldCount ?? 0,
+                        colorScanningOldCount: selectedProduct.a3Config?.colorScanningOldCount ?? 0,
+                    } : p.a3Config,
+                    a4Config: selectedProduct ? {
+                        ...p.a4Config,
+                        bwOldCount: selectedProduct.a4Config?.bwOldCount ?? 0,
+                        colorOldCount: selectedProduct.a4Config?.colorOldCount ?? 0,
+                        colorScanningOldCount: selectedProduct.a4Config?.colorScanningOldCount ?? 0,
+                    } : p.a4Config,
+                    a5Config: selectedProduct ? {
+                        ...p.a5Config,
+                        bwOldCount: selectedProduct.a5Config?.bwOldCount ?? 0,
+                        colorOldCount: selectedProduct.a5Config?.colorOldCount ?? 0,
+                        colorScanningOldCount: selectedProduct.a5Config?.colorScanningOldCount ?? 0,
+                    } : p.a5Config,
+                };
+            }
+            return p;
+        }));
+    };
+
+    const handleProductConfigChange = (productId, configType, field, value) => {
+        setProducts(prev => prev.map(p => {
+            if (p.id === productId) {
+                return {
+                    ...p,
+                    [configType]: {
+                        ...p[configType],
+                        [field]: value
+                    }
+                };
+            }
+            return p;
+        }));
+    };
+
+    const handleProductImageChange = (productId, e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = () => {
+                if (reader.readyState === 2) {
+                    setProducts(prev => prev.map(p => {
+                        if (p.id === productId) {
+                            return {
+                                ...p,
+                                countImageFile: reader.result,
+                                imagePreview: reader.result
+                            };
+                        }
+                        return p;
+                    }));
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
     const validateForm = () => {
         let tempErrors = {};
         if (!formData.companyId) tempErrors.companyId = "Company is required.";
-        if (!formData.machineId) tempErrors.machineId = "Serial No. is required.";
         if (!formData.sendDetailsTo) tempErrors.sendDetailsTo = "Send Details To is required.";
 
-        // Validate nested count fields
-        const validateCountField = (config, fieldName, label) => {
-            if (config[fieldName] < 0) {
-                tempErrors[`${label}.${fieldName}`] = `${label} ${fieldName.replace(/([A-Z])/g, ' $1').trim()} must be a non-negative number.`;
+        // Validate products array
+        products.forEach((product, index) => {
+            if (!product.machineId) {
+                tempErrors[`product_${product.id}_machineId`] = `Product ${index + 1}: Serial No. is required.`;
             }
-        };
 
-        validateCountField(formData.a3Config, 'bwNewCount', 'A3 B/W');
-        validateCountField(formData.a3Config, 'colorNewCount', 'A3 Color');
-        validateCountField(formData.a3Config, 'colorScanningNewCount', 'A3 Color Scanning');
+            // Validate nested count fields for each product
+            const validateCountField = (config, fieldName, label, productIndex) => {
+                if (config[fieldName] !== '' && config[fieldName] < 0) {
+                    tempErrors[`product_${product.id}_${label}.${fieldName}`] = `Product ${productIndex + 1} - ${label} ${fieldName.replace(/([A-Z])/g, ' $1').trim()} must be a non-negative number.`;
+                }
+            };
 
-        validateCountField(formData.a4Config, 'bwNewCount', 'A4 B/W');
-        validateCountField(formData.a4Config, 'colorNewCount', 'A4 Color');
-        validateCountField(formData.a4Config, 'colorScanningNewCount', 'A4 Color Scanning');
+            validateCountField(product.a3Config, 'bwNewCount', 'A3 B/W', index);
+            validateCountField(product.a3Config, 'colorNewCount', 'A3 Color', index);
+            validateCountField(product.a3Config, 'colorScanningNewCount', 'A3 Color Scanning', index);
 
-        validateCountField(formData.a5Config, 'bwNewCount', 'A5 B/W');
-        validateCountField(formData.a5Config, 'colorNewCount', 'A5 Color');
-        validateCountField(formData.a5Config, 'colorScanningNewCount', 'A5 Color Scanning');
+            validateCountField(product.a4Config, 'bwNewCount', 'A4 B/W', index);
+            validateCountField(product.a4Config, 'colorNewCount', 'A4 Color', index);
+            validateCountField(product.a4Config, 'colorScanningNewCount', 'A4 Color Scanning', index);
+
+            validateCountField(product.a5Config, 'bwNewCount', 'A5 B/W', index);
+            validateCountField(product.a5Config, 'colorNewCount', 'A5 Color', index);
+            validateCountField(product.a5Config, 'colorScanningNewCount', 'A5 Color Scanning', index);
+        });
+
+        // Also validate old format for backward compatibility
+        if (products.length === 1 && !products[0].machineId && formData.machineId) {
+            if (!formData.machineId) tempErrors.machineId = "Serial No. is required.";
+            
+            const validateCountField = (config, fieldName, label) => {
+                if (config[fieldName] !== '' && config[fieldName] < 0) {
+                    tempErrors[`${label}.${fieldName}`] = `${label} ${fieldName.replace(/([A-Z])/g, ' $1').trim()} must be a non-negative number.`;
+                }
+            };
+
+            validateCountField(formData.a3Config, 'bwNewCount', 'A3 B/W');
+            validateCountField(formData.a3Config, 'colorNewCount', 'A3 Color');
+            validateCountField(formData.a3Config, 'colorScanningNewCount', 'A3 Color Scanning');
+
+            validateCountField(formData.a4Config, 'bwNewCount', 'A4 B/W');
+            validateCountField(formData.a4Config, 'colorNewCount', 'A4 Color');
+            validateCountField(formData.a4Config, 'colorScanningNewCount', 'A4 Color Scanning');
+
+            validateCountField(formData.a5Config, 'bwNewCount', 'A5 B/W');
+            validateCountField(formData.a5Config, 'colorNewCount', 'A5 Color');
+            validateCountField(formData.a5Config, 'colorScanningNewCount', 'A5 Color Scanning');
+        }
 
         setErrors(tempErrors);
         return Object.keys(tempErrors).length === 0;
@@ -390,21 +641,61 @@ const RentalInvoiceForm = () => {
         try {
             setLoading(true);
             const data = new FormData();
-            data.append('machineId', formData.machineId);
-            data.append('rentalId', rentalId);
-            { invoiceType !== "quotation" ? data.append('invoiceNumber', invoices) : null }
-            data.append('companyId', formData.companyId);
+            data.append('rentalId', rentalId || '');
+            if (invoiceType !== "quotation") {
+                data.append('invoiceNumber', invoices);
+            }
+            // Use companyId from URL params if available, otherwise use formData.companyId
+            const finalCompanyId = companyId || formData.companyId;
+            if (!finalCompanyId) {
+                toast.error("Company is required.");
+                setLoading(false);
+                return;
+            }
+            data.append('companyId', finalCompanyId);
+            
+            if (!formData.sendDetailsTo) {
+                toast.error("Send Details To is required.");
+                setLoading(false);
+                return;
+            }
             data.append('sendDetailsTo', formData.sendDetailsTo);
-            data.append('remarks', formData.remarks);
-            data.append('assignedTo', employeeName);
-            data.append('invoiceType', invoiceType);
-            // Append nested config objects as JSON strings
-            data.append('a3Config', JSON.stringify(formData.a3Config));
-            data.append('a4Config', JSON.stringify(formData.a4Config));
-            data.append('a5Config', JSON.stringify(formData.a5Config));
+            data.append('remarks', formData.remarks || '');
+            data.append('assignedTo', employeeName || '');
+            data.append('invoiceType', invoiceType || '');
 
-            if (formData.countImageFile) {
-                data.append('countImageUpload', formData.countImageFile);
+            // Check if using multiple products or single product (backward compatibility)
+            const hasMultipleProducts = products.some(p => p.machineId);
+            const useOldFormat = !hasMultipleProducts && formData.machineId;
+
+            if (useOldFormat) {
+                // Old format - single product
+                data.append('machineId', formData.machineId);
+                data.append('a3Config', JSON.stringify(formData.a3Config));
+                data.append('a4Config', JSON.stringify(formData.a4Config));
+                data.append('a5Config', JSON.stringify(formData.a5Config));
+                if (formData.countImageFile) {
+                    data.append('countImageUpload', formData.countImageFile);
+                }
+            } else {
+                // New format - multiple products
+                const productsArray = products
+                    .filter(p => p.machineId) // Only include products with selected machine
+                    .map(p => ({
+                        machineId: p.machineId,
+                        serialNo: p.serialNo,
+                        a3Config: p.a3Config,
+                        a4Config: p.a4Config,
+                        a5Config: p.a5Config,
+                        countImageUpload: p.countImageFile || null,
+                    }));
+                
+                data.append('products', JSON.stringify(productsArray));
+                
+                // Also append main image if provided
+                if (formData.countImageFile) {
+                    data.append('countImageUpload', formData.countImageFile);
+                }
             }
 
             let res;
@@ -426,17 +717,58 @@ const RentalInvoiceForm = () => {
                 });
             }
 
-
             if (res.data?.success) {
                 if (!id && invoiceType !== "quotation") {
-                    handleUpdateInvoiceCount();
+                    await handleUpdateInvoiceCount();
                 }
                 if (!id) {
-                    updateStausToRental(rentalId, "Completed")
+                    await updateStausToRental(rentalId, "Completed");
                 }
-                updateCommissionDetails(res.data?.entry)
-                onUpdateRentalProduct()
-                console.log("Rental entry created successfully!", res.data);
+                await updateCommissionDetails(res.data?.entry);
+                
+                // Update all products
+                if (hasMultipleProducts) {
+                    await Promise.all(products
+                        .filter(p => p.machineId && p.selectedProduct)
+                        .map(p => updateRentalProduct(p.selectedProduct, p.a3Config, p.a4Config, p.a5Config))
+                    );
+                } else if (selectedProduct) {
+                    await onUpdateRentalProduct();
+                }
+                
+                toast.success("Rental entry created successfully!");
+                
+                // Reset form
+                setProducts([{
+                    id: Date.now(),
+                    machineId: '',
+                    serialNo: '',
+                    selectedProduct: null,
+                    countImageFile: null,
+                    imagePreview: '',
+                    basePrice: '',
+                    a3Config: { bwOldCount: '', bwNewCount: '', colorOldCount: '', colorNewCount: '', colorScanningOldCount: '', colorScanningNewCount: '' },
+                    a4Config: { bwOldCount: '', bwNewCount: '', colorOldCount: '', colorNewCount: '', colorScanningOldCount: '', colorScanningNewCount: '' },
+                    a5Config: { bwOldCount: '', bwNewCount: '', colorOldCount: '', colorNewCount: '', colorScanningOldCount: '', colorScanningNewCount: '' },
+                }]);
+                setFormData({
+                    companyId: '',
+                    machineId: '',
+                    sendDetailsTo: '',
+                    countImageFile: null,
+                    remarks: '',
+                    basePrice: '',
+                    a3Config: { bwOldCount: '', bwNewCount: '' },
+                    a4Config: { bwOldCount: '', bwNewCount: '' },
+                    a5Config: { bwOldCount: '', bwNewCount: '' },
+                });
+                setLogoPreview("");
+                
+                if (invoiceType === "quotation") {
+                    navigate('../rentalQuotationList');
+                } else {
+                    navigate('../rentalInvoiceList');
+                }
             } else {
                 toast.error(res.data?.message || `Failed to ${id ? 'update' : 'create'} rental payment entry.`);
             }
@@ -445,6 +777,35 @@ const RentalInvoiceForm = () => {
             toast.error(error.response?.data?.message || 'Something went wrong.');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const updateRentalProduct = async (product, a3Config, a4Config, a5Config) => {
+        const apiPayload = {
+            ...product,
+            a3Config: {
+                ...product?.a3Config,
+                bwOldCount: Number(a3Config.bwNewCount) || 0,
+                colorOldCount: Number(a3Config.colorNewCount) || 0,
+                colorScanningOldCount: Number(a3Config.colorScanningNewCount) || 0,
+            },
+            a4Config: {
+                ...product?.a4Config,
+                bwOldCount: Number(a4Config.bwNewCount) || 0,
+                colorOldCount: Number(a4Config.colorNewCount) || 0,
+                colorScanningOldCount: Number(a4Config.colorScanningNewCount) || 0,
+            },
+            a5Config: {
+                ...product?.a5Config,
+                bwOldCount: Number(a5Config.bwNewCount) || 0,
+                colorOldCount: Number(a5Config.colorNewCount) || 0,
+                colorScanningOldCount: Number(a5Config.colorScanningNewCount) || 0,
+            }
+        };
+        try {
+            await axios.put(`${import.meta.env.VITE_SERVER_URL}/api/v1/rental-products/${product?._id}`, apiPayload);
+        } catch (error) {
+            console.error('Error updating rental product:', error);
         }
     };
 
@@ -481,6 +842,7 @@ const RentalInvoiceForm = () => {
                     machineId: '',
                     sendDetailsTo: '',
                     countImageFile: null,
+                    basePrice: '',
                     remarks: '',
                     a3Config: { bwOldCount: '', bwNewCount: '', colorOldCount: '', colorNewCount: '', colorScanningOldCount: '', colorScanningNewCount: '' },
                     a4Config: { bwOldCount: '', bwNewCount: '', colorOldCount: '', colorNewCount: '', colorScanningOldCount: '', colorScanningNewCount: '' },
@@ -543,7 +905,8 @@ const RentalInvoiceForm = () => {
                                 onChange={(event, newValue) => {
                                     handleChange({ target: { name: 'companyId', value: newValue ? newValue._id : '' } });
                                 }}
-                                loading={loading}
+                                loading={loadingCompanies}
+                                disabled={!!id || !!companyId || loadingCompanies} // Disable if in edit mode or loading
                                 renderInput={(params) => (
                                     <TextField
                                         {...params}
@@ -551,46 +914,339 @@ const RentalInvoiceForm = () => {
                                         variant="outlined"
                                         size="small"
                                         required
-                                        InputProps={{ // Add InputProps to show loader
+                                        InputProps={{
                                             ...params.InputProps,
                                             endAdornment: (
                                                 <>
-                                                    {loading ? <CircularProgress color="inherit" size={20} /> : null}
+                                                    {loadingCompanies ? <CircularProgress color="inherit" size={20} /> : null}
                                                     {params.InputProps.endAdornment}
                                                 </>
                                             ),
                                         }}
                                         error={!!errors.companyId}
-                                        helperText={errors.companyId}
+                                        helperText={errors.companyId || (loadingCompanies ? 'Loading companies...' : '')}
                                     />
                                 )}
-                                disabled={!!id || !!companyId} // Disable if in edit mode
                             />
                         </FormControl>
-                        <FormControl fullWidth margin="normal" size="small" error={!!errors.machineId}>
-                            <Autocomplete
-                                id="machineId-autocomplete"
-                                options={availableProducts}
-                                getOptionLabel={(option) => option.serialNo || ''}
-                                isOptionEqualToValue={(option, value) => option._id === value._id}
-                                value={availableProducts.find(prod => prod._id === formData.machineId) || null}
-                                onChange={(event, newValue) => {
-                                    handleProductChange(newValue); // Pass the selected object
-                                }}
-                                loading={loading}
-                                renderInput={(params) => (
-                                    <TextField
-                                        {...params}
-                                        label="Serial No."
-                                        variant="outlined"
-                                        size="small"
-                                        error={!!errors.machineId}
-                                        helperText={errors.machineId}
-                                    />
-                                )}
-                                disabled={!formData.companyId || availableProducts.length === 0}
-                            />
-                        </FormControl>
+                    </Box>
+
+                    {/* Multiple Products Section */}
+                    <Box sx={{ mb: 4 }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                            <Typography variant="h6" sx={{ color: '#019ee3', fontWeight: 'bold' }}>
+                                Products ({products.length})
+                            </Typography>
+                            <Button
+                                variant="outlined"
+                                color="primary"
+                                size="small"
+                                onClick={addProduct}
+                                disabled={!formData.companyId}
+                            >
+                                + Add Product
+                            </Button>
+                        </Box>
+
+                        {products.map((product, productIndex) => (
+                            <Paper key={product.id} elevation={2} sx={{ p: 3, mb: 3, border: '1px solid #e0e0e0' }}>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                                    <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: '#666' }}>
+                                        Product {productIndex + 1} {product.serialNo && `- ${product.serialNo}`}
+                                    </Typography>
+                                    {products.length > 1 && (
+                                        <Button
+                                            variant="outlined"
+                                            color="error"
+                                            size="small"
+                                            onClick={() => removeProduct(product.id)}
+                                        >
+                                            Remove
+                                        </Button>
+                                    )}
+                                </Box>
+
+                                <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 3, mb: 3 }}>
+                                    <FormControl fullWidth size="small" error={!!errors[`product_${product.id}_machineId`]}>
+                                        <Autocomplete
+                                            options={availableProducts}
+                                            getOptionLabel={(option) => option.serialNo || ''}
+                                            isOptionEqualToValue={(option, value) => option._id === value._id}
+                                            value={availableProducts.find(prod => prod._id === product.machineId) || null}
+                                            onChange={(event, newValue) => {
+                                                handleProductSelect(product.id, newValue);
+                                            }}
+                                            loading={loading}
+                                            renderInput={(params) => (
+                                                <TextField
+                                                    {...params}
+                                                    label="Serial No. *"
+                                                    variant="outlined"
+                                                    size="small"
+                                                    error={!!errors[`product_${product.id}_machineId`]}
+                                                    helperText={errors[`product_${product.id}_machineId`]}
+                                                />
+                                            )}
+                                            disabled={!formData.companyId || availableProducts.length === 0}
+                                        />
+                                    </FormControl>
+
+                                    <Box>
+                                        <Typography variant="subtitle2" gutterBottom>Product Count Image:</Typography>
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={(e) => handleProductImageChange(product.id, e)}
+                                            style={{ display: 'block', marginBottom: '8px' }}
+                                        />
+                                        {product.imagePreview ? (
+                                            <img
+                                                draggable="false"
+                                                src={product.imagePreview}
+                                                alt="Product Count"
+                                                className="w-20 h-20 object-contain"
+                                            />
+                                        ) : (
+                                            <ImageIcon sx={{ fontSize: 40, color: '#ccc' }} />
+                                        )}
+                                    </Box>
+                                </Box>
+
+                                {/* A3 Entry for this product */}
+                                {product.a3Config.bwOldCount > 0 || product.a3Config.colorOldCount > 0 || product.a3Config.colorScanningOldCount > 0 ? (
+                                    <>
+                                        <Typography variant="subtitle2" gutterBottom sx={{ mt: 2, mb: 1, fontWeight: 'bold' }}>A3 Entry:</Typography>
+                                        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 2 }}>
+                                            {product.a3Config.bwOldCount > 0 && (
+                                                <>
+                                                    <TextField
+                                                        fullWidth
+                                                        label="A3 B/W Old Count"
+                                                        value={product.a3Config.bwOldCount}
+                                                        disabled
+                                                        size="small"
+                                                        InputLabelProps={{ shrink: true }}
+                                                    />
+                                                    <TextField
+                                                        fullWidth
+                                                        label="A3 B/W New Count"
+                                                        value={product.a3Config.bwNewCount}
+                                                        onChange={(e) => handleProductConfigChange(product.id, 'a3Config', 'bwNewCount', e.target.value)}
+                                                        type="number"
+                                                        size="small"
+                                                        error={!!errors[`product_${product.id}_A3 B/W.bwNewCount`]}
+                                                        helperText={errors[`product_${product.id}_A3 B/W.bwNewCount`]}
+                                                        InputLabelProps={{ shrink: true }}
+                                                    />
+                                                </>
+                                            )}
+                                            {product.a3Config.colorOldCount > 0 && (
+                                                <>
+                                                    <TextField
+                                                        fullWidth
+                                                        label="A3 Color Old Count"
+                                                        value={product.a3Config.colorOldCount}
+                                                        disabled
+                                                        size="small"
+                                                        InputLabelProps={{ shrink: true }}
+                                                    />
+                                                    <TextField
+                                                        fullWidth
+                                                        label="A3 Color New Count"
+                                                        value={product.a3Config.colorNewCount}
+                                                        onChange={(e) => handleProductConfigChange(product.id, 'a3Config', 'colorNewCount', e.target.value)}
+                                                        type="number"
+                                                        size="small"
+                                                        error={!!errors[`product_${product.id}_A3 Color.colorNewCount`]}
+                                                        helperText={errors[`product_${product.id}_A3 Color.colorNewCount`]}
+                                                        InputLabelProps={{ shrink: true }}
+                                                    />
+                                                </>
+                                            )}
+                                            {product.a3Config.colorScanningOldCount > 0 && (
+                                                <>
+                                                    <TextField
+                                                        fullWidth
+                                                        label="A3 Color Scanning Old Count"
+                                                        value={product.a3Config.colorScanningOldCount}
+                                                        disabled
+                                                        size="small"
+                                                        InputLabelProps={{ shrink: true }}
+                                                    />
+                                                    <TextField
+                                                        fullWidth
+                                                        label="A3 Color Scanning New Count"
+                                                        value={product.a3Config.colorScanningNewCount}
+                                                        onChange={(e) => handleProductConfigChange(product.id, 'a3Config', 'colorScanningNewCount', e.target.value)}
+                                                        type="number"
+                                                        size="small"
+                                                        error={!!errors[`product_${product.id}_A3 Color Scanning.colorScanningNewCount`]}
+                                                        helperText={errors[`product_${product.id}_A3 Color Scanning.colorScanningNewCount`]}
+                                                        InputLabelProps={{ shrink: true }}
+                                                    />
+                                                </>
+                                            )}
+                                        </Box>
+                                    </>
+                                ) : null}
+
+                                {/* A4 Entry for this product */}
+                                {product.a4Config.bwOldCount > 0 || product.a4Config.colorOldCount > 0 || product.a4Config.colorScanningOldCount > 0 ? (
+                                    <>
+                                        <Typography variant="subtitle2" gutterBottom sx={{ mt: 2, mb: 1, fontWeight: 'bold' }}>A4 Entry:</Typography>
+                                        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 2 }}>
+                                            {product.a4Config.bwOldCount > 0 && (
+                                                <>
+                                                    <TextField
+                                                        fullWidth
+                                                        label="A4 B/W Old Count"
+                                                        value={product.a4Config.bwOldCount}
+                                                        disabled
+                                                        size="small"
+                                                        InputLabelProps={{ shrink: true }}
+                                                    />
+                                                    <TextField
+                                                        fullWidth
+                                                        label="A4 B/W New Count"
+                                                        value={product.a4Config.bwNewCount}
+                                                        onChange={(e) => handleProductConfigChange(product.id, 'a4Config', 'bwNewCount', e.target.value)}
+                                                        type="number"
+                                                        size="small"
+                                                        error={!!errors[`product_${product.id}_A4 B/W.bwNewCount`]}
+                                                        helperText={errors[`product_${product.id}_A4 B/W.bwNewCount`]}
+                                                        InputLabelProps={{ shrink: true }}
+                                                    />
+                                                </>
+                                            )}
+                                            {product.a4Config.colorOldCount > 0 && (
+                                                <>
+                                                    <TextField
+                                                        fullWidth
+                                                        label="A4 Color Old Count"
+                                                        value={product.a4Config.colorOldCount}
+                                                        disabled
+                                                        size="small"
+                                                        InputLabelProps={{ shrink: true }}
+                                                    />
+                                                    <TextField
+                                                        fullWidth
+                                                        label="A4 Color New Count"
+                                                        value={product.a4Config.colorNewCount}
+                                                        onChange={(e) => handleProductConfigChange(product.id, 'a4Config', 'colorNewCount', e.target.value)}
+                                                        type="number"
+                                                        size="small"
+                                                        error={!!errors[`product_${product.id}_A4 Color.colorNewCount`]}
+                                                        helperText={errors[`product_${product.id}_A4 Color.colorNewCount`]}
+                                                        InputLabelProps={{ shrink: true }}
+                                                    />
+                                                </>
+                                            )}
+                                            {product.a4Config.colorScanningOldCount > 0 && (
+                                                <>
+                                                    <TextField
+                                                        fullWidth
+                                                        label="A4 Color Scanning Old Count"
+                                                        value={product.a4Config.colorScanningOldCount}
+                                                        disabled
+                                                        size="small"
+                                                        InputLabelProps={{ shrink: true }}
+                                                    />
+                                                    <TextField
+                                                        fullWidth
+                                                        label="A4 Color Scanning New Count"
+                                                        value={product.a4Config.colorScanningNewCount}
+                                                        onChange={(e) => handleProductConfigChange(product.id, 'a4Config', 'colorScanningNewCount', e.target.value)}
+                                                        type="number"
+                                                        size="small"
+                                                        error={!!errors[`product_${product.id}_A4 Color Scanning.colorScanningNewCount`]}
+                                                        helperText={errors[`product_${product.id}_A4 Color Scanning.colorScanningNewCount`]}
+                                                        InputLabelProps={{ shrink: true }}
+                                                    />
+                                                </>
+                                            )}
+                                        </Box>
+                                    </>
+                                ) : null}
+
+                                {/* A5 Entry for this product */}
+                                {product.a5Config.bwOldCount > 0 || product.a5Config.colorOldCount > 0 || product.a5Config.colorScanningOldCount > 0 ? (
+                                    <>
+                                        <Typography variant="subtitle2" gutterBottom sx={{ mt: 2, mb: 1, fontWeight: 'bold' }}>A5 Entry:</Typography>
+                                        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 2 }}>
+                                            {product.a5Config.bwOldCount > 0 && (
+                                                <>
+                                                    <TextField
+                                                        fullWidth
+                                                        label="A5 B/W Old Count"
+                                                        value={product.a5Config.bwOldCount}
+                                                        disabled
+                                                        size="small"
+                                                        InputLabelProps={{ shrink: true }}
+                                                    />
+                                                    <TextField
+                                                        fullWidth
+                                                        label="A5 B/W New Count"
+                                                        value={product.a5Config.bwNewCount}
+                                                        onChange={(e) => handleProductConfigChange(product.id, 'a5Config', 'bwNewCount', e.target.value)}
+                                                        type="number"
+                                                        size="small"
+                                                        error={!!errors[`product_${product.id}_A5 B/W.bwNewCount`]}
+                                                        helperText={errors[`product_${product.id}_A5 B/W.bwNewCount`]}
+                                                        InputLabelProps={{ shrink: true }}
+                                                    />
+                                                </>
+                                            )}
+                                            {product.a5Config.colorOldCount > 0 && (
+                                                <>
+                                                    <TextField
+                                                        fullWidth
+                                                        label="A5 Color Old Count"
+                                                        value={product.a5Config.colorOldCount}
+                                                        disabled
+                                                        size="small"
+                                                        InputLabelProps={{ shrink: true }}
+                                                    />
+                                                    <TextField
+                                                        fullWidth
+                                                        label="A5 Color New Count"
+                                                        value={product.a5Config.colorNewCount}
+                                                        onChange={(e) => handleProductConfigChange(product.id, 'a5Config', 'colorNewCount', e.target.value)}
+                                                        type="number"
+                                                        size="small"
+                                                        error={!!errors[`product_${product.id}_A5 Color.colorNewCount`]}
+                                                        helperText={errors[`product_${product.id}_A5 Color.colorNewCount`]}
+                                                        InputLabelProps={{ shrink: true }}
+                                                    />
+                                                </>
+                                            )}
+                                            {product.a5Config.colorScanningOldCount > 0 && (
+                                                <>
+                                                    <TextField
+                                                        fullWidth
+                                                        label="A5 Color Scanning Old Count"
+                                                        value={product.a5Config.colorScanningOldCount}
+                                                        disabled
+                                                        size="small"
+                                                        InputLabelProps={{ shrink: true }}
+                                                    />
+                                                    <TextField
+                                                        fullWidth
+                                                        label="A5 Color Scanning New Count"
+                                                        value={product.a5Config.colorScanningNewCount}
+                                                        onChange={(e) => handleProductConfigChange(product.id, 'a5Config', 'colorScanningNewCount', e.target.value)}
+                                                        type="number"
+                                                        size="small"
+                                                        error={!!errors[`product_${product.id}_A5 Color Scanning.colorScanningNewCount`]}
+                                                        helperText={errors[`product_${product.id}_A5 Color Scanning.colorScanningNewCount`]}
+                                                        InputLabelProps={{ shrink: true }}
+                                                    />
+                                                </>
+                                            )}
+                                        </Box>
+                                    </>
+                                ) : null}
+                            </Paper>
+                        ))}
                     </Box>
 
                     <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 3, mb: 3 }}>
@@ -617,7 +1273,7 @@ const RentalInvoiceForm = () => {
                             {errors.sendDetailsTo && <FormHelperText>{errors.sendDetailsTo}</FormHelperText>}
                         </FormControl>
 
-                        <Box>
+                        {/* <Box>
                             <Typography variant="subtitle1" gutterBottom>Count Image Upload:</Typography>
                             <input
                                 type="file"
@@ -638,289 +1294,9 @@ const RentalInvoiceForm = () => {
                                 />
                             )}
                             {errors.countImageFile && <FormHelperText error>{errors.countImageFile}</FormHelperText>}
-                        </Box>
+                        </Box> */}
                     </Box>
 
-                    {/* <TextField
-                        fullWidth
-                        label="Remarks"
-                        name="remarks"
-                        value={formData.remarks}
-                        onChange={handleChange}
-                        multiline
-                        rows={4}
-                        sx={{ mb: 3 }}
-                    /> */}
-
-                    <Typography variant="h6" gutterBottom sx={{ mt: 3, mb: 2 }}>A3 Entry:</Typography>
-                    <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 3, mb: 3 }}>
-                        {/* {{ edit_1 }} */}
-                        {formData.a3Config.bwOldCount > 0 && (
-                            <>
-                                <TextField
-                                    fullWidth
-                                    label="A3 B/W Old Count"
-                                    name="a3Config.bwOldCount"
-                                    value={formData.a3Config.bwOldCount}
-                                    disabled
-                                    size="small"
-                                    InputLabelProps={{ shrink: true }}
-                                />
-                                <TextField
-                                    fullWidth
-                                    label="A3 B/W New Count"
-                                    name="a3Config.bwNewCount"
-                                    value={formData.a3Config.bwNewCount}
-                                    onChange={handleChange}
-                                    type="number"
-                                    size="small"
-                                    error={!!errors['a3Config.bwNewCount']}
-                                    helperText={errors['a3Config.bwNewCount']}
-                                    InputLabelProps={{ shrink: true }}
-                                />
-                            </>
-
-                        )}
-                        {/* {{ edit_1 }} */}
-
-                        {/* {{ edit_2 }} */}
-                        {formData.a3Config.colorOldCount > 0 && (
-                            <>
-                                <TextField
-                                    fullWidth
-                                    label="A3 Color Old Count"
-                                    name="a3Config.colorOldCount"
-                                    value={formData.a3Config.colorOldCount}
-                                    disabled
-                                    size="small"
-                                    InputLabelProps={{ shrink: true }}
-                                />
-                                <TextField
-                                    fullWidth
-                                    label="A3 Color New Count"
-                                    name="a3Config.colorNewCount"
-                                    value={formData.a3Config.colorNewCount}
-                                    onChange={handleChange}
-                                    type="number"
-                                    size="small"
-                                    error={!!errors['a3Config.colorNewCount']}
-                                    helperText={errors['a3Config.colorNewCount']}
-                                    InputLabelProps={{ shrink: true }}
-                                />
-                            </>
-
-                        )}
-                        {/* {{ edit_2 }} */}
-
-                        {/* {{ edit_3 }} */}
-                        {formData.a3Config.colorScanningOldCount > 0 && (
-                            <>
-                                <TextField
-                                    fullWidth
-                                    label="A3 Color Scanning Old Count"
-                                    name="a3Config.colorScanningOldCount"
-                                    value={formData.a3Config.colorScanningOldCount}
-                                    disabled
-                                    size="small"
-                                    InputLabelProps={{ shrink: true }}
-                                />
-                                <TextField
-                                    fullWidth
-                                    label="A3 Color Scanning New Count"
-                                    name="a3Config.colorScanningNewCount"
-                                    value={formData.a3Config.colorScanningNewCount}
-                                    onChange={handleChange}
-                                    type="number"
-                                    size="small"
-                                    error={!!errors['a3Config.colorScanningNewCount']}
-                                    helperText={errors['a3Config.colorScanningNewCount']}
-                                    InputLabelProps={{ shrink: true }}
-                                />
-                            </>
-
-                        )}
-                        {/* {{ edit_3 }} */}
-
-                    </Box>
-
-                    <Typography variant="h6" gutterBottom sx={{ mt: 3, mb: 2 }}>A4 Entry:</Typography>
-                    <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 3, mb: 3 }}>
-                        {/* {{ edit_4 }} */}
-                        {formData.a4Config.bwOldCount > 0 && (
-                            <>
-                                <TextField
-                                    fullWidth
-                                    label="A4 B/W Old Count"
-                                    name="a4Config.bwOldCount"
-                                    value={formData.a4Config.bwOldCount}
-                                    disabled
-                                    size="small"
-                                    InputLabelProps={{ shrink: true }}
-                                />
-                                <TextField
-                                    fullWidth
-                                    label="A4 B/W New Count"
-                                    name="a4Config.bwNewCount"
-                                    value={formData.a4Config.bwNewCount}
-                                    onChange={handleChange}
-                                    type="number"
-                                    size="small"
-                                    error={!!errors['a4Config.bwNewCount']}
-                                    helperText={errors['a4Config.bwNewCount']}
-                                    InputLabelProps={{ shrink: true }}
-                                />
-                            </>
-
-                        )}
-                        {/* {{ edit_4 }} */}
-
-                        {/* {{ edit_5 }} */}
-                        {formData.a4Config.colorOldCount > 0 && (
-                            <>
-                                <TextField
-                                    fullWidth
-                                    label="A4 Color Old Count"
-                                    name="a4Config.colorOldCount"
-                                    value={formData.a4Config.colorOldCount}
-                                    disabled
-                                    size="small"
-                                    InputLabelProps={{ shrink: true }}
-                                />
-                                <TextField
-                                    fullWidth
-                                    label="A4 Color New Count"
-                                    name="a4Config.colorNewCount"
-                                    value={formData.a4Config.colorNewCount}
-                                    onChange={handleChange}
-                                    type="number"
-                                    size="small"
-                                    error={!!errors['a4Config.colorNewCount']}
-                                    helperText={errors['a4Config.colorNewCount']}
-                                    InputLabelProps={{ shrink: true }}
-                                />
-                            </>
-
-                        )}
-                        {/* {{ edit_5 }} */}
-
-                        {/* {{ edit_6 }} */}
-                        {formData.a4Config.colorScanningOldCount > 0 && (
-                            <>
-                                <TextField
-                                    fullWidth
-                                    label="A4 Color Scanning Old Count"
-                                    name="a4Config.colorScanningOldCount"
-                                    value={formData.a4Config.colorScanningOldCount}
-                                    disabled
-                                    size="small"
-                                    InputLabelProps={{ shrink: true }}
-                                />
-                                <TextField
-                                    fullWidth
-                                    label="A4 Color Scanning New Count"
-                                    name="a4Config.colorScanningNewCount"
-                                    value={formData.a4Config.colorScanningNewCount}
-                                    onChange={handleChange}
-                                    type="number"
-                                    size="small"
-                                    error={!!errors['a4Config.colorScanningNewCount']}
-                                    helperText={errors['a4Config.colorScanningNewCount']}
-                                    InputLabelProps={{ shrink: true }}
-                                />
-                            </>
-
-                        )}
-                        {/* {{ edit_6 }} */}
-
-                    </Box>
-
-                    <Typography variant="h6" gutterBottom sx={{ mt: 3, mb: 2 }}>A5 Entry:</Typography>
-                    <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 3, mb: 3 }}>
-                        {/* {{ edit_7 }} */}
-                        {formData.a5Config.bwOldCount > 0 && (
-                            <>
-                                <TextField
-                                    fullWidth
-                                    label="A5 B/W Old Count"
-                                    name="a5Config.bwOldCount"
-                                    value={formData.a5Config.bwOldCount}
-                                    disabled
-                                    size="small"
-                                    InputLabelProps={{ shrink: true }}
-                                />
-                                <TextField
-                                    fullWidth
-                                    label="A5 B/W New Count"
-                                    name="a5Config.bwNewCount"
-                                    value={formData.a5Config.bwNewCount}
-                                    onChange={handleChange}
-                                    type="number"
-                                    size="small"
-                                    error={!!errors['a5Config.bwNewCount']}
-                                    helperText={errors['a5Config.bwNewCount']}
-                                    InputLabelProps={{ shrink: true }}
-                                />
-                            </>
-
-                        )}
-                        {/* {{ edit_7 }} */}
-
-                        {/* {{ edit_8 }} */}
-                        {formData.a5Config.colorOldCount > 0 && (
-                            <>
-                                <TextField
-                                    fullWidth
-                                    label="A5 Color Old Count"
-                                    name="a5Config.colorOldCount"
-                                    value={formData.a5Config.colorOldCount}
-                                    disabled
-                                    size="small"
-                                    InputLabelProps={{ shrink: true }}
-                                />
-                                <TextField
-                                    fullWidth
-                                    label="A5 Color New Count"
-                                    name="a5Config.colorNewCount"
-                                    value={formData.a5Config.colorNewCount}
-                                    onChange={handleChange}
-                                    type="number"
-                                    size="small"
-                                    error={!!errors['a5Config.colorNewCount']}
-                                    helperText={errors['a5Config.colorNewCount']}
-                                    InputLabelProps={{ shrink: true }}
-                                />
-                            </>
-
-                        )}
-                        {/* {{ edit_8 }} */}
-
-                        {/* {{ edit_9 }} */}
-                        {formData.a5Config.colorScanningOldCount > 0 && (
-                            <>
-                                <TextField
-                                    fullWidth
-                                    label="A5 Color Scanning Old Count"
-                                    name="a5Config.colorScanningOldCount"
-                                    value={formData.a5Config.colorScanningOldCount}
-                                    disabled
-                                    size="small"
-                                    InputLabelProps={{ shrink: true }}
-                                />
-                                <TextField
-                                    fullWidth
-                                    label="A5 Color Scanning New Count"
-                                    name="a5Config.colorScanningNewCount"
-                                    value={formData.a5Config.colorScanningNewCount}
-                                    onChange={handleChange}
-                                    type="number"
-                                    size="small"
-                                    error={!!errors['a5Config.colorScanningNewCount']}
-                                    helperText={errors['a5Config.colorScanningNewCount']}
-                                    InputLabelProps={{ shrink: true }}
-                                />
-                            </>
-                        )}
-                    </Box>
 
                     <TextField
                         fullWidth

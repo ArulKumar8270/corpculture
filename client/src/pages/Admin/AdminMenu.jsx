@@ -360,6 +360,24 @@ const AdminMenu = ({ toggleMenu }) => {
                                                         </div>
                                                     </NavLink>
                                                 )}
+                                                {/* Old Invoices Link */}
+                                                {hasPermission('sales') && (
+                                                    <NavLink
+                                                        to="./oldInvoices"
+                                                        onClick={scrollToTop}
+                                                        className={({ isActive }) =>
+                                                            `rounded-lg mx-2 my-1 transition-all ${isActive
+                                                                ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
+                                                                : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
+                                                            }`
+                                                        }
+                                                    >
+                                                        <div className="h-10 px-8 flex items-center gap-3">
+                                                            <UploadFileIcon sx={{ fontSize: "20px" }} />
+                                                            Old Invoices
+                                                        </div>
+                                                    </NavLink>
+                                                )}
                                             </div>
                                         )}
                                     </div>
