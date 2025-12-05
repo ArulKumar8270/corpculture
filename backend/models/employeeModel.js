@@ -53,6 +53,10 @@ const employeeSchema = new mongoose.Schema(
             type: Number,
             min: 0,
         },
+        image: {
+            type: String,
+            trim: true,
+        },
     },
     { timestamps: true } // Adds createdAt and updatedAt timestamps
 );

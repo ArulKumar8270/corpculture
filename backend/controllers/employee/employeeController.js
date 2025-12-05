@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs"; // Assuming you use bcrypt for password hashing
 // Create a new employee
 export const createEmployeeController = async (req, res) => {
     try {
-        const { name, email, password, phone, address, employeeType, userId, designation, idCradNo, department, salary } = req.body;
+        const { name, email, password, phone, address, employeeType, userId, designation, idCradNo, department, salary, image } = req.body;
 
         // Validation
         if (!name || !email || !password || !phone || !address || !employeeType || !userId) {
@@ -40,6 +40,7 @@ export const createEmployeeController = async (req, res) => {
             idCradNo,    // Added
             department,  // Added
             salary,      // Added
+            image,       // Added
         });
 
         await employee.save();
@@ -111,7 +112,7 @@ export const getSingleEmployeeController = async (req, res) => {
 // Update an employee by ID
 export const updateEmployeeController = async (req, res) => {
     try {
-        const { name, email, phone, address, employeeType, designation, idCradNo, department, salary } = req.body;
+        const { name, email, phone, address, employeeType, designation, idCradNo, department, salary, image } = req.body;
         const employeeId = req.params.id;
 
         // Find the employee
@@ -133,6 +134,7 @@ export const updateEmployeeController = async (req, res) => {
         employee.idCradNo = idCradNo !== undefined ? idCradNo : employee.idCradNo;       // Added
         employee.department = department !== undefined ? department : employee.department; // Added
         employee.salary = salary !== undefined ? salary : employee.salary;             // Added
+        employee.image = image !== undefined ? image : employee.image;                 // Added
 
         // Note: Password update should ideally be handled in a separate route for security
 
