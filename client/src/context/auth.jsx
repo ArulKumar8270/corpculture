@@ -74,6 +74,8 @@ const AuthProvider = ({ children }) => {
         });
     };
 
+    console.log('auth23452345', auth);
+
     const getCompanyDetails = async () => {
         try {
             // 1. Check for user's company details

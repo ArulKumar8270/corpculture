@@ -1,0 +1,15 @@
+# Exclude everything outside mobile-app
+../*
+
+# Include only mobile-app directory contents
+!package.json
+!package-lock.json
+!app.json
+!App.tsx
+!tsconfig.json
+!babel.config.js
+!metro.config.js
+!eas.json
+!src/
+!assets/
+

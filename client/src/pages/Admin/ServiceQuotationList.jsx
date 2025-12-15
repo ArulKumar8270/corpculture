@@ -494,6 +494,7 @@ const ServiceQuotationList = (props) => {
 
     const navigate = useNavigate(); // Initialize useNavigate
     const [searchTerm, setSearchTerm] = useState('');
+    
     const fetchQuotations = async () => {
         try {
             setLoading(true);

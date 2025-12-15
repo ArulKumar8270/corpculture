@@ -371,13 +371,19 @@ export const getAllRentalPaymentEntries = async (req, res) => {
 
         const entries = await RentalPaymentEntry.find(query)
             .populate({
-                path: 'machineId', // First populate productId
+                path: 'machineId', // First populate productId (old format)
                 populate: {
                     path: 'gstType',        // Then populate gstType inside the product
                 }
             })// Populate product details
+            .populate({
+                path: 'products.machineId', // Populate machineId in products array (new format)
+                populate: {
+                    path: 'gstType',        // Then populate gstType inside each product
+                }
+            })
             .populate('companyId') // Populate company name
-            .populate('assignedTo') // Populate product details // Populate company details
+            .populate('assignedTo') // Populate assigned user
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(limit);
@@ -459,12 +465,19 @@ export const getRentalInvoiceAssignedTo = async (req, res) => {
             query = { invoiceType, assignedTo, tdsAmount: { $eq: null } };
         }
 
-        const entries = await RentalPaymentEntry.find(query).populate({
-            path: 'machineId', // First populate productId
-            populate: {
-                path: 'gstType',        // Then populate gstType inside the product
-            }
-        })// Populate product details
+        const entries = await RentalPaymentEntry.find(query)
+            .populate({
+                path: 'machineId', // First populate productId (old format)
+                populate: {
+                    path: 'gstType',        // Then populate gstType inside the product
+                }
+            })// Populate product details
+            .populate({
+                path: 'products.machineId', // Populate machineId in products array (new format)
+                populate: {
+                    path: 'gstType',        // Then populate gstType inside each product
+                }
+            })
             .populate('companyId') // Populate company name
             .populate('assignedTo')
             .sort({ createdAt: -1 }); // Find services by phone number
