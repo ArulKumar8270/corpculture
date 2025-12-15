@@ -12,7 +12,8 @@ import {
   TextInput,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import Icon from 'react-native-vector-icons/MaterialIcons';
+// @ts-ignore - @expo/vector-icons is available via expo dependency
+import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 

@@ -161,6 +161,59 @@ Currently using sample data. When API is ready:
 2. Update API endpoints
 3. Test with real backend
 
+## Building APK
+
+### Option 1: Using EAS Build (Recommended - Cloud Build)
+
+1. Install EAS CLI globally:
+```bash
+npm install -g eas-cli
+```
+
+2. Login to Expo:
+```bash
+eas login
+```
+
+3. Configure EAS Build:
+```bash
+eas build:configure
+```
+
+4. Build APK:
+```bash
+eas build --platform android --profile preview
+```
+
+The APK will be available for download from the Expo dashboard.
+
+### Option 2: Local Build (Requires Android Studio)
+
+1. Install dependencies:
+```bash
+npm install
+```
+
+2. Generate native Android project:
+```bash
+npx expo prebuild --platform android
+```
+
+3. Build APK locally:
+```bash
+cd android
+./gradlew assembleRelease
+```
+
+The APK will be at: `android/app/build/outputs/apk/release/app-release.apk`
+
+### Option 3: Development Build
+
+For testing during development:
+```bash
+npx expo run:android
+```
+
 ## Troubleshooting
 
 ### Common Issues
@@ -168,6 +221,7 @@ Currently using sample data. When API is ready:
 1. **Metro bundler errors**: Clear cache with `npm start -- --reset-cache`
 2. **iOS build issues**: Run `cd ios && pod install`
 3. **Android build issues**: Clean build folder in Android Studio
+4. **Flutter command error**: This is a React Native/Expo project, use Expo commands instead of Flutter commands
 
 ## Notes
 

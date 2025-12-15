@@ -11,7 +11,8 @@ import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { setOrders, setLoading } from '../../store/slices/orderSlice';
 import { orderService } from '../../services/api';
-import Icon from 'react-native-vector-icons/MaterialIcons';
+// @ts-ignore - @expo/vector-icons is available via expo dependency
+import { MaterialIcons as Icon } from '@expo/vector-icons';
 
 const OrdersScreen = () => {
   const navigation = useNavigation();

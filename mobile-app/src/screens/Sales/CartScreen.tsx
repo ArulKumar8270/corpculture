@@ -12,7 +12,8 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
 import { RootState } from '../../store';
 import { removeFromCart, updateQuantity, clearCart } from '../../store/slices/cartSlice';
-import Icon from 'react-native-vector-icons/MaterialIcons';
+// @ts-ignore - @expo/vector-icons is available via expo dependency
+import { MaterialIcons as Icon } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
 
 const CartScreen = () => {

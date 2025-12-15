@@ -1,7 +1,8 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
-import Icon from 'react-native-vector-icons/MaterialIcons';
+// @ts-ignore - @expo/vector-icons is available via expo dependency
+import { MaterialIcons as Icon } from '@expo/vector-icons';
 
 // Screens
 import HomeScreen from '../screens/Sales/HomeScreen';
