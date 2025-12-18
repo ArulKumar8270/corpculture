@@ -46,7 +46,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",
-    "@types/react": "~18.2.14",
+    "@types/react": "^19.1.0",
     "babel-preset-expo": "^54.0.8",
     "patch-package": "^8.0.1",
     "postinstall-postinstall": "^2.1.0",

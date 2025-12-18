@@ -129,7 +129,7 @@ const RentalProductList = () => {
     });
 
     return (
-        <div className="p-4">
+        <div className="p-4" style={{ width: '91%' }}>
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-semibold">Rental Product List</h1>
                 {hasPermission("rentalAllProducts") ? <Button

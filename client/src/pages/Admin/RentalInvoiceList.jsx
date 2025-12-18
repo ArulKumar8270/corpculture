@@ -23,7 +23,7 @@ import {
     Collapse,
     IconButton
 } from '@mui/material';
-import { Visibility as VisibilityIcon, UploadFile as UploadFileIcon } from '@mui/icons-material';
+import { Visibility as VisibilityIcon, UploadFile as UploadFileIcon, ExpandMore as ExpandMoreIcon, ExpandLess as ExpandLessIcon } from '@mui/icons-material';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../context/auth';
@@ -42,7 +42,7 @@ function RentalInvoiceList(props) {
     const navigate = useNavigate();
     const [openPaymentModal, setOpenPaymentModal] = useState(false); // State for payment modal
     const [paymentForm, setPaymentForm] = useState({ // State for payment form data
-        modeOfPayment: '',
+        modeOfPayment: 'CASH',
         bankName: '',
         transactionDetails: '', // e.g., cheque number, UPI ID
         chequeDate: '', // New field for Cheque
@@ -62,7 +62,9 @@ function RentalInvoiceList(props) {
     const [balanceAmount, setBalanceAmount] = useState(0)
     const [pendingAmount, setPendingAmount] = useState(0)
     const [deletingLink, setDeletingLink] = useState(false);
-    const [isInvoiceSend, setInvoiceSend] = useState(false)
+    const [isInvoiceSend, setInvoiceSend] = useState(false);
+    const [expandedEntries, setExpandedEntries] = useState(new Set()); // Track expanded entries
+    const [currentInvoice, setCurrentInvoice] = useState(null); // Store current invoice for filtering
     useEffect(() => {
         fetchRentalEntries();
     }, [auth.token, props.invoice]);
@@ -238,8 +240,9 @@ function RentalInvoiceList(props) {
             initialPaymentAmount = invoice.pendingAmount;
             initialPaymentAmountType = 'Pending';
         }
+        setCurrentInvoice(invoice); // Store current invoice for filtering
         setPaymentForm({
-            modeOfPayment: invoice?.modeOfPayment || '',
+            modeOfPayment: invoice?.modeOfPayment || 'CASH',
             bankName: invoice?.bankName || '',
             transactionDetails: invoice?.transactionDetails || '',
             chequeDate: invoice?.chequeDate ? new Date(invoice?.chequeDate).toISOString().split('T')[0] : '',
@@ -257,6 +260,8 @@ function RentalInvoiceList(props) {
 
     const handleClosePaymentDetailsModal = () => {
         setOpenPaymentModal(false);
+        setCurrentInvoice(null); // Clear current invoice when closing
+        setSelectedInvliceId(null); // Reset selected invoice
         // Optionally reset form here if needed, but it's re-initialized on open
     };
 
@@ -264,12 +269,12 @@ function RentalInvoiceList(props) {
         const { name, value } = e.target;
         setPaymentForm(prev => ({ ...prev, [name]: value }));
         if (name === "paymentAmount") {
-            if (value < invoice?.grandTotal) {
-                let balanceAmount = invoice?.grandTotal - value;
+            if (value < currentInvoice?.grandTotal) {
+                let balanceAmount = currentInvoice?.grandTotal - value;
                 setPendingAmount(balanceAmount)
                 setBalanceAmount(0)
             } else {
-                let balanceAmount = value - invoice?.grandTotal;
+                let balanceAmount = value - currentInvoice?.grandTotal;
                 setBalanceAmount(balanceAmount)
                 setPendingAmount(0)
                 try {
@@ -292,7 +297,16 @@ function RentalInvoiceList(props) {
 
     };
 
-    const handleSavePaymentDetails = async () => {
+    const handleSavePaymentDetails = async (balanceAmount) => {
+
+        let status = "Paid"
+        if (balanceAmount && selectedInvliceId) {
+            status = "Unpaid"
+        } else if (Number(paymentForm?.paymentAmount) >= Number(paymentForm?.grandTotal) || paymentForm.paymentAmountType === 'TDS') {
+            status = "Paid"
+        } else {
+            status = "Unpaid"
+        }
         try {
             const payload = {
                 modeOfPayment: paymentForm.modeOfPayment,
@@ -303,11 +317,10 @@ function RentalInvoiceList(props) {
                 companyNamePayment: paymentForm.companyNamePayment,
                 otherPaymentMode: paymentForm.otherPaymentMode,
                 paymentAmountType: paymentForm.paymentAmountType,
-                paymentAmount: paymentForm?.paymentAmount,
+                paymentAmount: balanceAmount ? balanceAmount : paymentForm?.paymentAmount >= paymentForm?.grandTotal ? paymentForm?.grandTotal : paymentForm?.paymentAmount,
                 tdsAmount: 0, // Default to 0, will be updated if type is TDS
                 pendingAmount: 0, // Default to 0, will be updated if type is Pending
-                // status: balanceAmount >= paymentForm?.grandTotal || paymentForm.paymentAmount >= paymentForm?.grandTotal || paymentForm.paymentAmountType === 'TDS' ? "Paid" : "Unpaid",
-                status: "Paid",
+                status: status,
             };
 
             // Conditionally set tdsAmount or pendingAmount based on selected type
@@ -317,23 +330,28 @@ function RentalInvoiceList(props) {
                 payload.pendingAmount = pendingAmount || 0;
             }
 
-            const res = await axios.put(
-                `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/${selectedInvliceId ? selectedInvliceId : paymentForm?.invoiceId}`,
-                payload,
-                {
-                    headers: {
-                        Authorization: auth.token,
-                    },
-                }
-            );
+            let updateId = balanceAmount ? selectedInvliceId : paymentForm?.invoiceId;
 
-            if (res.data?.success) {
-                toast.success(res.data.message || 'Payment details updated successfully!');
-                handleClosePaymentDetailsModal();
-                fetchRentalEntries(); // Re-fetch to update the list
-            } else {
-                toast.error(res.data?.message || 'Failed to update payment details.');
+            if (updateId) {
+                const res = await axios.put(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/${updateId}`,
+                    payload,
+                    {
+                        headers: {
+                            Authorization: auth.token,
+                        },
+                    }
+                );
+                if (res.data?.success) {
+                    toast.success(res.data.message || 'Payment details updated successfully!');
+                    handleClosePaymentDetailsModal();
+                    fetchRentalEntries(); // Re-fetch to update the list
+                } else {
+                    toast.error(res.data?.message || 'Failed to update payment details.');
+                }
             }
+
+
         } catch (error) {
             console.error('Error updating payment details:', error);
             toast.error(error.response?.data?.message || 'Something went wrong while updating payment details.');
@@ -432,6 +450,22 @@ function RentalInvoiceList(props) {
         setSearchQuery(event.target.value);
     };
 
+    const toggleExpand = (entryId) => {
+        setExpandedEntries(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(entryId)) {
+                newSet.delete(entryId);
+            } else {
+                newSet.add(entryId);
+            }
+            return newSet;
+        });
+    };
+
+    const isExpanded = (entryId) => {
+        return expandedEntries.has(entryId);
+    };
+
     if (loading) {
         return (
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
@@ -467,6 +501,7 @@ function RentalInvoiceList(props) {
                         <Table stickyHeader aria-label="rental invoice table">
                             <TableHead>
                                 <TableRow>
+                                    <TableCell padding="checkbox"></TableCell>
                                     {props?.invoice === "invoice" ? <TableCell>Invoice Number</TableCell> : null}
                                     <TableCell>Company Name</TableCell>
                                     <TableCell>Serial No.</TableCell>
@@ -474,86 +509,171 @@ function RentalInvoiceList(props) {
                                     <TableCell>Send Details To</TableCell>
                                     <TableCell>Image</TableCell>
                                     <TableCell>Assinged To</TableCell>
+                                    <TableCell>Grand Total</TableCell>
                                     <TableCell>Status</TableCell>
                                     <TableCell>Actions</TableCell>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
-                                {filteredRentalEntries.map((entry) => (
-                                    <>
-                                        <TableRow key={entry._id}>
-                                            {props?.invoice === "invoice" ? <TableCell>{entry.invoiceNumber || 'N/A'}</TableCell> : null}
-                                            <TableCell>{entry.companyId?.companyName || 'N/A'}</TableCell>
-                                            <TableCell>{entry.machineId?.serialNo || 'N/A'}</TableCell>
-                                            <TableCell>{entry.machineId?.modelName || 'N/A'}</TableCell>
-                                            <TableCell>{entry.sendDetailsTo}</TableCell>
-                                            <TableCell>
-                                                {entry.countImageUpload?.url ? (
-                                                    <a href={entry.countImageUpload.url} target="_blank" rel="noopener noreferrer">
-                                                        <img src={entry.countImageUpload.url} alt="Count" style={{ width: '50px', height: '50px', objectFit: 'cover' }} />
-                                                    </a>
-                                                ) : 'No Image'}
-                                            </TableCell>
-                                            <TableCell>{entry?.assignedTo ? (
-                                                <Chip label={entry.assignedTo?.name} size="small" color="primary" variant="outlined" />
-                                            ) : (
-                                                'N/A'
-                                            )}</TableCell>
-                                            <TableCell>
-                                                {/* <Chip
-                                                    label={entry.status}
-                                                    size="small"
-                                                    color={
-                                                        entry.status === 'Paid' ? 'success' :
-                                                            entry.status === 'Unpaid' ? 'error' :
-                                                                entry.status === 'Pending' || entry.status === 'Progress' ? 'warning' :
-                                                                    'default'
-                                                    }
-                                                /> */}
-                                                {entry?.invoiceLink?.length <= 0 ? <Chip
-                                                    label={"Invoice Upload Pending"}
-                                                    size="small"
-                                                    color={"error"}
-                                                    className='mt-2'
-                                                /> : null}
-                                            </TableCell>
-                                            <TableCell>
-                                                <Stack spacing={1}>
-                                                    {hasPermission("rentalInvoice") ? <Button variant="outlined" size="small" onClick={() => handleEdit(entry._id)}>
-                                                        Edit
-                                                    </Button> : null}
-                                                    <Button variant="outlined" size="small" onClick={() => onSendInvoice(entry)}>
-                                                        {isInvoiceSend ? <CircularProgress size={24} /> : `Send ${props?.invoice === "quotation" === "quotation" ? "Quotaion" : "Invoice"}`}
-                                                    </Button>
-                                                    {props?.invoice === "quotation" ? <Button variant="outlined" size="small" sx={{ my: 1 }} onClick={() => onMoveToInvoice("invoice", entry)}>Move to invoice</Button>
-                                                        : null}
-                                                    {!entry?.tdsAmount && props?.invoice !== "quotation" ? <Button variant="outlined" size="small" onClick={() => {
-                                                        handleOpenPaymentDetailsModal(entry)
-                                                    }}>
-                                                        Update Payment Details
-                                                    </Button> : null}
-                                                    <Button
-                                                        variant="contained"
-                                                        color="success"
+                                {filteredRentalEntries.map((entry) => {
+                                    const hasMultipleProducts = entry.products && Array.isArray(entry.products) && entry.products.length > 0;
+                                    const hasProducts = hasMultipleProducts || entry.machineId;
+                                    const expanded = isExpanded(entry._id);
+                                    const productsToShow = hasMultipleProducts ? entry.products : (entry.machineId ? [{ machineId: entry.machineId, serialNo: entry.machineId?.serialNo, countImageUpload: entry.countImageUpload }] : []);
+
+                                    // Get first product for main row display (for backward compatibility)
+                                    const firstProduct = hasMultipleProducts ? entry.products[0] : null;
+                                    const displayMachine = firstProduct?.machineId || entry.machineId;
+                                    const displayImage = firstProduct?.countImageUpload || entry.countImageUpload;
+
+                                    return (
+                                        <React.Fragment key={entry._id}>
+                                            <TableRow>
+                                                <TableCell>
+                                                    {hasProducts && (
+                                                        <IconButton
+                                                            aria-label="expand row"
+                                                            size="small"
+                                                            onClick={() => toggleExpand(entry._id)}
+                                                        >
+                                                            {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                                                        </IconButton>
+                                                    )}
+                                                </TableCell>
+                                                {props?.invoice === "invoice" ? <TableCell>{entry.invoiceNumber || 'N/A'}</TableCell> : null}
+                                                <TableCell>{entry.companyId?.companyName || 'N/A'}</TableCell>
+                                                <TableCell>{displayMachine?.serialNo || 'N/A'}</TableCell>
+                                                <TableCell>{displayMachine?.modelName || 'N/A'}</TableCell>
+                                                <TableCell>{entry.sendDetailsTo || 'N/A'}</TableCell>
+                                                <TableCell>
+                                                    {displayImage?.url ? (
+                                                        <a href={displayImage.url} target="_blank" rel="noopener noreferrer">
+                                                            <img src={displayImage.url} alt="Count" style={{ width: '50px', height: '50px', objectFit: 'cover' }} />
+                                                        </a>
+                                                    ) : 'No Image'}
+                                                </TableCell>
+                                                <TableCell>{entry?.assignedTo ? (
+                                                    <Chip label={entry.assignedTo?.name} size="small" color="primary" variant="outlined" />
+                                                ) : (
+                                                    'N/A'
+                                                )}</TableCell>
+                                                <TableCell>
+                                                    <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#1976d2' }}>
+                                                        ₹{entry.grandTotal ? parseFloat(entry.grandTotal).toFixed(2) : '0.00'}
+                                                    </Typography>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Chip
+                                                        label={entry.status}
                                                         size="small"
-                                                        startIcon={<UploadFileIcon />}
-                                                        onClick={() => handleUploadSignedInvoice(entry._id, entry?.invoiceLink)}
-                                                    >
-                                                        Upload Signed {props?.invoice === "invoice" ? "Invoices" : "Quotations"}
-                                                    </Button>
-                                                </Stack>
-                                            </TableCell>
-                                        </TableRow>
-                                        <TableRow>
-                                            <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={9}>
-                                                <Collapse in={open} timeout="auto" unmountOnExit>
-                                                    <Box sx={{ margin: 1 }}>
-                                                        <Typography variant="h6" gutterBottom component="div">
-                                                            {props?.invoice === "invoice" ? "Invoices" : "Quotations"} Links
-                                                        </Typography>
-                                                        <Stack direction="row" spacing={1} flexWrap="wrap"> {/* Use Stack for layout */}
-                                                            {
-                                                                entry.invoiceLink?.map((link, index) => (
+                                                        color={
+                                                            entry.status === 'Paid' ? 'success' :
+                                                                entry.status === 'Unpaid' ? 'error' :
+                                                                    entry.status === 'Pending' || entry.status === 'Progress' ? 'warning' :
+                                                                        'default'
+                                                        }
+                                                    />
+                                                    {entry?.invoiceLink?.length <= 0 ? <Chip
+                                                        label={"Invoice Upload Pending"}
+                                                        size="small"
+                                                        color={"error"}
+                                                        className='mt-2'
+                                                    /> : null}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Stack spacing={1}>
+                                                        {hasPermission("rentalInvoice") ? <Button variant="outlined" size="small" onClick={() => handleEdit(entry._id)}>
+                                                            Edit
+                                                        </Button> : null}
+                                                        <Button variant="outlined" size="small" onClick={() => onSendInvoice(entry)}>
+                                                            {isInvoiceSend ? <CircularProgress size={24} /> : `Send ${props?.invoice === "quotation" ? "Quotation" : "Invoice"}`}
+                                                        </Button>
+                                                        {props?.invoice === "quotation" ? <Button variant="outlined" size="small" sx={{ my: 1 }} onClick={() => onMoveToInvoice("invoice", entry)}>Move to invoice</Button>
+                                                            : null}
+                                                        {!entry?.tdsAmount && props?.invoice !== "quotation" ? <Button variant="outlined" size="small" onClick={() => {
+                                                            handleOpenPaymentDetailsModal(entry)
+                                                        }}>
+                                                            Update Payment Details
+                                                        </Button> : null}
+                                                        <Button
+                                                            variant="contained"
+                                                            color="success"
+                                                            size="small"
+                                                            startIcon={<UploadFileIcon />}
+                                                            onClick={() => handleUploadSignedInvoice(entry._id, entry?.invoiceLink)}
+                                                        >
+                                                            Upload Signed {props?.invoice === "invoice" ? "Invoices" : "Quotations"}
+                                                        </Button>
+                                                    </Stack>
+                                                </TableCell>
+                                            </TableRow>
+                                            {/* Products Expandable Row */}
+                                            {hasProducts && (
+                                                <TableRow>
+                                                    <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={props?.invoice === "invoice" ? 11 : 10}>
+                                                        <Collapse in={expanded} timeout="auto" unmountOnExit>
+                                                            <Box sx={{ margin: 2 }}>
+                                                                <Typography variant="h6" gutterBottom component="div" sx={{ mb: 2 }}>
+                                                                    Products ({productsToShow.length})
+                                                                </Typography>
+                                                                <Table size="small" aria-label="products">
+                                                                    <TableHead>
+                                                                        <TableRow>
+                                                                            <TableCell>#</TableCell>
+                                                                            <TableCell>Serial No.</TableCell>
+                                                                            <TableCell>Model Name</TableCell>
+                                                                            <TableCell>Image</TableCell>
+                                                                            <TableCell align="right">Product Total</TableCell>
+                                                                        </TableRow>
+                                                                    </TableHead>
+                                                                    <TableBody>
+                                                                        {productsToShow.map((product, index) => {
+                                                                            const machine = product.machineId || entry.machineId;
+                                                                            return (
+                                                                                <TableRow key={product._id || index}>
+                                                                                    <TableCell>{index + 1}</TableCell>
+                                                                                    <TableCell>{product.serialNo || machine?.serialNo || 'N/A'}</TableCell>
+                                                                                    <TableCell>{machine?.modelName || 'N/A'}</TableCell>
+                                                                                    <TableCell>
+                                                                                        {product.countImageUpload?.url ? (
+                                                                                            <a href={product.countImageUpload.url} target="_blank" rel="noopener noreferrer">
+                                                                                                <img src={product.countImageUpload.url} alt="Count" style={{ width: '50px', height: '50px', objectFit: 'cover' }} />
+                                                                                            </a>
+                                                                                        ) : 'No Image'}
+                                                                                    </TableCell>
+                                                                                    <TableCell align="right">
+                                                                                        <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
+                                                                                            ₹{product.productTotal ? parseFloat(product.productTotal).toFixed(2) : '0.00'}
+                                                                                        </Typography>
+                                                                                    </TableCell>
+                                                                                </TableRow>
+                                                                            );
+                                                                        })}
+                                                                        <TableRow>
+                                                                            <TableCell colSpan={4} align="right" sx={{ fontWeight: 'bold' }}>
+                                                                                Grand Total:
+                                                                            </TableCell>
+                                                                            <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: '1.1rem', color: '#1976d2' }}>
+                                                                                ₹{entry.grandTotal ? parseFloat(entry.grandTotal).toFixed(2) : '0.00'}
+                                                                            </TableCell>
+                                                                        </TableRow>
+                                                                    </TableBody>
+                                                                </Table>
+                                                            </Box>
+                                                        </Collapse>
+                                                    </TableCell>
+                                                </TableRow>
+                                            )}
+                                            {/* Invoice Links Row */}
+                                            {entry.invoiceLink && entry.invoiceLink.length > 0 && (
+                                                <TableRow>
+                                                    <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={props?.invoice === "invoice" ? 11 : 10}>
+                                                        <Box sx={{ margin: 1 }}>
+                                                            <Typography variant="h6" gutterBottom component="div">
+                                                                {props?.invoice === "invoice" ? "Invoices" : "Quotations"} Links
+                                                            </Typography>
+                                                            <Stack direction="row" spacing={1} flexWrap="wrap">
+                                                                {entry.invoiceLink?.map((link, index) => (
                                                                     <Box key={index} sx={{ display: 'flex', alignItems: 'center', my: 0.5 }}>
                                                                         <Button
                                                                             variant="outlined"
@@ -565,27 +685,27 @@ function RentalInvoiceList(props) {
                                                                         >
                                                                             Invoice {index + 1}
                                                                         </Button>
-                                                                        {hasPermission("serviceInvoice") && ( // Only show delete if user has permission
+                                                                        {hasPermission("serviceInvoice") && (
                                                                             <IconButton
                                                                                 aria-label={`delete invoice link ${index + 1}`}
                                                                                 size="small"
                                                                                 onClick={() => handleDeleteInvoiceLink(entry._id, link, entry)}
-                                                                                disabled={deletingLink} // Disable during deletion
+                                                                                disabled={deletingLink}
                                                                                 sx={{ ml: 0.5 }}
                                                                             >
                                                                                 {deletingLink ? <CircularProgress size={16} /> : <DeleteIcon fontSize="small" />}
                                                                             </IconButton>
                                                                         )}
                                                                     </Box>
-                                                                ))
-                                                            }
-                                                        </Stack>
-                                                    </Box>
-                                                </Collapse>
-                                            </TableCell>
-                                        </TableRow>
-                                    </>
-                                ))}
+                                                                ))}
+                                                            </Stack>
+                                                        </Box>
+                                                    </TableCell>
+                                                </TableRow>
+                                            )}
+                                        </React.Fragment>
+                                    );
+                                })}
                             </TableBody>
                         </Table>
                     </TableContainer>
@@ -593,7 +713,7 @@ function RentalInvoiceList(props) {
             </Paper>
             {/* Payment Details Update Modal */}
             <Dialog open={openPaymentModal} onClose={handleClosePaymentDetailsModal}>
-                <DialogTitle>Payment Details</DialogTitle>
+                <DialogTitle>Payment Details (RS: {paymentForm?.grandTotal})</DialogTitle>
                 <DialogContent>
                     <FormControl fullWidth margin="normal" size="small">
                         <InputLabel id="mode-of-payment-label">Mode Of Payment</InputLabel>
@@ -768,9 +888,11 @@ function RentalInvoiceList(props) {
                                     label="Mode Of Payment"
                                 >
                                     <MenuItem value="">--select Payment Mode--</MenuItem>
-                                    {companyPendingInvoice?.map((invoice) => {
-                                        return <MenuItem key={invoice._id} value={invoice._id}>{new Date(invoice.invoiceDate).toLocaleDateString() + " - Rs " + invoice?.grandTotal}</MenuItem>
-                                    })}
+                                    {companyPendingInvoice
+                                        ?.filter(pendingInv => pendingInv._id !== currentInvoice?._id) // Filter out the current invoice
+                                        .map((pendingInv) => {
+                                            return <MenuItem key={pendingInv._id} value={pendingInv._id}>{new Date(pendingInv.invoiceDate || pendingInv.createdAt).toLocaleDateString() + " - Rs " + pendingInv?.grandTotal}</MenuItem>
+                                        })}
                                 </Select>
                             </FormControl>
                         </>
@@ -804,7 +926,7 @@ function RentalInvoiceList(props) {
                         if (balanceAmount) {
                             setTimeout(() => {
                                 handleSavePaymentDetails(balanceAmount)
-                            }, 1000)
+                            }, 2000)
                         }
 
                     }

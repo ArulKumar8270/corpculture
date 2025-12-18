@@ -255,7 +255,7 @@ const AdminRental
     };
 
     const handleReport = (rentalId, employeeName, companyId) => {
-      navigate(`../addRentalReport?employeeName=${employeeName}&reportType=rental&rentalId=${rentalId}&companyId=${companyId}`);
+      navigate(`../addRentalReport?employeeName=${employeeName}&reportType=Rental_Report&rentalId=${rentalId}&companyId=${companyId}`);
       handleClose();
     };
 

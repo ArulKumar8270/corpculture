@@ -52,6 +52,7 @@ import UpdateOrders from "./UpdateOrders";
 import AdminCommission from "./AdminCommission";
 import EmployeeDetails from "./EmployeeDetails";
 import OldInvoicesList from "./OldInvoicesList";
+import CreditManagement from "./CreditManagement";
 
 const AdminDashboard = () => {
     const navigate = useNavigate();
@@ -121,14 +122,16 @@ const AdminDashboard = () => {
                             <Route path="all-category" element={<AllCategories />} />
                             <Route path="companyList" element={<CompanyList />} />
                             <Route path="addCompany/:companyId?" element={<AddCompany />} />
+                            <Route path="credit" element={<CreditManagement />} />
                             {/* <Route path="serviceReports" element={<ServiceReports />} /> */}
                             <Route path="addServiceQuotation/:quotationId?" element={<AddServiceQuotation />} />
                             <Route path="addServiceInvoice/:invoiceId?" element={<AddServiceInvoice />} />
                             <Route path="serviceInvoiceList" element={<ServiceInvoiceList invoice={"invoice"}/>} />
                             <Route path="serviceQuotationList" element={<ServiceInvoiceList invoice={"quotation"} />} />
-                            <Route path="addServiceReport/:id?" element={<AddServiceReport />} />
-                            <Route path="serviceReportlist" element={<ServiceReportsandGatpass reportType={"service"}/>} />
-                            <Route path="rentalReportlist" element={<ServiceReportsandGatpass reportType={"rental"}/>} />
+                            <Route path="addServiceReport/:id?" element={<AddServiceReport reportType={"Service_Report"}/>} />
+                            <Route path="addRentalReport/:id?" element={<AddServiceReport reportType={"Rental_Report"}/>} />
+                            <Route path="serviceReportlist" element={<ServiceReportsandGatpass reportType={"Service_Report"}/>} />
+                            <Route path="rentalReportlist" element={<ServiceReportsandGatpass reportType={"Rental_Report"}/>} />
                             <Route path="addRentalInvoice/:id?" element={<AddRentalInvoice />} />
                             <Route path="rentalInvoiceList" element={<RentalInvoiceList invoice={"invoice"}/>} />
                             <Route path="rentalQuotationList" element={<RentalInvoiceList invoice={"quotation"}/>} />

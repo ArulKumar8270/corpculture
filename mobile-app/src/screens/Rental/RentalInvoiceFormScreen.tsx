@@ -20,6 +20,7 @@ import { RootState } from '../../store';
 import axios from 'axios';
 import Toast from 'react-native-toast-message';
 import * as ImagePicker from 'expo-image-picker';
+import { getTotalRentalInvoicePayment } from '../../utils/functions';
 
 interface ProductConfig {
   bwOldCount: number | string;
@@ -810,9 +811,25 @@ const RentalInvoiceFormScreen = () => {
     try {
       // Calculate total amount - this would need the actual calculation logic
       // For now, using a placeholder
-      const totalAmountIncludingGST = 0; // TODO: Implement getTotalRentalInvoicePayment logic
-      const commissionAmount = 0; // TODO: Calculate commission
-      const commissionRate = 0; // TODO: Calculate commission rate
+      // Calculate total amount using utility function
+      let totalAmountIncludingGST = 0;
+      let commissionAmount = 0;
+      let commissionRate = 0;
+      
+      try {
+        if (res.data?.entry) {
+          const totalData = getTotalRentalInvoicePayment(res.data.entry);
+          totalAmountIncludingGST = parseFloat(totalData.totalAmount) || 0;
+          commissionAmount = parseFloat(totalData.commissionAmount) || 0;
+          commissionRate = totalData.commissionRate || 0;
+        }
+      } catch (error) {
+        console.error('Error calculating total amount:', error);
+        // Use fallback values
+        totalAmountIncludingGST = 0;
+        commissionAmount = 0;
+        commissionRate = 0;
+      }
 
       const apiParams = {
         commissionFrom: 'Rental',
@@ -914,7 +931,50 @@ const RentalInvoiceFormScreen = () => {
             })
         );
 
-        data.append('products', JSON.stringify(productsArray));
+        // Validate and stringify products array
+        try {
+          // Validate base64 strings before stringifying
+          const validatedProducts = productsArray.map((p: any) => {
+            if (p.countImageUpload && typeof p.countImageUpload === 'string') {
+              const base64Str = p.countImageUpload;
+              // Check if base64 string is complete (ends with proper format)
+              if (base64Str.length > 1000000) { // If over ~1MB, it might cause issues
+                console.warn(`Product image is very large (${base64Str.length} bytes). Consider compressing.`);
+              }
+              // Ensure it's a complete base64 string (not truncated)
+              if (!base64Str.includes('base64,') || base64Str.split('base64,')[1]?.length === 0) {
+                console.warn('Invalid base64 string detected, removing from product data');
+                delete p.countImageUpload;
+              }
+            }
+            return p;
+          });
+
+          const productsJson = JSON.stringify(validatedProducts);
+          // Validate JSON size (warn if approaching 1MB limit)
+          if (productsJson.length > 900000) {
+            console.warn(`Products JSON is large (${productsJson.length} bytes). Consider optimizing image sizes.`);
+          }
+          if (productsJson.length > 1048576) {
+            Toast.show({
+              type: 'error',
+              text1: 'Error',
+              text2: 'Products data is too large. Please reduce image sizes or remove some images.',
+            });
+            setLoading(false);
+            return;
+          }
+          data.append('products', productsJson);
+        } catch (error: any) {
+          console.error('Error stringifying products array:', error);
+          Toast.show({
+            type: 'error',
+            text1: 'Error',
+            text2: 'Error preparing products data. Please check your product images.',
+          });
+          setLoading(false);
+          return;
+        }
 
         // Convert main count image to base64 if provided
         if (formData.countImageFile) {

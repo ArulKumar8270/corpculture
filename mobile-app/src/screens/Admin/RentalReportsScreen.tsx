@@ -27,7 +27,7 @@ const RentalReportsScreen = () => {
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedReports, setExpandedReports] = useState<Set<string>>(new Set());
-  const [reportType, setReportType] = useState('Rental Report');
+  const [reportType, setReportType] = useState('Rental_Report');
   const [sendingReport, setSendingReport] = useState<string | null>(null);
 
   useFocusEffect(
@@ -58,7 +58,7 @@ const RentalReportsScreen = () => {
         url = `${process.env.EXPO_PUBLIC_API_URL}/report/${reportType}`;
       }
 
-      console.log('Fetching rental reports from:', url);
+      console.log('Fetching Rental_Reports from:', url);
       console.log('User role:', user?.role);
       console.log('User ID:', user?._id);
       console.log('Report type:', reportType);
@@ -69,32 +69,32 @@ const RentalReportsScreen = () => {
         },
       });
 
-      console.log('Rental reports response:', response.data);
-      console.log('Rental reports count:', response.data?.reports?.length || 0);
+      console.log('Rental_Reports response:', response.data);
+      console.log('Rental_Reports count:', response.data?.reports?.length || 0);
 
       if (response.data?.success) {
         const allReports = response.data.reports || [];
-        // Filter to only show Rental Report type (client-side filtering as backup)
+        // Filter to only show Rental_Report type (client-side filtering as backup)
         const fetchedReports = allReports.filter((report: any) => {
           // Check both reportType and reportFor fields
           const isRentalReport = 
-            report.reportType === 'Rental Report' || 
+            report.reportType === 'Rental_Report' || 
             report.reportFor === 'rental' ||
             (report.reportType && report.reportType.toLowerCase().includes('rental'));
           return isRentalReport;
         });
         setReports(fetchedReports);
         console.log('Total reports received:', allReports.length);
-        console.log('Rental reports filtered:', fetchedReports.length);
+        console.log('Rental_Reports filtered:', fetchedReports.length);
         if (fetchedReports.length === 0) {
-          console.log('No rental reports found for the given criteria');
+          console.log('No Rental_Reports found for the given criteria');
         }
       } else {
         console.warn('Response not successful:', response.data);
         setReports([]);
       }
     } catch (error: any) {
-      console.error('Error fetching rental reports:', error);
+      console.error('Error fetching Rental_Reports:', error);
       console.error('Error response:', error.response?.data);
       console.error('Error status:', error.response?.status);
       console.error('Request URL:', error.config?.url);
@@ -193,9 +193,9 @@ const RentalReportsScreen = () => {
   };
 
   const filteredReports = reports.filter((report) => {
-    // First ensure it's a rental report (double check)
+    // First ensure it's a Rental_Report (double check)
     const isRentalReport = 
-      report.reportType === 'Rental Report' || 
+      report.reportType === 'Rental_Report' || 
       report.reportFor === 'rental' ||
       (report.reportType && report.reportType.toLowerCase().includes('rental'));
     
@@ -233,7 +233,7 @@ const RentalReportsScreen = () => {
           onPress={() => toggleExpand(item._id)}
         >
           <View style={styles.reportHeaderLeft}>
-            <Text style={styles.reportType}>{item.reportType || 'Rental Report'}</Text>
+            <Text style={styles.reportType}>{item.reportType || 'Rental_Report'}</Text>
             <Text style={styles.companyName}>{item.company?.companyName || 'N/A'}</Text>
             <Text style={styles.modelNo}>Model: {item.modelNo || 'N/A'}</Text>
             <Text style={styles.serialNo}>Serial: {item.serialNo || 'N/A'}</Text>
@@ -358,7 +358,7 @@ const RentalReportsScreen = () => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Rental Reports & Gatpass</Text>
+        <Text style={styles.title}>Rental_Reports & Gatpass</Text>
         {(hasPermission('rentalReport', 'edit') || user?.role === 1) && (
           <TouchableOpacity
             style={styles.addButton}
@@ -391,7 +391,7 @@ const RentalReportsScreen = () => {
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Icon name="description" size={64} color="#ccc" />
-              <Text style={styles.emptyText}>No rental reports found</Text>
+              <Text style={styles.emptyText}>No Rental_Reports found</Text>
             </View>
           }
         />

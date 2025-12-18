@@ -15,7 +15,9 @@ import {
     Button,
     Collapse, // Import Collapse for smooth animation
     Chip,
-    TextField // Import TextField for search input
+    TextField, // Import TextField for search input
+    TablePagination,
+    Grid
 } from '@mui/material';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import EditIcon from '@mui/icons-material/Edit';
@@ -36,17 +38,45 @@ const ServiceReportsandGatpass = (props) => {
     const [error, setError] = useState(null);
     const [onSendn8n, setOnSendn8n] = useState(false)
     const [expandedReportId, setExpandedReportId] = useState(null); // State to manage expanded row
-    const [searchTerm, setSearchTerm] = useState(''); // New state for search term
+    const [fromDate, setFromDate] = useState('');
+    const [toDate, setToDate] = useState('');
+    const [companyNameFilter, setCompanyNameFilter] = useState('');
+    const [assignedToFilter, setAssignedToFilter] = useState('');
+    const [page, setPage] = useState(0);
+    const [rowsPerPage, setRowsPerPage] = useState(10);
+    const [totalCount, setTotalCount] = useState(0);
 
-    const fetchReports = async () => {
+    const fetchReports = async (
+        from = '',
+        to = '',
+        companyName = '',
+        assignedTo = '',
+        currentPage = page,
+        currentRowsPerPage = rowsPerPage
+    ) => {
         setLoading(true);
         setError(null);
         try {
-            const response = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/report/${auth?.user?.role === 3 ? `${auth?.user?._id}/${props?.reportType}` : `${props?.reportType}`}`, {
+            const queryParams = new URLSearchParams({
+                fromDate: from,
+                toDate: to,
+                companyName: companyName,
+                assignedTo: assignedTo,
+                reportType: props?.reportType || '',
+                page: currentPage + 1, // Backend expects 1-indexed page
+                limit: currentRowsPerPage,
+            }).toString();
+
+            const endpoint = auth?.user?.role === 3 
+                ? `${import.meta.env.VITE_SERVER_URL}/api/v1/report/getByassigned/${auth?.user?._id}/${props?.reportType}?${queryParams}`
+                : `${import.meta.env.VITE_SERVER_URL}/api/v1/report/${props?.reportType}?${queryParams}`;
+
+            const response = await axios.get(endpoint, {
                 headers: { Authorization: auth?.token }
             });
             if (response.data.success) {
                 setReports(response.data.reports);
+                setTotalCount(response.data.totalCount || 0);
             } else {
                 toast.error(response.data.message || 'Failed to fetch reports.');
                 setError(response.data.message || 'Failed to fetch reports.');
@@ -61,9 +91,16 @@ const ServiceReportsandGatpass = (props) => {
 
     useEffect(() => {
         if (auth?.token) {
-            fetchReports();
+            fetchReports(
+                fromDate,
+                toDate,
+                companyNameFilter,
+                assignedToFilter,
+                page,
+                rowsPerPage
+            );
         }
-    }, [auth?.token, props?.reportType]);
+    }, [auth?.token, props?.reportType, page, rowsPerPage]);
 
     const handleEdit = (reportId) => {
         // Navigate to an edit page for the report
@@ -79,7 +116,14 @@ const ServiceReportsandGatpass = (props) => {
                 });
                 if (response.data.success) {
                     toast.success(response.data.message);
-                    fetchReports(); // Refresh the list
+                    fetchReports(
+                        fromDate,
+                        toDate,
+                        companyNameFilter,
+                        assignedToFilter,
+                        page,
+                        rowsPerPage
+                    );
                 } else {
                     toast.error(response.data.message || 'Failed to delete report.');
                 }
@@ -107,21 +151,35 @@ const ServiceReportsandGatpass = (props) => {
         }
     };
 
-    // Filter reports based on search term
-    const filteredReports = reports.filter(report => {
-        const lowerCaseSearchTerm = searchTerm.toLowerCase();
-        const companyName = report.company?.companyName?.toLowerCase() || '';
-        const modelNo = report.modelNo?.toLowerCase() || '';
-        const branch = report.branch?.toLowerCase() || '';
-        const assignedToName = report.assignedTo?.name?.toLowerCase() || '';
+    const handleChangePage = (event, newPage) => {
+        setPage(newPage);
+    };
 
-        return (
-            companyName.includes(lowerCaseSearchTerm) ||
-            modelNo.includes(lowerCaseSearchTerm) ||
-            branch.includes(lowerCaseSearchTerm) ||
-            assignedToName.includes(lowerCaseSearchTerm)
+    const handleChangeRowsPerPage = (event) => {
+        setRowsPerPage(parseInt(event.target.value, 10));
+        setPage(0); // Reset to first page when changing rows per page
+    };
+
+    const handleFilter = () => {
+        setPage(0); // Reset to first page when applying new filters
+        fetchReports(
+            fromDate,
+            toDate,
+            companyNameFilter,
+            assignedToFilter,
+            0,
+            rowsPerPage
         );
-    });
+    };
+
+    const handleClearFilters = () => {
+        setFromDate('');
+        setToDate('');
+        setCompanyNameFilter('');
+        setAssignedToFilter('');
+        setPage(0);
+        fetchReports('', '', '', '', 0, rowsPerPage);
+    };
 
     if (loading) {
         return (
@@ -135,13 +193,19 @@ const ServiceReportsandGatpass = (props) => {
         return (
             <Box sx={{ p: 3, textAlign: 'center', color: 'error.main' }}>
                 <Typography variant="h6">Error: {error}</Typography>
-                <Button onClick={fetchReports} variant="outlined" sx={{ mt: 2 }}>Retry</Button>
+                <Button 
+                    onClick={() => fetchReports(fromDate, toDate, companyNameFilter, assignedToFilter, page, rowsPerPage)} 
+                    variant="outlined" 
+                    sx={{ mt: 2 }}
+                >
+                    Retry
+                </Button>
             </Box>
         );
     }
 
     return (
-        <Box sx={{ p: 3, bgcolor: 'background.default', minHeight: '100vh' }}>
+        <Box sx={{ p: 3, bgcolor: 'background.default', minHeight: '100vh', overflow: 'auto', width: '91%' }}>
             <div className='flex justify-between'>
                 <Typography variant="h5" component="h1" gutterBottom sx={{ mb: 3, color: '#019ee3', fontWeight: 'bold' }}>
                     Reports & Gatpass
@@ -152,18 +216,74 @@ const ServiceReportsandGatpass = (props) => {
                     </Button>
                 </Typography> */}
             </div>
-            {/* Search Input */}
-            <TextField
-                fullWidth
-                label="Search by Company, Model No, Branch, or Assigned To"
-                variant="outlined"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                sx={{ mb: 3 }}
-            />
-            <Paper elevation={3} sx={{ p: 2, borderRadius: '8px' }}>
+            {/* Filter Section */}
+            <Paper elevation={2} sx={{ p: 2, mb: 3, borderRadius: '8px' }}>
+                <Typography variant="h6" gutterBottom sx={{ mb: 2, color: '#019ee3' }}>
+                    Filters
+                </Typography>
+                <Grid container spacing={2} alignItems="center">
+                    <Grid item xs={12} sm={6} md={3}>
+                        <TextField
+                            fullWidth
+                            label="From Date"
+                            type="date"
+                            variant="outlined"
+                            value={fromDate}
+                            onChange={(e) => setFromDate(e.target.value)}
+                            InputLabelProps={{ shrink: true }}
+                        />
+                    </Grid>
+                    <Grid item xs={12} sm={6} md={3}>
+                        <TextField
+                            fullWidth
+                            label="To Date"
+                            type="date"
+                            variant="outlined"
+                            value={toDate}
+                            onChange={(e) => setToDate(e.target.value)}
+                            InputLabelProps={{ shrink: true }}
+                        />
+                    </Grid>
+                    <Grid item xs={12} sm={6} md={3}>
+                        <TextField
+                            fullWidth
+                            label="Company Name"
+                            variant="outlined"
+                            value={companyNameFilter}
+                            onChange={(e) => setCompanyNameFilter(e.target.value)}
+                        />
+                    </Grid>
+                    <Grid item xs={12} sm={6} md={3}>
+                        <TextField
+                            fullWidth
+                            label="Assigned To"
+                            variant="outlined"
+                            value={assignedToFilter}
+                            onChange={(e) => setAssignedToFilter(e.target.value)}
+                        />
+                    </Grid>
+                    <Grid item xs={12} sm={6} md={3}>
+                        <Button
+                            variant="contained"
+                            color="primary"
+                            onClick={handleFilter}
+                            sx={{ mr: 1 }}
+                        >
+                            Apply Filters
+                        </Button>
+                        <Button
+                            variant="outlined"
+                            color="secondary"
+                            onClick={handleClearFilters}
+                        >
+                            Clear
+                        </Button>
+                    </Grid>
+                </Grid>
+            </Paper>
+            <Paper elevation={3} sx={{ p: 2, borderRadius: '8px', overflow: 'auto', width: '100%' }}>
                 <TableContainer>
-                    <Table sx={{ minWidth: 650 }} aria-label="service reports table">
+                    <Table sx={{ minWidth: 650 }} aria-label="Service_Reports table">
                         <TableHead>
                             <TableRow sx={{ bgcolor: '#f0f0f0' }}>
                                 <TableCell>S.No</TableCell>
@@ -181,14 +301,14 @@ const ServiceReportsandGatpass = (props) => {
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {filteredReports.length === 0 ? ( // Use filteredReports here
+                            {reports.length === 0 ? (
                                 <TableRow>
                                     <TableCell colSpan={12} align="center" sx={{ py: 3, color: 'text.secondary' }}>
-                                        No service reports found.
+                                        No Service_Reports found.
                                     </TableCell>
                                 </TableRow>
                             ) : (
-                                filteredReports.map((report, index) => ( // Use filteredReports here
+                                reports.map((report, index) => (
                                     <React.Fragment key={report._id}>
                                         <TableRow>
                                             <TableCell>
@@ -199,7 +319,7 @@ const ServiceReportsandGatpass = (props) => {
                                                 >
                                                     {expandedReportId === report._id ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
                                                 </IconButton>
-                                                {index + 1}
+                                                {page * rowsPerPage + index + 1}
                                             </TableCell>
                                             <TableCell>{report.reportType}</TableCell>
                                             <TableCell>{report.company?.companyName || 'N/A'}</TableCell> {/* Assuming company is populated */}
@@ -321,6 +441,16 @@ const ServiceReportsandGatpass = (props) => {
                         </TableBody>
                     </Table>
                 </TableContainer>
+                {/* Pagination Component */}
+                <TablePagination
+                    rowsPerPageOptions={[5, 10, 25, 50]}
+                    component="div"
+                    count={totalCount}
+                    rowsPerPage={rowsPerPage}
+                    page={page}
+                    onPageChange={handleChangePage}
+                    onRowsPerPageChange={handleChangeRowsPerPage}
+                />
             </Paper>
         </Box>
     );

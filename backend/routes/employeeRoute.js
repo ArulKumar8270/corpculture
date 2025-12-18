@@ -4,6 +4,7 @@ import {
     createEmployeeController,
     getAllEmployeesController,
     getSingleEmployeeController,
+    getEmployeeByUserIdController,
     updateEmployeeController,
     deleteEmployeeController
 } from '../controllers/employee/employeeController.js';
@@ -21,6 +22,10 @@ router.get("/all", isAdmin, getAllEmployeesController);
 // Get Single Employee || GET
 // Assuming only signed-in users (or admin) can view a single employee
 router.get("/get/:id", getSingleEmployeeController);
+
+// Get Employee by User ID || GET
+// For users to get their own employee data
+router.get("/user/:userId", requireSignIn, getEmployeeByUserIdController);
 
 // Update Employee || PUT
 // Assuming only admin can update employees

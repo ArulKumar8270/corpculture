@@ -22,6 +22,7 @@ const AddEmployee = () => {
         email: '',
         phone: '',
         address: '',
+        pincode: '',
         employeeType: '',
         designation: '',
         idCradNo: '',
@@ -84,6 +85,7 @@ const AddEmployee = () => {
                         email: employeeData.email || '',
                         phone: employeeData.phone || '',
                         address: employeeData.address || '',
+                        pincode: employeeData.pincode || '',
                         employeeType: employeeData.employeeType || '',
                         designation: employeeData.designation || '',
                         idCradNo: employeeData.idCradNo || '',
@@ -107,7 +109,7 @@ const AddEmployee = () => {
             setIsEditMode(false);
             // Clear form data if switching from edit to add mode
             setFormData({
-                name: '', email: '', phone: '', address: '', employeeType: '',
+                name: '', email: '', phone: '', address: '', pincode: '', employeeType: '',
                 designation: '', idCradNo: '', department: '', salary: '', image: '',
             });
         }
@@ -324,6 +326,16 @@ const AddEmployee = () => {
                             helperText={errors.address}
                         />
                         <TextField
+                            label="Pincode"
+                            name="pincode"
+                            value={formData.pincode}
+                            onChange={handleInputChange}
+                            variant="outlined"
+                            size="small"
+                            fullWidth
+                            inputProps={{ maxLength: 6 }}
+                        />
+                        <TextField
                             select
                             label="Employee Type"
                             name="employeeType"
@@ -527,6 +539,14 @@ const AddEmployee = () => {
                                         {formData.email || 'N/A'}
                                     </span>
                                 </div>
+                                {formData.pincode && (
+                                    <div className="flex justify-between items-center py-1">
+                                        <span className="text-xs font-semibold text-gray-600">Pincode:</span>
+                                        <span className="text-sm font-bold text-gray-800">
+                                            {formData.pincode}
+                                        </span>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
@@ -549,6 +569,14 @@ const AddEmployee = () => {
                                 {formData.address || 'N/A'}
                             </span>
                         </div>
+                        {formData.pincode && (
+                            <div className="flex justify-between">
+                                <span className="text-sm font-semibold text-gray-600">Pincode:</span>
+                                <span className="text-sm text-gray-800">
+                                    {formData.pincode}
+                                </span>
+                            </div>
+                        )}
                         {formData.salary && (
                             <div className="flex justify-between">
                                 <span className="text-sm font-semibold text-gray-600">Salary:</span>

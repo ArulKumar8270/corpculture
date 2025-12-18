@@ -30,7 +30,7 @@ import toast from 'react-hot-toast';
 import axios from 'axios'; // Assuming axios is used for API calls
 import { useAuth } from '../../context/auth'; // Import useAuth to get the token
 
-const AddServiceReport = () => {
+const AddServiceReport = (props) => {
     const navigate = useNavigate();
     const { id: reportId } = useParams(); // Get report ID from URL
     const { auth } = useAuth(); // Get auth token from context
@@ -38,11 +38,12 @@ const AddServiceReport = () => {
     const employeeName = searchParams.get("employeeName");
     const reportFor = searchParams.get("reportType");
     const serviceId = searchParams.get("serviceId");
+    const companyId = searchParams.get("companyId");
     // State for form fields
     const [reportData, setReportData] = useState({
-        reportType: 'Service Report', // Default to 'Service Report'
+        reportType: reportFor || 'Service_Report', // Default to 'Service_Report'
         reportFor: reportFor,
-        company: '', // This will store the company _id
+        company: companyId, // This will store the company _id
         problemReport: '',
         remarksPendingWorks: '',
         accessService: '',
@@ -68,21 +69,20 @@ const AddServiceReport = () => {
     const [branches, setBranches] = useState([]); // Branches specific to selected company
     const [availableProducts, setAvailableProducts] = useState([]); // Products specific to selected company
 
-
     // Initial data fetch (only companies)
     useEffect(() => {
         const fetchInitialData = async () => {
             setLoading(true);
             try {
                 // Fetch companies
-                const companiesResponse = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/company/all`, {
-                    headers: { Authorization: auth?.token }
-                });
-                if (companiesResponse.data.success) {
-                    setCompanies(companiesResponse.data.companies);
-                } else {
-                    toast.error(companiesResponse.data.message || 'Failed to fetch companies.');
-                }
+                // const companiesResponse = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/company/all`, {
+                //     headers: { Authorization: auth?.token }
+                // });
+                // if (companiesResponse.data.success) {
+                //     setCompanies(companiesResponse.data.companies);
+                // } else {
+                //     toast.error(companiesResponse.data.message || 'Failed to fetch companies.');
+                // }
 
                 // If reportId exists, fetch report details
                 if (reportId) {
@@ -92,7 +92,7 @@ const AddServiceReport = () => {
                     if (reportResponse.data.success) {
                         const fetchedReport = reportResponse.data.report;
                         setReportData({
-                            reportType: fetchedReport.reportType || 'Service Report',
+                            reportType: fetchedReport.reportType || 'Service_Report',
                             reportFor: fetchedReport.reportFor || 'service',
                             company: fetchedReport.company?._id || '', // Assuming company is populated
                             problemReport: fetchedReport.problemReport || '',
@@ -174,6 +174,7 @@ const AddServiceReport = () => {
                             },
                         }
                     );
+                    setCompanies([companyData.company]);
                     if (companyData?.success && companyData.company) {
                         const company = companyData.company;
                         const extractedBranches = new Set();
@@ -228,6 +229,53 @@ const AddServiceReport = () => {
         }));
     };
 
+    // Helper function to safely extract productName from various structures
+    const extractProductName = (product) => {
+        if (!product) return 'Unknown Product';
+        
+        // If productName is a string, return it directly
+        if (typeof product.productName === 'string') {
+            return product.productName;
+        }
+        
+        // If productName is an object, try to extract the actual name
+        if (typeof product.productName === 'object' && product.productName !== null) {
+            const productNameObj = product.productName;
+            
+            // Try productName.productName (nested structure - could be Purchase -> VendorProduct)
+            if (productNameObj.productName) {
+                // If productName.productName is a string, return it
+                if (typeof productNameObj.productName === 'string') {
+                    return productNameObj.productName;
+                }
+                // If it's still an object, go one level deeper (Purchase -> VendorProduct -> productName)
+                if (typeof productNameObj.productName === 'object' && productNameObj.productName !== null) {
+                    const nested = productNameObj.productName;
+                    // Check if nested.productName is a string (the actual product name)
+                    if (typeof nested.productName === 'string') {
+                        return nested.productName;
+                    }
+                    // Fallback to nested.name
+                    if (typeof nested.name === 'string') {
+                        return nested.name;
+                    }
+                }
+            }
+            
+            // Try productName.name
+            if (productNameObj.name && typeof productNameObj.name === 'string') {
+                return productNameObj.name;
+            }
+        }
+        
+        // Fallback to product.name
+        if (product.name && typeof product.name === 'string') {
+            return product.name;
+        }
+        
+        return 'Unknown Product';
+    };
+
     // Select a material group to add/edit products
     const handleSelectGroup = (idx) => {
         setSelectedGroupIndex(idx);
@@ -252,8 +300,10 @@ const AddServiceReport = () => {
         }
 
         const quantity = parseInt(reportData.materialQuantity);
+        // Use helper function to safely extract productName
+        const productName = extractProductName(selectedProduct);
         const productData = {
-            productName: selectedProduct.productName,
+            productName: productName,
             quantity: quantity,
             rate: selectedProduct.rate,
             totalAmount: quantity * selectedProduct.rate,
@@ -301,7 +351,11 @@ const AddServiceReport = () => {
         setSelectedGroupIndex(groupIdx); // Ensure the correct group is selected
         setEditingProductId(product.id);
         // Find the product _id based on the productName to set the Select value correctly
-        const productToEdit = availableProducts.find(p => p.productName === product.productName);
+        // Compare extracted product names (handle nested structures)
+        const productToEdit = availableProducts.find(p => {
+            const pName = extractProductName(p);
+            return pName === product.productName;
+        });
         setReportData(prevData => ({
             ...prevData,
             materialProductName: productToEdit ? productToEdit._id : '',
@@ -374,12 +428,22 @@ const AddServiceReport = () => {
             reference: reportData.reference,
             usageData: reportData.usageData, // Add new field
             description: reportData.description, // Add new field
-            assignedTo : employeeName,
+            assignedTo: employeeName,
             reportFor: reportFor,
             // Send materialGroups as array of objects, without temporary 'id' field from products
+            // Ensure productName is always a string, not an object
             materialGroups: materialGroups.map(group => ({
                 name: group.name,
-                products: group.products.map(({ id, ...rest }) => rest) // Remove temporary 'id'
+                products: group.products.map(({ id, ...rest }) => {
+                    // Ensure productName is a string
+                    const productName = typeof rest.productName === 'string' 
+                        ? rest.productName 
+                        : extractProductName(rest);
+                    return {
+                        ...rest,
+                        productName: productName, // Always a string
+                    };
+                })
             })),
         };
 
@@ -417,16 +481,16 @@ const AddServiceReport = () => {
                 handleCancel(); // Reset form after successful submission/update
                 navigate('../serviceReportlist'); // Changed from ../serviceReportlist
             } else {
-                alert(response.data.message || `Failed to ${reportId ? 'update' : 'submit'} service report.`);
+                alert(response.data.message || `Failed to ${reportId ? 'update' : 'submit'} Service_Report.`);
             }
         } catch (err) {
-            console.error(`Error ${reportId ? 'updating' : 'submitting'} service report:`, err);
+            console.error(`Error ${reportId ? 'updating' : 'submitting'} Service_Report:`, err);
         }
     };
 
     const handleCancel = () => {
         setReportData({
-            reportType: 'Service Report',
+            reportType: 'Service_Report',
             company: '',
             problemReport: '',
             remarksPendingWorks: '',
@@ -462,11 +526,11 @@ const AddServiceReport = () => {
     return (
         <Box sx={{ p: 3, bgcolor: 'background.default', minHeight: '100vh' }}>
             <Typography variant="h5" component="h1" gutterBottom sx={{ mb: 3, color: '#019ee3', fontWeight: 'bold' }}>
-                {reportId ? 'Edit Service Report' : 'Add Service Report'} {/* Dynamic Title */}
+                {reportId ? `Edit ${reportFor}` : `Add ${reportFor}`} {/* Dynamic Title */}
             </Typography>
 
             <Paper elevation={3} sx={{ p: 4, mb: 4, borderRadius: '8px' }}>
-                <Box sx={{ mb: 3 }}>
+                {/* <Box sx={{ mb: 3 }}>
                     <FormControl component="fieldset">
                         <RadioGroup
                             row
@@ -474,28 +538,23 @@ const AddServiceReport = () => {
                             value={reportData.reportType}
                             onChange={handleChange}
                         >
-                            <FormControlLabel value="Service Report" control={<Radio />} label="Service Report" />
+                            <FormControlLabel value="Service_Report" control={<Radio />} label="Service_Report" />
                         </RadioGroup>
                     </FormControl>
-                </Box>
+                </Box> */}
 
                 <Grid container spacing={3}>
                     <Grid item xs={12} sm={6}>
                         <FormControl fullWidth margin="normal" size="small">
-                            <InputLabel id="company-label">Company</InputLabel>
-                            <Select
-                                labelId="company-label"
-                                id="company"
-                                name="company"
-                                value={reportData.company} // This now holds the company _id
-                                onChange={handleChange}
+                            <TextField
+                                fullWidth
+                                margin="normal" 
                                 label="Company"
-                            >
-                                <MenuItem value="">Select a Company</MenuItem>
-                                {companies.map(comp => (
-                                    <MenuItem key={comp._id} value={comp._id}>{comp.companyName}</MenuItem> // MenuItem value is _id
-                                ))}
-                            </Select>
+                                name="company"
+                                value={companies[0]?.companyName || ''}
+                                size="small"
+                                disabled={true}
+                            />
                         </FormControl>
                     </Grid>
                     <Grid item xs={12} sm={6}>
@@ -654,9 +713,12 @@ const AddServiceReport = () => {
                                     disabled={editingProductId !== null} // Disable product selection when editing
                                 >
                                     <MenuItem value="">Select a Product</MenuItem>
-                                    {availableProducts.map(prod => (
-                                        <MenuItem key={prod._id} value={prod._id}>{prod.productName}</MenuItem> // MenuItem value is product _id
-                                    ))}
+                                    {availableProducts?.map(prod => {
+                                        const productName = extractProductName(prod);
+                                        return (
+                                            <MenuItem key={prod._id} value={prod._id}>{productName}</MenuItem> // MenuItem value is product _id
+                                        );
+                                    })}
                                 </Select>
                             </FormControl>
                         </Grid>
@@ -750,26 +812,32 @@ const AddServiceReport = () => {
                                     </TableCell>
                                 </TableRow>
                             ) : (
-                                group.products.map((product, productIdx) => (
-                                    <TableRow key={product.id}>
-                                        <TableCell>{productIdx + 1}</TableCell>
-                                        <TableCell>{product.productName}</TableCell>
-                                        <TableCell align="right">{product.quantity}</TableCell>
-                                        <TableCell align="right">{product.totalAmount}</TableCell>
-                                        <TableCell align="center">
-                                            <IconButton
-                                                size="small"
-                                                onClick={() => handleEditProduct(groupIdx, product)}
-                                                disabled={editingProductId !== null && editingProductId !== product.id} // Disable other edit buttons when one is active
-                                            >
-                                                <EditIcon fontSize="small" />
-                                            </IconButton>
-                                            <IconButton size="small" onClick={() => handleDeleteProduct(groupIdx, product.id)}>
-                                                <DeleteIcon fontSize="small" color="error" />
-                                            </IconButton>
-                                        </TableCell>
-                                    </TableRow>
-                                ))
+                                group.products.map((product, productIdx) => {
+                                    // Ensure productName is a string (safety check)
+                                    const productName = typeof product.productName === 'string' 
+                                        ? product.productName 
+                                        : extractProductName(product);
+                                    return (
+                                        <TableRow key={product.id}>
+                                            <TableCell>{productIdx + 1}</TableCell>
+                                            <TableCell>{productName}</TableCell>
+                                            <TableCell align="right">{product.quantity}</TableCell>
+                                            <TableCell align="right">{product.totalAmount}</TableCell>
+                                            <TableCell align="center">
+                                                <IconButton
+                                                    size="small"
+                                                    onClick={() => handleEditProduct(groupIdx, product)}
+                                                    disabled={editingProductId !== null && editingProductId !== product.id} // Disable other edit buttons when one is active
+                                                >
+                                                    <EditIcon fontSize="small" />
+                                                </IconButton>
+                                                <IconButton size="small" onClick={() => handleDeleteProduct(groupIdx, product.id)}>
+                                                    <DeleteIcon fontSize="small" color="error" />
+                                                </IconButton>
+                                            </TableCell>
+                                        </TableRow>
+                                    );
+                                })
                             )}
                         </TableBody>
                     </Table>

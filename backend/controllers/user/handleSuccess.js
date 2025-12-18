@@ -63,7 +63,7 @@ const handleSuccess = async (req, res) => {
                 }, 0);
 
                 const totalAmount = subtotal + totalDeliveryCharges + totalInstallationCharges;
-                return totalAmount.toLocaleString();
+                return totalAmount;
             })(),
             customer_details: {
                 address: {
@@ -81,7 +81,10 @@ const handleSuccess = async (req, res) => {
 
         // Extract the payment intent ID from the retrieved session
         const paymentIntentId = session?.payment_intent;
-        const amount = session.amount_total;
+        // Ensure amount is a number (remove commas if present and convert to number)
+        const amount = typeof session.amount_total === 'string' 
+            ? parseFloat(session.amount_total.replace(/,/g, '')) 
+            : Number(session.amount_total);
 
         // Map order items to the required format
         const orderObject = orderItems?.map((product) => ({

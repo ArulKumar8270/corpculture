@@ -73,6 +73,7 @@ export const createRentalPaymentEntry = async (req, res) => {
             assignedTo,
             invoiceType,
             rentalId,
+            status,
             products: productsRaw, // New: array of products (may be JSON string from FormData)
         } = req.body;
         // Parse products if it's a JSON string (from FormData)
@@ -164,6 +165,7 @@ export const createRentalPaymentEntry = async (req, res) => {
                 a4Config,
                 a5Config,
                 grandTotal: grandTotal.toFixed(2),
+                status: status || 'Unpaid',
             });
 
             await newEntry.save();
@@ -266,6 +268,7 @@ export const createRentalPaymentEntry = async (req, res) => {
                 assignedTo,
                 invoiceType,
                 remarks,
+                status: status || 'Unpaid',
                 grandTotal: grandTotal.toFixed(2),
             });
 
@@ -528,7 +531,7 @@ export const updateRentalPaymentEntry = async (req, res) => {
             paymentAmount,
             invoiceLink,
             invoiceType,
-            staus,
+            status,
             products: productsRaw, // New: array of products (may be JSON string from FormData)
         } = req.body;
 
@@ -721,7 +724,7 @@ export const updateRentalPaymentEntry = async (req, res) => {
         if (invoiceType) entry.invoiceType = invoiceType;
         if (invoiceNumber) entry.invoiceNumber = invoiceNumber;
         entry.countImageUpload = countImageUploadUrl;
-        if (staus) entry.staus = staus;
+        if (status) entry.status = status;
         if (modeOfPayment !== undefined) entry.modeOfPayment = modeOfPayment;
         if (bankName !== undefined) entry.bankName = bankName;
         if (transactionDetails !== undefined) entry.transactionDetails = transactionDetails;

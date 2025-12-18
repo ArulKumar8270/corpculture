@@ -86,6 +86,9 @@ import ServiceEnquiriesReportScreen from '../screens/Admin/Reports/ServiceEnquir
 import ServiceInvoicesReportScreen from '../screens/Admin/Reports/ServiceInvoicesReportScreen';
 import ServiceReportsReportScreen from '../screens/Admin/Reports/ServiceReportsReportScreen';
 
+// Credit Management
+import CreditManagementScreen from '../screens/Admin/CreditManagementScreen';
+
 // Placeholder screens for missing ones
 import { View, Text, StyleSheet } from 'react-native';
 
@@ -270,7 +273,7 @@ const SettingsStack = () => (
     <Stack.Screen name="AddCompany" component={AddCompanyScreen} options={{ title: 'Add/Edit Company' }} />
     <Stack.Screen name="OldInvoicesList" component={OldInvoicesListScreen} options={{ title: 'Old Invoices' }} />
     <Stack.Screen name="MenuSettings" component={MenuSettingScreen} options={{ title: 'Menu Settings' }} />
-    <Stack.Screen name="CreditSettings" component={() => <PlaceholderScreen title="Credit Settings" />} options={{ title: 'Credit Settings' }} />
+    <Stack.Screen name="CreditSettings" component={CreditManagementScreen} options={{ title: 'Credit Management' }} />
     <Stack.Screen name="GiftSettings" component={() => <PlaceholderScreen title="Gift Settings" />} options={{ title: 'Gift Settings' }} />
   </Stack.Navigator>
 );

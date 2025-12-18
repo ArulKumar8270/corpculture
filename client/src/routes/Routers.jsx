@@ -19,12 +19,13 @@ import OrderFailed from "../pages/user/Cart/OrderFailed";
 import OrderDetails from "../pages/user/Orders/OrderDetails";
 import AdminOrders from "../pages/Admin/AdminOrders";
 import AdminCommission from "../pages/Admin/AdminCommission";
-import AdminEmployees from "../pages/Admin/AdminEmployees";
-import AddEmployee from "../pages/Admin/AddEmployee";
+import AdminEmployees from "../pages/Admin/adminemployees";
+import AddEmployee from "../pages/Admin/addemployee";
 import Users from "../pages/Admin/Users";
 import EmployeeDetails from "../pages/Admin/EmployeeDetails";
 import UpdateOrders from "../pages/Admin/UpdateOrders";
 import DeleteAllOrder from "../pages/DeleteAllOrder.jsx";
+import CreditManagement from "../pages/Admin/CreditManagement";
 
 const Routers = () => {
     return (
@@ -63,6 +64,7 @@ const Routers = () => {
                     path="orders/order_details/:id"
                     element={<UpdateOrders />}
                 />
+                <Route path="credit" element={<CreditManagement />} />
             </Route>
             <Route path="*" element={<PageNotFound />} />
             <Route path="/all-order/delete" element={<DeleteAllOrder />} />

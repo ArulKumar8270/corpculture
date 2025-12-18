@@ -183,6 +183,14 @@ export const uploadOldInvoices = async (req, res) => {
                 'paidamount': 'paymentAmount',
                 'dueamount': 'dueAmount',
                 'due': 'dueAmount',
+                'mailto': 'sentEmailList',
+                'mail to': 'sentEmailList',
+                'sentemaillist': 'sentEmailList',
+                'sentemail': 'sentEmailList',
+                'mailcc': 'ccEmailList',
+                'mail cc': 'ccEmailList',
+                'ccemaillist': 'ccEmailList',
+                'ccemail': 'ccEmailList',
                 'notes': 'notes',
                 'note': 'notes',
                 'remarks': 'notes'
@@ -207,9 +215,26 @@ export const uploadOldInvoices = async (req, res) => {
                 for (const col of availableColumns) {
                     const normalized = normalizeColumnName(col);
                     for (const term of searchTerms) {
-                        if (normalized.includes(term)) {
+                        // Normalize the search term as well to handle spaces
+                        const normalizedTerm = normalizeColumnName(term);
+                        // Check if normalized column includes the normalized term
+                        if (normalized.includes(normalizedTerm) || normalizedTerm.includes(normalized)) {
                             return col;
                         }
+                    }
+                }
+                return null;
+            };
+            
+            // Special function for mail columns that need both words
+            const findMailColumn = (firstWord, secondWord, availableColumns) => {
+                for (const col of availableColumns) {
+                    const normalized = normalizeColumnName(col);
+                    const normalizedFirst = normalizeColumnName(firstWord);
+                    const normalizedSecond = normalizeColumnName(secondWord);
+                    // Check if column contains both words (in any order)
+                    if (normalized.includes(normalizedFirst) && normalized.includes(normalizedSecond)) {
+                        return col;
                     }
                 }
                 return null;
@@ -219,6 +244,16 @@ export const uploadOldInvoices = async (req, res) => {
             const invoiceNoCol = findColumnByPartialMatch(['invoice', 'inv', 'bill'], actualColumns);
             const customerNameCol = findColumnByPartialMatch(['customer', 'client', 'name', 'party'], actualColumns);
             const productNameCol = findColumnByPartialMatch(['product', 'item', 'goods', 'service'], actualColumns);
+            // Try multiple strategies to find mail columns
+            let mailToCol = findColumnByPartialMatch(['mailto', 'mail to', 'sentemail', 'sent email'], actualColumns);
+            if (!mailToCol) {
+                mailToCol = findMailColumn('mail', 'to', actualColumns);
+            }
+            
+            let mailCcCol = findColumnByPartialMatch(['mailcc', 'mail cc', 'ccemail', 'cc email'], actualColumns);
+            if (!mailCcCol) {
+                mailCcCol = findMailColumn('mail', 'cc', actualColumns);
+            }
             
             // Add these to column mapping if found
             if (invoiceNoCol && !columnMapping[normalizeColumnName(invoiceNoCol)]) {
@@ -229,6 +264,12 @@ export const uploadOldInvoices = async (req, res) => {
             }
             if (productNameCol && !columnMapping[normalizeColumnName(productNameCol)]) {
                 columnMapping[normalizeColumnName(productNameCol)] = 'productName';
+            }
+            if (mailToCol && !columnMapping[normalizeColumnName(mailToCol)]) {
+                columnMapping[normalizeColumnName(mailToCol)] = 'sentEmailList';
+            }
+            if (mailCcCol && !columnMapping[normalizeColumnName(mailCcCol)]) {
+                columnMapping[normalizeColumnName(mailCcCol)] = 'ccEmailList';
             }
 
             // Process and save invoices
@@ -281,6 +322,12 @@ export const uploadOldInvoices = async (req, res) => {
                                 mappedKey = 'paymentAmount';
                             } else if (normalizedKey.includes('due') && normalizedKey.includes('amount')) {
                                 mappedKey = 'dueAmount';
+                            } else if ((normalizedKey.includes('mail') && normalizedKey.includes('to')) || 
+                                       (normalizedKey.includes('sent') && normalizedKey.includes('email'))) {
+                                mappedKey = 'sentEmailList';
+                            } else if ((normalizedKey.includes('mail') && normalizedKey.includes('cc')) || 
+                                       (normalizedKey.includes('cc') && normalizedKey.includes('email'))) {
+                                mappedKey = 'ccEmailList';
                             } else if (normalizedKey.includes('note') || normalizedKey.includes('remark')) {
                                 mappedKey = 'notes';
                             }
@@ -288,13 +335,19 @@ export const uploadOldInvoices = async (req, res) => {
                         
                         if (mappedKey) {
                             const cellValue = row[excelKey];
-                            // Only add if value exists and is not empty
-                            if (cellValue !== null && cellValue !== undefined && cellValue !== '') {
-                                // Check if it's a string and not just whitespace
-                                if (typeof cellValue === 'string' && cellValue.trim() === '') {
-                                    continue;
+                            // For email lists, always process (even if "No" or empty)
+                            if (mappedKey === 'sentEmailList' || mappedKey === 'ccEmailList') {
+                                // Always set the value, even if it's "No" or empty - we'll process it later
+                                invoiceData[mappedKey] = cellValue !== null && cellValue !== undefined ? cellValue : '';
+                            } else {
+                                // For other fields, only add if value exists and is not empty
+                                if (cellValue !== null && cellValue !== undefined && cellValue !== '') {
+                                    // Check if it's a string and not just whitespace
+                                    if (typeof cellValue === 'string' && cellValue.trim() === '') {
+                                        continue;
+                                    }
+                                    invoiceData[mappedKey] = cellValue;
                                 }
-                                invoiceData[mappedKey] = cellValue;
                             }
                         }
                     }
@@ -449,6 +502,50 @@ export const uploadOldInvoices = async (req, res) => {
                         }
                     }
 
+                    // Process sentEmailList
+                    if (invoiceData.sentEmailList !== undefined) {
+                        const emailValue = invoiceData.sentEmailList;
+                        // Check if value is "No" (case-insensitive)
+                        if (typeof emailValue === 'string' && emailValue.trim().toLowerCase() === 'no') {
+                            invoiceData.sentEmailList = [];
+                        } else if (typeof emailValue === 'string' && emailValue.trim() !== '') {
+                            // Split by comma or semicolon and process each email
+                            const emails = emailValue.split(/[,;]/).map(email => email.trim().toLowerCase()).filter(email => email && email.includes('@'));
+                            invoiceData.sentEmailList = emails;
+                        } else if (Array.isArray(emailValue)) {
+                            // Already an array, normalize it
+                            invoiceData.sentEmailList = emailValue
+                                .map(email => typeof email === 'string' ? email.trim().toLowerCase() : String(email).trim().toLowerCase())
+                                .filter(email => email && email !== 'no' && email.includes('@'));
+                        } else {
+                            invoiceData.sentEmailList = [];
+                        }
+                    } else {
+                        invoiceData.sentEmailList = [];
+                    }
+
+                    // Process ccEmailList
+                    if (invoiceData.ccEmailList !== undefined) {
+                        const emailValue = invoiceData.ccEmailList;
+                        // Check if value is "No" (case-insensitive)
+                        if (typeof emailValue === 'string' && emailValue.trim().toLowerCase() === 'no') {
+                            invoiceData.ccEmailList = [];
+                        } else if (typeof emailValue === 'string' && emailValue.trim() !== '') {
+                            // Split by comma or semicolon and process each email
+                            const emails = emailValue.split(/[,;]/).map(email => email.trim().toLowerCase()).filter(email => email && email.includes('@'));
+                            invoiceData.ccEmailList = emails;
+                        } else if (Array.isArray(emailValue)) {
+                            // Already an array, normalize it
+                            invoiceData.ccEmailList = emailValue
+                                .map(email => typeof email === 'string' ? email.trim().toLowerCase() : String(email).trim().toLowerCase())
+                                .filter(email => email && email !== 'no' && email.includes('@'));
+                        } else {
+                            invoiceData.ccEmailList = [];
+                        }
+                    } else {
+                        invoiceData.ccEmailList = [];
+                    }
+
                     // Add metadata
                     invoiceData.excelRowIndex = rowIndex;
                     invoiceData.isImported = true;
@@ -520,7 +617,9 @@ export const uploadOldInvoices = async (req, res) => {
                     suggestedMappings: {
                         invoiceNo: invoiceNoCol || 'NOT FOUND',
                         customerName: customerNameCol || 'NOT FOUND',
-                        productName: productNameCol || 'NOT FOUND'
+                        productName: productNameCol || 'NOT FOUND',
+                        mailTo: mailToCol || 'NOT FOUND',
+                        mailCc: mailCcCol || 'NOT FOUND'
                     }
                 };
             }
@@ -682,9 +781,42 @@ export const updateOldInvoice = async (req, res) => {
                 updateData.sentEmailList = updateData.sentEmailList
                     .map(email => email ? email.trim().toLowerCase() : null)
                     .filter(email => email && email.includes('@'));
+            } else if (typeof updateData.sentEmailList === 'string') {
+                // Handle string input (comma/semicolon separated or "No")
+                if (updateData.sentEmailList.trim().toLowerCase() === 'no') {
+                    updateData.sentEmailList = [];
+                } else {
+                    updateData.sentEmailList = updateData.sentEmailList
+                        .split(/[,;]/)
+                        .map(email => email.trim().toLowerCase())
+                        .filter(email => email && email.includes('@'));
+                }
             } else {
-                // If not an array, set to empty array
+                // If not an array or string, set to empty array
                 updateData.sentEmailList = [];
+            }
+        }
+
+        // Validate and normalize ccEmailList
+        if (updateData.ccEmailList !== undefined) {
+            if (Array.isArray(updateData.ccEmailList)) {
+                // Normalize emails: trim, lowercase, and filter out empty values
+                updateData.ccEmailList = updateData.ccEmailList
+                    .map(email => email ? email.trim().toLowerCase() : null)
+                    .filter(email => email && email.includes('@'));
+            } else if (typeof updateData.ccEmailList === 'string') {
+                // Handle string input (comma/semicolon separated or "No")
+                if (updateData.ccEmailList.trim().toLowerCase() === 'no') {
+                    updateData.ccEmailList = [];
+                } else {
+                    updateData.ccEmailList = updateData.ccEmailList
+                        .split(/[,;]/)
+                        .map(email => email.trim().toLowerCase())
+                        .filter(email => email && email.includes('@'));
+                }
+            } else {
+                // If not an array or string, set to empty array
+                updateData.ccEmailList = [];
             }
         }
 

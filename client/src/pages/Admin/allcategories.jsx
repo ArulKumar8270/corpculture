@@ -6,8 +6,9 @@ import { toast } from "react-toastify";
 import { Link } from "react-router-dom";
 import { DataGrid } from "@mui/x-data-grid";
 import SeoData from "../../SEO/SeoData";
-import DeleteIcon from "@mui/icons-material/Delete"; // {{ edit_1 }}
-import { IconButton } from "@mui/material"; // {{ edit_1 }}
+import DeleteIcon from "@mui/icons-material/Delete";
+import EditIcon from "@mui/icons-material/Edit";
+import { IconButton } from "@mui/material";
 import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField } from "@mui/material";
 
 const AllCategories = () => {
@@ -18,6 +19,7 @@ const AllCategories = () => {
     const [categoryForm, setCategoryForm] = useState({ name: "", commission: "0" });
     const [categoryErrors, setCategoryErrors] = useState({});
     const [categoryLoading, setCategoryLoading] = useState(false);
+    const [editingCategoryId, setEditingCategoryId] = useState(null); // Track which category is being edited
 
     const hasPermission = (key) => {
         return userPermissions.some(p => p.key === key && p.actions.includes('edit')) || auth?.user?.role === 1;
@@ -27,10 +29,27 @@ const AllCategories = () => {
         setCategoryModalOpen(true);
         setCategoryForm({ name: "", commission: "" });
         setCategoryErrors({});
+        setEditingCategoryId(null); // Reset editing state
+    };
+
+    const handleEditCategory = (categoryId) => {
+        const category = categories.find(cat => cat._id === categoryId);
+        if (category) {
+            setCategoryForm({
+                name: category.name || "",
+                commission: category.commission || "0"
+            });
+            setCategoryErrors({});
+            setEditingCategoryId(categoryId);
+            setCategoryModalOpen(true);
+        }
     };
 
     const handleCategoryClose = () => {
         setCategoryModalOpen(false);
+        setEditingCategoryId(null);
+        setCategoryForm({ name: "", commission: "" });
+        setCategoryErrors({});
     };
 
     const handleCategoryChange = (e) => {
@@ -49,17 +68,45 @@ const AllCategories = () => {
         }
         setCategoryLoading(true);
         try {
-            // Replace with your actual API endpoint
-            await axios.post(`${import.meta.env.VITE_SERVER_URL}/api/v1/category/create`, {
-                name: categoryForm.name.trim(),
-                commission: Number(categoryForm.commission),
-            }, {
-                headers: { Authorization: auth.token } 
-            });
-            toast.success("Category added successfully!");
+            if (editingCategoryId) {
+                // Update existing category
+                await axios.put(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/category/update/${editingCategoryId}`,
+                    {
+                        name: categoryForm.name.trim(),
+                        commission: Number(categoryForm.commission),
+                    },
+                    {
+                        headers: { Authorization: auth.token }
+                    }
+                );
+                toast.success("Category updated successfully!");
+            } else {
+                // Create new category
+                await axios.post(`${import.meta.env.VITE_SERVER_URL}/api/v1/category/create`, {
+                    name: categoryForm.name.trim(),
+                    commission: Number(categoryForm.commission),
+                }, {
+                    headers: { Authorization: auth.token }
+                });
+                toast.success("Category added successfully!");
+            }
             setCategoryModalOpen(false);
+            setEditingCategoryId(null);
+            // Refresh categories list
+            const res = await axios.get(
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/category/all`,
+                {
+                    headers: {
+                        Authorization: auth?.token,
+                    },
+                }
+            );
+            if (res.status === 200) {
+                setCategories(res.data.categories);
+            }
         } catch (err) {
-            toast.error(err.response?.data?.message || "Failed to add category");
+            toast.error(err.response?.data?.message || (editingCategoryId ? "Failed to update category" : "Failed to add category"));
         }
         setCategoryLoading(false);
     };
@@ -160,24 +207,35 @@ const AllCategories = () => {
         //         );
         //     },
         // },
-        (hasPermission("salesAllProducts") ? [{ // {{ edit_3 }}
-            field: "actions", // {{ edit_3 }}
-            headerName: "Actions", // {{ edit_3 }}
-            minWidth: 100, // {{ edit_3 }}
-            flex: 0.3, // {{ edit_3 }}
-            sortable: false, // {{ edit_3 }}
-            renderCell: (params) => { // {{ edit_3 }}
-                return ( // {{ edit_3 }}
-                    <IconButton // {{ edit_3 }}
-                        onClick={() => handleDeleteCategory(params.row.id)} // Call delete function with row ID // {{ edit_3 }}
-                        color="error" // {{ edit_3 }}
-                        aria-label="delete category" // {{ edit_3 }}
-                    >
-                        <DeleteIcon />
-                    </IconButton> // {{ edit_3 }}
-                ); // {{ edit_3 }}
-            }, // {{ edit_3 }}
-        }] : []) // {{ edit_3 }}
+        {
+            field: "actions",
+            headerName: "Actions",
+            minWidth: 150,
+            flex: 0.3,
+            sortable: false,
+            renderCell: (params) => {
+                return (
+                    <div className="flex gap-2">
+                        <IconButton
+                            onClick={() => handleEditCategory(params.row.id)}
+                            color="primary"
+                            aria-label="edit category"
+                            size="small"
+                        >
+                            <EditIcon />
+                        </IconButton>
+                        <IconButton
+                            onClick={() => handleDeleteCategory(params.row.id)}
+                            color="error"
+                            aria-label="delete category"
+                            size="small"
+                        >
+                            <DeleteIcon />
+                        </IconButton>
+                    </div>
+                );
+            },
+        }
     ];
 
     const rows = [];
@@ -202,12 +260,12 @@ const AllCategories = () => {
                         <h1 className="text-lg font-bold uppercase text-[#019ee3] tracking-wide">
                             Categories
                         </h1>
-                        {hasPermission("salesAllProducts")  ? <button
-                                onClick={handleCategoryOpen}
-                                className="py-2 px-5 rounded-xl shadow font-semibold text-white bg-gradient-to-r from-[#afcb09] to-[#019ee3] hover:from-[#019ee3] hover:to-[#afcb09] transition"
-                            >
-                                + New Category
-                            </button> : null}
+                        {hasPermission("salesAllProducts") ? <button
+                            onClick={handleCategoryOpen}
+                            className="py-2 px-5 rounded-xl shadow font-semibold text-white bg-gradient-to-r from-[#afcb09] to-[#019ee3] hover:from-[#019ee3] hover:to-[#afcb09] transition"
+                        >
+                            + New Category
+                        </button> : null}
                     </div>
 
                     <div className="w-full h-[80vh] bg-white rounded-2xl shadow-xl border border-[#e6fbff] p-2">
@@ -250,7 +308,7 @@ const AllCategories = () => {
             )}
             {/* Category Modal */}
             <Dialog open={categoryModalOpen} onClose={handleCategoryClose}>
-                <DialogTitle>Add New Category</DialogTitle>
+                <DialogTitle>{editingCategoryId ? "Edit Category" : "Add New Category"}</DialogTitle>
                 <form onSubmit={handleCategorySubmit}>
                     <DialogContent className="flex flex-col gap-4 min-w-[320px]">
                         <TextField
@@ -279,7 +337,7 @@ const AllCategories = () => {
                     <DialogActions>
                         <Button onClick={handleCategoryClose} disabled={categoryLoading}>Cancel</Button>
                         <Button type="submit" variant="contained" color="primary" disabled={categoryLoading}>
-                            {categoryLoading ? "Saving..." : "Add Category"}
+                            {categoryLoading ? "Saving..." : (editingCategoryId ? "Update Category" : "Add Category")}
                         </Button>
                     </DialogActions>
                 </form>

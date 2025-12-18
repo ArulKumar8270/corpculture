@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs"; // Assuming you use bcrypt for password hashing
 // Create a new employee
 export const createEmployeeController = async (req, res) => {
     try {
-        const { name, email, password, phone, address, employeeType, userId, designation, idCradNo, department, salary, image } = req.body;
+        const { name, email, password, phone, address, pincode, employeeType, userId, designation, idCradNo, department, salary, image } = req.body;
 
         // Validation
         if (!name || !email || !password || !phone || !address || !employeeType || !userId) {
@@ -34,6 +34,7 @@ export const createEmployeeController = async (req, res) => {
             password: hashedPassword,
             phone,
             address,
+            pincode,
             employeeType,
             userId,
             designation, // Added
@@ -109,10 +110,36 @@ export const getSingleEmployeeController = async (req, res) => {
     }
 };
 
+// Get employee by userId
+export const getEmployeeByUserIdController = async (req, res) => {
+    try {
+        const userId = req.params.userId;
+        const employee = await Employee.findOne({ userId }).select("-password").populate("department"); // Exclude password
+        if (!employee) {
+            return res.status(404).send({
+                success: false,
+                message: "Employee not found for this user",
+            });
+        }
+        res.status(200).send({
+            success: true,
+            message: "Employee fetched successfully",
+            employee,
+        });
+    } catch (error) {
+        console.error("Error in getEmployeeByUserIdController:", error);
+        res.status(500).send({
+            success: false,
+            message: "Error fetching employee",
+            error,
+        });
+    }
+};
+
 // Update an employee by ID
 export const updateEmployeeController = async (req, res) => {
     try {
-        const { name, email, phone, address, employeeType, designation, idCradNo, department, salary, image } = req.body;
+        const { name, email, phone, address, pincode, employeeType, designation, idCradNo, department, salary, image } = req.body;
         const employeeId = req.params.id;
 
         // Find the employee
@@ -129,6 +156,7 @@ export const updateEmployeeController = async (req, res) => {
         employee.email = email || employee.email;
         employee.phone = phone || employee.phone;
         employee.address = address || employee.address;
+        employee.pincode = pincode !== undefined ? pincode : employee.pincode;
         employee.employeeType = employeeType || employee.employeeType;
         employee.designation = designation !== undefined ? designation : employee.designation; // Added
         employee.idCradNo = idCradNo !== undefined ? idCradNo : employee.idCradNo;       // Added

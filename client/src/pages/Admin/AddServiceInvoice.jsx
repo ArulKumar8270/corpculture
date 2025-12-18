@@ -86,32 +86,31 @@ const AddServiceInvoice = () => {
     };
 
     // Fetch companies on component mount
-    useEffect(() => {
-        const fetchCompanies = async () => {
-            try {
-                setLoading(true);
-                const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/company/all`, {
-                    headers: {
-                        Authorization: auth.token,
-                    },
-                });
-                if (data?.success) {
-                    setCompanies(data.companies);
-                }
-            } catch (error) {
-                console.error("Error fetching companies:", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchCompanies();
-    }, []);
+    // useEffect(() => {
+    //     const fetchCompanies = async () => {
+    //         try {
+    //             setLoading(true);
+    //             const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/company/all`, {
+    //                 headers: {
+    //                     Authorization: auth.token,
+    //                 },
+    //             });
+    //             if (data?.success) {
+    //                 setCompanies(data.companies);
+    //             }
+    //         } catch (error) {
+    //             console.error("Error fetching companies:", error);
+    //         } finally {
+    //             setLoading(false);
+    //         }
+    //     };
+    //     fetchCompanies();
+    // }, []);
 
 
     useEffect(() => {
 
         if (auth?.token && invoiceData?.companyId && invoiceData?.companyId !== '') {
-            console.log("Fetching company data and products for companyId:", invoiceData?.companyId); // Log the companyId being used t
             fetchCompanyData();
             fetchProductsByCompany();
         }
@@ -534,9 +533,9 @@ const AddServiceInvoice = () => {
                         />
                     </Grid> */}
                     <Grid item xs={12} sm={6}>
-                        <FormControl fullWidth margin="normal" size="small" required>
+                        {/* <FormControl fullWidth margin="normal" size="small" required> */}
                             {/* Replaced Select with Autocomplete for Company */}
-                            <Autocomplete
+                            {/* <Autocomplete
                                 id="companyId-autocomplete"
                                 options={companies}
                                 getOptionLabel={(option) => option.companyName || ''}
@@ -565,8 +564,18 @@ const AddServiceInvoice = () => {
                                     />
                                 )}
                                 disabled={invoiceId || invoiceData?.companyId ? true : false} // only disable in edit mode
-                            />
-                        </FormControl>
+                            /> */}
+                                <TextField
+                                    fullWidth
+                                    margin="normal"
+                                    label="Company"
+                                    name="companyId"
+                                    value={companyData?.companyName || ''}
+                                    disabled={true}
+                                    placeholder="Enter Company"
+                                    size="small"
+                                />
+                        {/* </FormControl> */}
                     </Grid>
                     <Grid item xs={12} sm={6}>
                         <FormControl fullWidth margin="normal" size="small">

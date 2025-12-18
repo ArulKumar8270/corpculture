@@ -31,6 +31,7 @@ import remainderRoutes from "./routes/remainderRoutes.js"; // Import new routes
 import employeeBenefitsRoute from "./routes/employeeBenefitsRoute.js";
 import materialRoutes from "./routes/materialRoutes.js"; // Import material routes
 import oldInvoiceRoutes from "./routes/oldInvoiceRoute.js"; // Import old invoice routes
+import creditRoutes from "./routes/creditRoutes.js"; // Import credit routes
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
@@ -117,6 +118,7 @@ app.use("/api/v1/common-details", commonDetailsRoutes); // Add the new common de
 app.use("/api/v1/remainders", remainderRoutes);
 app.use("/api/v1/employee-benefits", employeeBenefitsRoute);
 app.use("/api/v1/materials", materialRoutes); // Material routes
+app.use("/api/v1/credit", creditRoutes); // Credit routes
 
 app.listen(PORT, () => {
     console.log(`SERVER RUNNING ON PORT ${PORT}`);

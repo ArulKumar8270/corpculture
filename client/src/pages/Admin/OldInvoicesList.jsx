@@ -403,6 +403,7 @@ function OldInvoicesList() {
                             <MenuItem value="Pending">Pending</MenuItem>
                         </Select>
                     </FormControl>
+
                     <TextField
                         label="Start Date"
                         type="date"
@@ -413,18 +414,22 @@ function OldInvoicesList() {
                         InputLabelProps={{ shrink: true }}
                         sx={{ minWidth: 150 }}
                     />
-                    <TextField
-                        label="End Date"
-                        type="date"
-                        variant="outlined"
-                        size="small"
-                        value={filters.endDate}
-                        onChange={(e) => handleFilterChange('endDate', e.target.value)}
-                        InputLabelProps={{ shrink: true }}
-                        sx={{ minWidth: 150 }}
-                    />
+                    <FormControl size="small">
+                        <TextField
+                            label="End Date"
+                            type="date"
+                            variant="outlined"
+                            size="small"
+                            value={filters.endDate}
+                            onChange={(e) => handleFilterChange('endDate', e.target.value)}
+                            InputLabelProps={{ shrink: true }}
+                            sx={{ minWidth: 150, marginTop: 2 }}
+                        />
+                    </FormControl>
+                    <FormControl size="small">
                     <Button
                         variant="outlined"
+                         sx={{ marginTop: 2 }}
                         onClick={() => {
                             setFilters({
                                 invoiceNumber: '',
@@ -439,6 +444,7 @@ function OldInvoicesList() {
                     >
                         Clear Filters
                     </Button>
+                    </FormControl>
                 </Stack>
             </Paper>
 
@@ -802,7 +808,7 @@ function OldInvoicesList() {
                                     onChange={(e) => handleUpdateFormChange('remainderDate', e.target.value)}
                                     fullWidth
                                     inputProps={{ min: 0, step: 1 }}
-                                    // helperText="Enter number of days (e.g., 1, 2, 3, 4, 5) for remainder notification"
+                                // helperText="Enter number of days (e.g., 1, 2, 3, 4, 5) for remainder notification"
                                 />
 
                                 {/* Sent Email List */}

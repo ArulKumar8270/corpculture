@@ -27,7 +27,41 @@ export const createCompany = async (req, res) => {
 // Get All Companies
 export const getAllCompanies = async (req, res) => {
     try {
-        const companies = await companyModel.find({}).sort({ createdAt: -1 }).lean(); // Use .lean() for better performance when adding properties
+        const {
+            page = 1,
+            limit = 10,
+            search = ''
+        } = req.query;
+
+        // Build query for search
+        let findQuery = {};
+        if (search) {
+            findQuery = {
+                $or: [
+                    { companyName: { $regex: search, $options: 'i' } },
+                    { pincode: { $regex: search, $options: 'i' } },
+                    { gstNo: { $regex: search, $options: 'i' } },
+                    { billingAddress: { $regex: search, $options: 'i' } },
+                    { city: { $regex: search, $options: 'i' } },
+                    { state: { $regex: search, $options: 'i' } },
+                    { 'contactPersons.name': { $regex: search, $options: 'i' } },
+                    { 'contactPersons.mobile': { $regex: search, $options: 'i' } }
+                ]
+            };
+        }
+
+        // Calculate skip for pagination
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+
+        // Get total count of documents matching the filters (before pagination)
+        const totalCount = await companyModel.countDocuments(findQuery);
+
+        // Fetch companies with pagination
+        const companies = await companyModel.find(findQuery)
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(parseInt(limit))
+            .lean(); // Use .lean() for better performance when adding properties
 
         const companiesWithCounts = await Promise.all(companies.map(async (company) => {
             const [
@@ -59,7 +93,11 @@ export const getAllCompanies = async (req, res) => {
 
         res.status(200).send({
             success: true,
-            companies: companiesWithCounts
+            companies: companiesWithCounts,
+            totalCount,
+            page: parseInt(page),
+            limit: parseInt(limit),
+            totalPages: Math.ceil(totalCount / parseInt(limit))
         });
     } catch (error) {
         console.error("Error in getting companies:", error);

@@ -17,11 +17,14 @@ export const getRandomProducts = (prodsArray, n) => {
 };
 
 export const getTotalRentalInvoicePayment = (entry) => {
-    console.log(entry, "entry3452345234")
-    let totalBillableAmount = 0;
-    const machine = entry.machineId;
-    const basePrice = parseFloat(machine?.basePrice) || 0;
-    totalBillableAmount += basePrice;
+    if (!entry) {
+        return {
+            totalAmount: '0.00',
+            commissionRate: 0,
+            commissionAmount: '0.00',
+            totalWithCommission: '0.00'
+        };
+    }
 
     // Helper to calculate amount
     const calculateCountAmount = (machineOld, entryNew, freeC, extraAmt) => {
@@ -36,40 +39,83 @@ export const getTotalRentalInvoicePayment = (entry) => {
         return billableCopies * extraAmt;
     };
 
-    // A3
-    if (machine.a3Config && entry.a3Config) {
-        totalBillableAmount += calculateCountAmount(machine.a3Config.bwOldCount, entry.a3Config.bwNewCount, machine.a3Config.freeCopiesBw, machine.a3Config.extraAmountBw);
-        totalBillableAmount += calculateCountAmount(machine.a3Config.colorOldCount, entry.a3Config.colorNewCount, machine.a3Config.freeCopiesColor, machine.a3Config.extraAmountColor);
-        totalBillableAmount += calculateCountAmount(machine.a3Config.colorScanningOldCount, entry.a3Config.colorScanningNewCount, machine.a3Config.freeCopiesColorScanning, machine.a3Config.extraAmountColorScanning);
-    }
+    // Helper to calculate total for a single product
+    const calculateProductTotal = (machine, entryConfig) => {
+        if (!machine) return 0;
+        
+        let productTotal = parseFloat(machine?.basePrice) || 0;
 
-    // A4
-    if (machine.a4Config && entry.a4Config) {
-        totalBillableAmount += calculateCountAmount(machine.a4Config.bwOldCount, entry.a4Config.bwNewCount, machine.a4Config.freeCopiesBw, machine.a4Config.extraAmountBw);
-        totalBillableAmount += calculateCountAmount(machine.a4Config.colorOldCount, entry.a4Config.colorNewCount, machine.a4Config.freeCopiesColor, machine.a4Config.extraAmountColor);
-        totalBillableAmount += calculateCountAmount(machine.a4Config.colorScanningOldCount, entry.a4Config.colorScanningNewCount, machine.a4Config.freeCopiesColorScanning, machine.a4Config.extraAmountColorScanning);
-    }
+        // A3
+        if (machine.a3Config && entryConfig?.a3Config) {
+            productTotal += calculateCountAmount(machine.a3Config.bwOldCount, entryConfig.a3Config.bwNewCount, machine.a3Config.freeCopiesBw, machine.a3Config.extraAmountBw);
+            productTotal += calculateCountAmount(machine.a3Config.colorOldCount, entryConfig.a3Config.colorNewCount, machine.a3Config.freeCopiesColor, machine.a3Config.extraAmountColor);
+            productTotal += calculateCountAmount(machine.a3Config.colorScanningOldCount, entryConfig.a3Config.colorScanningNewCount, machine.a3Config.freeCopiesColorScanning, machine.a3Config.extraAmountColorScanning);
+        }
 
-    // A5
-    if (machine.a5Config && entry.a5Config) {
-        totalBillableAmount += calculateCountAmount(machine.a5Config.bwOldCount, entry.a5Config.bwNewCount, machine.a5Config.freeCopiesBw, machine.a5Config.extraAmountBw);
-        totalBillableAmount += calculateCountAmount(machine.a5Config.colorOldCount, entry.a5Config.colorNewCount, machine.a5Config.freeCopiesColor, machine.a5Config.extraAmountColor);
-        totalBillableAmount += calculateCountAmount(machine.a5Config.colorScanningOldCount, entry.a5Config.colorScanningNewCount, machine.a5Config.freeCopiesColorScanning, machine.a5Config.extraAmountColorScanning);
-    }
+        // A4
+        if (machine.a4Config && entryConfig?.a4Config) {
+            productTotal += calculateCountAmount(machine.a4Config.bwOldCount, entryConfig.a4Config.bwNewCount, machine.a4Config.freeCopiesBw, machine.a4Config.extraAmountBw);
+            productTotal += calculateCountAmount(machine.a4Config.colorOldCount, entryConfig.a4Config.colorNewCount, machine.a4Config.freeCopiesColor, machine.a4Config.extraAmountColor);
+            productTotal += calculateCountAmount(machine.a4Config.colorScanningOldCount, entryConfig.a4Config.colorScanningNewCount, machine.a4Config.freeCopiesColorScanning, machine.a4Config.extraAmountColorScanning);
+        }
 
-    // GST
+        // A5
+        if (machine.a5Config && entryConfig?.a5Config) {
+            productTotal += calculateCountAmount(machine.a5Config.bwOldCount, entryConfig.a5Config.bwNewCount, machine.a5Config.freeCopiesBw, machine.a5Config.extraAmountBw);
+            productTotal += calculateCountAmount(machine.a5Config.colorOldCount, entryConfig.a5Config.colorNewCount, machine.a5Config.freeCopiesColor, machine.a5Config.extraAmountColor);
+            productTotal += calculateCountAmount(machine.a5Config.colorScanningOldCount, entryConfig.a5Config.colorScanningNewCount, machine.a5Config.freeCopiesColorScanning, machine.a5Config.extraAmountColorScanning);
+        }
+
+        return productTotal;
+    };
+
+    let totalBillableAmount = 0;
     let totalGSTPercentage = 0;
-    if (machine.gstType && machine.gstType.length > 0) {
-        totalGSTPercentage = machine.gstType.reduce(
-            (sum, gst) => sum + (parseFloat(gst.gstPercentage) || 0),
-            0
-        );
+    let commissionRate = 0;
+
+    // Check if entry has multiple products (new format)
+    if (entry.products && Array.isArray(entry.products) && entry.products.length > 0) {
+        // Multiple products format
+        entry.products.forEach((product) => {
+            const machine = product.machineId;
+            if (machine) {
+                const productTotal = calculateProductTotal(machine, product);
+                totalBillableAmount += productTotal;
+
+                // Get GST from first product (assuming all products have same GST)
+                if (totalGSTPercentage === 0 && machine.gstType && machine.gstType.length > 0) {
+                    totalGSTPercentage = machine.gstType.reduce(
+                        (sum, gst) => sum + (parseFloat(gst.gstPercentage) || 0),
+                        0
+                    );
+                }
+
+                // Get commission from first product (assuming all products have same commission)
+                if (commissionRate === 0) {
+                    commissionRate = parseFloat(machine?.commission || entry?.assignedTo?.commission || 0);
+                }
+            }
+        });
+    } else {
+        // Single product format (old format)
+        const machine = entry.machineId;
+        if (machine) {
+            totalBillableAmount = calculateProductTotal(machine, entry);
+
+            // GST
+            if (machine.gstType && machine.gstType.length > 0) {
+                totalGSTPercentage = machine.gstType.reduce(
+                    (sum, gst) => sum + (parseFloat(gst.gstPercentage) || 0),
+                    0
+                );
+            }
+
+            // Commission
+            commissionRate = parseFloat(machine?.commission || entry?.assignedTo?.commission || 0);
+        }
     }
 
     const totalAmountIncludingGST = totalBillableAmount * (1 + totalGSTPercentage / 100);
-
-    // ✅ Apply commission (from machine or assigned employee)
-    const commissionRate = parseFloat(machine?.commission || entry?.assignedTo?.commission || 0);
     const commissionAmount = (totalAmountIncludingGST * commissionRate) / 100;
 
     return {

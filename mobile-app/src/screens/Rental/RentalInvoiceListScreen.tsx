@@ -42,7 +42,7 @@ const RentalInvoiceListScreen = () => {
   const [sendingInvoice, setSendingInvoice] = useState<string | null>(null);
 
   const [paymentForm, setPaymentForm] = useState({
-    modeOfPayment: '',
+    modeOfPayment: 'CASH',
     bankName: '',
     transactionDetails: '',
     chequeDate: '',
@@ -346,7 +346,7 @@ const RentalInvoiceListScreen = () => {
     }
 
     setPaymentForm({
-      modeOfPayment: entry.modeOfPayment || '',
+      modeOfPayment: entry.modeOfPayment || 'CASH',
       bankName: entry.bankName || '',
       transactionDetails: entry.transactionDetails || '',
       chequeDate: entry.chequeDate ? new Date(entry.chequeDate).toISOString().split('T')[0] : '',
@@ -392,6 +392,7 @@ const RentalInvoiceListScreen = () => {
               },
             }
           );
+          // Filter out the current invoice
           const filteredInvoices = (response.data?.entries || []).filter(
             (inv: any) => inv._id !== selectedEntry?._id
           );
@@ -406,7 +407,7 @@ const RentalInvoiceListScreen = () => {
   const resetForm = useCallback((companyId?: string) => {
     const companyIdToUse = companyId && companyId !== 'null' ? companyId : '';
     setPaymentForm({
-      modeOfPayment: '',
+      modeOfPayment: 'CASH',
       bankName: '',
       transactionDetails: '',
       chequeDate: '',
@@ -423,12 +424,22 @@ const RentalInvoiceListScreen = () => {
     setSelectedPendingInvoiceId(null);
   }, []);
 
-  const handleSavePaymentDetails = async (balanceAmountParam?: number, tsdBalance?: number) => {
+  const handleSavePaymentDetails = async (balanceAmountParam?: number) => {
     if (!selectedEntry) return;
 
     try {
       const paymentAmount = parseFloat(paymentForm.paymentAmount) || 0;
-      const balance = balanceAmountParam !== undefined ? balanceAmountParam : balanceAmount;
+      const grandTotal = parseFloat(String(selectedEntry?.grandTotal || paymentForm.grandTotal)) || 0;
+      
+      // Calculate status based on payment amount and balance
+      let status = 'Paid';
+      if (balanceAmountParam && selectedPendingInvoiceId) {
+        status = 'Unpaid';
+      } else if (paymentAmount >= grandTotal || paymentForm.paymentAmountType === 'TDS') {
+        status = 'Paid';
+      } else {
+        status = 'Unpaid';
+      }
       
       const payload: any = {
         modeOfPayment: paymentForm.modeOfPayment,
@@ -439,10 +450,12 @@ const RentalInvoiceListScreen = () => {
         companyNamePayment: paymentForm.companyNamePayment,
         otherPaymentMode: paymentForm.otherPaymentMode,
         paymentAmountType: paymentForm.paymentAmountType,
-        paymentAmount: paymentForm?.paymentAmount ? parseFloat(paymentForm.paymentAmount) : 0,
+        paymentAmount: balanceAmountParam 
+          ? balanceAmountParam 
+          : (paymentAmount >= grandTotal ? grandTotal : paymentAmount),
         tdsAmount: 0,
         pendingAmount: 0,
-        status: 'Paid',
+        status: status,
       };
 
       if (paymentForm.paymentAmountType === 'TDS') {
@@ -451,25 +464,34 @@ const RentalInvoiceListScreen = () => {
         payload.pendingAmount = pendingAmount || 0;
       }
 
-      const invoiceId = selectedPendingInvoiceId || selectedEntry._id;
-      const res = await axios.put(
-        `${process.env.EXPO_PUBLIC_API_URL}/rental-payment/${invoiceId}`,
-        payload,
-        {
-          headers: {
-            Authorization: token || '',
-          },
-        }
-      );
+      const invoiceId = balanceAmountParam ? selectedPendingInvoiceId : (selectedPendingInvoiceId || selectedEntry._id);
+      
+      if (invoiceId) {
+        const res = await axios.put(
+          `${process.env.EXPO_PUBLIC_API_URL}/rental-payment/${invoiceId}`,
+          payload,
+          {
+            headers: {
+              Authorization: token || '',
+            },
+          }
+        );
 
-      if (res.data?.success) {
-        Toast.show({
-          type: 'success',
-          text1: 'Success',
-          text2: res.data.message || 'Payment details updated successfully!',
-        });
-        setPaymentModalVisible(false);
-        fetchRentalEntries();
+        if (res.data?.success) {
+          Toast.show({
+            type: 'success',
+            text1: 'Success',
+            text2: res.data.message || 'Payment details updated successfully!',
+          });
+          setPaymentModalVisible(false);
+          fetchRentalEntries();
+        } else {
+          Toast.show({
+            type: 'error',
+            text1: 'Error',
+            text2: res.data?.message || 'Failed to update payment details',
+          });
+        }
       }
     } catch (error: any) {
       Toast.show({
@@ -651,6 +673,27 @@ const RentalInvoiceListScreen = () => {
               </Text>
             </View>
           )}
+          {item.grandTotal && (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Grand Total:</Text>
+              <Text style={[styles.detailValue, { fontWeight: 'bold', color: '#1976d2' }]}>
+                ₹{parseFloat(String(item.grandTotal)).toFixed(2)}
+              </Text>
+            </View>
+          )}
+          {item.status && (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Status:</Text>
+              <View style={[
+                styles.statusBadge,
+                item.status === 'Paid' ? styles.statusPaid :
+                item.status === 'Unpaid' ? styles.statusUnpaid :
+                styles.statusPending
+              ]}>
+                <Text style={styles.statusText}>{item.status}</Text>
+              </View>
+            </View>
+          )}
           {item.countImageUpload?.url && (
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Count Image:</Text>
@@ -774,12 +817,20 @@ const RentalInvoiceListScreen = () => {
                   <Text style={styles.productTitle}>Product {index + 1}</Text>
                   <View style={styles.productRow}>
                     <Text style={styles.productLabel}>Serial No:</Text>
-                    <Text style={styles.productValue}>{machineObj?.serialNo || 'N/A'}</Text>
+                    <Text style={styles.productValue}>{product.serialNo || machineObj?.serialNo || 'N/A'}</Text>
                   </View>
                   <View style={styles.productRow}>
                     <Text style={styles.productLabel}>Model:</Text>
                     <Text style={styles.productValue}>{machineObj?.modelName || 'N/A'}</Text>
                   </View>
+                  {product.productTotal && (
+                    <View style={styles.productRow}>
+                      <Text style={styles.productLabel}>Product Total:</Text>
+                      <Text style={[styles.productValue, { fontWeight: 'bold' }]}>
+                        ₹{parseFloat(String(product.productTotal)).toFixed(2)}
+                      </Text>
+                    </View>
+                  )}
                   
                   {/* Configurations */}
                   {product.a3Config && (
@@ -814,6 +865,16 @@ const RentalInvoiceListScreen = () => {
                 </View>
               );
             })}
+            
+            {/* Grand Total */}
+            {item.grandTotal && (
+              <View style={styles.grandTotalSection}>
+                <Text style={styles.grandTotalLabel}>Grand Total:</Text>
+                <Text style={styles.grandTotalValue}>
+                  ₹{parseFloat(String(item.grandTotal)).toFixed(2)}
+                </Text>
+              </View>
+            )}
           </View>
         )}
       </View>
@@ -876,7 +937,9 @@ const RentalInvoiceListScreen = () => {
             contentContainerStyle={styles.modalContentContainer}
             onStartShouldSetResponder={() => true}
           >
-            <Text style={styles.modalTitle}>Payment Details</Text>
+            <Text style={styles.modalTitle}>
+              Payment Details (RS: {paymentForm?.grandTotal || selectedEntry?.grandTotal || '0.00'})
+            </Text>
 
             {/* Mode of Payment */}
             <View style={styles.modalInputGroup}>
@@ -1116,7 +1179,7 @@ const RentalInvoiceListScreen = () => {
                   if (balanceAmount > 0) {
                     setTimeout(() => {
                       handleSavePaymentDetails(balanceAmount);
-                    }, 1000);
+                    }, 2000);
                   }
                 }}
               >
@@ -1512,6 +1575,44 @@ const styles = StyleSheet.create({
   configLabel: {
     fontSize: 11,
     color: '#666',
+  },
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusPaid: {
+    backgroundColor: '#c8e6c9',
+  },
+  statusUnpaid: {
+    backgroundColor: '#ffcdd2',
+  },
+  statusPending: {
+    backgroundColor: '#fff9c4',
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#333',
+  },
+  grandTotalSection: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 15,
+    backgroundColor: '#e3f2fd',
+    borderRadius: 6,
+    marginTop: 10,
+  },
+  grandTotalLabel: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  grandTotalValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1976d2',
   },
   emptyContainer: {
     padding: 50,

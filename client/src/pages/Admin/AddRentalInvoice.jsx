@@ -92,32 +92,34 @@ const RentalInvoiceForm = () => {
         }
     };
 
-    // Fetch all companies on component mount
-    useEffect(() => {
-        const fetchCompanies = async () => {
-            try {
-                setLoadingCompanies(true);
-                setLoading(true);
-                const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/company/all`, {
+    const fetchCompanyData = async () => {
+        try {
+            const { data } = await axios.get(
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/company/get/${formData.companyId}`,
+                {
                     headers: {
                         Authorization: auth.token,
                     },
-                });
-                if (data?.success) {
-                    setCompanies(data.companies);
-                } else {
-                    toast.error(data?.message || 'Failed to fetch companies.');
                 }
-            } catch (error) {
-                console.error("Error fetching companies:", error);
-                toast.error('Something went wrong while fetching companies.');
-            } finally {
-                setLoadingCompanies(false);
-                setLoading(false);
+            );
+            if (data?.success && data.company) {
+                const company = data.company;
+                setCompanies([company]);
+
+            } else {
+                alert(data?.message || 'Failed to fetch company details.');
             }
-        };
-        fetchCompanies();
-    }, [auth.token]);
+        } catch (error) {
+            alert(error.response?.data?.message || 'Something went wrong while fetching company details.');
+        }
+    };
+
+    // Fetch all companies on component mount
+    useEffect(() => {
+        if(formData.companyId !== '') {
+        fetchCompanyData()
+    }
+    }, [auth.token, formData.companyId]);
 
     // Fetch existing rental entry data if in edit mode
     useEffect(() => {
@@ -132,7 +134,7 @@ const RentalInvoiceForm = () => {
                     });
                     if (data?.success) {
                         const entry = data.entry;
-                        
+
                         // Set basic form data
                         setFormData({
                             companyId: entry.companyId?._id || '',
@@ -171,11 +173,11 @@ const RentalInvoiceForm = () => {
                             // New format - multiple products
                             const productsData = entry.products.map((product, index) => {
                                 // Handle both populated (object) and unpopulated (string) machineId
-                                const machineIdValue = typeof product.machineId === 'object' && product.machineId?._id 
-                                    ? product.machineId._id 
+                                const machineIdValue = typeof product.machineId === 'object' && product.machineId?._id
+                                    ? product.machineId._id
                                     : (product.machineId || '');
                                 const machineObject = typeof product.machineId === 'object' ? product.machineId : null;
-                                
+
                                 return {
                                     id: Date.now() + index, // Generate unique ID
                                     machineId: machineIdValue,
@@ -214,11 +216,11 @@ const RentalInvoiceForm = () => {
                         } else if (entry.machineId) {
                             // Old format - single product
                             // Handle both populated (object) and unpopulated (string) machineId
-                            const machineIdValue = typeof entry.machineId === 'object' && entry.machineId?._id 
-                                ? entry.machineId._id 
+                            const machineIdValue = typeof entry.machineId === 'object' && entry.machineId?._id
+                                ? entry.machineId._id
                                 : (entry.machineId || '');
                             const machineObject = typeof entry.machineId === 'object' ? entry.machineId : null;
-                            
+
                             setSelectedProduct(machineObject);
                             setProducts([{
                                 id: Date.now(),
@@ -291,7 +293,7 @@ const RentalInvoiceForm = () => {
                     });
                     if (data?.success) {
                         setAvailableProducts(data.rentalProducts);
-                        
+
                         // If in edit mode, populate selectedProduct for each product in the products array
                         if (id && products.length > 0) {
                             setProducts(prevProducts => prevProducts.map(product => {
@@ -308,7 +310,7 @@ const RentalInvoiceForm = () => {
                                 return product;
                             }));
                         }
-                        
+
                         // If in edit mode and machineId is already set (old format), ensure it's still valid
                         if (id && formData.machineId && !data.rentalProducts.some(p => p._id === formData.machineId)) {
                             setFormData(prev => ({ ...prev, machineId: '' })); // Clear if machineId is not in the list
@@ -346,7 +348,7 @@ const RentalInvoiceForm = () => {
     // Populate "Send Details To" options based on selected company
     useEffect(() => {
         if (formData.companyId && companies.length > 0) {
-            const selectedCompany = companies.find(comp => comp._id === formData.companyId);
+            const selectedCompany = companies[0];
             if (selectedCompany && selectedCompany.contactPersons) {
                 const options = selectedCompany.contactPersons.map(person =>
                     `${person.name} (Mobile: ${person.mobile}, Email: ${person.email})`
@@ -396,46 +398,6 @@ const RentalInvoiceForm = () => {
             setErrors(prev => ({ ...prev, [name]: '' })); // Clear error on change
         }
     };
-
-    const handleProductChange = (newValue) => { // Modified to accept newValue directly from Autocomplete
-        const selectedProductId = newValue ? newValue._id : '';
-        setFormData(prev => ({ ...prev, machineId: selectedProductId }));
-        setErrors(prev => ({ ...prev, machineId: '' }));
-
-        const selectedProduct = availableProducts.find(prod => prod._id === selectedProductId);
-        setSelectedProduct(selectedProduct);
-        if (selectedProduct) {
-            setFormData(prev => ({
-                ...prev,
-                a3Config: {
-                    ...prev.a3Config,
-                    bwOldCount: selectedProduct.a3Config?.bwOldCount ?? 0,
-                    colorOldCount: selectedProduct.a3Config?.colorOldCount ?? 0,
-                    colorScanningOldCount: selectedProduct.a3Config?.colorScanningOldCount ?? 0,
-                },
-                a4Config: {
-                    ...prev.a4Config,
-                    bwOldCount: selectedProduct.a4Config?.bwOldCount ?? 0,
-                    colorOldCount: selectedProduct.a4Config?.colorOldCount ?? 0,
-                    colorScanningOldCount: selectedProduct.a4Config?.colorScanningOldCount ?? 0,
-                },
-                a5Config: {
-                    ...prev.a5Config,
-                    bwOldCount: selectedProduct.a5Config?.bwOldCount ?? 0,
-                    colorOldCount: selectedProduct.a5Config?.colorOldCount ?? 0,
-                    colorScanningOldCount: selectedProduct.a5Config?.colorScanningOldCount ?? 0,
-                },
-            }));
-        } else {
-            setFormData(prev => ({
-                ...prev,
-                a3Config: { ...prev.a3Config, bwOldCount: '', colorOldCount: '', colorNewCount: '', colorScanningOldCount: '', colorScanningNewCount: '' },
-                a4Config: { ...prev.a4Config, bwOldCount: '', colorOldCount: '', colorNewCount: '', colorScanningOldCount: '', colorScanningNewCount: '' },
-                a5Config: { ...prev.a5Config, bwOldCount: '', colorOldCount: '', colorNewCount: '', colorScanningOldCount: '', colorScanningNewCount: '' },
-            }));
-        }
-    };
-
     // Functions for managing multiple products
     const addProduct = () => {
         setProducts(prev => [...prev, {
@@ -565,7 +527,7 @@ const RentalInvoiceForm = () => {
         // Also validate old format for backward compatibility
         if (products.length === 1 && !products[0].machineId && formData.machineId) {
             if (!formData.machineId) tempErrors.machineId = "Serial No. is required.";
-            
+
             const validateCountField = (config, fieldName, label) => {
                 if (config[fieldName] !== '' && config[fieldName] < 0) {
                     tempErrors[`${label}.${fieldName}`] = `${label} ${fieldName.replace(/([A-Z])/g, ' $1').trim()} must be a non-negative number.`;
@@ -611,11 +573,11 @@ const RentalInvoiceForm = () => {
         }
     }
 
-    const updateStausToRental = async (rentalId, status) => {
+    const updateStausToRental = async (rentalId, status, totalAmount) => {
         try {
             const { data } = await axios.put(
                 `${import.meta.env.VITE_SERVER_URL}/api/v1/rental/update/${rentalId}`,
-                { status },
+                { status, grandTotal: totalAmount },
                 {
                     headers: {
                         Authorization: auth.token,
@@ -653,7 +615,7 @@ const RentalInvoiceForm = () => {
                 return;
             }
             data.append('companyId', finalCompanyId);
-            
+
             if (!formData.sendDetailsTo) {
                 toast.error("Send Details To is required.");
                 setLoading(false);
@@ -689,9 +651,20 @@ const RentalInvoiceForm = () => {
                         a5Config: p.a5Config,
                         countImageUpload: p.countImageFile || null,
                     }));
-                
+                const validatedProducts = productsArray.map(p => {
+                    if (p.countImageUpload && typeof p.countImageUpload === 'string') {
+                        // Check if base64 string is complete (ends with proper format)
+                        const base64Str = p.countImageUpload;
+                        // Base64 data URIs should end with the base64 data, not be truncated
+                        if (base64Str.length > 1000000) { // If over ~1MB, it might cause issues
+                            alert(`Product image is very large it should be less than 1MB Consider compressing.`);
+                        }
+                    }
+                    return p;
+                });
+
                 data.append('products', JSON.stringify(productsArray));
-                
+
                 // Also append main image if provided
                 if (formData.countImageFile) {
                     data.append('countImageUpload', formData.countImageFile);
@@ -721,23 +694,36 @@ const RentalInvoiceForm = () => {
                 if (!id && invoiceType !== "quotation") {
                     await handleUpdateInvoiceCount();
                 }
+                
+                // Calculate total amount - handle both single and multiple products
+                let totalAmountIncludingGST = null;
+                try {
+                    if (res.data?.entry) {
+                        totalAmountIncludingGST = getTotalRentalInvoicePayment(res.data.entry);
+                    } else {
+                        console.warn('Entry data not found in response');
+                        totalAmountIncludingGST = { totalAmount: '0.00', commissionRate: 0, commissionAmount: '0.00', totalWithCommission: '0.00' };
+                    }
+                } catch (error) {
+                    console.error('Error calculating total amount:', error);
+                    totalAmountIncludingGST = { totalAmount: '0.00', commissionRate: 0, commissionAmount: '0.00', totalWithCommission: '0.00' };
+                }
+                
                 if (!id) {
-                    await updateStausToRental(rentalId, "Completed");
+                    await updateStausToRental(rentalId, "Completed", totalAmountIncludingGST?.totalAmount);
                 }
                 await updateCommissionDetails(res.data?.entry);
-                
+
                 // Update all products
                 if (hasMultipleProducts) {
                     await Promise.all(products
                         .filter(p => p.machineId && p.selectedProduct)
-                        .map(p => updateRentalProduct(p.selectedProduct, p.a3Config, p.a4Config, p.a5Config))
+                        .map(p => updateRentalProduct(p.selectedProduct, p?.a3Config, p?.a4Config, p?.a5Config))
                     );
                 } else if (selectedProduct) {
                     await onUpdateRentalProduct();
                 }
-                
-                toast.success("Rental entry created successfully!");
-                
+
                 // Reset form
                 setProducts([{
                     id: Date.now(),
@@ -763,7 +749,7 @@ const RentalInvoiceForm = () => {
                     a5Config: { bwOldCount: '', bwNewCount: '' },
                 });
                 setLogoPreview("");
-                
+
                 if (invoiceType === "quotation") {
                     navigate('../rentalQuotationList');
                 } else {
@@ -814,23 +800,23 @@ const RentalInvoiceForm = () => {
             ...selectedProduct,
             a3Config: {
                 ...selectedProduct?.a3Config,
-                bwOldCount: Number(formData.a3Config.bwNewCount) || 0,
-                colorOldCount: Number(formData.a3Config.colorNewCount) || 0,
-                colorScanningOldCount: Number(formData.a3Config.colorScanningNewCount) || 0,
+                bwOldCount: Number(formData?.a3Config.bwNewCount) || 0,
+                colorOldCount: Number(formData?.a3Config.colorNewCount) || 0,
+                colorScanningOldCount: Number(formData?.a3Config.colorScanningNewCount) || 0,
 
             },
             a4Config: {
                 ...selectedProduct?.a4Config,
-                bwOldCount: Number(formData.a4Config.bwNewCount) || 0,
+                bwOldCount: Number(formData?.a4Config.bwNewCount) || 0,
                 colorOldCount: Number(formData.a4Config.colorNewCount) || 0,
-                colorScanningOldCount: Number(formData.a4Config.colorScanningNewCount) || 0,
+                colorScanningOldCount: Number(formData?.a4Config.colorScanningNewCount) || 0,
 
             },
             a5Config: {
                 ...selectedProduct?.a5Config,
-                bwOldCount: Number(formData.a5Config.bwNewCount) || 0,
-                colorOldCount: Number(formData.a5Config.colorNewCount) || 0,
-                colorScanningOldCount: Number(formData.a5Config.colorScanningNewCount) || 0,
+                bwOldCount: Number(formData?.a5Config.bwNewCount) || 0,
+                colorOldCount: Number(formData?.a5Config.colorNewCount) || 0,
+                colorScanningOldCount: Number(formData?.a5Config.colorScanningNewCount) || 0,
             }
         }
         try {
@@ -1264,7 +1250,7 @@ const RentalInvoiceForm = () => {
                                 <MenuItem value="">
                                     <em>Select Option</em>
                                 </MenuItem>
-                                {contactOptions.map((option, index) => (
+                                {contactOptions?.map((option, index) => (
                                     <MenuItem key={index} value={option}>
                                         {option}
                                     </MenuItem>

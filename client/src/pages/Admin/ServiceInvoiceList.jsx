@@ -58,7 +58,7 @@ function InvoiceRow(props) {
         otherPaymentMode: invoice.otherPaymentMode || '', // New field for OTHERS
         paymentAmount: 0, // Single field for amount
         paymentAmountType: '', // Type of amount (TDS or Pending)
-        grandTotal: invoice.grandTotal || 0,
+        grandTotal: Number(invoice.grandTotal).toFixed(2) || 0,
     });
 
     const hasPermission = (key) => {
@@ -118,17 +118,17 @@ function InvoiceRow(props) {
     };
 
     const handleOpenPaymentDetailsModal = () => {
-        let initialPaymentAmount = 0;
-        let initialPaymentAmountType = '';
+        // let initialPaymentAmount = 0;
+        // let initialPaymentAmountType = '';
 
-        // Initialize paymentAmount and paymentAmountType based on existing invoice data
-        if (invoice.tdsAmount > 0) {
-            initialPaymentAmount = invoice.tdsAmount;
-            initialPaymentAmountType = 'TDS';
-        } else if (invoice.pendingAmount > 0) {
-            initialPaymentAmount = invoice.pendingAmount;
-            initialPaymentAmountType = 'Pending';
-        }
+        // // Initialize paymentAmount and paymentAmountType based on existing invoice data
+        // if (invoice.tdsAmount > 0) {
+        //     initialPaymentAmount = invoice.tdsAmount;
+        //     initialPaymentAmountType = 'TDS';
+        // } else if (invoice.pendingAmount > 0) {
+        //     initialPaymentAmount = invoice.pendingAmount;
+        //     initialPaymentAmountType = 'Pending';
+        // }
 
         setPaymentForm({
             modeOfPayment: invoice.modeOfPayment || '',
@@ -138,8 +138,9 @@ function InvoiceRow(props) {
             transferDate: invoice.transferDate ? new Date(invoice.transferDate).toISOString().split('T')[0] : '',
             companyNamePayment: invoice.companyNamePayment || '',
             otherPaymentMode: invoice.otherPaymentMode || '',
-            paymentAmount: initialPaymentAmount,
-            paymentAmountType: initialPaymentAmountType,
+            paymentAmount: invoice.paymentAmount || 0,
+            paymentAmountType: invoice.paymentAmountType || '',
+            grandTotal: Number(invoice.grandTotal).toFixed(2) || 0,
         });
         setOpenPaymentModal(true);
     };
@@ -159,7 +160,7 @@ function InvoiceRow(props) {
                 setPendingAmount(balanceAmount)
                 setBalanceAmount(0)
             } else {
-                let balanceAmount = value - invoice?.grandTotal;
+                let balanceAmount = Number(value) - Number(invoice?.grandTotal);
                 setBalanceAmount(balanceAmount)
                 setPendingAmount(0)
                 try {
@@ -183,6 +184,14 @@ function InvoiceRow(props) {
     };
 
     const handleSavePaymentDetails = async (balanceAmount, tsdBalance) => {
+        let status = "Paid"
+        if (balanceAmount && selectedInvliceId) {
+            status = "Unpaid"
+        } else if (Number(paymentForm?.paymentAmount) >= Number(paymentForm?.grandTotal) || paymentForm.paymentAmountType === 'TDS') {
+            status = "Paid"
+        } else {
+            status = "Unpaid"
+        }
         try {
             const payload = {
                 modeOfPayment: paymentForm.modeOfPayment,
@@ -193,10 +202,10 @@ function InvoiceRow(props) {
                 companyNamePayment: paymentForm.companyNamePayment,
                 otherPaymentMode: paymentForm.otherPaymentMode,
                 paymentAmountType: paymentForm.paymentAmountType,
-                paymentAmount: paymentForm?.paymentAmount,
+                paymentAmount: balanceAmount ? Number(balanceAmount) : paymentForm?.paymentAmount >= paymentForm?.grandTotal ? Number(paymentForm?.grandTotal) : Number(paymentForm?.paymentAmount),
                 tdsAmount: 0, // Default to 0, will be updated if type is TDS
                 pendingAmount: 0, // Default to 0, will be updated if type is Pending
-                status: balanceAmount >= paymentForm?.grandTotal || paymentForm.paymentAmount >= paymentForm?.grandTotal || paymentForm.paymentAmountType === 'TDS' ? "Paid" : "Unpaid",
+                status: status,
             };
 
             // Conditionally set tdsAmount or pendingAmount based on selected type
@@ -206,21 +215,26 @@ function InvoiceRow(props) {
                 payload.pendingAmount = pendingAmount || 0;
             }
 
-            const res = await axios.put(
-                `${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/update/${selectedInvliceId ? selectedInvliceId : invoice._id}`,
-                payload,
-                {
-                    headers: {
-                        Authorization: auth.token,
-                    },
+            if (selectedInvliceId || invoice._id) {
+                const res = await axios.put(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/update/${balanceAmount ? selectedInvliceId : invoice._id}`,
+                    payload,
+                    {
+                        headers: {
+                            Authorization: auth.token,
+                        },
+                    }
+                );
+                if (res.data?.success) {
+                    toast.success(res.data.message || 'Payment details updated successfully!');
+                    handleClosePaymentDetailsModal();
+                    props.onInvoiceUpdate();
                 }
-            );
-
-            if (res.data?.success) {
-                toast.success(res.data.message || 'Payment details updated successfully!');
-                handleClosePaymentDetailsModal();
-                props.onInvoiceUpdate();
             }
+
+
+
+
         } catch (error) {
             console.error('Error updating payment details:', error);
         }
@@ -451,7 +465,6 @@ function InvoiceRow(props) {
                                 </TableHead>
                                 <TableBody>
                                     {invoice.products.map((product) => (
-                                        console.log(product, "product54234"),
                                         <TableRow key={product?.productId?._id || product._id}>
                                             <TableCell component="th" scope="row">
                                                 {product.productId?.productName?.productName?.productName || product.productName}
@@ -472,7 +485,7 @@ function InvoiceRow(props) {
 
             {/* Payment Details Update Modal */}
             <Dialog open={openPaymentModal} onClose={handleClosePaymentDetailsModal}>
-                <DialogTitle>Payment Details</DialogTitle>
+                <DialogTitle>Payment Details (RS: {invoice.grandTotal})</DialogTitle>
                 <DialogContent>
                     <FormControl fullWidth margin="normal" size="small">
                         <InputLabel id="mode-of-payment-label">Mode Of Payment</InputLabel>
@@ -688,7 +701,7 @@ function InvoiceRow(props) {
                         if (balanceAmount) {
                             setTimeout(() => {
                                 handleSavePaymentDetails(balanceAmount)
-                            }, 1000)
+                            }, 2000)
                         }
 
                     }

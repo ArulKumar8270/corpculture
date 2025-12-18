@@ -30,6 +30,10 @@ const employeeSchema = new mongoose.Schema(
             type: String,
             required: true,
         },
+        pincode: {
+            type: String,
+            trim: true,
+        },
         employeeType: {
             type: String,
             required: true,

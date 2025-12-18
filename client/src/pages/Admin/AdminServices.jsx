@@ -247,7 +247,7 @@ const AdminServices = () => {
   };
 
   const handleReport = (serviceId, employeeName, companyId) => {
-    navigate(`../addServiceReport?employeeName=${employeeName}&reportType=service&serviceId=${serviceId}&companyId=${companyId}`);
+    navigate(`../addServiceReport?employeeName=${employeeName}&reportType=Service_Report&serviceId=${serviceId}&companyId=${companyId}`);
     handleClose();
   };
 

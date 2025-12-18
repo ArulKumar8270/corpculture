@@ -77,6 +77,11 @@ const oldInvoiceSchema = new mongoose.Schema({
         trim: true,
         lowercase: true
     }],
+    ccEmailList: [{
+        type: String,
+        trim: true,
+        lowercase: true
+    }],
     notes: {
         type: String,
         trim: true

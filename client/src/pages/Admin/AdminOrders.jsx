@@ -6,6 +6,7 @@ import axios from "axios";
 import { useAuth } from "../../context/auth";
 import SeoData from "../../SEO/SeoData";
 import { Link } from "react-router-dom"; // Import Link for navigation
+import { TablePagination } from "@mui/material";
 
 const AdminOrders = () => {
     const { auth, userPermissions } = useAuth();
@@ -17,6 +18,15 @@ const AdminOrders = () => {
     const [employees, setEmployees] = useState([]); // State to store employees
     const [selectedEmployeeId, setSelectedEmployeeId] = useState(""); // State for selected employee
     const [refetchOrders, setRefetchOrders] = useState(false);
+    // Pagination and filter states
+    const [page, setPage] = useState(0);
+    const [rowsPerPage, setRowsPerPage] = useState(10);
+    const [totalCount, setTotalCount] = useState(0);
+    const [fromDate, setFromDate] = useState("");
+    const [toDate, setToDate] = useState("");
+    const [buyerNameFilter, setBuyerNameFilter] = useState("");
+    const [employeeIdFilter, setEmployeeIdFilter] = useState("");
+    const [orderStatusFilter, setOrderStatusFilter] = useState("");
 
     const hasPermission = (key) => {
         return userPermissions.some(p => p.key === key && p.actions.includes('edit')) || auth?.user?.role === 1;
@@ -29,7 +39,8 @@ const AdminOrders = () => {
             setOrders([]); // Clear orders if no token
             setLoading(false);
         }
-    }, [auth?.token, refetchOrders]); // Re-run effect if auth token changes
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [auth?.token, refetchOrders, page, rowsPerPage]); // Re-run effect when pagination changes or refetch is triggered
 
     // Fetch employees
     useEffect(() => {
@@ -42,12 +53,31 @@ const AdminOrders = () => {
 
 
     // fetch orders from server
-    const fetchOrders = async () => {
+    const fetchOrders = async (overrideFilters = {}) => {
         try {
             setLoading(true);
+            const currentSearch = overrideFilters.search !== undefined ? overrideFilters.search : search;
+            const currentFromDate = overrideFilters.fromDate !== undefined ? overrideFilters.fromDate : fromDate;
+            const currentToDate = overrideFilters.toDate !== undefined ? overrideFilters.toDate : toDate;
+            const currentBuyerName = overrideFilters.buyerNameFilter !== undefined ? overrideFilters.buyerNameFilter : buyerNameFilter;
+            const currentEmployeeId = overrideFilters.employeeIdFilter !== undefined ? overrideFilters.employeeIdFilter : employeeIdFilter;
+            const currentOrderStatus = overrideFilters.orderStatusFilter !== undefined ? overrideFilters.orderStatusFilter : orderStatusFilter;
+            const currentPage = overrideFilters.page !== undefined ? overrideFilters.page : page;
+            const currentRowsPerPage = overrideFilters.rowsPerPage !== undefined ? overrideFilters.rowsPerPage : rowsPerPage;
+
+            const queryParams = new URLSearchParams({
+                search: currentSearch || "",
+                fromDate: currentFromDate || "",
+                toDate: currentToDate || "",
+                buyerName: currentBuyerName || "",
+                employeeId: currentEmployeeId || "",
+                orderStatus: currentOrderStatus || "",
+                page: currentPage + 1, // Backend expects 1-indexed page
+                limit: currentRowsPerPage,
+            }).toString();
+
             const response = await axios.get(
-                `${import.meta.env.VITE_SERVER_URL
-                }/api/v1/user/admin-orders`, // *** Verify this is the correct endpoint for ALL orders ***
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/user/admin-orders?${queryParams}`,
                 {
                     headers: {
                         Authorization: auth?.token,
@@ -55,11 +85,12 @@ const AdminOrders = () => {
                 }
             );
             if (response?.data?.orders) {
-                // Assuming the backend returns an array of order objects
                 setOrders(response.data.orders);
+                setTotalCount(response.data.totalCount || 0);
                 setLoading(false);
             } else {
                 setOrders([]); // Ensure orders is an array even if response is empty
+                setTotalCount(0);
                 setLoading(false);
             }
         } catch (error) {
@@ -107,8 +138,6 @@ const AdminOrders = () => {
             return;
         }
 
-        setRefetchOrders(true);
-
         // *** Implement backend API call to assign orders to the employee ***
         // Example:
         try {
@@ -129,7 +158,7 @@ const AdminOrders = () => {
             alert("Orders assigned successfully!");
             // Optionally, clear selected orders and refetch orders/employees
             setSelectedOrderIds([]);
-            fetchOrders(); // You might want to refetch orders to update assignment status
+            setRefetchOrders(prev => !prev); // Toggle to trigger refetch
         } catch (error) {
             console.error("Error assigning orders:", error);
             alert("Failed to assign orders.");
@@ -137,13 +166,40 @@ const AdminOrders = () => {
     };
 
 
-    // Filter orders based on search input (optional, basic filtering)
-    const filteredOrders = orders.filter(order =>
-        order._id.toLowerCase().includes(search.toLowerCase()) ||
-        order.buyer?.name.toLowerCase().includes(search.toLowerCase()) ||
-        order.shippingInfo?.address.toLowerCase().includes(search.toLowerCase())
-        // Add more fields to search if needed
-    );
+    const handleChangePage = (event, newPage) => {
+        setPage(newPage);
+    };
+
+    const handleChangeRowsPerPage = (event) => {
+        setRowsPerPage(parseInt(event.target.value, 10));
+        setPage(0); // Reset to first page when changing rows per page
+    };
+
+    const handleApplyFilters = () => {
+        setPage(0); // Reset to first page when applying new filters
+        fetchOrders(); // Fetch with current filter values
+    };
+
+    const handleClearFilters = () => {
+        setSearch("");
+        setFromDate("");
+        setToDate("");
+        setBuyerNameFilter("");
+        setEmployeeIdFilter("");
+        setOrderStatusFilter("");
+        setPage(0);
+        // Fetch immediately with cleared filters
+        fetchOrders({
+            search: "",
+            fromDate: "",
+            toDate: "",
+            buyerNameFilter: "",
+            employeeIdFilter: "",
+            orderStatusFilter: "",
+            page: 0,
+            rowsPerPage: rowsPerPage
+        });
+    };
 
     return (
         <>
@@ -157,26 +213,112 @@ const AdminOrders = () => {
                         <Spinner />
                     ) : (
                         <div className="flex flex-col gap-3 w-full pb-5 overflow-hidden">
-                            {/* <!-- searchbar --> */}
-                            <form
-                                className="flex items-center justify-between mx-auto w-full sm:w-10/12 bg-white border border-[#019ee3] rounded-2xl mb-4 shadow hover:shadow-lg transition"
-                                onSubmit={(e) => e.preventDefault()} // Prevent default form submission
-                            >
-                                <input
-                                    value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                    type="search"
-                                    name="search"
-                                    placeholder="Search orders by ID, Customer, Address..."
-                                    className="p-3 text-sm outline-none flex-1 rounded-l-2xl bg-[#f7fafd]"
-                                />
-                                {/* Search button is now just visual, filtering happens onChange */}
-                                <div className="h-full text-sm px-4 py-3 text-white bg-gradient-to-r from-[#019ee3] to-[#afcb09] rounded-r-2xl flex items-center gap-2 font-semibold">
-                                    <SearchIcon sx={{ fontSize: "20px" }} />
-                                    <span className="text-xs sm:text-sm">Search</span>
+                            {/* <!-- searchbar and filters --> */}
+                            <div className="flex flex-col gap-4 mb-4">
+                                <form
+                                    className="flex items-center justify-between mx-auto w-full sm:w-10/12 bg-white border border-[#019ee3] rounded-2xl shadow hover:shadow-lg transition"
+                                    onSubmit={(e) => {
+                                        e.preventDefault();
+                                        handleApplyFilters();
+                                    }}
+                                >
+                                    <input
+                                        value={search}
+                                        onChange={(e) => setSearch(e.target.value)}
+                                        type="search"
+                                        name="search"
+                                        placeholder="Search orders by ID, Customer, Address..."
+                                        className="p-3 text-sm outline-none flex-1 rounded-l-2xl bg-[#f7fafd]"
+                                    />
+                                    <button
+                                        type="submit"
+                                        className="h-full text-sm px-4 py-3 text-white bg-gradient-to-r from-[#019ee3] to-[#afcb09] rounded-r-2xl flex items-center gap-2 font-semibold hover:from-[#afcb09] hover:to-[#019ee3] transition"
+                                    >
+                                        <SearchIcon sx={{ fontSize: "20px" }} />
+                                        <span className="text-xs sm:text-sm">Search</span>
+                                    </button>
+                                </form>
+                                
+                                {/* Advanced Filters */}
+                                <div className="bg-white border border-[#019ee3] rounded-2xl shadow p-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">From Date</label>
+                                            <input
+                                                type="date"
+                                                value={fromDate}
+                                                onChange={(e) => setFromDate(e.target.value)}
+                                                className="w-full p-2 border rounded-md text-sm"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">To Date</label>
+                                            <input
+                                                type="date"
+                                                value={toDate}
+                                                onChange={(e) => setToDate(e.target.value)}
+                                                className="w-full p-2 border rounded-md text-sm"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Buyer Name</label>
+                                            <input
+                                                type="text"
+                                                value={buyerNameFilter}
+                                                onChange={(e) => setBuyerNameFilter(e.target.value)}
+                                                placeholder="Filter by buyer name"
+                                                className="w-full p-2 border rounded-md text-sm"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Employee</label>
+                                            <select
+                                                value={employeeIdFilter}
+                                                onChange={(e) => setEmployeeIdFilter(e.target.value)}
+                                                className="w-full p-2 border rounded-md text-sm"
+                                            >
+                                                <option value="">All Employees</option>
+                                                {employees
+                                                    ?.filter(employee => employee.employeeType === 'Sales')
+                                                    .map(employee => (
+                                                        <option key={employee._id} value={employee._id}>
+                                                            {employee.name}
+                                                        </option>
+                                                    ))}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Order Status</label>
+                                            <select
+                                                value={orderStatusFilter}
+                                                onChange={(e) => setOrderStatusFilter(e.target.value)}
+                                                className="w-full p-2 border rounded-md text-sm"
+                                            >
+                                                <option value="">All Statuses</option>
+                                                <option value="Processing">Processing</option>
+                                                <option value="Shipped">Shipped</option>
+                                                <option value="Delivered">Delivered</option>
+                                                <option value="Cancelled">Cancelled</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={handleApplyFilters}
+                                            className="px-4 py-2 bg-gradient-to-r from-[#019ee3] to-[#afcb09] text-white rounded-md font-semibold hover:from-[#afcb09] hover:to-[#019ee3] transition"
+                                        >
+                                            Apply Filters
+                                        </button>
+                                        <button
+                                            onClick={handleClearFilters}
+                                            className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md font-semibold hover:bg-gray-300 transition"
+                                        >
+                                            Clear Filters
+                                        </button>
+                                    </div>
                                 </div>
-                            </form>
-                            {/* <!-- search bar --> */}
+                            </div>
+                            {/* <!-- search bar and filters --> */}
 
                             {/* Assignment Controls */}
                             {hasPermission("salesOrders") ? <div className="flex flex-col sm:flex-row items-center gap-4 mb-4 p-4 bg-white rounded-xl shadow justify-between">
@@ -210,7 +352,7 @@ const AdminOrders = () => {
                                 </div> </div> : null}
 
 
-                            {filteredOrders?.length === 0 && (
+                            {orders?.length === 0 && !loading && (
                                 <div className="flex flex-col items-center gap-3 p-10 bg-gradient-to-br from-[#e6fbff] to-[#f7fafd] rounded-2xl shadow">
                                     <img
                                         draggable="false"
@@ -226,7 +368,7 @@ const AdminOrders = () => {
                             )}
 
                             {/* Orders Table */}
-                            {filteredOrders?.length > 0 && (
+                            {orders?.length > 0 && (
                                 <div className="overflow-x-auto bg-white rounded-xl shadow p-4">
                                     <table className="min-w-full text-sm">
                                         <thead>
@@ -249,7 +391,6 @@ const AdminOrders = () => {
                                                 <th className="py-2 px-3 text-left">Order ID</th>
                                                 <th className="py-2 px-3 text-left">Status</th>
                                                 <th className="py-2 px-3 text-left">Assigned Users</th>
-                                                <th className="py-2 px-3 text-left">Customer</th>
                                                 <th className="py-2 px-3 text-left">Amount</th>
                                                 <th className="py-2 px-3 text-left">Products</th>
                                                 <th className="py-2 px-3 text-left">Order Date</th>
@@ -257,7 +398,7 @@ const AdminOrders = () => {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {filteredOrders?.map(order => (
+                                            {orders?.map(order => (
                                                 <tr key={order._id} className="border-b last:border-b-0 hover:bg-gray-50">
                                                     {hasPermission("salesOrders") ? <td className="py-2 px-3">
                                                         <input
@@ -281,7 +422,6 @@ const AdminOrders = () => {
                                                             {order.employeeId?.name} {/* {{ edit_2 }} */}
                                                         </Link>
                                                     </td>
-                                                    <td className="py-2 px-3">{order.buyer?.name || 'N/A'}</td>
                                                     <td className="py-2 px-3">
                                                         ₹ {order.amount || '0'}
                                                     </td>
@@ -305,6 +445,18 @@ const AdminOrders = () => {
                                             ))}
                                         </tbody>
                                     </table>
+                                    {/* Pagination */}
+                                    <div className="mt-4">
+                                        <TablePagination
+                                            rowsPerPageOptions={[5, 10, 25, 50]}
+                                            component="div"
+                                            count={totalCount}
+                                            rowsPerPage={rowsPerPage}
+                                            page={page}
+                                            onPageChange={handleChangePage}
+                                            onRowsPerPageChange={handleChangeRowsPerPage}
+                                        />
+                                    </div>
                                 </div>
                             )}
                         </div>
