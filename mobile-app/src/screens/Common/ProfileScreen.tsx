@@ -9,6 +9,7 @@ import {
   TextInput,
   FlatList,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useDispatch, useSelector } from 'react-redux';
@@ -29,12 +30,16 @@ const ProfileScreen = () => {
   // Payment update states
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
-  const [invoiceType, setInvoiceType] = useState<'rental' | 'service'>('rental');
-  const [companies, setCompanies] = useState<any[]>([]);
+  const [invoiceType, setInvoiceType] = useState<'rental' | 'service'>('service');
+  const [allCompanies, setAllCompanies] = useState<any[]>([]);
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
-  const [rentalInvoices, setRentalInvoices] = useState<any[]>([]);
-  const [serviceInvoices, setServiceInvoices] = useState<any[]>([]);
+  const [invoices, setInvoices] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingInvoices, setLoadingInvoices] = useState(false);
+  const [loadingCompanies, setLoadingCompanies] = useState(false);
+  const [employee, setEmployee] = useState<any>(null);
+  const [loadingEmployee, setLoadingEmployee] = useState(false);
+  const [companyPickerVisible, setCompanyPickerVisible] = useState(false);
   const [modeOfPaymentPickerVisible, setModeOfPaymentPickerVisible] = useState(false);
   const [amountTypePickerVisible, setAmountTypePickerVisible] = useState(false);
   const [pendingInvoicePickerVisible, setPendingInvoicePickerVisible] = useState(false);
@@ -81,100 +86,126 @@ const ProfileScreen = () => {
     }
   };
 
-  // Fetch companies with pending invoices
-  const fetchCompaniesWithInvoices = async () => {
+
+  console.log(token, 'user23452345', user?._id);
+  // Fetch employee data
+  const fetchEmployeeData = async () => {
+    if (!user?._id || !token) {
+      setLoadingEmployee(false);
+      return;
+    }
+    
+    try {
+      setLoadingEmployee(true);
+      console.log('user?._id23452345', user?._id, `${process.env.EXPO_PUBLIC_API_URL}/employee/user/${user?._id}`, token);
+      const response = await axios.get(
+        `${process.env.EXPO_PUBLIC_API_URL}/employee/user/${user?._id}`,
+        { headers: { Authorization: token || '' } }
+      );
+      
+      console.log('response22345234', response.data);
+
+      if (response.data?.success) {
+        setEmployee(response.data.employee);
+      }
+    } catch (error: any) {
+      console.log('error23452345', error);
+      // Employee might not exist for this user, which is okay
+      // Only log non-404 errors for debugging
+      if (error.response?.status === 404) {
+        // 404 is expected if employee doesn't exist - silently handle
+        setEmployee(null);
+      } else {
+        // Log other errors for debugging
+        console.error('Error fetching employee data:', error.response?.data || error.message);
+        setEmployee(null);
+      }
+    } finally {
+      setLoadingEmployee(false);
+    }
+  };
+
+  // Fetch all companies
+  const fetchCompanies = async () => {
     if (user?.role !== 3) return;
     
     try {
-      setLoading(true);
-      const [rentalRes, serviceRes] = await Promise.all([
-        axios.post(
-          `${process.env.EXPO_PUBLIC_API_URL}/rental-payment/assignedTo/${user?._id}/invoice`,
-          {},
-          { headers: { Authorization: token || '' } }
-        ).catch(() => ({ data: { success: false, entries: [] } })),
-        axios.get(
-          `${process.env.EXPO_PUBLIC_API_URL}/service-invoice/assignedTo/${user?._id}/invoice`,
-          { headers: { Authorization: token || '' } }
-        ).catch(() => ({ data: { success: false, serviceInvoices: [] } })),
-      ]);
-
-      const rentalEntries = rentalRes.data?.success ? (rentalRes.data.entries || []) : [];
-      const serviceEntries = serviceRes.data?.success ? (serviceRes.data.serviceInvoices || []) : [];
-
-      setRentalInvoices(rentalEntries);
-      setServiceInvoices(serviceEntries);
-
-      // Group by company
-      const companyMap = new Map();
+      setLoadingCompanies(true);
+      const response = await axios.get(
+        `${process.env.EXPO_PUBLIC_API_URL}/company/all?limit=1000`,
+        { headers: { Authorization: token || '' } }
+      );
       
-      rentalEntries.forEach((entry: any) => {
-        const companyId = entry.companyId?._id || entry.companyId;
-        const companyName = entry.companyId?.companyName || 'Unknown';
-        if (companyId) {
-          if (!companyMap.has(companyId)) {
-            companyMap.set(companyId, {
-              _id: companyId,
-              companyName,
-              rentalInvoices: [],
-              serviceInvoices: [],
-            });
-          }
-          companyMap.get(companyId).rentalInvoices.push(entry);
-        }
-      });
-
-      serviceEntries.forEach((entry: any) => {
-        const companyId = entry.companyId?._id || entry.companyId;
-        const companyName = entry.companyId?.companyName || 'Unknown';
-        if (companyId) {
-          if (!companyMap.has(companyId)) {
-            companyMap.set(companyId, {
-              _id: companyId,
-              companyName,
-              rentalInvoices: [],
-              serviceInvoices: [],
-            });
-          }
-          companyMap.get(companyId).serviceInvoices.push(entry);
-        }
-      });
-
-      setCompanies(Array.from(companyMap.values()));
+      if (response.data?.success) {
+        setAllCompanies(response.data.companies || []);
+      }
     } catch (error: any) {
       console.error('Error fetching companies:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Failed to load companies',
+      });
+    } finally {
+      setLoadingCompanies(false);
+    }
+  };
+
+  // Fetch invoices for selected company
+  const fetchInvoicesForCompany = async (companyId: string) => {
+    if (!companyId || !token) {
+      setInvoices([]);
+      return;
+    }
+    
+    try {
+      setLoadingInvoices(true);
+      const response = await axios.post(
+        `${process.env.EXPO_PUBLIC_API_URL}/service-invoice/all`,
+        {
+          companyId: companyId,
+          invoiceType: 'invoice',
+        },
+        { headers: { Authorization: token || '' } }
+      );
+      
+      if (response.data?.success) {
+        setInvoices(response.data.serviceInvoices || []);
+      }
+    } catch (error: any) {
+      console.error('Error fetching invoices:', error);
       Toast.show({
         type: 'error',
         text1: 'Error',
         text2: 'Failed to load invoices',
       });
     } finally {
-      setLoading(false);
+      setLoadingInvoices(false);
     }
   };
 
   useFocusEffect(
     useCallback(() => {
       if (user?.role === 3) {
-        fetchCompaniesWithInvoices();
+        fetchEmployeeData();
+        fetchCompanies();
       }
-    }, [user?.role, token])
+    }, [user?.role, token, user?._id])
   );
+
+  // Fetch invoices when company is selected
+  useEffect(() => {
+    if (selectedCompany) {
+      fetchInvoicesForCompany(selectedCompany);
+    } else {
+      setInvoices([]);
+    }
+  }, [selectedCompany, token]);
 
   const handleOpenPaymentModal = (invoice: any, type: 'rental' | 'service') => {
     setSelectedInvoice(invoice);
     setInvoiceType(type);
-    let initialPaymentAmount = 0;
-    let initialPaymentAmountType = '';
-
-    if (invoice.tdsAmount > 0) {
-      initialPaymentAmount = invoice.tdsAmount;
-      initialPaymentAmountType = 'TDS';
-    } else if (invoice.pendingAmount > 0) {
-      initialPaymentAmount = invoice.pendingAmount;
-      initialPaymentAmountType = 'Pending';
-    }
-
+    
     setPaymentForm({
       modeOfPayment: invoice.modeOfPayment || '',
       bankName: invoice.bankName || '',
@@ -183,8 +214,8 @@ const ProfileScreen = () => {
       transferDate: invoice.transferDate ? new Date(invoice.transferDate).toISOString().split('T')[0] : '',
       companyNamePayment: invoice.companyNamePayment || '',
       otherPaymentMode: invoice.otherPaymentMode || '',
-      paymentAmount: initialPaymentAmount.toString(),
-      paymentAmountType: initialPaymentAmountType,
+      paymentAmount: invoice.paymentAmount?.toString() || '0',
+      paymentAmountType: invoice.paymentAmountType || '',
       grandTotal: invoice.grandTotal || 0,
     });
     setBalanceAmount(0);
@@ -242,8 +273,18 @@ const ProfileScreen = () => {
     if (!selectedInvoice) return;
 
     try {
-      const paymentAmount = parseFloat(paymentForm.paymentAmount) || 0;
-      
+      let status = 'Paid';
+      if (balanceAmount && selectedPendingInvoiceId) {
+        status = 'Unpaid';
+      } else if (
+        Number(paymentForm?.paymentAmount) >= Number(paymentForm?.grandTotal) ||
+        paymentForm.paymentAmountType === 'TDS'
+      ) {
+        status = 'Paid';
+      } else {
+        status = 'Unpaid';
+      }
+
       const payload: any = {
         modeOfPayment: paymentForm.modeOfPayment,
         bankName: paymentForm.bankName,
@@ -253,10 +294,15 @@ const ProfileScreen = () => {
         companyNamePayment: paymentForm.companyNamePayment,
         otherPaymentMode: paymentForm.otherPaymentMode,
         paymentAmountType: paymentForm.paymentAmountType,
-        paymentAmount: paymentForm?.paymentAmount ? parseFloat(paymentForm.paymentAmount) : 0,
+        paymentAmount:
+          balanceAmount && selectedPendingInvoiceId
+            ? Number(balanceAmount)
+            : paymentForm?.paymentAmount && parseFloat(paymentForm.paymentAmount) >= paymentForm?.grandTotal
+            ? Number(paymentForm?.grandTotal)
+            : Number(paymentForm?.paymentAmount) || 0,
         tdsAmount: 0,
         pendingAmount: 0,
-        status: 'Paid',
+        status: status,
       };
 
       if (paymentForm.paymentAmountType === 'TDS') {
@@ -265,10 +311,8 @@ const ProfileScreen = () => {
         payload.pendingAmount = pendingAmount || 0;
       }
 
-      const invoiceId = selectedPendingInvoiceId || selectedInvoice._id;
-      const endpoint = invoiceType === 'rental'
-        ? `/rental-payment/${invoiceId}`
-        : `/service-invoice/update/${invoiceId}`;
+      const invoiceId = balanceAmount && selectedPendingInvoiceId ? selectedPendingInvoiceId : selectedInvoice._id;
+      const endpoint = `/service-invoice/update/${invoiceId}`;
       
       const res = await axios.put(
         `${process.env.EXPO_PUBLIC_API_URL}${endpoint}`,
@@ -284,10 +328,21 @@ const ProfileScreen = () => {
         Toast.show({
           type: 'success',
           text1: 'Success',
-          text2: 'Payment details updated successfully!',
+          text2: res.data.message || 'Payment details updated successfully!',
         });
-        setPaymentModalVisible(false);
-        fetchCompaniesWithInvoices();
+        
+        // If there's a balance amount, save to the pending invoice as well
+        if (balanceAmount && selectedPendingInvoiceId) {
+          setTimeout(() => {
+            handleSavePaymentDetails();
+          }, 1000);
+        } else {
+          setPaymentModalVisible(false);
+          // Refresh invoices for the selected company
+          if (selectedCompany) {
+            fetchInvoicesForCompany(selectedCompany);
+          }
+        }
       }
     } catch (error: any) {
       Toast.show({
@@ -298,89 +353,224 @@ const ProfileScreen = () => {
     }
   };
 
+  // Get department name (handle both string and populated object)
+  const getDepartmentName = () => {
+    if (!employee?.department) return 'N/A';
+    if (typeof employee.department === 'string') return employee.department;
+    return employee.department.name || employee.department._id || 'N/A';
+  };
+
   return (
     <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.avatar}>
-          <Icon name="person" size={50} color="#fff" />
-        </View>
-        <Text style={styles.name}>{user?.name || 'User'}</Text>
-        <Text style={styles.role}>{getRoleName(user?.role || 0)}</Text>
-      </View>
+      {/* Employee ID Card */}
+      {user?.role === 3 && employee && !loadingEmployee ? (
+        <View style={styles.employeeCard}>
+          {/* Card Header */}
+          <View style={styles.cardHeader}>
+            <Text style={styles.companyName}>CORPCULTURE</Text>
+            <Text style={styles.cardSubtitle}>EMPLOYEE IDENTIFICATION CARD</Text>
+          </View>
 
-      <View style={styles.section}>
-        <View style={styles.infoRow}>
-          <Icon name="email" size={20} color="#666" />
-          <Text style={styles.infoText}>{user?.email || 'N/A'}</Text>
+          {/* Profile Section */}
+          <View style={styles.profileSection}>
+            <View style={styles.profileImageContainer}>
+              {employee.image ? (
+                <Image source={{ uri: employee.image }} style={styles.profileImage} />
+              ) : (
+                <View style={styles.profileImagePlaceholder}>
+                  <Text style={styles.profileImageText}>
+                    {employee.name?.charAt(0)?.toUpperCase() || 'E'}
+                  </Text>
+                </View>
+              )}
+            </View>
+            <View style={styles.profileInfo}>
+              <Text style={styles.employeeName}>{employee.name}</Text>
+              <Text style={styles.designationLabel}>Designation</Text>
+              {employee.designation && (
+                <Text style={styles.designationValue}>{employee.designation}</Text>
+              )}
+              {employee.idCradNo && (
+                <View style={styles.idBadge}>
+                  <Text style={styles.idBadgeText}>ID: {employee.idCradNo}</Text>
+                </View>
+              )}
+            </View>
+          </View>
+
+          {/* Details Section */}
+          <View style={styles.detailsSection}>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Department:</Text>
+              <Text style={styles.detailValue}>{getDepartmentName()}</Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Type:</Text>
+              <Text style={styles.detailValue}>{employee.employeeType || 'N/A'}</Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Phone:</Text>
+              <Text style={styles.detailValue}>{employee.phone || 'N/A'}</Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Email:</Text>
+              <Text style={styles.detailValue} numberOfLines={1} ellipsizeMode="tail">
+                {employee.email || 'N/A'}
+              </Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Pincode:</Text>
+              <Text style={styles.detailValue}>{employee.pincode || 'N/A'}</Text>
+            </View>
+          </View>
+
+          {/* Footer Banner */}
+          <View style={styles.cardFooter}>
+            <Text style={styles.footerText}>This card is the property of Corpculture</Text>
+            <Text style={styles.footerSubtext}>Valid until further notice</Text>
+          </View>
         </View>
-        <View style={styles.infoRow}>
-          <Icon name="phone" size={20} color="#666" />
-          <Text style={styles.infoText}>{user?.phone || 'N/A'}</Text>
+      ) : user?.role === 3 && loadingEmployee ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#007AFF" />
+          <Text style={styles.loadingText}>Loading employee details...</Text>
         </View>
-      </View>
+      ) : (
+        <View style={styles.header}>
+          <View style={styles.avatar}>
+            <Icon name="person" size={50} color="#fff" />
+          </View>
+          <Text style={styles.name}>{user?.name || 'User'}</Text>
+          <Text style={styles.role}>{getRoleName(user?.role || 0)}</Text>
+        </View>
+      )}
+
+      {/* Additional Details Section */}
+      {user?.role === 3 && employee && !loadingEmployee && (
+        <View style={styles.section}>
+          <View style={styles.additionalDetailsRow}>
+            <Text style={styles.detailLabel}>Address:</Text>
+            <Text style={styles.detailValue} numberOfLines={3}>
+              {employee.address || 'N/A'}
+            </Text>
+          </View>
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Pincode:</Text>
+            <Text style={styles.detailValue}>{employee.pincode || 'N/A'}</Text>
+          </View>
+          {employee.salary && (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Salary:</Text>
+              <Text style={styles.salaryValue}>
+                ₹{employee.salary.toLocaleString('en-IN')}
+              </Text>
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* Regular User Info Section */}
+      {user?.role !== 3 && (
+        <View style={styles.section}>
+          <View style={styles.infoRow}>
+            <Icon name="email" size={20} color="#666" />
+            <Text style={styles.infoText}>{user?.email || 'N/A'}</Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Icon name="phone" size={20} color="#666" />
+            <Text style={styles.infoText}>{user?.phone || 'N/A'}</Text>
+          </View>
+        </View>
+      )}
 
       {/* Payment Update Section for Employees */}
       {user?.role === 3 && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Payment Updates</Text>
-          {loading ? (
-            <ActivityIndicator size="small" color="#007AFF" style={styles.loader} />
-          ) : companies.length === 0 ? (
-            <Text style={styles.emptyText}>No pending invoices</Text>
-          ) : (
-            companies.map((company) => (
-              <View key={company._id} style={styles.companyCard}>
-                <Text style={styles.companyName}>{company.companyName}</Text>
-                
-                {/* Rental Invoices */}
-                {company.rentalInvoices.length > 0 && (
-                  <View style={styles.invoiceGroup}>
-                    <Text style={styles.invoiceGroupTitle}>Rental Invoices ({company.rentalInvoices.length})</Text>
-                    {company.rentalInvoices.map((invoice: any) => (
-                      <TouchableOpacity
-                        key={invoice._id}
-                        style={styles.invoiceItem}
-                        onPress={() => handleOpenPaymentModal(invoice, 'rental')}
-                      >
-                        <View style={styles.invoiceItemLeft}>
-                          <Text style={styles.invoiceNumber}>
-                            {invoice.invoiceNumber || 'N/A'}
-                          </Text>
-                          <Text style={styles.invoiceAmount}>
-                            ₹{invoice.grandTotal || 0}
-                          </Text>
-                        </View>
-                        <Icon name="chevron-right" size={20} color="#999" />
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
+          <Text style={styles.sectionTitle}>Update Payment Details</Text>
+          
+          {/* Company Selector */}
+          <View style={styles.modalInputGroup}>
+            <Text style={styles.modalLabel}>Select Company</Text>
+            <TouchableOpacity
+              style={styles.pickerButton}
+              onPress={() => setCompanyPickerVisible(true)}
+              disabled={loadingCompanies}
+            >
+              {loadingCompanies ? (
+                <View style={styles.pickerButtonLoading}>
+                  <ActivityIndicator size="small" color="#007AFF" />
+                  <Text style={[styles.pickerButtonText, { marginLeft: 10 }]}>
+                    Loading companies...
+                  </Text>
+                </View>
+              ) : (
+                <>
+                  <Text style={styles.pickerButtonText}>
+                    {selectedCompany
+                      ? (() => {
+                          const company = allCompanies.find((c) => c._id === selectedCompany);
+                          return company?.companyName || 'Select Company';
+                        })()
+                      : '-- Select Company --'}
+                  </Text>
+                  <Icon name="arrow-drop-down" size={24} color="#666" />
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
 
-                {/* Service Invoices */}
-                {company.serviceInvoices.length > 0 && (
-                  <View style={styles.invoiceGroup}>
-                    <Text style={styles.invoiceGroupTitle}>Service Invoices ({company.serviceInvoices.length})</Text>
-                    {company.serviceInvoices.map((invoice: any) => (
-                      <TouchableOpacity
-                        key={invoice._id}
-                        style={styles.invoiceItem}
-                        onPress={() => handleOpenPaymentModal(invoice, 'service')}
-                      >
-                        <View style={styles.invoiceItemLeft}>
-                          <Text style={styles.invoiceNumber}>
-                            {invoice.invoiceNumber || 'N/A'}
-                          </Text>
-                          <Text style={styles.invoiceAmount}>
-                            ₹{invoice.grandTotal || 0}
-                          </Text>
+          {/* Invoices List */}
+          {selectedCompany && (
+            <View style={styles.invoicesContainer}>
+              {loadingInvoices ? (
+                <ActivityIndicator size="small" color="#007AFF" style={styles.loader} />
+              ) : invoices.length === 0 ? (
+                <Text style={styles.emptyText}>No invoices found for this company.</Text>
+              ) : (
+                invoices.map((invoice: any) => (
+                  <TouchableOpacity
+                    key={invoice._id}
+                    style={styles.invoiceItem}
+                    onPress={() => handleOpenPaymentModal(invoice, 'service')}
+                  >
+                    <View style={styles.invoiceItemLeft}>
+                      <Text style={styles.invoiceNumber}>
+                        {invoice.invoiceNumber || 'N/A'}
+                      </Text>
+                      <Text style={styles.invoiceCompany}>
+                        {invoice.companyId?.companyName || 'N/A'}
+                      </Text>
+                      <Text style={styles.invoiceDetails}>
+                        Payment: {invoice.modeOfPayment || 'N/A'} | ₹{Number(invoice.grandTotal).toFixed(2)}
+                      </Text>
+                      <View style={styles.statusContainer}>
+                        <View
+                          style={[
+                            styles.statusBadge,
+                            {
+                              backgroundColor:
+                                invoice.status === 'Paid'
+                                  ? '#4CAF50'
+                                  : invoice.status === 'Unpaid'
+                                  ? '#F44336'
+                                  : '#FF9800',
+                            },
+                          ]}
+                        >
+                          <Text style={styles.statusText}>{invoice.status || 'N/A'}</Text>
                         </View>
-                        <Icon name="chevron-right" size={20} color="#999" />
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
-              </View>
-            ))
+                        <Text style={styles.invoiceDate}>
+                          {new Date(invoice.invoiceDate).toLocaleDateString()}
+                        </Text>
+                      </View>
+                    </View>
+                    {!invoice?.tdsAmount && (
+                      <Icon name="chevron-right" size={20} color="#999" />
+                    )}
+                  </TouchableOpacity>
+                ))
+              )}
+            </View>
           )}
         </View>
       )}
@@ -407,7 +597,9 @@ const ProfileScreen = () => {
             contentContainerStyle={styles.modalContentContainer}
             onStartShouldSetResponder={() => true}
           >
-            <Text style={styles.modalTitle}>Payment Details</Text>
+            <Text style={styles.modalTitle}>
+              Payment Details (₹{selectedInvoice?.grandTotal || 0})
+            </Text>
 
             {/* Mode of Payment */}
             <View style={styles.modalInputGroup}>
@@ -751,6 +943,50 @@ const ProfileScreen = () => {
         </TouchableOpacity>
       </Modal>
 
+      {/* Company Picker Modal */}
+      <Modal
+        visible={companyPickerVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setCompanyPickerVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setCompanyPickerVisible(false)}
+        >
+          <View style={styles.pickerModalContent}>
+            <Text style={styles.pickerModalTitle}>Select Company</Text>
+            <FlatList
+              data={allCompanies}
+              keyExtractor={(item) => item._id}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.pickerOption}
+                  onPress={() => {
+                    setSelectedCompany(item._id);
+                    setCompanyPickerVisible(false);
+                  }}
+                >
+                  <Text style={styles.pickerOptionText}>{item.companyName}</Text>
+                </TouchableOpacity>
+              )}
+              ListEmptyComponent={
+                <View style={styles.pickerEmptyContainer}>
+                  <Text style={styles.pickerEmptyText}>No companies found</Text>
+                </View>
+              }
+            />
+            <TouchableOpacity
+              style={[styles.modalButton, styles.modalCancelButton]}
+              onPress={() => setCompanyPickerVisible(false)}
+            >
+              <Text style={styles.modalCancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
       {/* Pending Invoice Picker Modal */}
       <Modal
         visible={pendingInvoicePickerVisible}
@@ -898,7 +1134,7 @@ const styles = StyleSheet.create({
     padding: 20,
     textAlign: 'center',
   },
-  companyCard: {
+  companyCardOld: {
     backgroundColor: '#fff',
     margin: 10,
     padding: 15,
@@ -906,7 +1142,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e0e0e0',
   },
-  companyName: {
+  companyNameOld: {
     fontSize: 16,
     fontWeight: 'bold',
     color: '#333',
@@ -943,6 +1179,39 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#007AFF',
     fontWeight: '600',
+  },
+  invoicesContainer: {
+    marginTop: 10,
+  },
+  invoiceCompany: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+  },
+  invoiceDetails: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 4,
+  },
+  statusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    gap: 8,
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  statusText: {
+    fontSize: 12,
+    color: '#fff',
+    fontWeight: '600',
+  },
+  invoiceDate: {
+    fontSize: 12,
+    color: '#999',
   },
   modalOverlay: {
     flex: 1,
@@ -1060,6 +1329,171 @@ const styles = StyleSheet.create({
   pickerEmptyText: {
     fontSize: 14,
     color: '#999',
+  },
+  // Employee ID Card Styles
+  employeeCard: {
+    backgroundColor: '#fff',
+    margin: 15,
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  cardHeader: {
+    backgroundColor: '#fff',
+    paddingVertical: 20,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E3F2FD',
+  },
+  companyName: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#1976D2',
+    marginBottom: 5,
+  },
+  cardSubtitle: {
+    fontSize: 12,
+    color: '#666',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  profileSection: {
+    flexDirection: 'row',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  profileImageContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    borderWidth: 3,
+    borderColor: '#1976D2',
+    overflow: 'hidden',
+    marginRight: 15,
+  },
+  profileImage: {
+    width: '100%',
+    height: '100%',
+  },
+  profileImagePlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#E3F2FD',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  profileImageText: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#1976D2',
+  },
+  profileInfo: {
+    flex: 1,
+  },
+  employeeName: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 5,
+  },
+  designationLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 2,
+  },
+  designationValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  idBadge: {
+    backgroundColor: '#E3F2FD',
+    borderWidth: 1,
+    borderColor: '#90CAF9',
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    alignSelf: 'flex-start',
+  },
+  idBadgeText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#1565C0',
+  },
+  detailsSection: {
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  additionalDetailsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  detailLabel: {
+    fontSize: 14,
+    color: '#666',
+    flex: 1,
+  },
+  detailValue: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#333',
+    flex: 2,
+    textAlign: 'right',
+  },
+  salaryValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1976D2',
+    flex: 2,
+    textAlign: 'right',
+  },
+  cardFooter: {
+    backgroundColor: '#0EA5E9',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+  },
+  footerText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 4,
+  },
+  footerSubtext: {
+    fontSize: 11,
+    color: '#fff',
+    opacity: 0.9,
+  },
+  loadingContainer: {
+    padding: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 14,
+    color: '#666',
+  },
+  pickerButtonLoading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
   },
 });
 
