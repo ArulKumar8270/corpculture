@@ -16,6 +16,7 @@ import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import axios from 'axios';
+import { getApiBaseUrl } from '../../services/api';
 import Toast from 'react-native-toast-message';
 import { usePermissions } from '../../hooks/usePermissions';
 
@@ -42,7 +43,7 @@ const PurchaseListScreen = () => {
     try {
       setLoading(true);
       const response = await axios.get(
-        `${process.env.EXPO_PUBLIC_API_URL}/purchases`,
+        `${getApiBaseUrl()}/purchases`,
         {
           headers: { Authorization: token || '' },
         }
@@ -74,7 +75,7 @@ const PurchaseListScreen = () => {
   const fetchMaterials = async () => {
     try {
       const response = await axios.get(
-        `${process.env.EXPO_PUBLIC_API_URL}/materials`,
+        `${getApiBaseUrl()}/materials`,
         {
           headers: { Authorization: token || '' },
         }
@@ -118,7 +119,7 @@ const PurchaseListScreen = () => {
           onPress: async () => {
             try {
               const response = await axios.delete(
-                `${process.env.EXPO_PUBLIC_API_URL}/purchases/${id}`,
+                `${getApiBaseUrl()}/purchases/${id}`,
                 {
                   headers: { Authorization: token || '' },
                 }

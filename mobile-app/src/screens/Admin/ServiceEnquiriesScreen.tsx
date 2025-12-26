@@ -18,6 +18,7 @@ import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { usePermissions } from '../../hooks/usePermissions';
 import axios from 'axios';
+import { getApiBaseUrl } from '../../services/api';
 import Toast from 'react-native-toast-message';
 // Using custom picker modal instead of @react-native-picker/picker
 
@@ -57,7 +58,7 @@ const ServiceEnquiriesScreen = () => {
     try {
       setLoading(true);
       const { data } = await axios.get(
-        `${process.env.EXPO_PUBLIC_API_URL}/service/${user?.role === 3 ? `assignedTo/${user?._id}` : 'all'}`,
+        `${getApiBaseUrl()}/service/${user?.role === 3 ? `assignedTo/${user?._id}` : 'all'}`,
         {
           headers: {
             Authorization: token || '',
@@ -88,7 +89,7 @@ const ServiceEnquiriesScreen = () => {
 
   const fetchEmployees = async () => {
     try {
-      const { data } = await axios.get(`${process.env.EXPO_PUBLIC_API_URL}/employee/all`, {
+      const { data } = await axios.get(`${getApiBaseUrl()}/employee/all`, {
         headers: {
           Authorization: token || '',
         },
@@ -134,7 +135,7 @@ const ServiceEnquiriesScreen = () => {
     setUpdatingServiceId(serviceId);
     try {
       const { data } = await axios.put(
-        `${process.env.EXPO_PUBLIC_API_URL}/service/update/${serviceId}`,
+        `${getApiBaseUrl()}/service/update/${serviceId}`,
         { employeeId },
         {
           headers: {
@@ -172,7 +173,7 @@ const ServiceEnquiriesScreen = () => {
     setUpdatingServiceId(serviceId);
     try {
       const { data } = await axios.put(
-        `${process.env.EXPO_PUBLIC_API_URL}/service/update/${serviceId}`,
+        `${getApiBaseUrl()}/service/update/${serviceId}`,
         { status },
         {
           headers: {

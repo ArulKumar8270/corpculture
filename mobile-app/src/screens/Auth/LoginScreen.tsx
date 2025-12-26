@@ -153,10 +153,21 @@ const LoginScreen = () => {
       } else if (error.request) {
         // Request was made but no response received
         errorTitle = 'Network Error';
-        errorMessage = 'Unable to connect to server. Please check your internet connection';
+        if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+          errorMessage = 'Request timed out. Please check your mobile network connection and try again.';
+        } else if (error.code === 'NETWORK_ERROR' || error.message?.includes('Network Error')) {
+          errorMessage = 'Network error. Please check your mobile data or WiFi connection and try again.';
+        } else {
+          errorMessage = 'Unable to connect to server. Please check your internet connection and try again.';
+        }
       } else if (error.message) {
         // Error in request setup
-        errorMessage = error.message;
+        if (error.message.includes('timeout')) {
+          errorTitle = 'Connection Timeout';
+          errorMessage = 'The request took too long. Please check your network connection and try again.';
+        } else {
+          errorMessage = error.message;
+        }
       }
 
       Toast.show({

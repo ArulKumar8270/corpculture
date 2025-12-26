@@ -15,6 +15,7 @@ import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import axios from 'axios';
+import { getApiBaseUrl } from '../../services/api';
 import Toast from 'react-native-toast-message';
 
 const VendorCreateScreen = () => {
@@ -52,7 +53,7 @@ const VendorCreateScreen = () => {
     setLoading(true);
     try {
       const response = await axios.get(
-        `${process.env.EXPO_PUBLIC_API_URL}/vendors/${vendorId}`,
+        `${getApiBaseUrl()}/vendors/${vendorId}`,
         {
           headers: { Authorization: token || '' },
         }
@@ -127,7 +128,7 @@ const VendorCreateScreen = () => {
       if (vendorId) {
         // Update existing vendor
         response = await axios.put(
-          `${process.env.EXPO_PUBLIC_API_URL}/vendors/${vendorId}`,
+          `${getApiBaseUrl()}/vendors/${vendorId}`,
           formData,
           {
             headers: { Authorization: token || '' },
@@ -136,7 +137,7 @@ const VendorCreateScreen = () => {
       } else {
         // Create new vendor
         response = await axios.post(
-          `${process.env.EXPO_PUBLIC_API_URL}/vendors`,
+          `${getApiBaseUrl()}/vendors`,
           formData,
           {
             headers: { Authorization: token || '' },

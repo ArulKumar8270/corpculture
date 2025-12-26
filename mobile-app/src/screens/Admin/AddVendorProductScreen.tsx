@@ -17,6 +17,7 @@ import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import axios from 'axios';
+import { getApiBaseUrl } from '../../services/api';
 import Toast from 'react-native-toast-message';
 
 const AddVendorProductScreen = () => {
@@ -60,7 +61,7 @@ const AddVendorProductScreen = () => {
   const fetchVendorCompanies = async () => {
     try {
       const response = await axios.get(
-        `${process.env.EXPO_PUBLIC_API_URL}/vendors`,
+        `${getApiBaseUrl()}/vendors`,
         {
           headers: { Authorization: token || '' },
         }
@@ -76,7 +77,7 @@ const AddVendorProductScreen = () => {
   const fetchGstOptions = async () => {
     try {
       const response = await axios.get(
-        `${process.env.EXPO_PUBLIC_API_URL}/gst`,
+        `${getApiBaseUrl()}/gst`,
         {
           headers: { Authorization: token || '' },
         }
@@ -92,7 +93,7 @@ const AddVendorProductScreen = () => {
   const fetchCategories = async () => {
     try {
       const response = await axios.get(
-        `${process.env.EXPO_PUBLIC_API_URL}/category/all`,
+        `${getApiBaseUrl()}/category/all`,
         {
           headers: { Authorization: token || '' },
         }
@@ -110,7 +111,7 @@ const AddVendorProductScreen = () => {
     setLoading(true);
     try {
       const response = await axios.get(
-        `${process.env.EXPO_PUBLIC_API_URL}/vendor-products/${productId}`,
+        `${getApiBaseUrl()}/vendor-products/${productId}`,
         {
           headers: { Authorization: token || '' },
         }
@@ -185,7 +186,7 @@ const AddVendorProductScreen = () => {
       if (productId) {
         // Update existing vendor product
         response = await axios.put(
-          `${process.env.EXPO_PUBLIC_API_URL}/vendor-products/${productId}`,
+          `${getApiBaseUrl()}/vendor-products/${productId}`,
           productData,
           {
             headers: { Authorization: token || '' },
@@ -194,7 +195,7 @@ const AddVendorProductScreen = () => {
       } else {
         // Create new vendor product
         response = await axios.post(
-          `${process.env.EXPO_PUBLIC_API_URL}/vendor-products`,
+          `${getApiBaseUrl()}/vendor-products`,
           productData,
           {
             headers: { Authorization: token || '' },

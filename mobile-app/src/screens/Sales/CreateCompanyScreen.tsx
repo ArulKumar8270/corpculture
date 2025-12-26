@@ -8,136 +8,331 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { companyService } from '../../services/api';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+// @ts-ignore
+import { MaterialIcons as Icon } from '@expo/vector-icons';
+import { useSelector, useDispatch } from 'react-redux';
+import { RootState } from '../../store';
+import { setCompanyDetails } from '../../store/slices/companySlice';
+import axios from 'axios';
+import { getApiBaseUrl } from '../../services/api';
 import Toast from 'react-native-toast-message';
 
 const CreateCompanyScreen = () => {
   const navigation = useNavigation();
+  const dispatch = useDispatch();
+  const { user, token } = useSelector((state: RootState) => state.auth);
+  const { isCompanyEnabled } = useSelector((state: RootState) => state.company);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     companyName: '',
-    email: '',
-    phone: '',
-    gstNumber: '',
-    address: '',
+    billingAddress: '',
+    invoiceType: 'Corpculture Invoice',
     city: '',
     state: '',
     pincode: '',
-    isPartner: false,
+    gstNo: '',
+    customerType: 'New',
+    customerComplaint: '',
+    phone: '',
   });
+  const [serviceDeliveryAddresses, setServiceDeliveryAddresses] = useState([{ address: '', pincode: '' }]);
+  const [contactPersons, setContactPersons] = useState([
+    { name: user?.name || '', mobile: user?.phone || '', email: user?.email || '' }
+  ]);
 
   const handleSubmit = async () => {
-    if (!formData.companyName || !formData.email || !formData.phone) {
+    if (!formData.companyName || !formData.billingAddress) {
       Toast.show({
         type: 'error',
-        text1: 'Error',
+        text1: 'Validation Error',
         text2: 'Please fill in all required fields',
+      });
+      return;
+    }
+
+    // Validate service delivery addresses
+    if (serviceDeliveryAddresses.length > 0 && serviceDeliveryAddresses.some(addr => !addr.address.trim() || !addr.pincode.trim())) {
+      Toast.show({
+        type: 'error',
+        text1: 'Validation Error',
+        text2: 'Please fill in all service delivery addresses and pincodes or remove empty ones',
+      });
+      return;
+    }
+
+    // Validate contact persons
+    if (contactPersons.length > 0 && contactPersons.some(person => !person.name.trim() || !person.mobile.trim() || !person.email.trim())) {
+      Toast.show({
+        type: 'error',
+        text1: 'Validation Error',
+        text2: 'Please fill in all contact person details or remove empty ones',
       });
       return;
     }
 
     setLoading(true);
     try {
-      await companyService.createCompany(formData);
-      Toast.show({
-        type: 'success',
-        text1: 'Success',
-        text2: 'Company created successfully',
-      });
-      navigation.goBack();
-    } catch (error) {
+      const payload = {
+        ...formData,
+        userId: user?._id,
+        // Filter out empty address objects
+        serviceDeliveryAddresses: serviceDeliveryAddresses.filter(addr => addr.address.trim() !== '' && addr.pincode.trim() !== ''),
+        // Filter out empty contact person objects
+        contactPersons: contactPersons.filter(person => person.name.trim() !== '' && person.mobile.trim() !== '' && person.email.trim() !== ''),
+      };
+
+      const { data } = await axios.post(
+        `${getApiBaseUrl() || 'https://nicknameinfo.net/corpculture/api/v1'}/company/create`,
+        payload,
+        {
+          headers: { Authorization: token || '' },
+        }
+      );
+
+      if (data?.success) {
+        // Refresh company list in Redux
+        if (isCompanyEnabled && token) {
+          try {
+            let response;
+            if (user?.role === 0 && user?.phone) {
+              response = await axios.get(
+                `${getApiBaseUrl() || 'https://nicknameinfo.net/corpculture/api/v1'}/company/user-company/${user.phone}`,
+                { headers: { Authorization: token || '' } }
+              );
+              if (response.data?.success && response.data.company) {
+                const companies = Array.isArray(response.data.company)
+                  ? response.data.company
+                  : [response.data.company];
+                dispatch(setCompanyDetails(companies));
+              }
+            } else {
+              response = await axios.get(
+                `${getApiBaseUrl() || 'https://nicknameinfo.net/corpculture/api/v1'}/company/all?limit=1000`,
+                { headers: { Authorization: token || '' } }
+              );
+              if (response.data?.success && response.data.companies) {
+                dispatch(setCompanyDetails(response.data.companies));
+              }
+            }
+          } catch (error) {
+            console.error('Error refreshing company list:', error);
+          }
+        }
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: 'Company created successfully',
+        });
+        navigation.goBack();
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: data?.message || 'Failed to create company',
+        });
+      }
+    } catch (error: any) {
+      console.error('Error creating company:', error);
       Toast.show({
         type: 'error',
         text1: 'Error',
-        text2: 'Failed to create company',
+        text2: error.response?.data?.message || 'Failed to create company',
       });
     } finally {
       setLoading(false);
     }
   };
 
+  const addDeliveryAddress = () => {
+    setServiceDeliveryAddresses([...serviceDeliveryAddresses, { address: '', pincode: '' }]);
+  };
+
+  const removeDeliveryAddress = (index: number) => {
+    setServiceDeliveryAddresses(serviceDeliveryAddresses.filter((_, i) => i !== index));
+  };
+
+  const addContactPerson = () => {
+    setContactPersons([...contactPersons, { name: '', mobile: '', email: '' }]);
+  };
+
+  const removeContactPerson = (index: number) => {
+    setContactPersons(contactPersons.filter((_, i) => i !== index));
+  };
+
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.label}>Company Name *</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Company name"
-        value={formData.companyName}
-        onChangeText={(text) => setFormData({ ...formData, companyName: text })}
-      />
+      <View style={styles.form}>
+        <Text style={styles.label}>Company Name *</Text>
+        <TextInput
+          style={styles.input}
+          value={formData.companyName}
+          onChangeText={(text) => setFormData({ ...formData, companyName: text })}
+          placeholder="Enter company name"
+        />
 
-      <Text style={styles.label}>Email *</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Email address"
-        value={formData.email}
-        onChangeText={(text) => setFormData({ ...formData, email: text })}
-        keyboardType="email-address"
-      />
+        <Text style={styles.label}>Billing Address *</Text>
+        <TextInput
+          style={[styles.input, styles.textArea]}
+          value={formData.billingAddress}
+          onChangeText={(text) => setFormData({ ...formData, billingAddress: text })}
+          placeholder="Enter billing address"
+          multiline
+          numberOfLines={3}
+        />
 
-      <Text style={styles.label}>Phone *</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Phone number"
-        value={formData.phone}
-        onChangeText={(text) => setFormData({ ...formData, phone: text })}
-        keyboardType="phone-pad"
-      />
+        <Text style={styles.label}>City</Text>
+        <TextInput
+          style={styles.input}
+          value={formData.city}
+          onChangeText={(text) => setFormData({ ...formData, city: text })}
+          placeholder="Enter city"
+        />
 
-      <Text style={styles.label}>GST Number</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="GST number"
-        value={formData.gstNumber}
-        onChangeText={(text) => setFormData({ ...formData, gstNumber: text })}
-      />
+        <Text style={styles.label}>State</Text>
+        <TextInput
+          style={styles.input}
+          value={formData.state}
+          onChangeText={(text) => setFormData({ ...formData, state: text })}
+          placeholder="Enter state"
+        />
 
-      <Text style={styles.label}>Address</Text>
-      <TextInput
-        style={[styles.input, styles.textArea]}
-        placeholder="Address"
-        value={formData.address}
-        onChangeText={(text) => setFormData({ ...formData, address: text })}
-        multiline
-      />
+        <Text style={styles.label}>Pincode</Text>
+        <TextInput
+          style={styles.input}
+          value={formData.pincode}
+          onChangeText={(text) => setFormData({ ...formData, pincode: text })}
+          placeholder="Enter pincode"
+          keyboardType="numeric"
+        />
 
-      <Text style={styles.label}>City</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="City"
-        value={formData.city}
-        onChangeText={(text) => setFormData({ ...formData, city: text })}
-      />
+        <Text style={styles.label}>GST No</Text>
+        <TextInput
+          style={styles.input}
+          value={formData.gstNo}
+          onChangeText={(text) => setFormData({ ...formData, gstNo: text })}
+          placeholder="Enter GST number"
+        />
 
-      <Text style={styles.label}>State</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="State"
-        value={formData.state}
-        onChangeText={(text) => setFormData({ ...formData, state: text })}
-      />
+        <Text style={styles.label}>Phone</Text>
+        <TextInput
+          style={styles.input}
+          value={formData.phone}
+          onChangeText={(text) => setFormData({ ...formData, phone: text })}
+          placeholder="Enter phone number"
+          keyboardType="phone-pad"
+        />
 
-      <Text style={styles.label}>Pincode</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Pincode"
-        value={formData.pincode}
-        onChangeText={(text) => setFormData({ ...formData, pincode: text })}
-        keyboardType="number-pad"
-      />
+        <Text style={styles.label}>Invoice Type</Text>
+        <TextInput
+          style={styles.input}
+          value={formData.invoiceType}
+          onChangeText={(text) => setFormData({ ...formData, invoiceType: text })}
+          placeholder="Enter invoice type"
+        />
 
-      <TouchableOpacity
-        style={[styles.button, loading && styles.buttonDisabled]}
-        onPress={handleSubmit}
-        disabled={loading}
-      >
-        {loading ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.buttonText}>Create Company</Text>
-        )}
-      </TouchableOpacity>
+        <Text style={styles.sectionTitle}>Service Delivery Addresses</Text>
+        {serviceDeliveryAddresses.map((addr, index) => (
+          <View key={index} style={styles.addressRow}>
+            <TextInput
+              style={[styles.input, { flex: 1 }]}
+              value={addr.address}
+              onChangeText={(text) => {
+                const newAddresses = [...serviceDeliveryAddresses];
+                newAddresses[index].address = text;
+                setServiceDeliveryAddresses(newAddresses);
+              }}
+              placeholder="Address"
+            />
+            <TextInput
+              style={[styles.input, { width: 100, marginLeft: 10 }]}
+              value={addr.pincode}
+              onChangeText={(text) => {
+                const newAddresses = [...serviceDeliveryAddresses];
+                newAddresses[index].pincode = text;
+                setServiceDeliveryAddresses(newAddresses);
+              }}
+              placeholder="Pincode"
+              keyboardType="numeric"
+            />
+            {serviceDeliveryAddresses.length > 1 && (
+              <TouchableOpacity
+                onPress={() => removeDeliveryAddress(index)}
+                style={styles.removeButton}
+              >
+                <Icon name="delete" size={20} color="#dc3545" />
+              </TouchableOpacity>
+            )}
+          </View>
+        ))}
+        <TouchableOpacity onPress={addDeliveryAddress} style={styles.addButton}>
+          <Icon name="add" size={20} color="#019ee3" />
+          <Text style={styles.addButtonText}>Add Address</Text>
+        </TouchableOpacity>
+
+        <Text style={styles.sectionTitle}>Contact Persons</Text>
+        {contactPersons.map((person, index) => (
+          <View key={index} style={styles.contactRow}>
+            <TextInput
+              style={styles.input}
+              value={person.name}
+              onChangeText={(text) => {
+                const newPersons = [...contactPersons];
+                newPersons[index].name = text;
+                setContactPersons(newPersons);
+              }}
+              placeholder="Name"
+            />
+            <TextInput
+              style={styles.input}
+              value={person.mobile}
+              onChangeText={(text) => {
+                const newPersons = [...contactPersons];
+                newPersons[index].mobile = text;
+                setContactPersons(newPersons);
+              }}
+              placeholder="Mobile"
+              keyboardType="phone-pad"
+            />
+            <TextInput
+              style={styles.input}
+              value={person.email}
+              onChangeText={(text) => {
+                const newPersons = [...contactPersons];
+                newPersons[index].email = text;
+                setContactPersons(newPersons);
+              }}
+              placeholder="Email"
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+            {contactPersons.length > 1 && (
+              <TouchableOpacity
+                onPress={() => removeContactPerson(index)}
+                style={styles.removeButton}
+              >
+                <Icon name="delete" size={20} color="#dc3545" />
+              </TouchableOpacity>
+            )}
+          </View>
+        ))}
+        <TouchableOpacity onPress={addContactPerson} style={styles.addButton}>
+          <Icon name="add" size={20} color="#019ee3" />
+          <Text style={styles.addButtonText}>Add Contact Person</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.button, loading && styles.buttonDisabled]}
+          onPress={handleSubmit}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.buttonText}>Create Company</Text>
+          )}
+        </TouchableOpacity>
+      </View>
     </ScrollView>
   );
 };
@@ -145,42 +340,75 @@ const CreateCompanyScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#f5f5f5',
+  },
+  form: {
     padding: 20,
   },
   label: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
-    marginTop: 15,
-    marginBottom: 5,
     color: '#333',
+    marginBottom: 8,
+    marginTop: 12,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginTop: 20,
+    marginBottom: 10,
   },
   input: {
+    backgroundColor: '#fff',
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 8,
-    padding: 15,
+    padding: 12,
     fontSize: 16,
-    marginBottom: 10,
+    color: '#333',
   },
   textArea: {
     height: 80,
     textAlignVertical: 'top',
   },
+  addressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  contactRow: {
+    marginBottom: 10,
+  },
+  addButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    marginBottom: 10,
+  },
+  addButtonText: {
+    color: '#019ee3',
+    marginLeft: 8,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  removeButton: {
+    padding: 10,
+    marginLeft: 10,
+  },
   button: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#019ee3',
     padding: 15,
     borderRadius: 8,
     alignItems: 'center',
     marginTop: 20,
-    marginBottom: 30,
   },
   buttonDisabled: {
     opacity: 0.6,
   },
   buttonText: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
   },
 });

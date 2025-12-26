@@ -18,6 +18,7 @@ import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { usePermissions } from '../../hooks/usePermissions';
 import axios from 'axios';
+import { getApiBaseUrl } from '../../services/api';
 import Toast from 'react-native-toast-message';
 
 const RentalEnquiriesScreen = () => {
@@ -66,7 +67,7 @@ const RentalEnquiriesScreen = () => {
 
   const fetchEmployees = async () => {
     try {
-      const { data } = await axios.get(`${process.env.EXPO_PUBLIC_API_URL}/employee/all`, {
+      const { data } = await axios.get(`${getApiBaseUrl()}/employee/all`, {
         headers: {
           Authorization: token || '',
         },
@@ -86,7 +87,7 @@ const RentalEnquiriesScreen = () => {
         user?.role === 3
           ? `rental/assignedTo/${user?._id}`
           : 'rental/all';
-      const { data } = await axios.get(`${process.env.EXPO_PUBLIC_API_URL}/${endpoint}`, {
+      const { data } = await axios.get(`${getApiBaseUrl()}/${endpoint}`, {
         headers: {
           Authorization: token || '',
         },
@@ -185,7 +186,7 @@ const RentalEnquiriesScreen = () => {
     setUpdatingRentalId(rentalId);
     try {
       const { data } = await axios.put(
-        `${process.env.EXPO_PUBLIC_API_URL}/rental/update/${rentalId}`,
+        `${getApiBaseUrl()}/rental/update/${rentalId}`,
         { employeeId },
         {
           headers: {
@@ -227,7 +228,7 @@ const RentalEnquiriesScreen = () => {
     setUpdatingRentalId(rentalId);
     try {
       const { data } = await axios.put(
-        `${process.env.EXPO_PUBLIC_API_URL}/rental/update/${rentalId}`,
+        `${getApiBaseUrl()}/rental/update/${rentalId}`,
         { status },
         {
           headers: {

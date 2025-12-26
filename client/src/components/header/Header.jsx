@@ -11,53 +11,20 @@ import { MdLogin, MdLogout } from "react-icons/md";
 import { useAuth } from "../../context/auth";
 import SearchBar from "./SearchBar";
 import { useCart } from "../../context/cart";
-import InputLabel from '@mui/material/InputLabel';
-import MenuItem from '@mui/material/MenuItem';
-import FormControl from '@mui/material/FormControl';
-import Select from '@mui/material/Select';
+import CompanyToggleHeader from './CompanyToggleHeader';
 
 const Header = () => {
     const [isDropdownOpen, setDropdownOpen] = useState(false);
     const headerRef = useRef(null);
     const [commissions, setCommissions] = useState([]);
-    const { auth, setAuth, LogOut, isCompanyEnabled, setIsCompanyEnabled, companyDetails, setSelectedCompany, selectedCompany } = useAuth();
+    const { auth, setAuth, LogOut } = useAuth();
     const [cartItems, setCartItems] = useCart();
-
-    // Initialize isCompanyEnabled from localStorage
-    useEffect(() => {
-        const storedCompanyEnabled = localStorage.getItem('isCompanyEnabled');
-        if (storedCompanyEnabled !== null) {
-            setIsCompanyEnabled(JSON.parse(storedCompanyEnabled));
-        }
-    }, []);
-
-    // Update localStorage whenever isCompanyEnabled changes
-    useEffect(() => {
-        localStorage.setItem('isCompanyEnabled', JSON.stringify(isCompanyEnabled));
-    }, [isCompanyEnabled]);
-
-    // Initialize selectedCompany from localStorage
-    useEffect(() => {
-        const storedSelectedCompany = localStorage.getItem('selectedCompany');
-        if (storedSelectedCompany !== null) {
-            setSelectedCompany(storedSelectedCompany);
-        }
-    }, []);
-
-    // Update localStorage whenever selectedCompany changes
-    useEffect(() => {
-        localStorage.setItem('selectedCompany', selectedCompany);
-    }, [selectedCompany]);
 
     useEffect(() => {
         if (auth?.token) {
             getCommisionDetails();
         }
     }, [auth?.token]);
-
-    const handleChange = (event) => {
-        setSelectedCompany(event.target.value);
-    };
 
     let closeTimeout;
     const toggleDropdown = () => {
@@ -177,60 +144,8 @@ const Header = () => {
                         </div>
                     ) : null}
 
-                    {/* Company Select */}
-                    {isCompanyEnabled ? (
-                        <FormControl sx={{ m: 1, minWidth: 140 }} size="small">
-                            <InputLabel id="company-select-label" sx={{ color: 'white', fontSize: '0.875rem' }}>Companies</InputLabel>
-                            <Select
-                                labelId="company-select-label"
-                                id="company-select"
-                                value={selectedCompany}
-                                onChange={handleChange}
-                                autoWidth
-                                label="Companies"
-                                sx={{
-                                    color: 'white',
-                                    fontSize: '0.875rem',
-                                    '.MuiOutlinedInput-notchedOutline': {
-                                        borderColor: 'rgba(255, 255, 255, 0.5)',
-                                    },
-                                    '&:hover .MuiOutlinedInput-notchedOutline': {
-                                        borderColor: 'white',
-                                    },
-                                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                                        borderColor: 'white',
-                                    },
-                                    '.MuiSvgIcon-root': {
-                                        color: 'white',
-                                    },
-                                    '& .MuiSelect-select': {
-                                        padding: '8px 12px',
-                                    }
-                                }}
-                            >
-                                <MenuItem value="new">
-                                    <em>New Company</em>
-                                </MenuItem>
-                                {companyDetails?.map((res) =>
-                                    <MenuItem key={res?._id} value={res?._id}>{res?.companyName}</MenuItem>
-                                )}
-                            </Select>
-                        </FormControl>
-                    ) : null}
-
-                    {/* Enable Company Account Checkbox */}
-                    {auth?.user?.role !== 1 && (
-                        <label className="flex items-center gap-2 text-white text-sm font-medium cursor-pointer hover:bg-white/10 rounded-lg px-3 py-2 transition-all duration-200">
-                            <input
-                                type="checkbox"
-                                checked={isCompanyEnabled}
-                                className="accent-cyan-300 w-4 h-4 rounded focus:ring-2 focus:ring-cyan-400"
-                                onChange={() => setIsCompanyEnabled(!isCompanyEnabled)}
-                            />
-                            <span className="hidden lg:block">Enable Company</span>
-                            <span className="lg:hidden">Company</span>
-                        </label>
-                    )}
+                    {/* Company Toggle Header Component */}
+                    <CompanyToggleHeader />
                     
                     {/* Account Dropdown */}
                     <div

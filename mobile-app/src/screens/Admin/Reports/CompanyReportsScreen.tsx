@@ -8,6 +8,8 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   FlatList,
+  Modal,
+  Alert,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 // @ts-ignore - @expo/vector-icons is available via expo dependency
@@ -15,6 +17,7 @@ import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../../store';
 import axios from 'axios';
+import { getApiBaseUrl } from '../../../services/api';
 import Toast from 'react-native-toast-message';
 
 interface Company {
@@ -37,6 +40,28 @@ const CompanyReportsScreen = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Reminder Modal States
+  const [openReminderModal, setOpenReminderModal] = useState(false);
+  const [currentCompanyIdForReminder, setCurrentCompanyIdForReminder] = useState<string | null>(null);
+  const [reminderMail, setReminderMail] = useState('');
+  const [ccMail, setCcMail] = useState('');
+  const [selectedReminderDates, setSelectedReminderDates] = useState<string[]>([]);
+  const [remainderType, setRemainderType] = useState('');
+  const [fetchingReminderData, setFetchingReminderData] = useState(false);
+  const [reminderTypePickerVisible, setReminderTypePickerVisible] = useState(false);
+  const [reminderDatePickerVisible, setReminderDatePickerVisible] = useState(false);
+  
+  // Options for reminder dates (days of the month, 1 to 31)
+  const reminderDateOptions = Array.from({ length: 31 }, (_, i) => (i + 1).toString());
+  const reminderTypeOptions = [
+    { value: 'ServiceInvoice', label: 'Service Invoice' },
+    { value: 'RentalInvoice', label: 'Rental Invoice' },
+    { value: 'SalesInvoice', label: 'Sales Invoice' },
+    { value: 'Report', label: 'Report' },
+    { value: 'Quotation', label: 'Quotation' },
+    { value: 'Other', label: 'Other' },
+  ];
 
   useFocusEffect(
     useCallback(() => {
@@ -56,7 +81,7 @@ const CompanyReportsScreen = () => {
 
     try {
       const response = await axios.get(
-        `${process.env.EXPO_PUBLIC_API_URL}/company/all`,
+        `${getApiBaseUrl()}/company/all`,
         {
           headers: { Authorization: token },
         }
@@ -135,6 +160,117 @@ const CompanyReportsScreen = () => {
     });
   };
 
+  // Reminder Functions
+  const handleOpenReminderModal = async (companyId: string, type: string) => {
+    setCurrentCompanyIdForReminder(companyId);
+    setRemainderType(type);
+    setReminderMail('');
+    setCcMail('');
+    setSelectedReminderDates([]);
+    setFetchingReminderData(true);
+
+    try {
+      const response = await axios.get(
+        `${getApiBaseUrl()}/remainders/company/${companyId}/${type}`,
+        { headers: { Authorization: token } }
+      );
+
+      if (response.data.success && response.data.remainders) {
+        const fetchedReminder = response.data.remainders;
+        setReminderMail(fetchedReminder.remainderMail || '');
+        setCcMail(fetchedReminder.ccMails?.join(', ') || '');
+        setSelectedReminderDates(fetchedReminder.remainderDates?.map(String) || []);
+      }
+    } catch (error: any) {
+      // If 404, it means no existing reminder, which is fine.
+      if (error.response && error.response.status !== 404) {
+        console.error('Error fetching existing reminder:', error);
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: 'Failed to load existing reminder data.',
+        });
+      }
+    } finally {
+      setFetchingReminderData(false);
+      setOpenReminderModal(true);
+    }
+  };
+
+  const handleCloseReminderModal = () => {
+    setOpenReminderModal(false);
+    setCurrentCompanyIdForReminder(null);
+    setReminderMail('');
+    setCcMail('');
+    setSelectedReminderDates([]);
+    setRemainderType('');
+    setFetchingReminderData(false);
+  };
+
+  const handleSaveReminder = async () => {
+    if (!reminderMail) {
+      Alert.alert('Error', 'Reminder Mail is required.');
+      return;
+    }
+    if (selectedReminderDates.length === 0) {
+      Alert.alert('Error', 'At least one Reminder Date is required.');
+      return;
+    }
+    if (!remainderType) {
+      Alert.alert('Error', 'Reminder Type is required.');
+      return;
+    }
+
+    const ccMailsArray = ccMail
+      .split(',')
+      .map((email) => email.trim())
+      .filter((email) => email !== '');
+
+    try {
+      const response = await axios.post(
+        `${getApiBaseUrl()}/remainders`,
+        {
+          companyId: currentCompanyIdForReminder,
+          remainderType: remainderType,
+          remainderMail: reminderMail,
+          ccMails: ccMailsArray,
+          remainderDates: selectedReminderDates.map(Number),
+        },
+        {
+          headers: {
+            Authorization: token,
+          },
+        }
+      );
+
+      if (response.data.success) {
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: response.data.message || 'Reminder saved successfully',
+        });
+        handleCloseReminderModal();
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: response.data.message || 'Failed to save reminder.',
+        });
+      }
+    } catch (error: any) {
+      console.error('Error saving reminder:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: error.response?.data?.message || 'Error saving reminder.',
+      });
+    }
+  };
+
+  const handleSetReminder = (companyId: string, type: string) => {
+    handleOpenReminderModal(companyId, type);
+  };
+
   const filteredCompanies = companies.filter((company) => {
     const lowerCaseSearchTerm = searchTerm.toLowerCase();
     const companyName = company.companyName?.toLowerCase() || '';
@@ -157,23 +293,31 @@ const CompanyReportsScreen = () => {
       <View style={styles.reportsSection}>
         <Text style={styles.sectionTitle}>Service Reports</Text>
         <View style={styles.reportRow}>
-          <TouchableOpacity
-            style={[
-              styles.countButton,
-              item.serviceInvoiceCount === 0 && styles.countButtonDisabled,
-            ]}
-            onPress={() => handleViewServiceInvoices(item._id)}
-            disabled={item.serviceInvoiceCount === 0}
-          >
-            <Text
+          <View style={styles.countButtonContainer}>
+            <TouchableOpacity
               style={[
-                styles.countButtonText,
-                item.serviceInvoiceCount === 0 && styles.countButtonTextDisabled,
+                styles.countButton,
+                item.serviceInvoiceCount === 0 && styles.countButtonDisabled,
               ]}
+              onPress={() => handleViewServiceInvoices(item._id)}
+              disabled={item.serviceInvoiceCount === 0}
             >
-              Invoices: {item.serviceInvoiceCount}
-            </Text>
-          </TouchableOpacity>
+              <Text
+                style={[
+                  styles.countButtonText,
+                  item.serviceInvoiceCount === 0 && styles.countButtonTextDisabled,
+                ]}
+              >
+                Invoices: {item.serviceInvoiceCount}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.reminderIconButton}
+              onPress={() => handleSetReminder(item._id, 'ServiceInvoice')}
+            >
+              <Icon name="notifications-active" size={20} color="#FF9500" />
+            </TouchableOpacity>
+          </View>
           <TouchableOpacity
             style={[
               styles.countButton,
@@ -212,23 +356,31 @@ const CompanyReportsScreen = () => {
 
         <Text style={[styles.sectionTitle, { marginTop: 15 }]}>Rental Reports</Text>
         <View style={styles.reportRow}>
-          <TouchableOpacity
-            style={[
-              styles.countButton,
-              item.rentalInvoiceCount === 0 && styles.countButtonDisabled,
-            ]}
-            onPress={() => handleViewRentalInvoices(item._id)}
-            disabled={item.rentalInvoiceCount === 0}
-          >
-            <Text
+          <View style={styles.countButtonContainer}>
+            <TouchableOpacity
               style={[
-                styles.countButtonText,
-                item.rentalInvoiceCount === 0 && styles.countButtonTextDisabled,
+                styles.countButton,
+                item.rentalInvoiceCount === 0 && styles.countButtonDisabled,
               ]}
+              onPress={() => handleViewRentalInvoices(item._id)}
+              disabled={item.rentalInvoiceCount === 0}
             >
-              Invoices: {item.rentalInvoiceCount}
-            </Text>
-          </TouchableOpacity>
+              <Text
+                style={[
+                  styles.countButtonText,
+                  item.rentalInvoiceCount === 0 && styles.countButtonTextDisabled,
+                ]}
+              >
+                Invoices: {item.rentalInvoiceCount}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.reminderIconButton}
+              onPress={() => handleSetReminder(item._id, 'RentalInvoice')}
+            >
+              <Icon name="notifications-active" size={20} color="#FF9500" />
+            </TouchableOpacity>
+          </View>
           <TouchableOpacity
             style={[
               styles.countButton,
@@ -324,6 +476,195 @@ const CompanyReportsScreen = () => {
           </View>
         }
       />
+
+      {/* Reminder Modal */}
+      <Modal
+        visible={openReminderModal}
+        animationType="slide"
+        transparent
+        onRequestClose={handleCloseReminderModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Set Reminder</Text>
+              <TouchableOpacity onPress={handleCloseReminderModal}>
+                <Icon name="close" size={24} color="#333" />
+              </TouchableOpacity>
+            </View>
+
+            {fetchingReminderData ? (
+              <View style={styles.modalLoadingContainer}>
+                <ActivityIndicator size="large" color="#019ee3" />
+                <Text style={styles.modalLoadingText}>Loading reminder data...</Text>
+              </View>
+            ) : (
+              <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+                <View style={styles.modalInputGroup}>
+                  <Text style={styles.modalLabel}>Reminder Mail *</Text>
+                  <TextInput
+                    style={styles.modalInput}
+                    placeholder="Enter reminder email"
+                    value={reminderMail}
+                    onChangeText={setReminderMail}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                  />
+                </View>
+
+                <View style={styles.modalInputGroup}>
+                  <Text style={styles.modalLabel}>Reminder Type *</Text>
+                  <TouchableOpacity
+                    style={styles.pickerButton}
+                    onPress={() => setReminderTypePickerVisible(true)}
+                  >
+                    <Text style={[styles.pickerButtonText, !remainderType && styles.placeholderText]}>
+                      {remainderType
+                        ? reminderTypeOptions.find((opt) => opt.value === remainderType)?.label || remainderType
+                        : 'Select Reminder Type'}
+                    </Text>
+                    <Icon name="arrow-drop-down" size={24} color="#666" />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.modalInputGroup}>
+                  <Text style={styles.modalLabel}>CC Mail (comma-separated)</Text>
+                  <TextInput
+                    style={styles.modalInput}
+                    placeholder="Enter CC emails separated by commas"
+                    value={ccMail}
+                    onChangeText={setCcMail}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                  />
+                </View>
+
+                <View style={styles.modalInputGroup}>
+                  <Text style={styles.modalLabel}>Reminder Dates *</Text>
+                  <TouchableOpacity
+                    style={styles.pickerButton}
+                    onPress={() => setReminderDatePickerVisible(true)}
+                  >
+                    <Text style={[styles.pickerButtonText, selectedReminderDates.length === 0 && styles.placeholderText]}>
+                      {selectedReminderDates.length > 0
+                        ? selectedReminderDates.join(', ')
+                        : 'Select Reminder Dates'}
+                    </Text>
+                    <Icon name="arrow-drop-down" size={24} color="#666" />
+                  </TouchableOpacity>
+                  {selectedReminderDates.length > 0 && (
+                    <View style={styles.selectedDatesContainer}>
+                      {selectedReminderDates.map((date, index) => (
+                        <View key={index} style={styles.dateChip}>
+                          <Text style={styles.dateChipText}>{date}</Text>
+                          <TouchableOpacity
+                            onPress={() => {
+                              setSelectedReminderDates(selectedReminderDates.filter((d) => d !== date));
+                            }}
+                          >
+                            <Icon name="close" size={16} color="#666" />
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                </View>
+
+                <View style={styles.modalActions}>
+                  <TouchableOpacity style={styles.modalCancelButton} onPress={handleCloseReminderModal}>
+                    <Text style={styles.modalCancelButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.modalSaveButton, fetchingReminderData && styles.modalSaveButtonDisabled]}
+                    onPress={handleSaveReminder}
+                    disabled={fetchingReminderData}
+                  >
+                    <Text style={styles.modalSaveButtonText}>Save</Text>
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Reminder Type Picker Modal */}
+      <Modal visible={reminderTypePickerVisible} animationType="slide" transparent>
+        <View style={styles.pickerModalOverlay}>
+          <View style={styles.pickerModalContent}>
+            <View style={styles.pickerModalHeader}>
+              <Text style={styles.pickerModalTitle}>Select Reminder Type</Text>
+              <TouchableOpacity onPress={() => setReminderTypePickerVisible(false)}>
+                <Icon name="close" size={24} color="#333" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView>
+              {reminderTypeOptions.map((option) => (
+                <TouchableOpacity
+                  key={option.value}
+                  style={styles.pickerOption}
+                  onPress={() => {
+                    setRemainderType(option.value);
+                    setReminderTypePickerVisible(false);
+                  }}
+                >
+                  <Text style={styles.pickerOptionText}>{option.label}</Text>
+                  {remainderType === option.value && <Icon name="check" size={20} color="#019ee3" />}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Reminder Date Picker Modal */}
+      <Modal visible={reminderDatePickerVisible} animationType="slide" transparent>
+        <View style={styles.pickerModalOverlay}>
+          <View style={styles.pickerModalContent}>
+            <View style={styles.pickerModalHeader}>
+              <Text style={styles.pickerModalTitle}>Select Reminder Dates (1-31)</Text>
+              <TouchableOpacity onPress={() => setReminderDatePickerVisible(false)}>
+                <Icon name="close" size={24} color="#333" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView>
+              {reminderDateOptions.map((date) => {
+                const isSelected = selectedReminderDates.includes(date);
+                return (
+                  <TouchableOpacity
+                    key={date}
+                    style={styles.pickerOption}
+                    onPress={() => {
+                      if (isSelected) {
+                        setSelectedReminderDates(selectedReminderDates.filter((d) => d !== date));
+                      } else {
+                        setSelectedReminderDates([...selectedReminderDates, date]);
+                      }
+                    }}
+                  >
+                    <Text style={styles.pickerOptionText}>Day {date}</Text>
+                    {isSelected && <Icon name="check" size={20} color="#019ee3" />}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+            <View style={styles.pickerModalActions}>
+              <TouchableOpacity
+                style={styles.pickerModalClearButton}
+                onPress={() => setSelectedReminderDates([])}
+              >
+                <Text style={styles.pickerModalClearButtonText}>Clear All</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.pickerModalDoneButton}
+                onPress={() => setReminderDatePickerVisible(false)}
+              >
+                <Text style={styles.pickerModalDoneButtonText}>Done</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -420,6 +761,11 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 10,
   },
+  countButtonContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   countButton: {
     backgroundColor: '#e3f2fd',
     paddingHorizontal: 12,
@@ -428,6 +774,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#019ee3',
     minWidth: 100,
+  },
+  reminderIconButton: {
+    padding: 4,
   },
   countButtonDisabled: {
     backgroundColor: '#f5f5f5',
@@ -468,6 +817,199 @@ const styles = StyleSheet.create({
   retryButtonText: {
     color: '#fff',
     fontSize: 16,
+    fontWeight: '600',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '90%',
+    paddingBottom: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  modalLoadingContainer: {
+    padding: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 200,
+  },
+  modalLoadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#666',
+  },
+  modalBody: {
+    padding: 20,
+  },
+  modalInputGroup: {
+    marginBottom: 20,
+  },
+  modalLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  modalInput: {
+    backgroundColor: '#f5f5f5',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+  },
+  pickerButton: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+  },
+  pickerButtonText: {
+    fontSize: 16,
+    color: '#333',
+    flex: 1,
+  },
+  placeholderText: {
+    color: '#999',
+  },
+  selectedDatesContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 10,
+    gap: 8,
+  },
+  dateChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#e3f2fd',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#019ee3',
+    gap: 6,
+  },
+  dateChipText: {
+    fontSize: 14,
+    color: '#019ee3',
+    fontWeight: '500',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 20,
+  },
+  modalCancelButton: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+    padding: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  modalCancelButtonText: {
+    color: '#666',
+    fontWeight: '600',
+    fontSize: 16,
+  },
+  modalSaveButton: {
+    flex: 1,
+    backgroundColor: '#019ee3',
+    padding: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  modalSaveButtonDisabled: {
+    opacity: 0.6,
+  },
+  modalSaveButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 16,
+  },
+  pickerModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  pickerModalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '80%',
+  },
+  pickerModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  pickerModalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  pickerOption: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  pickerOptionText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  pickerModalActions: {
+    flexDirection: 'row',
+    padding: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+    gap: 10,
+  },
+  pickerModalClearButton: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+    padding: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  pickerModalClearButtonText: {
+    color: '#666',
+    fontWeight: '600',
+  },
+  pickerModalDoneButton: {
+    flex: 1,
+    backgroundColor: '#019ee3',
+    padding: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  pickerModalDoneButtonText: {
+    color: '#fff',
     fontWeight: '600',
   },
 });

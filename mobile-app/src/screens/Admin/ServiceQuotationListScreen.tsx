@@ -19,6 +19,7 @@ import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { usePermissions } from '../../hooks/usePermissions';
 import axios from 'axios';
+import { getApiBaseUrl } from '../../services/api';
 import Toast from 'react-native-toast-message';
 import * as ImagePicker from 'expo-image-picker';
 
@@ -71,7 +72,7 @@ const ServiceQuotationListScreen = () => {
       let response;
       if (user?.role === 3) {
         response = await axios.get(
-          `${process.env.EXPO_PUBLIC_API_URL}/service-invoice/assignedTo/${user?._id}/quotation`,
+          `${getApiBaseUrl()}/service-invoice/assignedTo/${user?._id}/quotation`,
           {
             headers: {
               Authorization: token || '',
@@ -80,7 +81,7 @@ const ServiceQuotationListScreen = () => {
         );
       } else {
         response = await axios.post(
-          `${process.env.EXPO_PUBLIC_API_URL}/service-invoice/all`,
+          `${getApiBaseUrl()}/service-invoice/all`,
           { invoiceType: 'quotation' },
           {
             headers: {
@@ -109,7 +110,7 @@ const ServiceQuotationListScreen = () => {
 
   const fetchInvoicesCount = async () => {
     try {
-      const { data } = await axios.get(`${process.env.EXPO_PUBLIC_API_URL}/common-details`, {
+      const { data } = await axios.get(`${getApiBaseUrl()}/common-details`, {
         headers: {
           Authorization: token || '',
         },
@@ -125,7 +126,7 @@ const ServiceQuotationListScreen = () => {
   const handleUpdateInvoiceCount = async () => {
     try {
       await axios.put(
-        `${process.env.EXPO_PUBLIC_API_URL}/common-details/increment-invoice`,
+        `${getApiBaseUrl()}/common-details/increment-invoice`,
         {
           invoiceCount: invoiceCount,
         },
@@ -187,7 +188,7 @@ const ServiceQuotationListScreen = () => {
       } as any);
 
       const uploadRes = await axios.post(
-        `${process.env.EXPO_PUBLIC_API_URL}/auth/upload-file`,
+        `${getApiBaseUrl()}/auth/upload-file`,
         formData,
         {
           headers: {
@@ -200,7 +201,7 @@ const ServiceQuotationListScreen = () => {
       if (uploadRes.data?.fileUrl) {
         const oldLinks = quotation.quotationLink || [];
         await axios.put(
-          `${process.env.EXPO_PUBLIC_API_URL}/service-invoice/update/${quotation._id}`,
+          `${getApiBaseUrl()}/service-invoice/update/${quotation._id}`,
           {
             quotationLink: [...oldLinks, uploadRes.data.fileUrl],
             status: 'InvoiceSent',
@@ -258,7 +259,7 @@ const ServiceQuotationListScreen = () => {
       };
 
       const res = await axios.put(
-        `${process.env.EXPO_PUBLIC_API_URL}/service-invoice/update/${selectedQuotation._id}`,
+        `${getApiBaseUrl()}/service-invoice/update/${selectedQuotation._id}`,
         payload,
         {
           headers: {
@@ -293,7 +294,7 @@ const ServiceQuotationListScreen = () => {
       };
 
       const res = await axios.put(
-        `${process.env.EXPO_PUBLIC_API_URL}/service-invoice/update/${quotation._id}`,
+        `${getApiBaseUrl()}/service-invoice/update/${quotation._id}`,
         payload,
         {
           headers: {

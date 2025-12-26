@@ -1,36 +1,64 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
   TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { setOrders, setLoading } from '../../store/slices/orderSlice';
 import { orderService } from '../../services/api';
+import axios from 'axios';
+import { getApiBaseUrl } from '../../services/api';
+import Toast from 'react-native-toast-message';
 // @ts-ignore - @expo/vector-icons is available via expo dependency
 import { MaterialIcons as Icon } from '@expo/vector-icons';
+import CompanyToggleHeader from '../../components/CompanyToggleHeader';
 
 const OrdersScreen = () => {
   const navigation = useNavigation();
   const dispatch = useDispatch();
   const { orders, isLoading } = useSelector((state: RootState) => state.order);
+  const { token } = useSelector((state: RootState) => state.auth);
+  const [localLoading, setLocalLoading] = useState(false);
 
   useEffect(() => {
     loadOrders();
   }, []);
 
   const loadOrders = async () => {
+    setLocalLoading(true);
     dispatch(setLoading(true));
     try {
-      const response = await orderService.getOrders();
-      dispatch(setOrders(response.data.orders || []));
-    } catch (error) {
+      // Use direct axios call to ensure proper error handling
+      const response = await axios.get(
+        `${getApiBaseUrl()}/user/orders`,
+        {
+          headers: { Authorization: token || '' },
+          timeout: 30000,
+        }
+      );
+      
+      if (response.data?.orders) {
+        dispatch(setOrders(response.data.orders || []));
+      } else {
+        dispatch(setOrders([]));
+      }
+    } catch (error: any) {
       console.error('Error loading orders:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: error.response?.data?.message || 'Failed to load orders',
+      });
+      dispatch(setOrders([]));
     } finally {
+      setLocalLoading(false);
       dispatch(setLoading(false));
     }
   };
@@ -55,44 +83,78 @@ const OrdersScreen = () => {
   const renderOrder = ({ item }: { item: any }) => (
     <TouchableOpacity
       style={styles.orderCard}
-      onPress={() => navigation.navigate('OrderDetail' as never, { orderId: item._id } as never)}
+      onPress={() => (navigation as any).navigate('OrderDetail', { orderId: item._id })}
     >
       <View style={styles.orderHeader}>
-        <Text style={styles.orderNumber}>{item.orderNumber}</Text>
-        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
-          <Text style={styles.statusText}>{item.status}</Text>
+        <Text style={styles.orderNumber}>
+          {item.orderNumber || item._id?.slice(-8) || 'Order #N/A'}
+        </Text>
+        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status || item.orderStatus || 'pending') }]}>
+          <Text style={styles.statusText}>
+            {(item.status || item.orderStatus || 'Pending').toUpperCase()}
+          </Text>
         </View>
       </View>
-      <Text style={styles.orderDate}>Date: {item.createdAt}</Text>
-      <Text style={styles.orderTotal}>Total: ₹{item.total.toFixed(2)}</Text>
+      <Text style={styles.orderDate}>
+        Date: {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : 'N/A'}
+      </Text>
+      <Text style={styles.orderTotal}>
+        Total: ₹{item.total ? item.total.toFixed(2) : item.amount ? item.amount.toFixed(2) : '0.00'}
+      </Text>
       <Text style={styles.productCount}>
-        {item.products.length} product{item.products.length > 1 ? 's' : ''}
+        {item.products?.length || 0} product{(item.products?.length || 0) > 1 ? 's' : ''}
       </Text>
       <Icon name="chevron-right" size={24} color="#999" style={styles.chevron} />
     </TouchableOpacity>
   );
 
-  if (orders.length === 0 && !isLoading) {
+  if ((localLoading || isLoading) && orders.length === 0) {
     return (
-      <View style={styles.emptyContainer}>
-        <Icon name="receipt" size={80} color="#ccc" />
-        <Text style={styles.emptyText}>No orders yet</Text>
-        <Text style={styles.emptySubtext}>Your orders will appear here</Text>
-      </View>
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#007AFF" />
+          <Text style={styles.loadingText}>Loading orders...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (orders.length === 0 && !isLoading && !localLoading) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+        <View style={styles.emptyContainer}>
+          <Icon name="receipt" size={80} color="#ccc" />
+          <Text style={styles.emptyText}>No orders yet</Text>
+          <Text style={styles.emptySubtext}>Your orders will appear here</Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      {/* Header with Company Toggle */}
+      <View style={styles.topHeader}>
+        <CompanyToggleHeader />
+      </View>
       <FlatList
         data={orders}
         renderItem={renderOrder}
-        keyExtractor={(item) => item._id}
+        keyExtractor={(item) => item._id || Math.random().toString()}
         contentContainerStyle={styles.listContainer}
-        refreshing={isLoading}
+        refreshing={isLoading || localLoading}
         onRefresh={loadOrders}
+        ListEmptyComponent={
+          !isLoading && !localLoading ? (
+            <View style={styles.emptyContainer}>
+              <Icon name="receipt" size={80} color="#ccc" />
+              <Text style={styles.emptyText}>No orders yet</Text>
+              <Text style={styles.emptySubtext}>Your orders will appear here</Text>
+            </View>
+          ) : null
+        }
       />
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -100,6 +162,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+  },
+  topHeader: {
+    backgroundColor: '#fff',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
   },
   listContainer: {
     padding: 15,
@@ -157,11 +229,23 @@ const styles = StyleSheet.create({
     top: '50%',
     marginTop: -12,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#666',
+  },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#f5f5f5',
+    paddingVertical: 50,
   },
   emptyText: {
     fontSize: 20,

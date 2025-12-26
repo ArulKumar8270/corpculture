@@ -17,6 +17,7 @@ import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import axios from 'axios';
+import { getApiBaseUrl } from '../../services/api';
 import Toast from 'react-native-toast-message';
 
 interface ModelSpecs {
@@ -215,7 +216,7 @@ const AddRentalProductScreen = () => {
 
   const fetchCompanies = async () => {
     try {
-      const { data } = await axios.get(`${process.env.EXPO_PUBLIC_API_URL}/company/all`, {
+      const { data } = await axios.get(`${getApiBaseUrl()}/company/all`, {
         headers: { Authorization: token || '' },
       });
       if (data?.success) {
@@ -233,7 +234,7 @@ const AddRentalProductScreen = () => {
 
   const fetchGstOptions = async () => {
     try {
-      const { data } = await axios.get(`${process.env.EXPO_PUBLIC_API_URL}/gst`, {
+      const { data } = await axios.get(`${getApiBaseUrl()}/gst`, {
         headers: { Authorization: token || '' },
       });
       if (data?.success) {
@@ -252,7 +253,7 @@ const AddRentalProductScreen = () => {
   const fetchProduct = async (id: string) => {
     try {
       setLoading(true);
-      const { data } = await axios.get(`${process.env.EXPO_PUBLIC_API_URL}/rental-products/${id}`, {
+      const { data } = await axios.get(`${getApiBaseUrl()}/rental-products/${id}`, {
         headers: { Authorization: token || '' },
       });
       if (data?.success) {
@@ -359,7 +360,7 @@ const AddRentalProductScreen = () => {
       let response;
       if (isEditMode) {
         response = await axios.put(
-          `${process.env.EXPO_PUBLIC_API_URL}/rental-products/${productId}`,
+          `${getApiBaseUrl()}/rental-products/${productId}`,
           rentalProductData,
           {
             headers: { Authorization: token || '' },
@@ -367,7 +368,7 @@ const AddRentalProductScreen = () => {
         );
       } else {
         response = await axios.post(
-          `${process.env.EXPO_PUBLIC_API_URL}/rental-products`,
+          `${getApiBaseUrl()}/rental-products`,
           rentalProductData,
           {
             headers: { Authorization: token || '' },

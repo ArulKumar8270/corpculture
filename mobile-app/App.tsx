@@ -8,6 +8,10 @@ import Toast from 'react-native-toast-message';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { setAuth } from './src/store/slices/authSlice';
 import { fetchUserPermissions } from './src/store/slices/permissionsSlice';
+import {
+  setCompanyEnabled,
+  setSelectedCompany,
+} from './src/store/slices/companySlice';
 
 const App = () => {
   useEffect(() => {
@@ -17,13 +21,7 @@ const App = () => {
         const authData = await AsyncStorage.getItem('auth');
         if (authData) {
           const { user, token } = JSON.parse(authData);
-          console.log('App - Loading stored auth:', {
-            user: user ? 'User exists' : 'User missing',
-            token: token ? 'Token exists' : 'Token missing',
-            tokenLength: token?.length,
-          });
           store.dispatch(setAuth({ user, token }));
-          console.log('App - setAuth dispatched from stored auth');
           
           // Fetch user permissions
           if (user._id) {
@@ -32,6 +30,23 @@ const App = () => {
         } else {
           console.log('App - No stored auth data found');
         }
+
+        // Load company settings
+        const loadCompanySettings = async () => {
+          try {
+            const storedCompanyEnabled = await AsyncStorage.getItem('isCompanyEnabled');
+            const storedSelectedCompany = await AsyncStorage.getItem('selectedCompany');
+            if (storedCompanyEnabled) {
+              store.dispatch(setCompanyEnabled(JSON.parse(storedCompanyEnabled)));
+            }
+            if (storedSelectedCompany) {
+              store.dispatch(setSelectedCompany(storedSelectedCompany));
+            }
+          } catch (error) {
+            console.error('Error loading company settings:', error);
+          }
+        };
+        loadCompanySettings();
       } catch (error) {
         console.error('Error loading stored auth:', error);
       }

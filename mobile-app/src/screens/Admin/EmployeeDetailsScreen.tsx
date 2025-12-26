@@ -13,6 +13,7 @@ import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import axios from 'axios';
+import { getApiBaseUrl } from '../../services/api';
 import Toast from 'react-native-toast-message';
 
 const EmployeeDetailsScreen = () => {
@@ -35,10 +36,10 @@ const EmployeeDetailsScreen = () => {
     try {
       setLoading(true);
       const [employeeRes, ordersRes] = await Promise.allSettled([
-        axios.get(`${process.env.EXPO_PUBLIC_API_URL}/employee/get/${employeeId}`, {
+        axios.get(`${getApiBaseUrl()}/employee/get/${employeeId}`, {
           headers: { Authorization: token || '' },
         }),
-        axios.get(`${process.env.EXPO_PUBLIC_API_URL}/user/ordersByEmpId/${employeeId}`, {
+        axios.get(`${getApiBaseUrl()}/user/ordersByEmpId/${employeeId}`, {
           headers: { Authorization: token || '' },
         }),
       ]);

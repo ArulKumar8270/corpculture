@@ -18,6 +18,7 @@ import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import axios from 'axios';
+import { getApiBaseUrl } from '../../services/api';
 import Toast from 'react-native-toast-message';
 import * as ImagePicker from 'expo-image-picker';
 
@@ -57,7 +58,7 @@ const AddEmployeeScreen = () => {
 
   const fetchCategories = async () => {
     try {
-      const { data } = await axios.get(`${process.env.EXPO_PUBLIC_API_URL}/category/all`, {
+      const { data } = await axios.get(`${getApiBaseUrl()}/category/all`, {
         headers: { Authorization: token || '' },
       });
       if (data?.success) {
@@ -71,7 +72,7 @@ const AddEmployeeScreen = () => {
   const fetchEmployee = async (id: string) => {
     try {
       setLoading(true);
-      const { data } = await axios.get(`${process.env.EXPO_PUBLIC_API_URL}/employee/get/${id}`, {
+      const { data } = await axios.get(`${getApiBaseUrl()}/employee/get/${id}`, {
         headers: { Authorization: token || '' },
       });
       if (data?.employee) {
@@ -131,7 +132,7 @@ const AddEmployeeScreen = () => {
         setLoading(true);
         try {
           const response = await axios.post(
-            `${process.env.EXPO_PUBLIC_API_URL}/auth/upload-file`,
+            `${getApiBaseUrl()}/auth/upload-file`,
             formDataUpload,
             {
               headers: {
@@ -199,7 +200,7 @@ const AddEmployeeScreen = () => {
       if (isEditMode) {
         // Update existing employee
         const response = await axios.put(
-          `${process.env.EXPO_PUBLIC_API_URL}/employee/update/${employeeId}`,
+          `${getApiBaseUrl()}/employee/update/${employeeId}`,
           {
             ...formData,
             salary: formData.salary ? Number(formData.salary) : undefined,
@@ -222,7 +223,7 @@ const AddEmployeeScreen = () => {
         // Register new user first, then create employee
         try {
           const registerResponse = await axios.post(
-            `${process.env.EXPO_PUBLIC_API_URL}/auth/register`,
+            `${getApiBaseUrl()}/auth/register`,
             {
               ...formData,
               password: formData.phone,
@@ -237,7 +238,7 @@ const AddEmployeeScreen = () => {
 
           if (registerUser?._id) {
             const employeeCreateResponse = await axios.post(
-              `${process.env.EXPO_PUBLIC_API_URL}/employee/create`,
+              `${getApiBaseUrl()}/employee/create`,
               {
                 ...formData,
                 password: formData.phone,

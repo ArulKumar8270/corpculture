@@ -7,6 +7,7 @@ import serviceReducer from './slices/serviceSlice';
 import rentalReducer from './slices/rentalSlice';
 import adminReducer from './slices/adminSlice';
 import permissionsReducer from './slices/permissionsSlice';
+import companyReducer from './slices/companySlice';
 
 export const store = configureStore({
   reducer: {
@@ -18,6 +19,7 @@ export const store = configureStore({
     rental: rentalReducer,
     admin: adminReducer,
     permissions: permissionsReducer,
+    company: companyReducer,
   },
 });
 

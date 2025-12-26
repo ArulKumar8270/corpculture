@@ -17,6 +17,7 @@ import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import axios from 'axios';
+import { getApiBaseUrl } from '../../services/api';
 import Toast from 'react-native-toast-message';
 
 const PurchaseRegisterScreen = () => {
@@ -62,7 +63,7 @@ const PurchaseRegisterScreen = () => {
   const fetchVendorCompanies = async () => {
     try {
       const response = await axios.get(
-        `${process.env.EXPO_PUBLIC_API_URL}/vendors`,
+        `${getApiBaseUrl()}/vendors`,
         {
           headers: { Authorization: token || '' },
         }
@@ -82,7 +83,7 @@ const PurchaseRegisterScreen = () => {
     }
     try {
       const response = await axios.get(
-        `${process.env.EXPO_PUBLIC_API_URL}/vendor-products/getProductsByVendorId/${vendorId}`,
+        `${getApiBaseUrl()}/vendor-products/getProductsByVendorId/${vendorId}`,
         {
           headers: { Authorization: token || '' },
         }
@@ -113,7 +114,7 @@ const PurchaseRegisterScreen = () => {
     setLoading(true);
     try {
       const response = await axios.get(
-        `${process.env.EXPO_PUBLIC_API_URL}/purchases/${purchaseId}`,
+        `${getApiBaseUrl()}/purchases/${purchaseId}`,
         {
           headers: { Authorization: token || '' },
         }
@@ -237,7 +238,7 @@ const PurchaseRegisterScreen = () => {
       let response;
       if (purchaseId) {
         response = await axios.put(
-          `${process.env.EXPO_PUBLIC_API_URL}/purchases/${purchaseId}`,
+          `${getApiBaseUrl()}/purchases/${purchaseId}`,
           purchaseData,
           {
             headers: { Authorization: token || '' },
@@ -245,7 +246,7 @@ const PurchaseRegisterScreen = () => {
         );
       } else {
         response = await axios.post(
-          `${process.env.EXPO_PUBLIC_API_URL}/purchases`,
+          `${getApiBaseUrl()}/purchases`,
           purchaseData,
           {
             headers: { Authorization: token || '' },
@@ -257,7 +258,7 @@ const PurchaseRegisterScreen = () => {
         // Update or create material entry
         try {
           const materialResponse = await axios.post(
-            `${process.env.EXPO_PUBLIC_API_URL}/materials/update-or-create`,
+            `${getApiBaseUrl()}/materials/update-or-create`,
             {
               name: formData.productName,
               unit: purchaseData.quantity,

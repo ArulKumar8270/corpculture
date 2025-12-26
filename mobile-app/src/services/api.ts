@@ -1,15 +1,37 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 import * as sampleData from '../data/sampleData';
 
-// API Configuration
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://nicknameinfo.net/corpculture/api/v1';
+// API Configuration - Use Constants for production builds
+// In production APK builds, environment variables may not be available
+// So we use Constants.expoConfig.extra or fallback to hardcoded URL
+const getApiBaseUrl = () => {
+  // Try to get from expo config extra (set in app.json)
+  if (Constants.expoConfig?.extra?.apiUrl) {
+    return Constants.expoConfig.extra.apiUrl;
+  }
+  // Try environment variable (works in development)
+  if (process.env.EXPO_PUBLIC_API_URL) {
+    return process.env.EXPO_PUBLIC_API_URL;
+  }
+  // Fallback to hardcoded URL (for production builds)
+  return 'https://nicknameinfo.net/corpculture/api/v1';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 const USE_SAMPLE_DATA = false; // Set to false to use real API, true for sample data
 
-// Create axios instance
+// Export getApiBaseUrl for use in screens that make direct axios calls
+export { getApiBaseUrl, API_BASE_URL };
+
+// Log API URL for debugging
+console.log('API Base URL:', API_BASE_URL);
+
+// Create axios instance with increased timeout for mobile networks
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000,
+  timeout: 30000, // Increased to 30 seconds for mobile networks
   headers: {
     'Content-Type': 'application/json',
   },
@@ -37,6 +59,28 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
+    // Enhanced error logging for debugging mobile network issues
+    if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+      console.error('API Request Timeout:', {
+        url: error.config?.url,
+        baseURL: error.config?.baseURL,
+        timeout: error.config?.timeout,
+      });
+    } else if (error.code === 'NETWORK_ERROR' || error.message?.includes('Network Error')) {
+      console.error('Network Error:', {
+        url: error.config?.url,
+        baseURL: error.config?.baseURL,
+        message: error.message,
+      });
+    } else if (!error.response) {
+      console.error('No Response from Server:', {
+        url: error.config?.url,
+        baseURL: error.config?.baseURL,
+        message: error.message,
+        code: error.code,
+      });
+    }
+    
     if (error.response?.status === 401) {
       // Handle logout
       await AsyncStorage.removeItem('authToken');
@@ -73,15 +117,34 @@ export const authService = {
   login: async (email: string, password: string) => {
     // Login should only succeed on 200 status - no fallback to sample data
     try {
-      const response = await api.post('/auth/login', { email, password });
+      console.log('Login attempt - API Base URL:', API_BASE_URL);
+      console.log('Login attempt - Full URL:', `${API_BASE_URL}/auth/login`);
+      
+      const response = await api.post('/auth/login', { email, password }, {
+        timeout: 30000, // 30 seconds timeout for login
+      });
       
       // Only proceed if status is 200
       if (response.status === 200 && response.data) {
+        console.log('Login successful');
         return response;
       } else {
         throw new Error('Invalid response from server');
       }
     } catch (error: any) {
+      // Enhanced error logging for mobile network debugging
+      console.error('Login error details:', {
+        message: error.message,
+        code: error.code,
+        response: error.response?.data,
+        status: error.response?.status,
+        config: {
+          url: error.config?.url,
+          baseURL: error.config?.baseURL,
+          timeout: error.config?.timeout,
+        },
+      });
+      
       // Re-throw the error - don't use sample data fallback for login
       throw error;
     }
@@ -418,7 +481,7 @@ export const adminService = {
 
   getAllUsers: async () => {
     return getData(
-      () => api.get('/user/all'),
+      () => api.get('/auth/all-users'),
       { data: { users: sampleData.sampleUsers } } as any,
       800
     );

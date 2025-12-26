@@ -18,6 +18,7 @@ import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { usePermissions } from '../../hooks/usePermissions';
 import axios from 'axios';
+import { getApiBaseUrl } from '../../services/api';
 import Toast from 'react-native-toast-message';
 
 const RentalProductListScreen = () => {
@@ -46,7 +47,7 @@ const RentalProductListScreen = () => {
   const fetchRentalProducts = async () => {
     try {
       setLoading(true);
-      const { data } = await axios.get(`${process.env.EXPO_PUBLIC_API_URL}/rental-products`, {
+      const { data } = await axios.get(`${getApiBaseUrl()}/rental-products`, {
         headers: {
           Authorization: token || '',
         },
@@ -70,7 +71,7 @@ const RentalProductListScreen = () => {
 
   const fetchEmployees = async () => {
     try {
-      const { data } = await axios.get(`${process.env.EXPO_PUBLIC_API_URL}/employee/all`, {
+      const { data } = await axios.get(`${getApiBaseUrl()}/employee/all`, {
         headers: {
           Authorization: token || '',
         },
@@ -101,7 +102,7 @@ const RentalProductListScreen = () => {
           onPress: async () => {
             try {
               const { data } = await axios.delete(
-                `${process.env.EXPO_PUBLIC_API_URL}/rental-products/${productId}`,
+                `${getApiBaseUrl()}/rental-products/${productId}`,
                 {
                   headers: {
                     Authorization: token || '',
@@ -139,7 +140,7 @@ const RentalProductListScreen = () => {
     try {
       const rentalProductData = { ...product, employeeId: employeeId };
       const { data } = await axios.put(
-        `${process.env.EXPO_PUBLIC_API_URL}/rental-products/${productId}`,
+        `${getApiBaseUrl()}/rental-products/${productId}`,
         rentalProductData,
         {
           headers: {

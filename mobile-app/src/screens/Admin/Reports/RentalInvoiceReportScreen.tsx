@@ -17,6 +17,7 @@ import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../../store';
 import axios from 'axios';
+import { getApiBaseUrl } from '../../../services/api';
 import Toast from 'react-native-toast-message';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
@@ -84,7 +85,7 @@ const RentalInvoiceReportScreen = () => {
       };
 
       const response = await axios.post(
-        `${process.env.EXPO_PUBLIC_API_URL}/rental-payment/all/`,
+        `${getApiBaseUrl()}/rental-payment/all/`,
         requestBody,
         {
           headers: { Authorization: token || '' },

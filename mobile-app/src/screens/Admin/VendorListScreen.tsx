@@ -15,6 +15,7 @@ import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import axios from 'axios';
+import { getApiBaseUrl } from '../../services/api';
 import Toast from 'react-native-toast-message';
 import { usePermissions } from '../../hooks/usePermissions';
 
@@ -36,7 +37,7 @@ const VendorListScreen = () => {
     setLoading(true);
     try {
       const response = await axios.get(
-        `${process.env.EXPO_PUBLIC_API_URL}/vendors`,
+        `${getApiBaseUrl()}/vendors`,
         {
           headers: { Authorization: token || '' },
         }
@@ -86,7 +87,7 @@ const VendorListScreen = () => {
           onPress: async () => {
             try {
               const response = await axios.delete(
-                `${process.env.EXPO_PUBLIC_API_URL}/vendors/${vendorId}`,
+                `${getApiBaseUrl()}/vendors/${vendorId}`,
                 {
                   headers: { Authorization: token || '' },
                 }

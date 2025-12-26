@@ -16,6 +16,7 @@ import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { usePermissions } from '../../hooks/usePermissions';
 import axios from 'axios';
+import { getApiBaseUrl } from '../../services/api';
 import Toast from 'react-native-toast-message';
 
 const ServiceProductListScreen = () => {
@@ -37,7 +38,7 @@ const ServiceProductListScreen = () => {
   const loadProducts = async () => {
     setLoading(true);
     try {
-      const { data } = await axios.get(`${process.env.EXPO_PUBLIC_API_URL}/service-products`, {
+      const { data } = await axios.get(`${getApiBaseUrl()}/service-products`, {
         headers: {
           Authorization: token || '',
         },
@@ -80,7 +81,7 @@ const ServiceProductListScreen = () => {
           onPress: async () => {
             try {
               const { data } = await axios.delete(
-                `${process.env.EXPO_PUBLIC_API_URL}/service-products/${productId}`,
+                `${getApiBaseUrl()}/service-products/${productId}`,
                 {
                   headers: {
                     Authorization: token || '',

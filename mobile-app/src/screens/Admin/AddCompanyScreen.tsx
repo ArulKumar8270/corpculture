@@ -14,6 +14,7 @@ import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import axios from 'axios';
+import { getApiBaseUrl } from '../../services/api';
 import Toast from 'react-native-toast-message';
 
 const AddCompanyScreen = () => {
@@ -49,7 +50,7 @@ const AddCompanyScreen = () => {
   const fetchCompanyData = async () => {
     try {
       setLoading(true);
-      const { data } = await axios.get(`${process.env.EXPO_PUBLIC_API_URL}/company/get/${companyId}`, {
+      const { data } = await axios.get(`${getApiBaseUrl()}/company/get/${companyId}`, {
         headers: { Authorization: token || '' },
       });
       if (data?.success && data.company) {
@@ -103,8 +104,8 @@ const AddCompanyScreen = () => {
     try {
       setLoading(true);
       const url = isEditMode
-        ? `${process.env.EXPO_PUBLIC_API_URL}/company/update/${companyId}`
-        : `${process.env.EXPO_PUBLIC_API_URL}/company/create`;
+        ? `${getApiBaseUrl()}/company/update/${companyId}`
+        : `${getApiBaseUrl()}/company/create`;
       const method = isEditMode ? 'put' : 'post';
 
       const payload = {

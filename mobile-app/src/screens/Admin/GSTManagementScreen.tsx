@@ -19,6 +19,7 @@ import { RootState } from '../../store';
 import axios from 'axios';
 import Toast from 'react-native-toast-message';
 import { usePermissions } from '../../hooks/usePermissions';
+import { getApiBaseUrl } from '../../services/api';
 
 const GSTManagementScreen = () => {
   const { token, user } = useSelector((state: RootState) => state.auth);
@@ -42,9 +43,10 @@ const GSTManagementScreen = () => {
     try {
       setLoading(true);
       const response = await axios.get(
-        `${process.env.EXPO_PUBLIC_API_URL}/gst`,
+        `${getApiBaseUrl()}/gst`,
         {
           headers: { Authorization: token || '' },
+          timeout: 30000,
         }
       );
       if (response.data?.success) {
@@ -78,7 +80,7 @@ const GSTManagementScreen = () => {
       if (editingGst) {
         // Update existing GST
         const response = await axios.put(
-          `${process.env.EXPO_PUBLIC_API_URL}/gst/${editingGst._id}`,
+          `${getApiBaseUrl()}/gst/${editingGst._id}`,
           {
             gstType,
             gstPercentage: parseFloat(gstPercentage),
@@ -106,7 +108,7 @@ const GSTManagementScreen = () => {
       } else {
         // Create new GST
         const response = await axios.post(
-          `${process.env.EXPO_PUBLIC_API_URL}/gst`,
+          `${getApiBaseUrl()}/gst`,
           {
             gstType,
             gstPercentage: parseFloat(gstPercentage),
@@ -160,7 +162,7 @@ const GSTManagementScreen = () => {
           onPress: async () => {
             try {
               const response = await axios.delete(
-                `${process.env.EXPO_PUBLIC_API_URL}/gst/${id}`,
+                `${getApiBaseUrl()}/gst/${id}`,
                 {
                   headers: { Authorization: token || '' },
                 }

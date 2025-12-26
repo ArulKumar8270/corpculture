@@ -20,6 +20,7 @@ import { RootState } from '../../store';
 import axios from 'axios';
 import Toast from 'react-native-toast-message';
 import { usePermissions } from '../../hooks/usePermissions';
+import { getApiBaseUrl } from '../../services/api';
 
 const ProductManagementScreen = () => {
   const navigation = useNavigation();
@@ -44,12 +45,14 @@ const ProductManagementScreen = () => {
   const loadProducts = async () => {
     setLoading(true);
     try {
+      const API_BASE_URL = getApiBaseUrl();
       const response = await axios.get(
-        `${process.env.EXPO_PUBLIC_API_URL}/product/seller-product`,
+        `${API_BASE_URL}/product/seller-product`,
         {
           headers: {
             Authorization: token || '',
           },
+          timeout: 30000,
         }
       );
       if (response.status === 201) {
@@ -92,13 +95,15 @@ const ProductManagementScreen = () => {
           style: 'destructive',
           onPress: async () => {
             try {
+              const API_BASE_URL = getApiBaseUrl();
               const response = await axios.post(
-                `${process.env.EXPO_PUBLIC_API_URL}/product/delete-product`,
+                `${API_BASE_URL}/product/delete-product`,
                 { id },
                 {
                   headers: {
                     Authorization: token || '',
                   },
+                  timeout: 30000,
                 }
               );
               if (response.status === 200) {
@@ -151,14 +156,16 @@ const ProductManagementScreen = () => {
     }
     setCategoryLoading(true);
     try {
+      const API_BASE_URL = getApiBaseUrl();
       await axios.post(
-        `${process.env.EXPO_PUBLIC_API_URL}/category/create`,
+        `${API_BASE_URL}/category/create`,
         {
           name: categoryForm.name.trim(),
           commission: Number(categoryForm.commission),
         },
         {
           headers: { Authorization: token || '' },
+          timeout: 30000,
         }
       );
       Toast.show({

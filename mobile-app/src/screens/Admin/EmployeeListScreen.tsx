@@ -17,6 +17,7 @@ import { RootState } from '../../store';
 import axios from 'axios';
 import Toast from 'react-native-toast-message';
 import { usePermissions } from '../../hooks/usePermissions';
+import { getApiBaseUrl } from '../../services/api';
 
 interface Employee {
   _id: string;
@@ -49,8 +50,10 @@ const EmployeeListScreen = () => {
   const fetchEmployees = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${process.env.EXPO_PUBLIC_API_URL}/employee/all`, {
+      const API_BASE_URL = getApiBaseUrl();
+      const response = await axios.get(`${API_BASE_URL}/employee/all`, {
         headers: { Authorization: token || '' },
+        timeout: 30000,
       });
       if (response.data?.employees) {
         setEmployees(response.data.employees);
@@ -83,7 +86,8 @@ const EmployeeListScreen = () => {
           onPress: async () => {
             try {
               setLoading(true);
-              await axios.delete(`${process.env.EXPO_PUBLIC_API_URL}/employee/delete/${employeeId}`, {
+              const API_BASE_URL = getApiBaseUrl();
+              await axios.delete(`${API_BASE_URL}/employee/delete/${employeeId}`, {
                 headers: { Authorization: token || '' },
               });
               Toast.show({

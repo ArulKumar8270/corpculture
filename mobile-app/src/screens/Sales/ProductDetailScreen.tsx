@@ -6,7 +6,11 @@ import {
   ScrollView,
   Image,
   TouchableOpacity,
+  FlatList,
+  Dimensions,
+  ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRoute } from '@react-navigation/native';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
@@ -15,12 +19,15 @@ import { addToCart } from '../../store/slices/cartSlice';
 import { productService } from '../../services/api';
 import Toast from 'react-native-toast-message';
 
+const { width } = Dimensions.get('window');
+
 const ProductDetailScreen = () => {
   const route = useRoute();
   const { productId } = route.params as { productId: string };
   const dispatch = useDispatch();
-  const { selectedProduct } = useSelector((state: RootState) => state.product);
+  const { selectedProduct, isLoading } = useSelector((state: RootState) => state.product);
   const [quantity, setQuantity] = useState(1);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   useEffect(() => {
     loadProduct();
@@ -40,57 +47,112 @@ const ProductDetailScreen = () => {
 
   const handleAddToCart = () => {
     if (selectedProduct) {
+      const product = selectedProduct as any;
+      const productImage = product.images && product.images.length > 0 
+        ? product.images[0].url 
+        : 'https://via.placeholder.com/300';
+      
       dispatch(
         addToCart({
-          productId: selectedProduct._id,
-          name: selectedProduct.name,
-          price: selectedProduct.discountPrice || selectedProduct.price,
+          productId: product._id,
+          name: product.name,
+          price: product.price || 0,
+          discountPrice: product.discountPrice,
           quantity,
-          image: selectedProduct.image,
+          image: productImage,
+          images: product.images,
+          priceRange: product.priceRange,
+          deliveryCharge: product.deliveryCharge || 0,
+          installationCost: product.installationCost || 0,
+          isInstalation: false, // Default to false, user can toggle in cart
+          sendInvoice: false, // Default to false, user can toggle in cart
+          brandName: product.brandName,
+          stock: product.stock,
         })
       );
       Toast.show({
         type: 'success',
         text1: 'Added to Cart',
-        text2: `${selectedProduct.name} added to cart`,
+        text2: `${product.name} added to cart`,
       });
     }
   };
 
-  if (!selectedProduct) {
+  const renderImageItem = ({ item, index }: { item: any; index: number }) => (
+    <Image
+      source={{ uri: item.url || 'https://via.placeholder.com/300' }}
+      style={styles.productImage}
+      resizeMode="contain"
+    />
+  );
+
+  if (isLoading || !selectedProduct) {
     return (
-      <View style={styles.container}>
-        <Text>Loading...</Text>
-      </View>
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#007AFF" />
+          <Text style={styles.loadingText}>Loading product...</Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
+  const product = selectedProduct as any;
+  const productImages = product.images && product.images.length > 0 
+    ? product.images 
+    : [{ url: 'https://via.placeholder.com/300' }];
+
   return (
-    <ScrollView style={styles.container}>
-      <Image
-        source={{ uri: selectedProduct.image || 'https://via.placeholder.com/300' }}
-        style={styles.productImage}
-      />
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <ScrollView style={styles.scrollView}>
+      {/* Image Carousel */}
+      <View style={styles.imageContainer}>
+        <FlatList
+          data={productImages}
+          renderItem={renderImageItem}
+          keyExtractor={(item, index) => item._id || index.toString()}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onMomentumScrollEnd={(e) => {
+            const index = Math.round(e.nativeEvent.contentOffset.x / width);
+            setCurrentImageIndex(index);
+          }}
+        />
+        {productImages.length > 1 && (
+          <View style={styles.imageIndicatorContainer}>
+        {productImages.map((_: any, index: number) => (
+          <View
+            key={index}
+            style={[
+              styles.imageIndicator,
+              currentImageIndex === index && styles.imageIndicatorActive,
+            ]}
+          />
+        ))}
+          </View>
+        )}
+      </View>
       <View style={styles.content}>
-        <Text style={styles.productName}>{selectedProduct.name}</Text>
-        <Text style={styles.category}>{selectedProduct.category}</Text>
+        <Text style={styles.productName}>{product.name}</Text>
+        <Text style={styles.category}>{product.category}</Text>
         <View style={styles.priceContainer}>
-          {selectedProduct.discountPrice ? (
+          {product.discountPrice ? (
             <>
-              <Text style={styles.discountPrice}>₹{selectedProduct.discountPrice}</Text>
-              <Text style={styles.originalPrice}>₹{selectedProduct.price}</Text>
+              <Text style={styles.discountPrice}>₹{product.discountPrice}</Text>
+              <Text style={styles.originalPrice}>₹{product.price}</Text>
             </>
           ) : (
-            <Text style={styles.price}>₹{selectedProduct.price}</Text>
+            <Text style={styles.price}>₹{product.price}</Text>
           )}
         </View>
-        <Text style={styles.description}>{selectedProduct.description}</Text>
-        {selectedProduct.rating && (
+        <Text style={styles.description}>{product.description}</Text>
+        {product.ratings > 0 && (
           <Text style={styles.rating}>
-            ⭐ {selectedProduct.rating} ({selectedProduct.reviews} reviews)
+            ⭐ {product.ratings.toFixed(1)} ({product.numOfReviews} reviews)
           </Text>
         )}
-        <Text style={styles.stock}>Stock: {selectedProduct.stock} available</Text>
+        <Text style={styles.stock}>Stock: {product.stock} available</Text>
 
         <View style={styles.quantityContainer}>
           <Text style={styles.quantityLabel}>Quantity:</Text>
@@ -115,7 +177,8 @@ const ProductDetailScreen = () => {
           <Text style={styles.addToCartText}>Add to Cart</Text>
         </TouchableOpacity>
       </View>
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
@@ -124,10 +187,48 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
-  productImage: {
+  scrollView: {
+    flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#666',
+  },
+  imageContainer: {
+    position: 'relative',
     width: '100%',
-    height: 300,
-    resizeMode: 'cover',
+    height: 350,
+    backgroundColor: '#f9f9f9',
+  },
+  productImage: {
+    width: width,
+    height: 350,
+  },
+  imageIndicatorContainer: {
+    position: 'absolute',
+    bottom: 15,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+  },
+  imageIndicator: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+  },
+  imageIndicatorActive: {
+    backgroundColor: '#007AFF',
+    width: 24,
   },
   content: {
     padding: 20,

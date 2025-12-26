@@ -10,6 +10,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { setSelectedOrder, setLoading } from '../../store/slices/orderSlice';
 import { orderService } from '../../services/api';
+import TrackerScreen from './TrackerScreen';
 
 const OrderDetailScreen = () => {
   const route = useRoute();
@@ -31,6 +32,17 @@ const OrderDetailScreen = () => {
     } finally {
       dispatch(setLoading(false));
     }
+  };
+
+  const getActiveStep = (status: string) => {
+    const statusMap: { [key: string]: number } = {
+      'pending': 0,
+      'processing': 0,
+      'shipped': 1,
+      'out for delivery': 2,
+      'delivered': 3,
+    };
+    return statusMap[status?.toLowerCase()] || 0;
   };
 
   if (!selectedOrder) {
@@ -57,6 +69,14 @@ const OrderDetailScreen = () => {
           <Text style={styles.label}>Date:</Text>
           <Text style={styles.value}>{selectedOrder.createdAt}</Text>
         </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Order Tracking</Text>
+        <TrackerScreen
+          activeStep={getActiveStep(selectedOrder.status)}
+          orderOn={selectedOrder.createdAt}
+        />
       </View>
 
       <View style={styles.section}>

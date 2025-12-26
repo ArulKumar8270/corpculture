@@ -14,6 +14,7 @@ import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../../store';
 import axios from 'axios';
+import { getApiBaseUrl } from '../../../services/api';
 import Toast from 'react-native-toast-message';
 
 interface ReportData {
@@ -55,19 +56,19 @@ const RentalReportsSummaryScreen = () => {
         rentalEnquiriesRes,
       ] = await Promise.allSettled([
         axios.post(
-          `${process.env.EXPO_PUBLIC_API_URL}/rental-payment/all/`,
+          `${getApiBaseUrl()}/rental-payment/all/`,
           { invoiceType: 'invoice' },
           { headers: { Authorization: token } }
         ),
         axios.post(
-          `${process.env.EXPO_PUBLIC_API_URL}/rental-payment/all/`,
+          `${getApiBaseUrl()}/rental-payment/all/`,
           { invoiceType: 'quotation' },
           { headers: { Authorization: token } }
         ),
-        axios.get(`${process.env.EXPO_PUBLIC_API_URL}/report/rental`, {
+        axios.get(`${getApiBaseUrl()}/report/rental`, {
           headers: { Authorization: token },
         }),
-        axios.get(`${process.env.EXPO_PUBLIC_API_URL}/rental/all`, {
+        axios.get(`${getApiBaseUrl()}/rental/all`, {
           headers: { Authorization: token },
         }),
       ]);

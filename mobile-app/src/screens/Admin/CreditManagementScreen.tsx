@@ -18,6 +18,7 @@ import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import axios from 'axios';
 import Toast from 'react-native-toast-message';
+import { getApiBaseUrl } from '../../services/api';
 
 interface Credit {
   _id: string;
@@ -85,10 +86,12 @@ const CreditManagementScreen = () => {
   const fetchCompanies = async () => {
     try {
       setCompaniesLoading(true);
+      const API_BASE_URL = getApiBaseUrl();
       const { data } = await axios.get(
-        `${process.env.EXPO_PUBLIC_API_URL}/company/all?limit=1000`,
+        `${API_BASE_URL}/company/all?limit=1000`,
         {
           headers: { Authorization: token || '' },
+          timeout: 30000,
         }
       );
       if (data?.success) {
@@ -118,10 +121,12 @@ const CreditManagementScreen = () => {
         toDate: appliedFilters.toDate || '',
       }).toString();
 
+      const API_BASE_URL = getApiBaseUrl();
       const { data } = await axios.get(
-        `${process.env.EXPO_PUBLIC_API_URL}/credit/all?${queryParams}`,
+        `${API_BASE_URL}/credit/all?${queryParams}`,
         {
           headers: { Authorization: token || '' },
+          timeout: 30000,
         }
       );
 
@@ -226,7 +231,7 @@ const CreditManagementScreen = () => {
     try {
       if (editingCredit) {
         await axios.put(
-          `${process.env.EXPO_PUBLIC_API_URL}/credit/update/${editingCredit._id}`,
+          `${getApiBaseUrl()}/credit/update/${editingCredit._id}`,
           {
             amount: parseFloat(formData.amount),
             description: formData.description,
@@ -241,7 +246,7 @@ const CreditManagementScreen = () => {
         });
       } else {
         await axios.post(
-          `${process.env.EXPO_PUBLIC_API_URL}/credit/create`,
+          `${getApiBaseUrl()}/credit/create`,
           formData,
           { headers: { Authorization: token || '' } }
         );
@@ -275,7 +280,7 @@ const CreditManagementScreen = () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              await axios.delete(`${process.env.EXPO_PUBLIC_API_URL}/credit/delete/${creditId}`, {
+              await axios.delete(`${getApiBaseUrl()}/credit/delete/${creditId}`, {
                 headers: { Authorization: token || '' },
               });
               Toast.show({

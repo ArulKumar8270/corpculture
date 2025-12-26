@@ -16,6 +16,7 @@ import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { usePermissions } from '../../hooks/usePermissions';
 import axios from 'axios';
+import { getApiBaseUrl } from '../../services/api';
 import Toast from 'react-native-toast-message';
 
 const RentalReportsScreen = () => {
@@ -52,10 +53,10 @@ const RentalReportsScreen = () => {
       let url: string;
       if (user?.role === 3) {
         // Employee: use getByassigned route to match backend
-        url = `${process.env.EXPO_PUBLIC_API_URL}/report/getByassigned/${user?._id}/${reportType}`;
+        url = `${getApiBaseUrl()}/report/getByassigned/${user?._id}/${reportType}`;
       } else {
         // Admin: use reportType route
-        url = `${process.env.EXPO_PUBLIC_API_URL}/report/${reportType}`;
+        url = `${getApiBaseUrl()}/report/${reportType}`;
       }
 
       console.log('Fetching Rental_Reports from:', url);
@@ -137,7 +138,7 @@ const RentalReportsScreen = () => {
         onPress: async () => {
           try {
             const response = await axios.delete(
-              `${process.env.EXPO_PUBLIC_API_URL}/report/${reportId}`,
+              `${getApiBaseUrl()}/report/${reportId}`,
               {
                 headers: {
                   Authorization: token || '',

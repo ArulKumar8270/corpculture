@@ -17,6 +17,7 @@ import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../../store';
 import axios from 'axios';
+import { getApiBaseUrl } from '../../../services/api';
 import Toast from 'react-native-toast-message';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
@@ -77,7 +78,7 @@ const ServiceReportsReportScreen = () => {
       }).toString();
 
       const response = await axios.get(
-        `${process.env.EXPO_PUBLIC_API_URL}/report/service?${queryParams}`,
+        `${getApiBaseUrl()}/report/service?${queryParams}`,
         {
           headers: { Authorization: token || '' },
         }

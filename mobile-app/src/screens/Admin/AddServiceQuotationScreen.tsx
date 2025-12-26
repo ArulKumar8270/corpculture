@@ -17,6 +17,7 @@ import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import axios from 'axios';
+import { getApiBaseUrl } from '../../services/api';
 import Toast from 'react-native-toast-message';
 
 interface ProductInTable {
@@ -81,7 +82,7 @@ const AddServiceQuotationScreen = () => {
 
   const fetchQuotationsCount = async () => {
     try {
-      const { data } = await axios.get(`${process.env.EXPO_PUBLIC_API_URL}/service-invoice/all`, {
+      const { data } = await axios.get(`${getApiBaseUrl()}/service-invoice/all`, {
         headers: {
           Authorization: user?.token || '',
         },
@@ -97,7 +98,7 @@ const AddServiceQuotationScreen = () => {
   const fetchCompanies = async () => {
     try {
       setLoading(true);
-      const { data } = await axios.get(`${process.env.EXPO_PUBLIC_API_URL}/company/all`, {
+      const { data } = await axios.get(`${getApiBaseUrl()}/company/all`, {
         headers: {
           Authorization: user?.token || '',
         },
@@ -115,7 +116,7 @@ const AddServiceQuotationScreen = () => {
   const fetchCompanyData = async () => {
     try {
       const { data } = await axios.get(
-        `${process.env.EXPO_PUBLIC_API_URL}/company/get/${quotationData.companyId}`,
+        `${getApiBaseUrl()}/company/get/${quotationData.companyId}`,
         {
           headers: {
             Authorization: user?.token || '',
@@ -134,7 +135,7 @@ const AddServiceQuotationScreen = () => {
     try {
       setLoading(true);
       const { data } = await axios.get(
-        `${process.env.EXPO_PUBLIC_API_URL}/service-products/getServiceProductsByCompany/${quotationData.companyId}`,
+        `${getApiBaseUrl()}/service-products/getServiceProductsByCompany/${quotationData.companyId}`,
         {
           headers: {
             Authorization: user?.token || '',
@@ -158,7 +159,7 @@ const AddServiceQuotationScreen = () => {
     try {
       setLoading(true);
       const { data } = await axios.get(
-        `${process.env.EXPO_PUBLIC_API_URL}/service-invoice/get/${quotationId}`,
+        `${getApiBaseUrl()}/service-invoice/get/${quotationId}`,
         {
           headers: {
             Authorization: user?.token || '',
@@ -292,7 +293,7 @@ const AddServiceQuotationScreen = () => {
       let response;
       if (quotationId) {
         response = await axios.put(
-          `${process.env.EXPO_PUBLIC_API_URL}/service-invoice/update/${quotationId}`,
+          `${getApiBaseUrl()}/service-invoice/update/${quotationId}`,
           payload,
           {
             headers: {
@@ -302,7 +303,7 @@ const AddServiceQuotationScreen = () => {
         );
       } else {
         response = await axios.post(
-          `${process.env.EXPO_PUBLIC_API_URL}/service-invoice/create`,
+          `${getApiBaseUrl()}/service-invoice/create`,
           payload,
           {
             headers: {

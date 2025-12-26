@@ -142,14 +142,14 @@ const EmployeeDashboardScreen = () => {
       permissionKey: 'salesCommission',
       color: '#2196F3',
     },
-    {
-      id: 'oldInvoices',
-      title: 'Old Invoices',
-      icon: 'description',
-      screen: 'OldInvoicesList',
-      permissionKey: 'sales',
-      color: '#9E9E9E',
-    },
+    // {
+    //   id: 'oldInvoices',
+    //   title: 'Old Invoices',
+    //   icon: 'description',
+    //   screen: 'OldInvoicesList',
+    //   permissionKey: 'sales',
+    //   color: '#9E9E9E',
+    // },
   ];
 
   // Service Section

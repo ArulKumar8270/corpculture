@@ -4,6 +4,8 @@ const contactPersonSchema = new mongoose.Schema({
     name: { type: String, required: true },
     mobile: { type: String, required: true },
     email: { type: String, required: true },
+    designation: { type: String, required: false }, // Optional designation field
+    dob: { type: String, required: false }, // Optional date of birth field
 }, { _id: false }); // _id: false to prevent Mongoose from adding _id to subdocuments
 
 const deliveryAddressSchema = new mongoose.Schema({

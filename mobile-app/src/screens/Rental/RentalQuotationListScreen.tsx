@@ -20,6 +20,7 @@ import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { usePermissions } from '../../hooks/usePermissions';
 import axios from 'axios';
+import { getApiBaseUrl } from '../../services/api';
 import Toast from 'react-native-toast-message';
 import * as ImagePicker from 'expo-image-picker';
 
@@ -87,7 +88,7 @@ const RentalQuotationListScreen = () => {
       if (user?.role === 3) {
         // Backend route is POST, not GET
         response = await axios.post(
-          `${process.env.EXPO_PUBLIC_API_URL}/rental-payment/assignedTo/${user?._id}/${invoiceType}`,
+          `${getApiBaseUrl()}/rental-payment/assignedTo/${user?._id}/${invoiceType}`,
           {},
           {
             headers: {
@@ -97,7 +98,7 @@ const RentalQuotationListScreen = () => {
         );
       } else {
         response = await axios.post(
-          `${process.env.EXPO_PUBLIC_API_URL}/rental-payment/all`,
+          `${getApiBaseUrl()}/rental-payment/all`,
           { invoiceType, tdsAmount: { $eq: null }, status: { $ne: 'Paid' } },
           {
             headers: {
@@ -128,7 +129,7 @@ const RentalQuotationListScreen = () => {
 
   const fetchInvoicesCount = async () => {
     try {
-      const { data } = await axios.get(`${process.env.EXPO_PUBLIC_API_URL}/common-details`, {
+      const { data } = await axios.get(`${getApiBaseUrl()}/common-details`, {
         headers: {
           Authorization: token || '',
         },
@@ -205,7 +206,7 @@ const RentalQuotationListScreen = () => {
         name: fileName,
       } as any);
 
-      const apiUrl = process.env.EXPO_PUBLIC_API_URL;
+      const apiUrl = getApiBaseUrl();
       if (!apiUrl) {
         throw new Error('API URL is not configured');
       }
@@ -277,7 +278,7 @@ const RentalQuotationListScreen = () => {
               setDeletingLink(entry._id);
               const fileName = linkToDelete.split('/').pop();
               await axios.post(
-                `${process.env.EXPO_PUBLIC_API_URL}/auth/delete-file/${fileName}`,
+                `${getApiBaseUrl()}/auth/delete-file/${fileName}`,
                 {},
                 {
                   headers: {
@@ -288,7 +289,7 @@ const RentalQuotationListScreen = () => {
 
               const updatedLinks = entry.invoiceLink.filter((link: string) => link !== linkToDelete);
               await axios.put(
-                `${process.env.EXPO_PUBLIC_API_URL}/rental-payment/${entry._id}`,
+                `${getApiBaseUrl()}/rental-payment/${entry._id}`,
                 { invoiceLink: updatedLinks },
                 {
                   headers: {
@@ -326,7 +327,7 @@ const RentalQuotationListScreen = () => {
       };
 
       const res = await axios.put(
-        `${process.env.EXPO_PUBLIC_API_URL}/rental-payment/${entry._id}`,
+        `${getApiBaseUrl()}/rental-payment/${entry._id}`,
         payload,
         {
           headers: {
@@ -363,7 +364,7 @@ const RentalQuotationListScreen = () => {
   const handleUpdateInvoiceCount = async () => {
     try {
       await axios.put(
-        `${process.env.EXPO_PUBLIC_API_URL}/common-details/increment-invoice`,
+        `${getApiBaseUrl()}/common-details/increment-invoice`,
         {
           invoiceCount: invoiceCount,
         },

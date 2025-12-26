@@ -41,7 +41,7 @@ const AddCompany = () => {
     // Changed to array of objects { address: '', pincode: '' }
     const [serviceDeliveryAddresses, setServiceDeliveryAddresses] = useState([{ address: '', pincode: '' }]);
     const [contactPersons, setContactPersons] = useState([
-        { name: auth?.user?.role === 0 ? auth?.user?.name : '', mobile: auth?.user?.role === 0 ? auth?.user?.phone : '', email: auth?.user?.role === 0 ? auth?.user?.email : '' }
+        { name: auth?.user?.role === 0 ? auth?.user?.name : '', mobile: auth?.user?.role === 0 ? auth?.user?.phone : '', email: auth?.user?.role === 0 ? auth?.user?.email : '', designation: '', dob: '' }
     ]); // Array of objects for contact persons
 
     const [loading, setLoading] = useState(false); // For form submission loading
@@ -83,15 +83,16 @@ const AddCompany = () => {
                                 )
                                 : [{ address: '', pincode: '' }]
                         );
-                        setContactPersons(company.contactPersons?.length > 0 ? company.contactPersons : [{ name: '', mobile: '', email: '' }]);
+                        setContactPersons(company.contactPersons?.length > 0 ? company.contactPersons.map(person => ({ ...person, designation: person.designation || '', dob: person.dob || '' })) : [{ name: '', mobile: '', email: '', designation: '', dob: '' }]);
                     } else {
                         toast.error(data?.message || 'Failed to fetch company details.');
-                        navigate('../companyList'); // Redirect if company not found
+                        // Redirect if company not found
+                        location.reload();
                     }
                 } catch (error) {
                     console.error('Error fetching company details:', error);
                     toast.error(error.response?.data?.message || 'Something went wrong while fetching company details.');
-                    navigate('../companyList'); // Redirect on error
+                    location.reload();
                 } finally {
                     setInitialLoading(false);
                 }
@@ -134,7 +135,7 @@ const AddCompany = () => {
     };
 
     const addContactPerson = () => {
-        setContactPersons(prev => [...prev, { name: '', mobile: '', email: '' }]);
+        setContactPersons(prev => [...prev, { name: '', mobile: '', email: '', designation: '', dob: '' }]);
     };
 
     const removeContactPerson = (index) => {
@@ -408,7 +409,7 @@ const AddCompany = () => {
                             <Typography variant="subtitle1" sx={{ mb: 1 }}>Contact Persons</Typography>
                             {contactPersons.map((person, index) => (
                                 <Grid container spacing={2} key={index} sx={{ mb: 2, alignItems: 'center' }}>
-                                    <Grid item xs={12} sm={4}>
+                                    <Grid item xs={12} sm={2.4}>
                                         <TextField
                                             fullWidth
                                             label={`Person Name ${index + 1}`}
@@ -418,7 +419,7 @@ const AddCompany = () => {
                                             required
                                         />
                                     </Grid>
-                                    <Grid item xs={12} sm={3}>
+                                    <Grid item xs={12} sm={2.4}>
                                         <TextField
                                             fullWidth
                                             label="Mobile No"
@@ -428,7 +429,7 @@ const AddCompany = () => {
                                             required
                                         />
                                     </Grid>
-                                    <Grid item xs={12} sm={4}>
+                                    <Grid item xs={12} sm={2.4}>
                                         <TextField
                                             fullWidth
                                             label="Email_ID"
@@ -439,7 +440,29 @@ const AddCompany = () => {
                                             required
                                         />
                                     </Grid>
-                                    <Grid item xs={12} sm={1}>
+                                    <Grid item xs={12} sm={2.4}>
+                                        <TextField
+                                            fullWidth
+                                            label="Designation"
+                                            value={person.designation}
+                                            onChange={(e) => handleContactPersonChange(index, 'designation', e.target.value)}
+                                            size="small"
+                                        />
+                                    </Grid>
+                                    <Grid item xs={12} sm={2.4}>
+                                        <TextField
+                                            fullWidth
+                                            label="Date of Birth"
+                                            value={person.dob}
+                                            onChange={(e) => handleContactPersonChange(index, 'dob', e.target.value)}
+                                            size="small"
+                                            type="date"
+                                            InputLabelProps={{
+                                                shrink: true,
+                                            }}
+                                        />
+                                    </Grid>
+                                    <Grid item xs={12} sm={0.4}>
                                         {contactPersons.length > 1 && (
                                             <IconButton color="error" onClick={() => removeContactPerson(index)}>
                                                 <DeleteIcon />

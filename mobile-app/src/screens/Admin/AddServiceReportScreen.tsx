@@ -17,6 +17,7 @@ import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import axios from 'axios';
+import { getApiBaseUrl } from '../../services/api';
 import Toast from 'react-native-toast-message';
 
 interface MaterialGroup {
@@ -103,7 +104,7 @@ const AddServiceReportScreen = () => {
   const fetchInitialData = async () => {
     try {
       setLoading(true);
-      const { data } = await axios.get(`${process.env.EXPO_PUBLIC_API_URL}/company/all`, {
+      const { data } = await axios.get(`${getApiBaseUrl()}/company/all`, {
         headers: { Authorization: token || '' },
       });
       if (data?.success) {
@@ -112,7 +113,7 @@ const AddServiceReportScreen = () => {
 
       if (reportId) {
         const reportResponse = await axios.get(
-          `${process.env.EXPO_PUBLIC_API_URL}/report/getById/${reportId}`,
+          `${getApiBaseUrl()}/report/getById/${reportId}`,
           { headers: { Authorization: token || '' } }
         );
         if (reportResponse.data.success) {
@@ -173,7 +174,7 @@ const AddServiceReportScreen = () => {
   const fetchCompanyRelatedData = async () => {
     try {
       const { data: companyData } = await axios.get(
-        `${process.env.EXPO_PUBLIC_API_URL}/company/get/${formData.company}`,
+        `${getApiBaseUrl()}/company/get/${formData.company}`,
         { headers: { Authorization: token || '' } }
       );
       if (companyData?.success && companyData.company) {
@@ -187,7 +188,7 @@ const AddServiceReportScreen = () => {
       }
 
       const { data: productsData } = await axios.get(
-        `${process.env.EXPO_PUBLIC_API_URL}/service-products/getServiceProductsByCompany/${formData.company}`,
+        `${getApiBaseUrl()}/service-products/getServiceProductsByCompany/${formData.company}`,
         { headers: { Authorization: token || '' } }
       );
       if (productsData?.success) {
@@ -499,11 +500,11 @@ const AddServiceReportScreen = () => {
       
       let response;
       if (reportId) {
-        response = await axios.put(`${process.env.EXPO_PUBLIC_API_URL}/report/${reportId}`, payload, {
+        response = await axios.put(`${getApiBaseUrl()}/report/${reportId}`, payload, {
           headers: { Authorization: token || '', 'Content-Type': 'application/json' },
         });
       } else {
-        response = await axios.post(`${process.env.EXPO_PUBLIC_API_URL}/report`, payload, {
+        response = await axios.post(`${getApiBaseUrl()}/report`, payload, {
           headers: { Authorization: token || '', 'Content-Type': 'application/json' },
         });
       }

@@ -18,6 +18,7 @@ import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import axios from 'axios';
+import { getApiBaseUrl } from '../../services/api';
 import Toast from 'react-native-toast-message';
 import * as ImagePicker from 'expo-image-picker';
 import { getTotalRentalInvoicePayment } from '../../utils/functions';
@@ -175,7 +176,7 @@ const RentalInvoiceFormScreen = () => {
 
   const fetchInvoicesCounts = async () => {
     try {
-      const { data } = await axios.get(`${process.env.EXPO_PUBLIC_API_URL}/common-details`, {
+      const { data } = await axios.get(`${getApiBaseUrl()}/common-details`, {
         headers: {
           Authorization: token || '',
         },
@@ -192,7 +193,7 @@ const RentalInvoiceFormScreen = () => {
     try {
       setLoadingCompanies(true);
       setLoading(true);
-      const { data } = await axios.get(`${process.env.EXPO_PUBLIC_API_URL}/company/all`, {
+      const { data } = await axios.get(`${getApiBaseUrl()}/company/all`, {
         headers: {
           Authorization: token || '',
         },
@@ -216,7 +217,7 @@ const RentalInvoiceFormScreen = () => {
   const fetchCompanyData = async () => {
     try {
       const { data } = await axios.get(
-        `${process.env.EXPO_PUBLIC_API_URL}/company/get/${formData.companyId}`,
+        `${getApiBaseUrl()}/company/get/${formData.companyId}`,
         {
           headers: {
             Authorization: token || '',
@@ -233,7 +234,7 @@ const RentalInvoiceFormScreen = () => {
     try {
       setLoading(true);
       const { data } = await axios.get(
-        `${process.env.EXPO_PUBLIC_API_URL}/rental-products/getServiceProductsByCompany/${formData.companyId}`,
+        `${getApiBaseUrl()}/rental-products/getServiceProductsByCompany/${formData.companyId}`,
         {
           headers: {
             Authorization: token || '',
@@ -276,7 +277,7 @@ const RentalInvoiceFormScreen = () => {
     try {
       setLoading(true);
       const { data } = await axios.get(
-        `${process.env.EXPO_PUBLIC_API_URL}/rental-payment/${entryId}`,
+        `${getApiBaseUrl()}/rental-payment/${entryId}`,
         {
           headers: {
             Authorization: token || '',
@@ -697,7 +698,7 @@ const RentalInvoiceFormScreen = () => {
   const handleUpdateInvoiceCount = async () => {
     try {
       await axios.put(
-        `${process.env.EXPO_PUBLIC_API_URL}/common-details/increment-invoice`,
+        `${getApiBaseUrl()}/common-details/increment-invoice`,
         {
           invoiceCount: invoices,
         },
@@ -715,7 +716,7 @@ const RentalInvoiceFormScreen = () => {
   const updateStatusToRental = async (rentalId: string, status: string) => {
     try {
       await axios.put(
-        `${process.env.EXPO_PUBLIC_API_URL}/rental/update/${rentalId}`,
+        `${getApiBaseUrl()}/rental/update/${rentalId}`,
         { status },
         {
           headers: {
@@ -751,7 +752,7 @@ const RentalInvoiceFormScreen = () => {
       },
     };
     try {
-      await axios.put(`${process.env.EXPO_PUBLIC_API_URL}/rental-products/${product?._id}`, apiPayload, {
+      await axios.put(`${getApiBaseUrl()}/rental-products/${product?._id}`, apiPayload, {
         headers: {
           Authorization: token || '',
         },
@@ -840,7 +841,7 @@ const RentalInvoiceFormScreen = () => {
         percentageRate: commissionRate,
       };
 
-      await axios.post(`${process.env.EXPO_PUBLIC_API_URL}/commissions`, apiParams, {
+      await axios.post(`${getApiBaseUrl()}/commissions`, apiParams, {
         headers: { Authorization: token || '' },
       });
     } catch (error) {
@@ -990,7 +991,7 @@ const RentalInvoiceFormScreen = () => {
 
       let res;
       if (entryId) {
-        res = await axios.put(`${process.env.EXPO_PUBLIC_API_URL}/rental-payment/${entryId}`, data, {
+        res = await axios.put(`${getApiBaseUrl()}/rental-payment/${entryId}`, data, {
           headers: {
             Authorization: token || '',
             'Content-Type': 'multipart/form-data',
@@ -998,7 +999,7 @@ const RentalInvoiceFormScreen = () => {
         });
       } else {
         res = await axios.post(
-          `${process.env.EXPO_PUBLIC_API_URL}/rental-payment/create-rental-entry`,
+          `${getApiBaseUrl()}/rental-payment/create-rental-entry`,
           data,
           {
             headers: {

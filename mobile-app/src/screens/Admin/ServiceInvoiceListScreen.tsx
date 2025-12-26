@@ -19,6 +19,7 @@ import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { usePermissions } from '../../hooks/usePermissions';
 import axios from 'axios';
+import { getApiBaseUrl } from '../../services/api';
 import Toast from 'react-native-toast-message';
 import * as ImagePicker from 'expo-image-picker';
 
@@ -75,7 +76,7 @@ const ServiceInvoiceListScreen = () => {
       let response;
       if (user?.role === 3) {
         response = await axios.get(
-          `${process.env.EXPO_PUBLIC_API_URL}/service-invoice/assignedTo/${user?._id}/${invoiceType}`,
+          `${getApiBaseUrl()}/service-invoice/assignedTo/${user?._id}/${invoiceType}`,
           {
             headers: {
               Authorization: token || '',
@@ -84,7 +85,7 @@ const ServiceInvoiceListScreen = () => {
         );
       } else {
         response = await axios.post(
-          `${process.env.EXPO_PUBLIC_API_URL}/service-invoice/all`,
+          `${getApiBaseUrl()}/service-invoice/all`,
           { invoiceType, tdsAmount: { $eq: null }, status: { $ne: 'Paid' } },
           {
             headers: {
@@ -113,7 +114,7 @@ const ServiceInvoiceListScreen = () => {
 
   const fetchInvoicesCount = async () => {
     try {
-      const { data } = await axios.get(`${process.env.EXPO_PUBLIC_API_URL}/common-details`, {
+      const { data } = await axios.get(`${getApiBaseUrl()}/common-details`, {
         headers: {
           Authorization: token || '',
         },
@@ -203,7 +204,7 @@ const ServiceInvoiceListScreen = () => {
       } as any);
 
       // Upload file first
-      const apiUrl = process.env.EXPO_PUBLIC_API_URL;
+      const apiUrl = getApiBaseUrl();
       if (!apiUrl) {
         throw new Error('API URL is not configured');
       }
@@ -226,7 +227,7 @@ const ServiceInvoiceListScreen = () => {
         
         // Update invoice with new link and set status to InvoiceSent
         const serviceRes = await axios.put(
-          `${process.env.EXPO_PUBLIC_API_URL}/service-invoice/update/${invoice._id}`,
+          `${getApiBaseUrl()}/service-invoice/update/${invoice._id}`,
           {
             invoiceLink: [...oldInvoiceLink, uploadRes.data.fileUrl],
             status: 'InvoiceSent',
@@ -259,7 +260,7 @@ const ServiceInvoiceListScreen = () => {
         response: error.response?.data,
         status: error.response?.status,
         url: error.config?.url,
-        apiUrl: process.env.EXPO_PUBLIC_API_URL,
+        apiUrl: getApiBaseUrl(),
       });
       
       let errorMessage = 'Failed to upload invoice';
@@ -295,7 +296,7 @@ const ServiceInvoiceListScreen = () => {
               setDeletingLink(invoice._id);
               const fileName = linkToDelete.split('/').pop();
               await axios.post(
-                `${process.env.EXPO_PUBLIC_API_URL}/auth/delete-file/${fileName}`,
+                `${getApiBaseUrl()}/auth/delete-file/${fileName}`,
                 {},
                 {
                   headers: {
@@ -306,7 +307,7 @@ const ServiceInvoiceListScreen = () => {
 
               const updatedLinks = invoice.invoiceLink.filter((link: string) => link !== linkToDelete);
               await axios.put(
-                `${process.env.EXPO_PUBLIC_API_URL}/service-invoice/update/${invoice._id}`,
+                `${getApiBaseUrl()}/service-invoice/update/${invoice._id}`,
                 { invoiceLink: updatedLinks },
                 {
                   headers: {
@@ -385,7 +386,7 @@ const ServiceInvoiceListScreen = () => {
       if (balance > 0) {
         try {
           const response = await axios.post(
-            `${process.env.EXPO_PUBLIC_API_URL}/service-invoice/all`,
+            `${getApiBaseUrl()}/service-invoice/all`,
             {
               companyId: selectedInvoice?.companyId?._id || selectedInvoice?.companyId,
               tdsAmount: { $eq: null },
@@ -445,7 +446,7 @@ const ServiceInvoiceListScreen = () => {
 
       const invoiceId = selectedPendingInvoiceId || selectedInvoice._id;
       const res = await axios.put(
-        `${process.env.EXPO_PUBLIC_API_URL}/service-invoice/update/${invoiceId}`,
+        `${getApiBaseUrl()}/service-invoice/update/${invoiceId}`,
         payload,
         {
           headers: {
@@ -480,7 +481,7 @@ const ServiceInvoiceListScreen = () => {
       };
 
       const res = await axios.put(
-        `${process.env.EXPO_PUBLIC_API_URL}/service-invoice/update/${invoice._id}`,
+        `${getApiBaseUrl()}/service-invoice/update/${invoice._id}`,
         payload,
         {
           headers: {
@@ -491,7 +492,7 @@ const ServiceInvoiceListScreen = () => {
 
       if (res.data?.success) {
         await axios.put(
-          `${process.env.EXPO_PUBLIC_API_URL}/common-details/increment-invoice`,
+          `${getApiBaseUrl()}/common-details/increment-invoice`,
           { invoiceCount },
           {
             headers: {

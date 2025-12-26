@@ -17,6 +17,7 @@ import { RootState } from '../../store';
 import { usePermissions } from '../../hooks/usePermissions';
 import axios from 'axios';
 import Toast from 'react-native-toast-message';
+import { getApiBaseUrl } from '../../services/api';
 
 const ServiceReportsScreen = () => {
   const navigation = useNavigation();
@@ -49,12 +50,13 @@ const ServiceReportsScreen = () => {
       // The client uses /report/${userId}/${reportType} but that doesn't match any route correctly
       // We should use /getByassigned for employees to match the backend route
       let url: string;
+      const API_BASE_URL = getApiBaseUrl();
       if (user?.role === 3) {
         // Employee: use getByassigned route to match backend
-        url = `${process.env.EXPO_PUBLIC_API_URL}/report/getByassigned/${user?._id}/${reportType}`;
+        url = `${API_BASE_URL}/report/getByassigned/${user?._id}/${reportType}`;
       } else {
         // Admin: use reportType route
-        url = `${process.env.EXPO_PUBLIC_API_URL}/report/${reportType}`;
+        url = `${API_BASE_URL}/report/${reportType}`;
       }
 
       console.log('Fetching reports from:', url);
@@ -66,6 +68,7 @@ const ServiceReportsScreen = () => {
         headers: {
           Authorization: token || '',
         },
+        timeout: 30000,
       });
 
       console.log('Reports response:', response.data);
@@ -143,7 +146,7 @@ const ServiceReportsScreen = () => {
           onPress: async () => {
             try {
               const response = await axios.delete(
-                `${process.env.EXPO_PUBLIC_API_URL}/report/${reportId}`,
+                `${getApiBaseUrl()}/report/${reportId}`,
                 {
                   headers: {
                     Authorization: token || '',

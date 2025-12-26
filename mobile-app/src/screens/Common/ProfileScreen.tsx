@@ -21,6 +21,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
 import axios from 'axios';
+import { getApiBaseUrl } from '../../services/api';
 
 const ProfileScreen = () => {
   const navigation = useNavigation();
@@ -60,6 +61,11 @@ const ProfileScreen = () => {
   const [pendingAmount, setPendingAmount] = useState(0);
   const [companyPendingInvoices, setCompanyPendingInvoices] = useState<any[]>([]);
   const [selectedPendingInvoiceId, setSelectedPendingInvoiceId] = useState<string | null>(null);
+  
+  // Edit Profile states
+  const [editingName, setEditingName] = useState(false);
+  const [name, setName] = useState(user?.name || '');
+  const [nameInputFocused, setNameInputFocused] = useState(false);
 
   const handleLogout = async () => {
     await AsyncStorage.removeItem('authToken');
@@ -97,10 +103,13 @@ const ProfileScreen = () => {
     
     try {
       setLoadingEmployee(true);
-      console.log('user?._id23452345', user?._id, `${process.env.EXPO_PUBLIC_API_URL}/employee/user/${user?._id}`, token);
+      console.log('user?._id23452345', user?._id, `${getApiBaseUrl()}/employee/user/${user?._id}`, token);
       const response = await axios.get(
-        `${process.env.EXPO_PUBLIC_API_URL}/employee/user/${user?._id}`,
-        { headers: { Authorization: token || '' } }
+        `${getApiBaseUrl()}/employee/user/${user?._id}`,
+        { 
+          headers: { Authorization: token || '' },
+          timeout: 30000,
+        }
       );
       
       console.log('response22345234', response.data);
@@ -132,8 +141,11 @@ const ProfileScreen = () => {
     try {
       setLoadingCompanies(true);
       const response = await axios.get(
-        `${process.env.EXPO_PUBLIC_API_URL}/company/all?limit=1000`,
-        { headers: { Authorization: token || '' } }
+        `${getApiBaseUrl()}/company/all?limit=1000`,
+        { 
+          headers: { Authorization: token || '' },
+          timeout: 30000,
+        }
       );
       
       if (response.data?.success) {
@@ -161,12 +173,15 @@ const ProfileScreen = () => {
     try {
       setLoadingInvoices(true);
       const response = await axios.post(
-        `${process.env.EXPO_PUBLIC_API_URL}/service-invoice/all`,
+        `${getApiBaseUrl()}/service-invoice/all`,
         {
           companyId: companyId,
           invoiceType: 'invoice',
         },
-        { headers: { Authorization: token || '' } }
+        { 
+          headers: { Authorization: token || '' },
+          timeout: 30000,
+        }
       );
       
       if (response.data?.success) {
@@ -190,7 +205,11 @@ const ProfileScreen = () => {
         fetchEmployeeData();
         fetchCompanies();
       }
-    }, [user?.role, token, user?._id])
+      // Update name when user changes
+      if (user?.name) {
+        setName(user.name);
+      }
+    }, [user?.role, token, user?._id, user?.name])
   );
 
   // Fetch invoices when company is selected
@@ -246,7 +265,7 @@ const ProfileScreen = () => {
           const responseKey = invoiceType === 'rental' ? 'entries' : 'serviceInvoices';
           
           const response = await axios.post(
-            `${process.env.EXPO_PUBLIC_API_URL}${endpoint}`,
+            `${getApiBaseUrl()}${endpoint}`,
             {
               companyId: selectedInvoice?.companyId?._id || selectedInvoice?.companyId,
               tdsAmount: { $eq: null },
@@ -315,7 +334,7 @@ const ProfileScreen = () => {
       const endpoint = `/service-invoice/update/${invoiceId}`;
       
       const res = await axios.put(
-        `${process.env.EXPO_PUBLIC_API_URL}${endpoint}`,
+        `${getApiBaseUrl()}${endpoint}`,
         payload,
         {
           headers: {
@@ -466,6 +485,90 @@ const ProfileScreen = () => {
               </Text>
             </View>
           )}
+        </View>
+      )}
+
+      {/* Edit Profile Section */}
+      {user?.role === 3 && employee && !loadingEmployee && (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Edit Profile</Text>
+          </View>
+
+          {/* Name Edit */}
+          <View style={styles.editFieldContainer}>
+            <View style={styles.editFieldHeader}>
+              <Text style={styles.editFieldLabel}>Name</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setEditingName(!editingName);
+                  if (!editingName) {
+                    setName(user?.name || '');
+                  }
+                }}
+              >
+                <Text style={styles.editButtonText}>
+                  {!editingName ? 'Edit' : 'Cancel'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            {editingName ? (
+              <View style={styles.editFieldInputContainer}>
+                <TextInput
+                  style={[
+                    styles.editFieldInput,
+                    nameInputFocused && styles.editFieldInputFocused,
+                  ]}
+                  value={name}
+                  onChangeText={setName}
+                  onFocus={() => setNameInputFocused(true)}
+                  onBlur={() => setNameInputFocused(false)}
+                  placeholder="Enter name"
+                />
+                <TouchableOpacity
+                  style={styles.saveButton}
+                  onPress={async () => {
+                    try {
+                      const response = await axios.post(
+                        `${getApiBaseUrl()}/auth/update-details`,
+                        {
+                          newName: name,
+                          email: user?.email,
+                        },
+                        {
+                          headers: {
+                            Authorization: token || '',
+                          },
+                        }
+                      );
+                      if (response.data?.success) {
+                        Toast.show({
+                          type: 'success',
+                          text1: 'Success',
+                          text2: response.data.message || 'Name updated successfully',
+                        });
+                        setEditingName(false);
+                        // Update user in Redux store if needed
+                        // You might need to dispatch an action to update the user
+                      }
+                    } catch (error: any) {
+                      Toast.show({
+                        type: 'error',
+                        text1: 'Error',
+                        text2: error.response?.data?.message || 'Failed to update name',
+                      });
+                    }
+                  }}
+                >
+                  <Text style={styles.saveButtonText}>Save</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.editFieldDisplay}>
+                <Text style={styles.editFieldDisplayText}>{user?.name || 'N/A'}</Text>
+              </View>
+            )}
+          </View>
         </View>
       )}
 
@@ -1073,7 +1176,7 @@ const styles = StyleSheet.create({
   section: {
     backgroundColor: '#fff',
     marginTop: 10,
-    paddingVertical: 10,
+    padding: 20,
   },
   infoRow: {
     flexDirection: 'row',
@@ -1240,7 +1343,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#333',
-    marginBottom: 8,
+    marginVertical: 10,
   },
   modalInput: {
     backgroundColor: '#fff',
@@ -1494,6 +1597,78 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+  },
+  // Edit Profile Styles
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  editFieldContainer: {
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  editFieldHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  editFieldLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  editButtonText: {
+    fontSize: 14,
+    color: '#007AFF',
+    fontWeight: '500',
+  },
+  editFieldInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  editFieldInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: '#fff',
+  },
+  editFieldInputFocused: {
+    borderColor: '#007AFF',
+  },
+  saveButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  saveButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  editFieldDisplay: {
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 8,
+    padding: 12,
+    backgroundColor: '#f9f9f9',
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  editFieldDisplayText: {
+    fontSize: 16,
+    color: '#333',
   },
 });
 

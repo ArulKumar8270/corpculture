@@ -16,6 +16,7 @@ import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import axios from 'axios';
+import { getApiBaseUrl } from '../../services/api';
 import Toast from 'react-native-toast-message';
 import { usePermissions } from '../../hooks/usePermissions';
 
@@ -134,9 +135,10 @@ const MenuSettingScreen = () => {
   const fetchRoles = async () => {
     try {
       const response = await axios.get(
-        `${process.env.EXPO_PUBLIC_API_URL}/employee/all`,
+        `${getApiBaseUrl()}/employee/all`,
         {
           headers: { Authorization: token || '' },
+          timeout: 30000,
         }
       );
       if (response.data?.success) {
@@ -162,9 +164,10 @@ const MenuSettingScreen = () => {
   const fetchPermissionsForRole = async (roleId: string) => {
     try {
       const response = await axios.get(
-        `${process.env.EXPO_PUBLIC_API_URL}/permissions/user/${roleId}`,
+        `${getApiBaseUrl()}/permissions/user/${roleId}`,
         {
           headers: { Authorization: token || '' },
+          timeout: 30000,
         }
       );
       if (response.data?.success) {
@@ -253,10 +256,11 @@ const MenuSettingScreen = () => {
     setIsLoading(true);
     try {
       const response = await axios.put(
-        `${process.env.EXPO_PUBLIC_API_URL}/permissions/batch-update`,
+        `${getApiBaseUrl()}/permissions/batch-update`,
         { userId: selectedRole, permissions },
         {
           headers: { Authorization: token || '' },
+          timeout: 30000,
         }
       );
       if (response.data?.success) {

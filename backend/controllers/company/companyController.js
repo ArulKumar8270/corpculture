@@ -45,7 +45,9 @@ export const getAllCompanies = async (req, res) => {
                     { city: { $regex: search, $options: 'i' } },
                     { state: { $regex: search, $options: 'i' } },
                     { 'contactPersons.name': { $regex: search, $options: 'i' } },
-                    { 'contactPersons.mobile': { $regex: search, $options: 'i' } }
+                    { 'contactPersons.mobile': { $regex: search, $options: 'i' } },
+                    { 'contactPersons.email': { $regex: search, $options: 'i' } },
+                    { 'contactPersons.designation': { $regex: search, $options: 'i' } }
                 ]
             };
         }

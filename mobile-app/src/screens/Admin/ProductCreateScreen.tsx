@@ -19,6 +19,7 @@ import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import axios from 'axios';
+import { getApiBaseUrl } from '../../services/api';
 import Toast from 'react-native-toast-message';
 
 const MAX_IMAGE_SIZE = 500 * 1024; // 500KB
@@ -128,7 +129,7 @@ const ProductCreateScreen = () => {
   const fetchCategories = async () => {
     try {
       const response = await axios.get(
-        `${process.env.EXPO_PUBLIC_API_URL}/category/all`,
+        `${getApiBaseUrl()}/category/all`,
         {
           headers: { Authorization: token || '' },
         }
@@ -151,7 +152,7 @@ const ProductCreateScreen = () => {
     setLoading(true);
     try {
       const response = await axios.get(
-        `${process.env.EXPO_PUBLIC_API_URL}/product/${productId}`,
+        `${getApiBaseUrl()}/product/${productId}`,
         {
           headers: { Authorization: token || '' },
         }
@@ -502,8 +503,8 @@ const ProductCreateScreen = () => {
 
       // Use update endpoint if editing, otherwise create new
       const endpoint = isEditMode
-        ? `${process.env.EXPO_PUBLIC_API_URL}/product/update/${productId}`
-        : `${process.env.EXPO_PUBLIC_API_URL}/product/new-product`;
+        ? `${getApiBaseUrl()}/product/update/${productId}`
+        : `${getApiBaseUrl()}/product/new-product`;
       const method = isEditMode ? 'patch' : 'post';
 
       const response = await axios[method](

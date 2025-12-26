@@ -19,11 +19,36 @@ const AuthProvider = ({ children }) => {
     const [selectedCompany, setSelectedCompany] = useState(null); // {{ edit_8 }}
     const [userPermissions, setUserPermissions] = useState([]);
     const [loadingPermissions, setLoadingPermissions] = useState(true);
+
+    // Initialize company settings from localStorage
     useEffect(() => {
-        if (auth?.user?._id || refetch) {
+        const storedCompanyEnabled = localStorage.getItem('isCompanyEnabled');
+        const storedSelectedCompany = localStorage.getItem('selectedCompany');
+        if (storedCompanyEnabled !== null) {
+            setIsCompanyEnabled(JSON.parse(storedCompanyEnabled));
+        }
+        if (storedSelectedCompany !== null && storedSelectedCompany !== 'null' && storedSelectedCompany !== '') {
+            setSelectedCompany(storedSelectedCompany);
+        }
+    }, []);
+
+    // Update localStorage whenever company state changes
+    useEffect(() => {
+        localStorage.setItem('isCompanyEnabled', JSON.stringify(isCompanyEnabled));
+    }, [isCompanyEnabled]);
+
+    useEffect(() => {
+        if (selectedCompany) {
+            localStorage.setItem('selectedCompany', selectedCompany);
+        } else if (selectedCompany === null || selectedCompany === '') {
+            localStorage.removeItem('selectedCompany');
+        }
+    }, [selectedCompany]);
+    useEffect(() => {
+        if ((auth?.user?._id && isCompanyEnabled) || refetch) {
             getCompanyDetails();
         }
-    }, [auth, isCompanyEnabled, refetch, selectedCompany])
+    }, [auth, isCompanyEnabled, refetch])
 
     useEffect(() => {
         const fetchPermissions = async () => {
@@ -77,23 +102,46 @@ const AuthProvider = ({ children }) => {
     console.log('auth23452345', auth);
 
     const getCompanyDetails = async () => {
+        if (!auth?.user || !auth?.token || !isCompanyEnabled) return;
+        
         try {
-            // 1. Check for user's company details
-            // You need a backend endpoint that returns the company details for the logged-in user
-            const companyResponse = await axios.get(
-                `${import.meta.env.VITE_SERVER_URL}/api/v1/company/user-company/${auth?.user?.phone}`, // *** Create this backend endpoint ***
-                {
-                    headers: {
-                        Authorization: auth?.token,
-                    },
+            let response;
+            // For customers (role 0), use user-company endpoint
+            if (auth.user.role === 0 && auth.user.phone) {
+                response = await axios.get(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/company/user-company/${auth.user.phone}`,
+                    {
+                        headers: {
+                            Authorization: auth.token,
+                        },
+                    }
+                );
+                // Handle response structure: { success: true, company: [...] }
+                if (response.data?.success && response.data.company) {
+                    // company is an array in this response
+                    const companies = Array.isArray(response.data.company) 
+                        ? response.data.company 
+                        : [response.data.company];
+                    setCompanyDetails(companies);
                 }
-            );
-
-            // Assuming the backend returns company data if it exists, or null/empty if not found
-            const userCompany = companyResponse.data.company;
-            setCompanyDetails(userCompany) // Adjust based on your backend response structure
+            } else {
+                // For admin/employee, use all companies endpoint
+                response = await axios.get(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/company/all?limit=1000`,
+                    {
+                        headers: {
+                            Authorization: auth.token,
+                        },
+                    }
+                );
+                // Handle response structure: { success: true, companies: [...] }
+                if (response.data?.success && response.data.companies) {
+                    setCompanyDetails(response.data.companies);
+                }
+            }
         } catch (error) {
             console.error("Error fetching company details:", error);
+            setCompanyDetails(null);
         }
     }
 

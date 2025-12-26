@@ -17,6 +17,7 @@ import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import axios from 'axios';
+import { getApiBaseUrl } from '../../services/api';
 import Toast from 'react-native-toast-message';
 
 const AddServiceProductScreen = () => {
@@ -100,7 +101,7 @@ const AddServiceProductScreen = () => {
 
   const fetchCompanies = async () => {
     try {
-      const { data } = await axios.get(`${process.env.EXPO_PUBLIC_API_URL}/company/all`, {
+      const { data } = await axios.get(`${getApiBaseUrl()}/company/all`, {
         headers: {
           Authorization: token || '',
         },
@@ -115,7 +116,7 @@ const AddServiceProductScreen = () => {
 
   const fetchGstOptions = async () => {
     try {
-      const { data } = await axios.get(`${process.env.EXPO_PUBLIC_API_URL}/gst`, {
+      const { data } = await axios.get(`${getApiBaseUrl()}/gst`, {
         headers: {
           Authorization: token || '',
         },
@@ -130,7 +131,7 @@ const AddServiceProductScreen = () => {
 
   const fetchPurchaseProducts = async () => {
     try {
-      const url = `${process.env.EXPO_PUBLIC_API_URL}/purchases${user?.role !== 1 ? `?category=${user?.department}` : ''}`;
+      const url = `${getApiBaseUrl()}/purchases${user?.role !== 1 ? `?category=${user?.department}` : ''}`;
       const { data } = await axios.get(url, {
         headers: {
           Authorization: token || '',
@@ -155,7 +156,7 @@ const AddServiceProductScreen = () => {
   const fetchProduct = async (productId: string) => {
     setLoading(true);
     try {
-      const { data } = await axios.get(`${process.env.EXPO_PUBLIC_API_URL}/service-products/${productId}`, {
+      const { data } = await axios.get(`${getApiBaseUrl()}/service-products/${productId}`, {
         headers: {
           Authorization: token || '',
         },
@@ -232,7 +233,7 @@ const AddServiceProductScreen = () => {
       let response;
       if (product_id) {
         response = await axios.put(
-          `${process.env.EXPO_PUBLIC_API_URL}/service-products/${product_id}`,
+          `${getApiBaseUrl()}/service-products/${product_id}`,
           productData,
           {
             headers: {
@@ -242,7 +243,7 @@ const AddServiceProductScreen = () => {
         );
       } else {
         response = await axios.post(
-          `${process.env.EXPO_PUBLIC_API_URL}/service-products`,
+          `${getApiBaseUrl()}/service-products`,
           productData,
           {
             headers: {

@@ -17,6 +17,7 @@ import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import axios from 'axios';
+import { getApiBaseUrl } from '../../services/api';
 import Toast from 'react-native-toast-message';
 
 interface ProductInTable {
@@ -151,7 +152,7 @@ const AddServiceInvoiceScreen = () => {
 
   const fetchInvoicesCount = async () => {
     try {
-      const { data } = await axios.get(`${process.env.EXPO_PUBLIC_API_URL}/common-details`, {
+      const { data } = await axios.get(`${getApiBaseUrl()}/common-details`, {
         headers: {
           Authorization: token || '',
         },
@@ -167,7 +168,7 @@ const AddServiceInvoiceScreen = () => {
   const fetchCompanies = async () => {
     try {
       setLoading(true);
-      const { data } = await axios.get(`${process.env.EXPO_PUBLIC_API_URL}/company/all`, {
+      const { data } = await axios.get(`${getApiBaseUrl()}/company/all`, {
         headers: {
           Authorization: token || '',
         },
@@ -185,7 +186,7 @@ const AddServiceInvoiceScreen = () => {
   const fetchCompanyData = async () => {
     try {
       const { data } = await axios.get(
-        `${process.env.EXPO_PUBLIC_API_URL}/company/get/${invoiceData.companyId}`,
+        `${getApiBaseUrl()}/company/get/${invoiceData.companyId}`,
         {
           headers: {
             Authorization: token || '',
@@ -204,7 +205,7 @@ const AddServiceInvoiceScreen = () => {
     try {
       setLoading(true);
       const { data } = await axios.get(
-        `${process.env.EXPO_PUBLIC_API_URL}/service-products/getServiceProductsByCompany/${invoiceData.companyId}`,
+        `${getApiBaseUrl()}/service-products/getServiceProductsByCompany/${invoiceData.companyId}`,
         {
           headers: {
             Authorization: token || '',
@@ -228,7 +229,7 @@ const AddServiceInvoiceScreen = () => {
     try {
       setLoading(true);
       const { data } = await axios.get(
-        `${process.env.EXPO_PUBLIC_API_URL}/service-invoice/get/${invoiceId}`,
+        `${getApiBaseUrl()}/service-invoice/get/${invoiceId}`,
         {
           headers: {
             Authorization: token || '',
@@ -417,7 +418,7 @@ const AddServiceInvoiceScreen = () => {
       let response;
       if (invoiceId) {
         response = await axios.put(
-          `${process.env.EXPO_PUBLIC_API_URL}/service-invoice/update/${invoiceId}`,
+          `${getApiBaseUrl()}/service-invoice/update/${invoiceId}`,
           payload,
           {
             headers: {
@@ -427,7 +428,7 @@ const AddServiceInvoiceScreen = () => {
         );
       } else {
         response = await axios.post(
-          `${process.env.EXPO_PUBLIC_API_URL}/service-invoice/create`,
+          `${getApiBaseUrl()}/service-invoice/create`,
           payload,
           {
             headers: {
@@ -482,7 +483,7 @@ const AddServiceInvoiceScreen = () => {
   const updateInvoiceCount = async () => {
     try {
       await axios.put(
-        `${process.env.EXPO_PUBLIC_API_URL}/common-details/increment-invoice`,
+        `${getApiBaseUrl()}/common-details/increment-invoice`,
         { invoiceCount: invoices },
         {
           headers: {
@@ -498,7 +499,7 @@ const AddServiceInvoiceScreen = () => {
   const updateStatusToService = async (serviceId: string, status: string) => {
     try {
       await axios.put(
-        `${process.env.EXPO_PUBLIC_API_URL}/service/update/${serviceId}`,
+        `${getApiBaseUrl()}/service/update/${serviceId}`,
         { status },
         {
           headers: {
@@ -530,7 +531,7 @@ const AddServiceInvoiceScreen = () => {
       }
 
       await axios.post(
-        `${process.env.EXPO_PUBLIC_API_URL}/commissions`,
+        `${getApiBaseUrl()}/commissions`,
         {
           commissionFrom: 'Service',
           userId: user?._id,
@@ -555,7 +556,7 @@ const AddServiceInvoiceScreen = () => {
       for (const product of productsInTable) {
         if (product.reInstall === true || product.otherProducts) {
           await axios.post(
-            `${process.env.EXPO_PUBLIC_API_URL}/employee-benefits`,
+            `${getApiBaseUrl()}/employee-benefits`,
             {
               employeeId: invoice?.assignedTo?._id,
               invoiceId: invoice?._id,
@@ -582,7 +583,7 @@ const AddServiceInvoiceScreen = () => {
       for (const product of productsInTable) {
         if (product.reInstall === true || product.otherProducts) {
           await axios.post(
-            `${process.env.EXPO_PUBLIC_API_URL}/materials/updateMaterial/${product.productName}`,
+            `${getApiBaseUrl()}/materials/updateMaterial/${product.productName}`,
             {
               name: product.productName,
               unit: product.quantity,
