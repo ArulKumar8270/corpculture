@@ -215,7 +215,6 @@ const AllProducts = () => {
         e.preventDefault();
         let errors = {};
         if (!categoryForm.name.trim()) errors.name = "Category name is required";
-        if (!categoryForm.commission || isNaN(categoryForm.commission)) errors.commission = "Commission is required and must be a number";
         if (Object.keys(errors).length > 0) {
             setCategoryErrors(errors);
             return;
@@ -277,18 +276,6 @@ const AllProducts = () => {
                                     helperText={categoryErrors.name}
                                     fullWidth
                                     required
-                                />
-                                <TextField
-                                    label="Commission (%)"
-                                    name="commission"
-                                    value={categoryForm.commission}
-                                    onChange={handleCategoryChange}
-                                    error={!!categoryErrors.commission}
-                                    helperText={categoryErrors.commission}
-                                    fullWidth
-                                    required
-                                    type="number"
-                                    inputProps={{ min: 0 }}
                                 />
                             </DialogContent>
                             <DialogActions>

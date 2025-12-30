@@ -404,7 +404,7 @@ const ProductDetails = () => {
                                     <div className="flex gap-16 mt-4 items-center text-sm font-medium">
                                         <p className="text-gray-500">Delivery</p>
                                         <span>
-                                            Delivery by {getDeliveryDate()} | ₹40
+                                            Delivery by {getDeliveryDate()} |  ₹{product?.deliveryCharge}
                                         </span>
                                     </div>
                                     {/* <!-- delivery details --> */}

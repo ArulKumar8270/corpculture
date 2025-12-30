@@ -114,12 +114,33 @@ const RentalInvoiceForm = () => {
         }
     };
 
-    // Fetch all companies on component mount
+    // Fetch all companies on component mount for Autocomplete
     useEffect(() => {
-        if(formData.companyId !== '') {
-        fetchCompanyData()
-    }
-    }, [auth.token, formData.companyId]);
+        const fetchAllCompanies = async () => {
+            if (!id && !companyId) {
+                // Only fetch all companies when creating new entry (not editing)
+                try {
+                    setLoadingCompanies(true);
+                    const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/company/all?limit=1000`, {
+                        headers: {
+                            Authorization: auth.token,
+                        },
+                    });
+                    if (data?.success) {
+                        setCompanies(data.companies || []);
+                    }
+                } catch (error) {
+                    console.error("Error fetching companies:", error);
+                } finally {
+                    setLoadingCompanies(false);
+                }
+            } else if (formData.companyId !== '') {
+                // When editing, fetch only the specific company
+                fetchCompanyData();
+            }
+        };
+        fetchAllCompanies();
+    }, [auth.token, formData.companyId, id, companyId]);
 
     // Fetch existing rental entry data if in edit mode
     useEffect(() => {

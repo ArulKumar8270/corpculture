@@ -69,6 +69,404 @@ export const createPurchase = async (req, res) => {
     }
 };
 
+// Bulk Create Purchases
+export const bulkCreatePurchases = async (req, res) => {
+    try {
+        let purchases = [];
+
+        // Debug: Log request details
+        console.log('Request files:', req.files);
+        console.log('Request body keys:', Object.keys(req.body || {}));
+
+        // Check if file was uploaded - try multiple possible field names
+        let file = null;
+        if (req.files) {
+            // Try common field names
+            file = req.files.file || req.files.json || req.files.data || req.files.upload || 
+                   req.files.purchases || Object.values(req.files)[0];
+        }
+
+        if (file) {
+            console.log('File found:', file.name, 'MIME type:', file.mimetype);
+            
+            // Check if it's a JSON file (by extension or MIME type)
+            const isJsonFile = file.name.endsWith('.json') || 
+                              file.mimetype === 'application/json' ||
+                              file.mimetype === 'text/json' ||
+                              file.mimetype === 'application/octet-stream';
+            
+            if (!isJsonFile) {
+                return res.status(400).send({
+                    success: false,
+                    message: 'Only JSON files are allowed.',
+                    received: {
+                        filename: file.name,
+                        mimetype: file.mimetype
+                    }
+                });
+            }
+
+            // Read file content
+            const fileContent = file.data.toString('utf8');
+            console.log('File content length:', fileContent.length, 'characters');
+            
+            // Check if it's newline-delimited JSON (NDJSON) by checking if first line is valid JSON
+            const lines = fileContent.split('\n').filter(line => line.trim());
+            const isNDJSON = lines.length > 1 && lines.every(line => {
+                try {
+                    JSON.parse(line);
+                    return true;
+                } catch {
+                    return false;
+                }
+            });
+            
+            if (isNDJSON) {
+                // Parse as newline-delimited JSON
+                purchases = lines.map(line => {
+                    try {
+                        return JSON.parse(line);
+                    } catch (e) {
+                        console.error('Error parsing line:', line, e);
+                        return null;
+                    }
+                }).filter(item => item !== null);
+            } else {
+                // Try to parse as single JSON (array or object)
+                try {
+                    const parsed = JSON.parse(fileContent);
+                    
+                    // If it's already an array, use it
+                    if (Array.isArray(parsed)) {
+                        purchases = parsed;
+                    } 
+                    // If it's a single object, wrap it in an array
+                    else if (typeof parsed === 'object' && parsed !== null) {
+                        purchases = [parsed];
+                    }
+                    else {
+                        return res.status(400).send({
+                            success: false,
+                            message: 'Invalid JSON format. Expected an array or object(s).'
+                        });
+                    }
+                } catch (parseError) {
+                    return res.status(400).send({
+                        success: false,
+                        message: 'Invalid JSON file format. Please ensure the file contains valid JSON.',
+                        error: parseError.message
+                    });
+                }
+            }
+            
+            if (purchases.length === 0) {
+                return res.status(400).send({
+                    success: false,
+                    message: 'No valid purchase data found in the file.'
+                });
+            }
+        } 
+        // If no file, check if purchases array is in request body
+        else if (req.body.purchases) {
+            purchases = req.body.purchases;
+        } 
+        // If purchases is directly in body as array
+        else if (Array.isArray(req.body)) {
+            purchases = req.body;
+        }
+        // Check if JSON data is in body as string (base64 or direct)
+        else if (req.body.data || req.body.json) {
+            try {
+                const jsonData = req.body.data || req.body.json;
+                let fileContent = '';
+                
+                // Try to decode if it's base64
+                if (typeof jsonData === 'string') {
+                    try {
+                        fileContent = Buffer.from(jsonData, 'base64').toString('utf8');
+                    } catch {
+                        // If not base64, use as-is
+                        fileContent = jsonData;
+                    }
+                } else {
+                    fileContent = JSON.stringify(jsonData);
+                }
+                
+                // Parse the content
+                const lines = fileContent.split('\n').filter(line => line.trim());
+                const isNDJSON = lines.length > 1 && lines.every(line => {
+                    try {
+                        JSON.parse(line);
+                        return true;
+                    } catch {
+                        return false;
+                    }
+                });
+                
+                if (isNDJSON) {
+                    purchases = lines.map(line => {
+                        try {
+                            return JSON.parse(line);
+                        } catch (e) {
+                            return null;
+                        }
+                    }).filter(item => item !== null);
+                } else {
+                    const parsed = JSON.parse(fileContent);
+                    purchases = Array.isArray(parsed) ? parsed : [parsed];
+                }
+            } catch (error) {
+                return res.status(400).send({
+                    success: false,
+                    message: 'Error parsing JSON data from request body.',
+                    error: error.message
+                });
+            }
+        }
+        else {
+            return res.status(400).send({
+                success: false,
+                message: 'Please upload a JSON file or provide purchases array in request body.',
+                debug: {
+                    hasFiles: !!req.files,
+                    fileKeys: req.files ? Object.keys(req.files) : [],
+                    bodyKeys: Object.keys(req.body || {}),
+                    bodyType: typeof req.body
+                }
+            });
+        }
+
+        console.log(`Processing ${purchases.length} purchases from ${req.files ? 'file upload' : 'request body'}`);
+
+        // Validate that purchases is an array
+        if (!Array.isArray(purchases) || purchases.length === 0) {
+            return res.status(400).send({ 
+                success: false, 
+                message: 'Purchases must be a non-empty array.' 
+            });
+        }
+
+        // Limit the number of purchases that can be uploaded at once
+        if (purchases.length > 1000) {
+            return res.status(400).send({ 
+                success: false, 
+                message: 'Maximum 1000 purchases can be uploaded at once.' 
+            });
+        }
+
+        const results = {
+            successful: [],
+            failed: [],
+            total: purchases.length,
+            successCount: 0,
+            failureCount: 0
+        };
+
+        // Get all existing invoice numbers to check for duplicates
+        const existingInvoiceNumbers = new Set();
+        const existingPurchases = await Purchase.find({}, { purchaseInvoiceNumber: 1 });
+        existingPurchases.forEach(p => existingInvoiceNumbers.add(p.purchaseInvoiceNumber));
+
+        // Track invoice numbers in the current batch to detect duplicates within the batch
+        const batchInvoiceNumbers = new Set();
+
+        // Validate and process each purchase
+        for (let i = 0; i < purchases.length; i++) {
+            const purchaseData = purchases[i];
+            const rowNumber = i + 1;
+            let errorMessages = [];
+
+            try {
+                // Handle MongoDB ObjectId format ($oid) from JSON export
+                const extractObjectId = (value) => {
+                    if (!value) return null;
+                    if (typeof value === 'string') return value;
+                    if (value.$oid) return value.$oid;
+                    if (value._id) return extractObjectId(value._id);
+                    return value.toString();
+                };
+
+                // Map fields from vendor products JSON format
+                // vendorCompanyName from JSON -> vendorCompanyName in purchase
+                // _id from JSON -> productName in purchase
+                // pricePerQuantity from JSON -> rate in purchase
+                const vendorCompanyName = extractObjectId(purchaseData.vendorCompanyName);
+                const productId = extractObjectId(purchaseData._id) || extractObjectId(purchaseData.productName);
+                const pricePerQuantity = purchaseData.pricePerQuantity || purchaseData.rate;
+                
+                // Use provided values or defaults
+                const voucherType = purchaseData.voucherType || 'Purchase';
+                const purchaseInvoiceNumber = purchaseData.purchaseInvoiceNumber || `BULK-${Date.now()}-${i + 1}`;
+                const narration = purchaseData.narration || '';
+                const purchaseDate = purchaseData.purchaseDate || new Date();
+                const quantity = purchaseData.quantity !== undefined && purchaseData.quantity !== null ? purchaseData.quantity : 1;
+                const rate = pricePerQuantity !== undefined && pricePerQuantity !== null ? pricePerQuantity : (purchaseData.rate || 0);
+                const freightCharges = purchaseData.freightCharges !== undefined && purchaseData.freightCharges !== null ? purchaseData.freightCharges : 0;
+                const roundOff = purchaseData.roundOff !== undefined && purchaseData.roundOff !== null ? purchaseData.roundOff : 0;
+                
+                // Calculate price and grossTotal if not provided
+                const calculatedPrice = purchaseData.price !== undefined && purchaseData.price !== null 
+                    ? purchaseData.price 
+                    : (parseFloat(quantity) * parseFloat(rate));
+                const grossTotal = purchaseData.grossTotal !== undefined && purchaseData.grossTotal !== null 
+                    ? purchaseData.grossTotal 
+                    : calculatedPrice; // Default to price if not provided
+
+                // Required field validation
+                if (!vendorCompanyName) errorMessages.push('Vendor Company Name is required');
+                if (!productId) errorMessages.push('Product ID (_id) is required');
+
+                // Check for duplicate invoice number in batch
+                if (purchaseInvoiceNumber && batchInvoiceNumbers.has(purchaseInvoiceNumber)) {
+                    errorMessages.push(`Duplicate invoice number in upload: ${purchaseInvoiceNumber}`);
+                }
+
+                // Check for duplicate invoice number in database
+                if (purchaseInvoiceNumber && existingInvoiceNumbers.has(purchaseInvoiceNumber)) {
+                    errorMessages.push(`Invoice number already exists: ${purchaseInvoiceNumber}`);
+                }
+
+                // Numeric validation
+                if (isNaN(parseFloat(quantity)) || parseFloat(quantity) < 0) {
+                    errorMessages.push('Quantity must be a non-negative number');
+                }
+                if (isNaN(parseFloat(rate)) || parseFloat(rate) < 0) {
+                    errorMessages.push('Rate must be a non-negative number');
+                }
+                if (freightCharges !== undefined && freightCharges !== null && (isNaN(parseFloat(freightCharges)) || parseFloat(freightCharges) < 0)) {
+                    errorMessages.push('Freight Charges must be a non-negative number');
+                }
+                if (isNaN(parseFloat(calculatedPrice)) || parseFloat(calculatedPrice) < 0) {
+                    errorMessages.push('Price must be a non-negative number');
+                }
+                if (isNaN(parseFloat(grossTotal)) || parseFloat(grossTotal) < 0) {
+                    errorMessages.push('Gross Total must be a non-negative number');
+                }
+                if (roundOff !== undefined && roundOff !== null && isNaN(parseFloat(roundOff))) {
+                    errorMessages.push('Round Off must be a number');
+                }
+
+                // If there are validation errors, skip this purchase
+                if (errorMessages.length > 0) {
+                    results.failed.push({
+                        row: rowNumber,
+                        purchaseInvoiceNumber: purchaseInvoiceNumber || 'N/A',
+                        productId: productId || 'N/A',
+                        errors: errorMessages,
+                        data: purchaseData
+                    });
+                    results.failureCount++;
+                    continue;
+                }
+
+                // Check if vendor exists
+                const existingVendor = await Vendor.findById(vendorCompanyName);
+                if (!existingVendor) {
+                    results.failed.push({
+                        row: rowNumber,
+                        purchaseInvoiceNumber: purchaseInvoiceNumber,
+                        productId: productId || 'N/A',
+                        errors: ['Vendor not found'],
+                        data: purchaseData
+                    });
+                    results.failureCount++;
+                    continue;
+                }
+
+                // Check if product exists (optional validation - you may want to verify the product ID exists)
+                // This is commented out as it might not be necessary if you trust the data
+                // const existingProduct = await VendorProduct.findById(productId);
+                // if (!existingProduct) {
+                //     results.failed.push({
+                //         row: rowNumber,
+                //         purchaseInvoiceNumber: purchaseInvoiceNumber,
+                //         productId: productId,
+                //         errors: ['Product not found'],
+                //         data: purchaseData
+                //     });
+                //     results.failureCount++;
+                //     continue;
+                // }
+
+                // Add invoice number to batch set
+                batchInvoiceNumbers.add(purchaseInvoiceNumber);
+
+                // Create purchase object
+                const newPurchase = new Purchase({
+                    vendorCompanyName,
+                    productName: productId, // Use the _id from JSON as productName
+                    voucherType,
+                    purchaseInvoiceNumber,
+                    narration: narration || '',
+                    purchaseDate: purchaseDate instanceof Date ? purchaseDate : new Date(purchaseDate),
+                    quantity: parseFloat(quantity),
+                    rate: parseFloat(rate),
+                    freightCharges: parseFloat(freightCharges),
+                    price: parseFloat(calculatedPrice),
+                    grossTotal: parseFloat(grossTotal),
+                    roundOff: parseFloat(roundOff),
+                });
+
+                // Save purchase
+                const savedPurchase = await newPurchase.save();
+                
+                // Add to existing invoice numbers set to prevent duplicates in same batch
+                existingInvoiceNumbers.add(purchaseInvoiceNumber);
+
+                results.successful.push({
+                    row: rowNumber,
+                    purchaseInvoiceNumber: purchaseInvoiceNumber,
+                    productId: productId,
+                    purchaseId: savedPurchase._id
+                });
+                results.successCount++;
+
+            } catch (error) {
+                console.error(`Error processing purchase at row ${rowNumber}:`, error);
+                const productId = purchaseData?._id?.$oid || purchaseData?._id || purchaseData?.productName?.$oid || purchaseData?.productName || 'N/A';
+                results.failed.push({
+                    row: rowNumber,
+                    purchaseInvoiceNumber: purchaseData?.purchaseInvoiceNumber || 'N/A',
+                    productId: productId,
+                    errors: [error.message || 'Unknown error occurred'],
+                    data: purchaseData
+                });
+                results.failureCount++;
+            }
+        }
+
+        // Prepare response
+        const response = {
+            success: results.successCount > 0,
+            message: `Bulk upload completed. ${results.successCount} successful, ${results.failureCount} failed out of ${results.total} total.`,
+            results: {
+                total: results.total,
+                successCount: results.successCount,
+                failureCount: results.failureCount,
+                successful: results.successful,
+                failed: results.failed
+            }
+        };
+
+        // Return appropriate status code
+        if (results.failureCount === 0) {
+            res.status(201).send(response);
+        } else if (results.successCount === 0) {
+            res.status(400).send(response);
+        } else {
+            res.status(207).send(response); // 207 Multi-Status for partial success
+        }
+
+    } catch (error) {
+        console.error("Error in bulkCreatePurchases:", error);
+        res.status(500).send({ 
+            success: false, 
+            message: 'Error in bulk creating purchases', 
+            error: error.message 
+        });
+    }
+};
+
 // Get All Purchases
 export const getAllPurchases = async (req, res) => {
     try {

@@ -1,6 +1,7 @@
 import express from "express";
 import {
     createPurchase,
+    bulkCreatePurchases,
     getAllPurchases,
     getPurchaseById,
     updatePurchase,
@@ -13,6 +14,9 @@ const router = express.Router();
 
 // Create new Purchase
 router.post("/", createPurchase); // Consider adding isAdmin middleware here
+
+// Bulk Create Purchases
+router.post("/bulk", bulkCreatePurchases); // Consider adding isAdmin middleware here
 
 // Get all Purchases
 router.get("/", getAllPurchases);

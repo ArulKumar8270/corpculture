@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -15,7 +15,7 @@ const AddServiceProduct = () => {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const product_id = searchParams.get('product_id');
-    const { auth } = useAuth();
+    const { auth, isAdmin } = useAuth();
     const [company, setCompany] = useState('');
     const [productName, setProductName] = useState(''); // This will now store the _id of the selected product
     const [sku, setSku] = useState('');
@@ -31,12 +31,46 @@ const AddServiceProduct = () => {
     const [purchaseProducts, setPurchaseProducts] = useState([]); // New state for products from purchases API
     const [loadingProducts, setLoadingProducts] = useState(false); // New state for product loading
     const [loadingCompanies, setLoadingCompanies] = useState(false); // New state for company loading
+    const [companyPage, setCompanyPage] = useState(1);
+    const [companyTotalCount, setCompanyTotalCount] = useState(0);
+    const [loadingMoreCompanies, setLoadingMoreCompanies] = useState(false);
+    const [companySearch, setCompanySearch] = useState('');
+    const isInitialMount = useRef(true);
     // Fetch companies and GST options on component mount
     useEffect(() => {
-        fetchCompanies();
+        fetchCompanies(1, false); // Load first 10 companies
         fetchGstOptions();
         fetchPurchaseProducts(); // Fetch purchase products on mount
     }, []);
+
+    // Debounced search effect
+    useEffect(() => {
+        // Skip on initial mount
+        if (isInitialMount.current) {
+            isInitialMount.current = false;
+            return;
+        }
+
+        const searchTimer = setTimeout(() => {
+            // Reset to page 1 when search changes
+            fetchCompanies(1, false, companySearch);
+        }, 500); // 500ms debounce
+
+        return () => clearTimeout(searchTimer);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [companySearch]);
+
+    // Load more companies in background after initial load (only when no search)
+    useEffect(() => {
+        if (!companySearch && companies.length > 0 && companies.length < companyTotalCount && companyPage === 1) {
+            // Load next batch in background after a short delay (only after first page loads)
+            const timer = setTimeout(() => {
+                loadMoreCompanies();
+            }, 500);
+            return () => clearTimeout(timer);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [companies.length, companyTotalCount, companyPage, companySearch]);
 
     // Fetch product data if editing
     useEffect(() => {
@@ -50,26 +84,54 @@ const AddServiceProduct = () => {
         calculateTotalAmount();
     }, [quantity, rate, gstTypeIds, gstOptions]); // Depend on gstTypeIds (array)
 
-    const fetchCompanies = async () => {
-        setLoadingCompanies(true); // Set loading to true
+    const fetchCompanies = async (page = 1, append = false, search = '') => {
+        if (!append) {
+            setLoadingCompanies(true);
+        }
         try {
-            // Replace with your actual API endpoint to fetch companies
-            const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/company/all`, {
+            const searchParam = search ? `&search=${encodeURIComponent(search)}` : '';
+            const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/company/all?page=${page}&limit=10${searchParam}`, {
                 headers: {
                     Authorization: auth?.token,
                 },
             });
             if (data?.success) {
-                setCompanies(data.companies);
+                if (append) {
+                    setCompanies(prev => [...prev, ...(data.companies || [])]);
+                } else {
+                    setCompanies(data.companies || []);
+                }
+                setCompanyTotalCount(data.totalCount || 0);
+                setCompanyPage(page);
             } else {
-                toast.error(data?.message || 'Failed to fetch companies.');
+                if (!append) {
+                    toast.error(data?.message || 'Failed to fetch companies.');
+                }
             }
         } catch (error) {
             console.error('Error fetching companies:', error);
-            // Mock data for development if API is not ready
-            setCompanies([]);
+            if (!append) {
+                setCompanies([]);
+            }
         } finally {
-            setLoadingCompanies(false); // Set loading to false
+            if (!append) {
+                setLoadingCompanies(false);
+            }
+        }
+    };
+
+    // Load more companies in background
+    const loadMoreCompanies = async () => {
+        if (loadingMoreCompanies || companies.length >= companyTotalCount) return;
+        
+        setLoadingMoreCompanies(true);
+        try {
+            const nextPage = companyPage + 1;
+            await fetchCompanies(nextPage, true, companySearch);
+        } catch (error) {
+            console.error('Error loading more companies:', error);
+        } finally {
+            setLoadingMoreCompanies(false);
         }
     };
 
@@ -168,7 +230,8 @@ const AddServiceProduct = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         // Updated validation for gstTypeIds (check if array is empty)
-        if (!company || !productName || !sku || !hsn || !quantity || !rate || gstTypeIds.length === 0 || commission === '') { // Added commission to validation
+        // Commission is only required for admin users
+        if (!company || !productName || !hsn || !quantity || !rate || gstTypeIds.length === 0 || (isAdmin && commission === '')) {
             toast.error('Please fill in all required fields.');
             return;
         }
@@ -177,13 +240,13 @@ const AddServiceProduct = () => {
             const productData = {
                 company,
                 productName, // productName is now the _id
-                sku,
+                sku: sku ? sku : `${productName}-${hsn}-${quantity}-${rate}-${gstTypeIds.join('-')}${isAdmin ? `-${commission}` : ''}`,
                 hsn,
                 quantity: parseInt(quantity),
                 rate: parseFloat(rate),
                 gstType: gstTypeIds, // Send the array of IDs
                 totalAmount: parseFloat(totalAmount),
-                commission: parseFloat(commission), // Add commission to payload
+                ...(isAdmin && { commission: parseFloat(commission) }), // Add commission to payload only for admin
             };
 
             if (product_id) {
@@ -249,7 +312,27 @@ const AddServiceProduct = () => {
                         onChange={(event, newValue) => {
                             setCompany(newValue ? newValue._id : ''); // Set the _id to state
                         }}
-                        loading={loadingCompanies}
+                        onInputChange={(event, newInputValue) => {
+                            setCompanySearch(newInputValue);
+                        }}
+                        onOpen={() => {
+                            // Load more companies when dropdown opens if needed (only if no search)
+                            if (!companySearch && companies.length < companyTotalCount && !loadingMoreCompanies) {
+                                loadMoreCompanies();
+                            }
+                        }}
+                        loading={loadingCompanies || loadingMoreCompanies}
+                        ListboxProps={{
+                            onScroll: (e) => {
+                                const { target } = e;
+                                // Load more when user scrolls near bottom
+                                if (target.scrollTop + target.clientHeight >= target.scrollHeight - 50) {
+                                    if (companies.length < companyTotalCount && !loadingMoreCompanies) {
+                                        loadMoreCompanies();
+                                    }
+                                }
+                            },
+                        }}
                         renderInput={(params) => (
                             <TextField
                                 {...params}
@@ -261,7 +344,7 @@ const AddServiceProduct = () => {
                                     ...params.InputProps,
                                     endAdornment: (
                                         <>
-                                            {loadingCompanies ? <CircularProgress color="inherit" size={20} /> : null}
+                                            {(loadingCompanies || loadingMoreCompanies) ? <CircularProgress color="inherit" size={20} /> : null}
                                             {params.InputProps.endAdornment}
                                         </>
                                     ),
@@ -305,7 +388,7 @@ const AddServiceProduct = () => {
                         fullWidth
                     />
 
-                    <TextField
+                    {/* <TextField
                         label="SKU"
                         placeholder="Enter Sku"
                         value={sku}
@@ -313,7 +396,7 @@ const AddServiceProduct = () => {
                         fullWidth
                         variant="outlined"
                         size="small"
-                    />
+                    /> */}
 
                     <TextField
                         label="HSN"
@@ -374,17 +457,19 @@ const AddServiceProduct = () => {
                         </Select>
                     </FormControl>
 
-                    <TextField
-                        label="Commission"
-                        type="number"
-                        placeholder="Enter Commission"
-                        value={commission}
-                        onChange={(e) => setCommission(e.target.value)}
-                        fullWidth
-                        variant="outlined"
-                        size="small"
-                        inputProps={{ step: "0.01" }}
-                    />
+                    {isAdmin && (
+                        <TextField
+                            label="Commission"
+                            type="number"
+                            placeholder="Enter Commission"
+                            value={commission}
+                            onChange={(e) => setCommission(e.target.value)}
+                            fullWidth
+                            variant="outlined"
+                            size="small"
+                            inputProps={{ step: "0.01" }}
+                        />
+                    )}
 
                     <TextField
                         label="Total Amount"

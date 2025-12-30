@@ -58,7 +58,7 @@ const CompanyReports = () => {
     useEffect(() => {
         setLoading(true);
         setError(null);
-        axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/company/all`, {
+        axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/company/all?limit=1000`, {
             headers: { Authorization: auth?.token }
         })
             .then(res => {

@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import { useNavigate, useParams } from 'react-router-dom'; // Import useParams
 import {
     TextField, Button, Select, MenuItem, FormControl, InputLabel, Paper, Box, Typography, InputAdornment,
-    CircularProgress // Added for loading indicator
+    CircularProgress, Autocomplete // Added for loading indicator and autocomplete
 } from '@mui/material';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -132,8 +132,8 @@ const PurchaseRegister = () => {
 
     // Effect to set rate based on selected product's pricePerQuantity
     useEffect(() => {
-        if (productName && products.length > 0) {
-            const selectedProduct = products.find(p => p._id === productName?._id);
+        if (selectedProductId && products.length > 0) {
+            const selectedProduct = products.find(p => p._id === selectedProductId);
             if (selectedProduct && selectedProduct.pricePerQuantity !== undefined) {
                 setRate(selectedProduct.pricePerQuantity.toString());
                 setGstOptions(selectedProduct.gstType || []);
@@ -143,7 +143,7 @@ const PurchaseRegister = () => {
         } else {
             setRate(''); // Clear rate if no product selected
         }
-    }, [productName, products]); // Depend on productName and products list
+    }, [selectedProductId, products]); // Depend on selectedProductId and products list
 
     // Calculations for Price, GST Amount, and Gross Total
     const parsedQuantity = parseFloat(quantity) || 0;
@@ -213,11 +213,10 @@ const PurchaseRegister = () => {
                     setPurchaseInvoiceNumber('');
                     setGstinUn('');
                     // Removed: setNarration('');
-                    setGstType([]);
+                    setGstOptions([]);
                     setPurchaseDate(dayjs());
                     setQuantity('');
                     setRate('');
-                    setCategory(''); // Clear category after submission
                     navigate('../purchaseList');
                 } else {
                     // Optionally navigate back to list or view page after update
@@ -288,34 +287,39 @@ const PurchaseRegister = () => {
                                     ))}
                                 </Select>
                             </FormControl>
-                            <FormControl fullWidth variant="outlined" size="small">
-                                <InputLabel>Product Name</InputLabel>
-                                <Select
-                                    value={selectedProductId || ''}
-                                    onChange={(e) => {
-                                        const productId = e.target.value;
-                                        setSelectedProductId(productId);
-                                        const selectedProduct = products.find(p => p._id === productId);
-                                        if (selectedProduct) {
-                                            setProductName(selectedProduct.productName);
-                                        }
-                                    }}
-                                    label="Product Name"
-                                    endAdornment={
-                                        <InputAdornment position="end">
-                                            <DescriptionIcon /> {/* Icon as per image */}
-                                        </InputAdornment>
+                            <Autocomplete
+                                options={products}
+                                getOptionLabel={(option) => option.productName || ''}
+                                isOptionEqualToValue={(option, value) => option._id === value._id}
+                                value={products.find(p => p._id === selectedProductId) || null}
+                                onChange={(event, newValue) => {
+                                    if (newValue) {
+                                        setSelectedProductId(newValue._id);
+                                        setProductName(newValue.productName);
+                                    } else {
+                                        setSelectedProductId('');
+                                        setProductName('');
                                     }
-                                    disabled={!vendorCompanyName} // Disable if no vendor is selected
-                                >
-                                    <MenuItem value="">
-                                        <em>--select Product Name--</em>
-                                    </MenuItem>
-                                    {products?.map((product) => (
-                                        <MenuItem key={product._id} value={product._id}>{product.productName}</MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
+                                }}
+                                disabled={!vendorCompanyName}
+                                filterOptions={(options, { inputValue }) => {
+                                    return options.filter((option) =>
+                                        option.productName?.toLowerCase().includes(inputValue.toLowerCase())
+                                    );
+                                }}
+                                noOptionsText={vendorCompanyName ? "No products found" : "Please select a vendor first"}
+                                renderInput={(params) => (
+                                    <TextField
+                                        {...params}
+                                        label="Product Name"
+                                        placeholder="Search Product Name"
+                                        variant="outlined"
+                                        size="small"
+                                        InputLabelProps={{ shrink: true }}
+                                    />
+                                )}
+                                fullWidth
+                            />
 
                             <FormControl fullWidth variant="outlined" size="small">
                                 <InputLabel>Voucher Type</InputLabel>

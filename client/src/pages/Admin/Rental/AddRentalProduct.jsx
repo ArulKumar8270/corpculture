@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
     TextField, Button, Select, MenuItem, FormControl, InputLabel, Paper, Typography,
-    Checkbox, FormControlLabel, FormGroup
+    Checkbox, FormControlLabel, FormGroup, CircularProgress, Autocomplete
 } from '@mui/material';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -108,13 +108,48 @@ const AddRentalProduct = () => {
     const [branches, setBranches] = useState([]); // Assuming branches are fetched based on company
     const [departments, setDepartments] = useState([]); // Assuming departments are fetched based on company/branch
     const [gstOptions, setGstOptions] = useState([]);
+    const [companyPage, setCompanyPage] = useState(1);
+    const [companyTotalCount, setCompanyTotalCount] = useState(0);
+    const [loadingMoreCompanies, setLoadingMoreCompanies] = useState(false);
+    const [loadingCompanies, setLoadingCompanies] = useState(false);
+    const [companySearch, setCompanySearch] = useState('');
+    const isInitialMount = useRef(true);
 
     useEffect(() => {
-        fetchCompanies();
+        fetchCompanies(1, false); // Load first 10 companies
         fetchGstOptions();
         // Fetch branches and departments if needed (e.g., if they are static or depend on user role)
         // For now, they are just text fields, but if they become dropdowns, add fetch logic here.
     }, []);
+
+    // Debounced search effect
+    useEffect(() => {
+        // Skip on initial mount
+        if (isInitialMount.current) {
+            isInitialMount.current = false;
+            return;
+        }
+
+        const searchTimer = setTimeout(() => {
+            // Reset to page 1 when search changes
+            fetchCompanies(1, false, companySearch);
+        }, 500); // 500ms debounce
+
+        return () => clearTimeout(searchTimer);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [companySearch]);
+
+    // Load more companies in background after initial load (only when no search)
+    useEffect(() => {
+        if (!companySearch && companies.length > 0 && companies.length < companyTotalCount && companyPage === 1) {
+            // Load next batch in background after a short delay (only after first page loads)
+            const timer = setTimeout(() => {
+                loadMoreCompanies();
+            }, 500);
+            return () => clearTimeout(timer);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [companies.length, companyTotalCount, companyPage, companySearch]);
 
     useEffect(() => {
         if (id) {
@@ -122,23 +157,55 @@ const AddRentalProduct = () => {
         }
     }, [id]);
 
-    const fetchCompanies = async () => {
+    const fetchCompanies = async (page = 1, append = false, search = '') => {
+        if (!append) {
+            setLoadingCompanies(true);
+        }
         try {
-            // Replace with your actual API endpoint to fetch companies
-            const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/company/all`, {
+            const searchParam = search ? `&search=${encodeURIComponent(search)}` : '';
+            const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/company/all?page=${page}&limit=10${searchParam}`, {
                 headers: {
                     Authorization: auth?.token,
                 },
             });
             if (data?.success) {
-                setCompanies(data.companies);
+                if (append) {
+                    setCompanies(prev => [...prev, ...(data.companies || [])]);
+                } else {
+                    setCompanies(data.companies || []);
+                }
+                setCompanyTotalCount(data.totalCount || 0);
+                setCompanyPage(page);
             } else {
-                toast.error(data?.message || 'Failed to fetch companies.');
+                if (!append) {
+                    toast.error(data?.message || 'Failed to fetch companies.');
+                }
             }
         } catch (error) {
             console.error('Error fetching companies:', error);
-            toast.error('Something went wrong while fetching companies.');
-            setCompanies([]);
+            if (!append) {
+                toast.error('Something went wrong while fetching companies.');
+                setCompanies([]);
+            }
+        } finally {
+            if (!append) {
+                setLoadingCompanies(false);
+            }
+        }
+    };
+
+    // Load more companies in background
+    const loadMoreCompanies = async () => {
+        if (loadingMoreCompanies || companies.length >= companyTotalCount) return;
+        
+        setLoadingMoreCompanies(true);
+        try {
+            const nextPage = companyPage + 1;
+            await fetchCompanies(nextPage, true, companySearch);
+        } catch (error) {
+            console.error('Error loading more companies:', error);
+        } finally {
+            setLoadingMoreCompanies(false);
         }
     };
 
@@ -300,21 +367,55 @@ const AddRentalProduct = () => {
 
                 <Paper className="p-6 shadow-md mb-6">
                     <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        <FormControl fullWidth variant="outlined" size="small">
-                            <InputLabel id="company-label">Company *</InputLabel>
-                            <Select
-                                labelId="company-label"
-                                value={company}
-                                onChange={(e) => setCompany(e.target.value)}
-                                displayEmpty
-                            >
-                                {companies.map((comp) => (
-                                    <MenuItem key={comp._id} value={comp._id}>
-                                        {comp.companyName}
-                                    </MenuItem>
-                                ))}
-                            </Select>
-                        </FormControl>
+                        <Autocomplete
+                            options={companies}
+                            getOptionLabel={(option) => option.companyName || ''}
+                            isOptionEqualToValue={(option, value) => option._id === value._id}
+                            value={companies.find(c => c._id === company) || null}
+                            onChange={(event, newValue) => {
+                                setCompany(newValue ? newValue._id : '');
+                            }}
+                            onInputChange={(event, newInputValue) => {
+                                setCompanySearch(newInputValue);
+                            }}
+                            onOpen={() => {
+                                // Load more companies when dropdown opens if needed (only if no search)
+                                if (!companySearch && companies.length < companyTotalCount && !loadingMoreCompanies) {
+                                    loadMoreCompanies();
+                                }
+                            }}
+                            loading={loadingCompanies || loadingMoreCompanies}
+                            ListboxProps={{
+                                onScroll: (e) => {
+                                    const { target } = e;
+                                    // Load more when user scrolls near bottom
+                                    if (target.scrollTop + target.clientHeight >= target.scrollHeight - 50) {
+                                        if (companies.length < companyTotalCount && !loadingMoreCompanies) {
+                                            loadMoreCompanies();
+                                        }
+                                    }
+                                },
+                            }}
+                            renderInput={(params) => (
+                                <TextField
+                                    {...params}
+                                    label="Company *"
+                                    placeholder="Search Company"
+                                    variant="outlined"
+                                    size="small"
+                                    InputProps={{
+                                        ...params.InputProps,
+                                        endAdornment: (
+                                            <>
+                                                {(loadingCompanies || loadingMoreCompanies) ? <CircularProgress color="inherit" size={20} /> : null}
+                                                {params.InputProps.endAdornment}
+                                            </>
+                                        ),
+                                    }}
+                                />
+                            )}
+                            fullWidth
+                        />
 
                         <TextField
                             label="Branch *"

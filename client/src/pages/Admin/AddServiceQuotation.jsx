@@ -113,7 +113,7 @@ const AddServiceQuotation = () => {
         const fetchCompanies = async () => {
             try {
                 setLoading(true);
-                const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/company/all`, {
+                const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/company/all?limit=1000`, {
                     headers: {
                         Authorization: auth.token,
                     },

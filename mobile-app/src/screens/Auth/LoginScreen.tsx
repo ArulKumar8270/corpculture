@@ -166,7 +166,7 @@ const LoginScreen = () => {
           errorTitle = 'Connection Timeout';
           errorMessage = 'The request took too long. Please check your network connection and try again.';
         } else {
-          errorMessage = error.message;
+        errorMessage = error.message;
         }
       }
 

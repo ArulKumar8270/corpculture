@@ -271,6 +271,7 @@ const AddCompany = () => {
                                     value={companyData.invoiceType}
                                     label="Invoice Type"
                                     onChange={handleChange}
+                                    disabled
                                 >
                                     <MenuItem value="Corpculture Invoice">Corpculture Invoice</MenuItem>
                                     {/* Add other invoice types if needed */}

@@ -25,6 +25,7 @@ const AddServiceProductScreen = () => {
   const route = useRoute();
   const { user, token } = useSelector((state: RootState) => state.auth);
   const product_id = (route.params as any)?.product_id;
+  const isAdmin = user?.role === 1 || user?.role === 3;
   
   // Track previous product_id to detect changes
   const [previousProductId, setPreviousProductId] = React.useState<string | undefined>(product_id);
@@ -46,12 +47,28 @@ const AddServiceProductScreen = () => {
   const [companyPickerVisible, setCompanyPickerVisible] = useState(false);
   const [productPickerVisible, setProductPickerVisible] = useState(false);
   const [gstPickerVisible, setGstPickerVisible] = useState(false);
+  const [companySearch, setCompanySearch] = useState('');
+  const [companyPage, setCompanyPage] = useState(1);
+  const [companyTotalCount, setCompanyTotalCount] = useState(0);
+  const [loadingMoreCompanies, setLoadingMoreCompanies] = useState(false);
+  const [loadingCompanies, setLoadingCompanies] = useState(false);
 
   useEffect(() => {
-    fetchCompanies();
+    fetchCompanies(1, false); // Load first 10 companies
     fetchGstOptions();
     fetchPurchaseProducts();
   }, []);
+
+  // Debounced search effect
+  useEffect(() => {
+    if (!companyPickerVisible) return; // Only search when picker is visible
+    
+    const searchTimer = setTimeout(() => {
+      fetchCompanies(1, false, companySearch);
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(searchTimer);
+  }, [companySearch, companyPickerVisible]);
 
   // Function to clear all form fields
   const clearForm = () => {
@@ -99,18 +116,50 @@ const AddServiceProductScreen = () => {
     calculateTotalAmount();
   }, [quantity, rate, gstTypeIds, gstOptions]);
 
-  const fetchCompanies = async () => {
+  const fetchCompanies = async (page = 1, append = false, search = '') => {
+    if (!append) {
+      setLoadingCompanies(true);
+    }
     try {
-      const { data } = await axios.get(`${getApiBaseUrl()}/company/all`, {
+      const searchParam = search ? `&search=${encodeURIComponent(search)}` : '';
+      const { data } = await axios.get(`${getApiBaseUrl()}/company/all?page=${page}&limit=10${searchParam}`, {
         headers: {
           Authorization: token || '',
         },
+        timeout: 30000,
       });
       if (data?.success) {
-        setCompanies(data.companies || []);
+        if (append) {
+          setCompanies(prev => [...prev, ...(data.companies || [])]);
+        } else {
+          setCompanies(data.companies || []);
+        }
+        setCompanyTotalCount(data.totalCount || 0);
+        setCompanyPage(page);
       }
     } catch (error) {
       console.error('Error fetching companies:', error);
+      if (!append) {
+        setCompanies([]);
+      }
+    } finally {
+      if (!append) {
+        setLoadingCompanies(false);
+      }
+    }
+  };
+
+  const loadMoreCompanies = async () => {
+    if (loadingMoreCompanies || companies.length >= companyTotalCount) return;
+    
+    setLoadingMoreCompanies(true);
+    try {
+      const nextPage = companyPage + 1;
+      await fetchCompanies(nextPage, true, companySearch);
+    } catch (error) {
+      console.error('Error loading more companies:', error);
+    } finally {
+      setLoadingMoreCompanies(false);
     }
   };
 
@@ -207,7 +256,8 @@ const AddServiceProductScreen = () => {
   };
 
   const handleSubmit = async () => {
-    if (!company || !productName || !sku || !hsn || !quantity || !rate || gstTypeIds.length === 0 || !commission) {
+    // Commission is only required for admin users
+    if (!company || !productName || !sku || !hsn || !quantity || !rate || gstTypeIds.length === 0 || (isAdmin && !commission)) {
       Toast.show({
         type: 'error',
         text1: 'Validation Error',
@@ -227,7 +277,7 @@ const AddServiceProductScreen = () => {
         rate: parseFloat(rate),
         gstType: gstTypeIds,
         totalAmount: parseFloat(totalAmount),
-        commission: parseFloat(commission),
+        ...(isAdmin && { commission: parseFloat(commission) }), // Add commission to payload only for admin
       };
 
       let response;
@@ -381,17 +431,19 @@ const AddServiceProductScreen = () => {
           </TouchableOpacity>
         </View>
 
-        {/* Commission */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Commission *</Text>
-          <TextInput
-            style={styles.input}
-            value={commission}
-            onChangeText={setCommission}
-            placeholder="Enter Commission"
-            keyboardType="decimal-pad"
-          />
-        </View>
+        {/* Commission - Only for Admin */}
+        {isAdmin && (
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Commission *</Text>
+            <TextInput
+              style={styles.input}
+              value={commission}
+              onChangeText={setCommission}
+              placeholder="Enter Commission"
+              keyboardType="decimal-pad"
+            />
+          </View>
+        )}
 
         {/* Total Amount (Read-only) */}
         <View style={styles.inputGroup}>
@@ -438,15 +490,31 @@ const AddServiceProductScreen = () => {
         visible={companyPickerVisible}
         transparent={true}
         animationType="slide"
-        onRequestClose={() => setCompanyPickerVisible(false)}
+        onRequestClose={() => {
+          setCompanyPickerVisible(false);
+          setCompanySearch('');
+        }}
       >
         <TouchableOpacity
           style={styles.modalOverlay}
           activeOpacity={1}
-          onPress={() => setCompanyPickerVisible(false)}
+          onPress={() => {
+            setCompanyPickerVisible(false);
+            setCompanySearch('');
+          }}
         >
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Select Company</Text>
+            <View style={styles.searchContainer}>
+              <Icon name="search" size={20} color="#999" style={styles.searchIcon} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search company..."
+                value={companySearch}
+                onChangeText={setCompanySearch}
+                placeholderTextColor="#999"
+              />
+            </View>
             <FlatList
               data={companies}
               keyExtractor={(item) => item._id}
@@ -456,15 +524,31 @@ const AddServiceProductScreen = () => {
                   onPress={() => {
                     setCompany(item._id);
                     setCompanyPickerVisible(false);
+                    setCompanySearch('');
                     setProductName(''); // Reset product when company changes
                   }}
                 >
                   <Text style={styles.modalItemText}>{item.companyName}</Text>
                 </TouchableOpacity>
               )}
+              onEndReached={() => {
+                if (companies.length < companyTotalCount && !loadingMoreCompanies) {
+                  loadMoreCompanies();
+                }
+              }}
+              onEndReachedThreshold={0.5}
+              ListFooterComponent={
+                loadingMoreCompanies ? (
+                  <View style={styles.loadingFooter}>
+                    <ActivityIndicator size="small" color="#019ee3" />
+                  </View>
+                ) : null
+              }
               ListEmptyComponent={
                 <View style={styles.emptyContainer}>
-                  <Text style={styles.emptyText}>No companies found</Text>
+                  <Text style={styles.emptyText}>
+                    {loadingCompanies ? 'Loading...' : 'No companies found'}
+                  </Text>
                 </View>
               }
             />
@@ -710,6 +794,29 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     color: '#999',
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    paddingHorizontal: 15,
+    marginBottom: 15,
+  },
+  searchIcon: {
+    marginRight: 10,
+  },
+  searchInput: {
+    flex: 1,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: '#333',
+  },
+  loadingFooter: {
+    padding: 20,
+    alignItems: 'center',
   },
 });
 

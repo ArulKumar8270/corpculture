@@ -56,6 +56,11 @@ const AddRentalProductScreen = () => {
   const [companyPickerVisible, setCompanyPickerVisible] = useState(false);
   const [gstPickerVisible, setGstPickerVisible] = useState(false);
   const [paymentDatePickerVisible, setPaymentDatePickerVisible] = useState(false);
+  const [companySearch, setCompanySearch] = useState('');
+  const [companyPage, setCompanyPage] = useState(1);
+  const [companyTotalCount, setCompanyTotalCount] = useState(0);
+  const [loadingMoreCompanies, setLoadingMoreCompanies] = useState(false);
+  const [loadingCompanies, setLoadingCompanies] = useState(false);
 
   const [formData, setFormData] = useState({
     company: '',
@@ -122,12 +127,23 @@ const AddRentalProductScreen = () => {
   });
 
   useEffect(() => {
-    fetchCompanies();
+    fetchCompanies(1, false); // Load first 10 companies
     fetchGstOptions();
     if (isEditMode && productId) {
       fetchProduct(productId);
     }
   }, []);
+
+  // Debounced search effect
+  useEffect(() => {
+    if (!companyPickerVisible) return; // Only search when picker is visible
+    
+    const searchTimer = setTimeout(() => {
+      fetchCompanies(1, false, companySearch);
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(searchTimer);
+  }, [companySearch, companyPickerVisible]);
 
   useFocusEffect(
     useCallback(() => {
@@ -214,21 +230,53 @@ const AddRentalProductScreen = () => {
     });
   }, []);
 
-  const fetchCompanies = async () => {
+  const fetchCompanies = async (page = 1, append = false, search = '') => {
+    if (!append) {
+      setLoadingCompanies(true);
+    }
     try {
-      const { data } = await axios.get(`${getApiBaseUrl()}/company/all`, {
+      const searchParam = search ? `&search=${encodeURIComponent(search)}` : '';
+      const { data } = await axios.get(`${getApiBaseUrl()}/company/all?page=${page}&limit=10${searchParam}`, {
         headers: { Authorization: token || '' },
+        timeout: 30000,
       });
       if (data?.success) {
-        setCompanies(data.companies || []);
+        if (append) {
+          setCompanies(prev => [...prev, ...(data.companies || [])]);
+        } else {
+          setCompanies(data.companies || []);
+        }
+        setCompanyTotalCount(data.totalCount || 0);
+        setCompanyPage(page);
       }
     } catch (error) {
       console.error('Error fetching companies:', error);
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: 'Failed to fetch companies',
-      });
+      if (!append) {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: 'Failed to fetch companies',
+        });
+        setCompanies([]);
+      }
+    } finally {
+      if (!append) {
+        setLoadingCompanies(false);
+      }
+    }
+  };
+
+  const loadMoreCompanies = async () => {
+    if (loadingMoreCompanies || companies.length >= companyTotalCount) return;
+    
+    setLoadingMoreCompanies(true);
+    try {
+      const nextPage = companyPage + 1;
+      await fetchCompanies(nextPage, true, companySearch);
+    } catch (error) {
+      console.error('Error loading more companies:', error);
+    } finally {
+      setLoadingMoreCompanies(false);
     }
   };
 
@@ -748,15 +796,31 @@ const AddRentalProductScreen = () => {
         visible={companyPickerVisible}
         transparent={true}
         animationType="slide"
-        onRequestClose={() => setCompanyPickerVisible(false)}
+        onRequestClose={() => {
+          setCompanyPickerVisible(false);
+          setCompanySearch('');
+        }}
       >
         <TouchableOpacity
           style={styles.modalOverlay}
           activeOpacity={1}
-          onPress={() => setCompanyPickerVisible(false)}
+          onPress={() => {
+            setCompanyPickerVisible(false);
+            setCompanySearch('');
+          }}
         >
           <View style={styles.pickerModalContent}>
             <Text style={styles.pickerModalTitle}>Select Company</Text>
+            <View style={styles.searchContainer}>
+              <Icon name="search" size={20} color="#999" style={styles.searchIcon} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search company..."
+                value={companySearch}
+                onChangeText={setCompanySearch}
+                placeholderTextColor="#999"
+              />
+            </View>
             <FlatList
               data={companies}
               keyExtractor={(item) => item._id}
@@ -766,15 +830,39 @@ const AddRentalProductScreen = () => {
                   onPress={() => {
                     setFormData({ ...formData, company: item._id });
                     setCompanyPickerVisible(false);
+                    setCompanySearch('');
                   }}
                 >
                   <Text style={styles.pickerOptionText}>{item.companyName}</Text>
                 </TouchableOpacity>
               )}
+              onEndReached={() => {
+                if (companies.length < companyTotalCount && !loadingMoreCompanies) {
+                  loadMoreCompanies();
+                }
+              }}
+              onEndReachedThreshold={0.5}
+              ListFooterComponent={
+                loadingMoreCompanies ? (
+                  <View style={styles.loadingFooter}>
+                    <ActivityIndicator size="small" color="#019ee3" />
+                  </View>
+                ) : null
+              }
+              ListEmptyComponent={
+                <View style={styles.emptyContainer}>
+                  <Text style={styles.emptyText}>
+                    {loadingCompanies ? 'Loading...' : 'No companies found'}
+                  </Text>
+                </View>
+              }
             />
             <TouchableOpacity
               style={styles.modalButton}
-              onPress={() => setCompanyPickerVisible(false)}
+              onPress={() => {
+                setCompanyPickerVisible(false);
+                setCompanySearch('');
+              }}
             >
               <Text style={styles.modalButtonText}>Cancel</Text>
             </TouchableOpacity>
@@ -1066,6 +1154,37 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     marginTop: 5,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    paddingHorizontal: 15,
+    marginBottom: 15,
+  },
+  searchIcon: {
+    marginRight: 10,
+  },
+  searchInput: {
+    flex: 1,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: '#333',
+  },
+  loadingFooter: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  emptyContainer: {
+    padding: 50,
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#999',
   },
 });
 
