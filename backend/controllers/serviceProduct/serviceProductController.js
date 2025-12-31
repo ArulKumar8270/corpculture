@@ -1,6 +1,7 @@
 import ServiceProduct from "../../models/serviceProductModel.js";
 import Company from "../../models/companyModel.js"; // Assuming this path is correct
 import GST from "../../models/gstModel.js"; // Assuming this path is correct
+import Material from "../../models/materialModel.js"; // Import Material model
 
 // Create Service Product
 export const createServiceProduct = async (req, res) => {
@@ -31,6 +32,12 @@ export const createServiceProduct = async (req, res) => {
         const existingGstType = await GST.findById(gstType);
         if (!existingGstType) {
             return res.status(404).send({ success: false, message: 'GST Type not found.' });
+        }
+
+        // Check if Material exists
+        const existingMaterial = await Material.findById(productName);
+        if (!existingMaterial) {
+            return res.status(404).send({ success: false, message: 'Material not found.' });
         }
 
         // Check if SKU already exists
@@ -65,12 +72,7 @@ export const getAllServiceProducts = async (req, res) => {
         const serviceProducts = await ServiceProduct.find({})
             .populate('company') // Populate company name
             .populate('gstType', 'gstType gstPercentage') // Populate GST details
-            .populate({ // Nested population for productName
-                path: 'productName', // First, populate the Purchase document
-                populate: {
-                    path: 'productName', // Then, populate the VendorProduct within the Purchase document
-                }
-            })
+            .populate('productName', 'name unit description') // Populate Material details
             .sort({ createdAt: -1 });
 
         res.status(200).send({ success: true, message: 'All Service Products fetched', serviceProducts });
@@ -85,14 +87,9 @@ export const getServiceProductById = async (req, res) => {
     try {
         const { id } = req.params;
         const serviceProduct = await ServiceProduct.findById(id)
-            .populate('company', 'name')
+            .populate('company', 'companyName')
             .populate('gstType', 'gstType gstPercentage')
-            .populate({ // Nested population for productName
-                path: 'productName', // First, populate the Purchase document
-                populate: {
-                    path: 'productName', // Then, populate the VendorProduct within the Purchase document
-                }
-            })
+            .populate('productName', 'name unit description') // Populate Material details
 
         if (!serviceProduct) {
             return res.status(404).send({ success: false, message: 'Service Product not found' });
@@ -116,13 +113,7 @@ export const getServiceProductsByCompany = async (req, res) => {
         const serviceProducts = await ServiceProduct.find({ company: companyId }) // Corrected query
             .populate('company', 'companyName') // Populate company name
             .populate('gstType', 'gstType gstPercentage') // Populate GST details
-            // .populate('productName', "productName")
-            .populate({ // Nested population for productName
-                path: 'productName', // First, populate the Purchase document
-                populate: {
-                    path: 'productName', // Then, populate the VendorProduct within the Purchase document
-                }
-            })
+            .populate('productName', 'name unit description') // Populate Material details
             .sort({ createdAt: -1 });
 
         if (!serviceProducts || serviceProducts.length === 0) {
@@ -166,6 +157,12 @@ export const updateServiceProduct = async (req, res) => {
         const existingGstType = await GST.findById(gstType);
         if (!existingGstType) {
             return res.status(404).send({ success: false, message: 'GST Type not found.' });
+        }
+
+        // Check if Material exists
+        const existingMaterial = await Material.findById(productName);
+        if (!existingMaterial) {
+            return res.status(404).send({ success: false, message: 'Material not found.' });
         }
 
         // Check for duplicate SKU, excluding the current product

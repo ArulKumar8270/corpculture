@@ -1,4 +1,4 @@
-import { useContext, createContext, useState, useEffect } from "react";
+import { useContext, createContext, useState, useEffect, useCallback } from "react";
 import { toast } from "react-toastify";
 import Cookies from "js-cookie";
 import axios from "axios";
@@ -44,11 +44,49 @@ const AuthProvider = ({ children }) => {
             localStorage.removeItem('selectedCompany');
         }
     }, [selectedCompany]);
-    useEffect(() => {
-        if ((auth?.user?._id && isCompanyEnabled) || refetch) {
-            getCompanyDetails();
+
+    // Define getCompanyDetails before it's used in useEffect hooks
+    const getCompanyDetails = useCallback(async () => {
+        if (!auth?.user || !auth?.token) return;
+
+        // Fetch company details if company is enabled OR if there's a selected company
+        if (!isCompanyEnabled && !selectedCompany) return;
+
+        try {
+            let response;
+            // For customers (role 0), use user-company endpoint
+            response = await axios.get(
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/company/user-company/${auth.user.phone}`,
+                {
+                    headers: {
+                        Authorization: auth.token,
+                    },
+                }
+            );
+            // Handle response structure: { success: true, company: [...] }
+            if (response.data?.success && response.data.company) {
+                // company is an array in this response
+                const companies = Array.isArray(response.data.company)
+                    ? response.data.company
+                    : [response.data.company];
+                setCompanyDetails(companies);
+            }
+
+        } catch (error) {
+            console.error("Error fetching company details:", error);
+            setCompanyDetails(null);
         }
-    }, [auth, isCompanyEnabled, refetch])
+    }, [auth?.user, auth?.token, isCompanyEnabled, selectedCompany]);
+
+    // Fetch company details when auth is loaded and company is enabled
+    useEffect(() => {
+        // Wait for context to finish loading before fetching company details
+        if (!isContextLoading && auth?.user?._id && auth?.token) {
+            if (isCompanyEnabled || selectedCompany || refetch) {
+                getCompanyDetails();
+            }
+        }
+    }, [auth?.user?._id, auth?.token, isCompanyEnabled, selectedCompany, refetch, isContextLoading, getCompanyDetails])
 
     useEffect(() => {
         const fetchPermissions = async () => {
@@ -86,6 +124,24 @@ const AuthProvider = ({ children }) => {
         }
         setIsContextLoading(false);
     }, []);
+
+    // Fetch company details on initial load if conditions are met
+    useEffect(() => {
+        if (!isContextLoading && auth?.user?._id && auth?.token) {
+            const storedCompanyEnabled = localStorage.getItem('isCompanyEnabled');
+            const storedSelectedCompany = localStorage.getItem('selectedCompany');
+            const shouldFetch = storedCompanyEnabled === 'true' || (storedSelectedCompany && storedSelectedCompany !== 'null' && storedSelectedCompany !== '');
+
+            if (shouldFetch) {
+                // Small delay to ensure isCompanyEnabled state is updated from localStorage
+                const timer = setTimeout(() => {
+                    getCompanyDetails();
+                }, 100);
+                return () => clearTimeout(timer);
+            }
+        }
+    }, [isContextLoading, auth?.user?._id, auth?.token, getCompanyDetails]);
+
     //Function to Logout user
     const LogOut = () => {
         setAuth({
@@ -100,50 +156,6 @@ const AuthProvider = ({ children }) => {
     };
 
     console.log('auth23452345', auth);
-
-    const getCompanyDetails = async () => {
-        if (!auth?.user || !auth?.token || !isCompanyEnabled) return;
-        
-        try {
-            let response;
-            // For customers (role 0), use user-company endpoint
-            if (auth.user.role === 0 && auth.user.phone) {
-                response = await axios.get(
-                    `${import.meta.env.VITE_SERVER_URL}/api/v1/company/user-company/${auth.user.phone}`,
-                    {
-                        headers: {
-                            Authorization: auth.token,
-                        },
-                    }
-                );
-                // Handle response structure: { success: true, company: [...] }
-                if (response.data?.success && response.data.company) {
-                    // company is an array in this response
-                    const companies = Array.isArray(response.data.company) 
-                        ? response.data.company 
-                        : [response.data.company];
-                    setCompanyDetails(companies);
-                }
-            } else {
-                // For admin/employee, use all companies endpoint
-                response = await axios.get(
-                    `${import.meta.env.VITE_SERVER_URL}/api/v1/company/all?limit=1000`,
-                    {
-                        headers: {
-                            Authorization: auth.token,
-                        },
-                    }
-                );
-                // Handle response structure: { success: true, companies: [...] }
-                if (response.data?.success && response.data.companies) {
-                    setCompanyDetails(response.data.companies);
-                }
-            }
-        } catch (error) {
-            console.error("Error fetching company details:", error);
-            setCompanyDetails(null);
-        }
-    }
 
     return (
         <AuthContext.Provider

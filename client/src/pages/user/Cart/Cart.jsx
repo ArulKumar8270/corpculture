@@ -11,6 +11,8 @@ import { loadStripe } from "@stripe/stripe-js";
 import axios from "axios";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 // Import the CompanyRegistrationForm component
 import CompanyRegistrationForm from '../CompanyRegistration/CompanyRegistrationForm'; // {{ edit_1 }}
 
@@ -30,6 +32,8 @@ const Cart = () => {
     const [newUserEmail, setNewUserEmail] = useState("");
     const [newUserPhone, setNewUserPhone] = useState("");
     const [newUserName, setNewUserName] = useState("");
+    const [newUserDesignation, setNewUserDesignation] = useState("");
+    const [newUserDob, setNewUserDob] = useState("");
     const [additionalEmails, setAdditionalEmails] = useState([]);
     const [existingUsers, setExistingUsers] = useState([]); // {{ edit_7 }}
     const [isLoading, setIsLoading] = useState(false);
@@ -59,6 +63,8 @@ const Cart = () => {
                     mobile: user.mobile,
                     email: user.email,
                     name: user.name,
+                    designation: user.designation || '',
+                    dob: user.dob || '',
                 })));
             }
         } catch (error) {
@@ -132,7 +138,13 @@ const Cart = () => {
             serviceDeliveryAddresses: auth?.user?.address ? [{ address: auth.user.address, pincode: "000000" }] : [], // Using auth.user.address and a placeholder pincode
         };
         let companyPaylod = {
-            contactPersons: [...existingUsers, { name: newUserName, mobile: newUserPhone, email: newUserEmail }],
+            contactPersons: [...existingUsers, { 
+                name: newUserName, 
+                mobile: newUserPhone, 
+                email: newUserEmail,
+                designation: newUserDesignation,
+                dob: newUserDob
+            }],
         }
         setIsLoading(true);
         try {
@@ -156,6 +168,8 @@ const Cart = () => {
             setNewUserEmail("");
             setNewUserName("");
             setNewUserPhone("");
+            setNewUserDesignation("");
+            setNewUserDob("");
             setIsLoading(false);
             setRefetch(true)
             // Email already registered
@@ -254,35 +268,53 @@ const Cart = () => {
                                         </div>
                                         {/* Add new user emails */}
                                         <label className="font-semibold text-sm mb-1">Add New User Email(s):</label>
-                                        <div className="flex gap-2 mb-2">
-                                            <input
-                                                type="name"
-                                                value={newUserName}
-                                                onChange={(e) => setNewUserName(e.target.value)}
-                                                placeholder="Enter Name"
-                                                className="border rounded-lg p-2 flex-1"
-                                            />
-                                            <input
-                                                type="email"
-                                                value={newUserEmail}
-                                                onChange={(e) => setNewUserEmail(e.target.value)}
-                                                placeholder="Enter email"
-                                                className="border rounded-lg p-2 flex-1"
-                                            />
-                                            <input
-                                                type="phone"
-                                                value={newUserPhone}
-                                                onChange={(e) => setNewUserPhone(e.target.value)}
-                                                placeholder="Enter Phone"
-                                                className="border rounded-lg p-2 flex-1"
-                                            />
-                                            <button
-                                                type="button"
-                                                onClick={addNewUser}
-                                                className="bg-primaryBlue text-white px-4 py-2 rounded-lg font-semibold"
-                                            >
-                                                Add
-                                            </button>
+                                        <div className="flex flex-col gap-2 mb-2">
+                                            <div className="flex gap-2">
+                                                <input
+                                                    type="text"
+                                                    value={newUserName}
+                                                    onChange={(e) => setNewUserName(e.target.value)}
+                                                    placeholder="Enter Name"
+                                                    className="border rounded-lg p-2 flex-1"
+                                                />
+                                                <input
+                                                    type="email"
+                                                    value={newUserEmail}
+                                                    onChange={(e) => setNewUserEmail(e.target.value)}
+                                                    placeholder="Enter email"
+                                                    className="border rounded-lg p-2 flex-1"
+                                                />
+                                                <input
+                                                    type="tel"
+                                                    value={newUserPhone}
+                                                    onChange={(e) => setNewUserPhone(e.target.value)}
+                                                    placeholder="Enter Phone"
+                                                    className="border rounded-lg p-2 flex-1"
+                                                />
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <input
+                                                    type="text"
+                                                    value={newUserDesignation}
+                                                    onChange={(e) => setNewUserDesignation(e.target.value)}
+                                                    placeholder="Enter Designation"
+                                                    className="border rounded-lg p-2 flex-1"
+                                                />
+                                                <input
+                                                    type="date"
+                                                    value={newUserDob}
+                                                    onChange={(e) => setNewUserDob(e.target.value)}
+                                                    placeholder="Date of Birth"
+                                                    className="border rounded-lg p-2 flex-1"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={addNewUser}
+                                                    className="bg-primaryBlue text-white px-4 py-2 rounded-lg font-semibold"
+                                                >
+                                                    Add
+                                                </button>
+                                            </div>
                                         </div>
                                         {/* Show added emails as chips */}
                                         <div className="flex flex-wrap gap-2 mb-2">
@@ -342,7 +374,7 @@ const Cart = () => {
 
             {/* Company Registration Modal */}
             {showCompanyModal ? ( // {{ edit_5 }}
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 w-full h-full">
                     <div className="bg-white rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto relative">
                         {/* Close button */}
                         <button

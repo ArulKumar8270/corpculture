@@ -23,7 +23,9 @@ import {
     TableRow,
     Paper,
     Chip,
+    Autocomplete,
 } from "@mui/material";
+import qrCode from "../assets/images/qrCode.png";
 
 const UserProfile = () => {
     const { auth, setAuth } = useAuth();
@@ -38,7 +40,7 @@ const UserProfile = () => {
     const [nameInputFocused, setNameInputFocused] = useState(false);
     const [emailInputFocused, setEmailInputFocused] = useState(false);
     const [phoneInputFocused, setPhoneInputFocused] = useState(false);
-    
+
     // Payment details state
     const [companies, setCompanies] = useState([]);
     const [selectedCompany, setSelectedCompany] = useState("");
@@ -361,8 +363,8 @@ const UserProfile = () => {
                     balanceAmount && selectedInvoiceId
                         ? Number(balanceAmount)
                         : paymentForm?.paymentAmount >= paymentForm?.grandTotal
-                        ? Number(paymentForm?.grandTotal)
-                        : Number(paymentForm?.paymentAmount),
+                            ? Number(paymentForm?.grandTotal)
+                            : Number(paymentForm?.paymentAmount),
                 tdsAmount: 0,
                 pendingAmount: 0,
                 status: status,
@@ -582,11 +584,10 @@ const UserProfile = () => {
                                 className="flex flex-col sm:flex-row gap-4 items-start sm:items-center"
                             >
                                 <div
-                                    className={`border p-3 flex flex-col w-full sm:w-[220px] rounded-md transition-colors duration-200 ${
-                                        nameInputFocused
+                                    className={`border p-3 flex flex-col w-full sm:w-[220px] rounded-md transition-colors duration-200 ${nameInputFocused
                                             ? "border-blue-500"
                                             : "border-gray-300"
-                                    }`}
+                                        }`}
                                 >
                                     <label
                                         htmlFor="name"
@@ -809,8 +810,8 @@ const UserProfile = () => {
                                                                 invoice.status === "Paid"
                                                                     ? "success"
                                                                     : invoice.status === "Unpaid"
-                                                                    ? "error"
-                                                                    : "warning"
+                                                                        ? "error"
+                                                                        : "warning"
                                                             }
                                                         />
                                                     </TableCell>
@@ -1120,11 +1121,10 @@ const UserProfile = () => {
                                 className="flex flex-col sm:flex-row gap-4 sm:gap-6 items-start sm:items-center"
                             >
                                 <div
-                                    className={`border p-3 flex flex-col w-full sm:w-[220px] rounded-md transition-colors duration-200 ${
-                                        nameInputFocused
+                                    className={`border p-3 flex flex-col w-full sm:w-[220px] rounded-md transition-colors duration-200 ${nameInputFocused
                                             ? "border-blue-500"
                                             : "border-gray-300"
-                                    }`}
+                                        }`}
                                 >
                                     <label
                                         htmlFor="name"
@@ -1170,9 +1170,8 @@ const UserProfile = () => {
                     <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 items-start sm:items-center">
                         {emailSection ? (
                             <div
-                                className={`border p-3 flex flex-col w-full sm:w-[220px] rounded-md transition-colors duration-200 ${
-                                    emailInputFocused ? "border-blue-500" : "border-gray-300"
-                                }`}
+                                className={`border p-3 flex flex-col w-full sm:w-[220px] rounded-md transition-colors duration-200 ${emailInputFocused ? "border-blue-500" : "border-gray-300"
+                                    }`}
                             >
                                 <label
                                     htmlFor="email"
@@ -1221,9 +1220,8 @@ const UserProfile = () => {
                     <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 items-start sm:items-center">
                         {phoneSection ? (
                             <div
-                                className={`border p-3 flex flex-col w-full sm:w-[220px] rounded-md transition-colors duration-200 ${
-                                    phoneInputFocused ? "border-blue-500" : "border-gray-300"
-                                }`}
+                                className={`border p-3 flex flex-col w-full sm:w-[220px] rounded-md transition-colors duration-200 ${phoneInputFocused ? "border-blue-500" : "border-gray-300"
+                                    }`}
                             >
                                 <label
                                     htmlFor="phone"
@@ -1263,7 +1261,7 @@ const UserProfile = () => {
                 </div>
 
                 {/* Payment Details Update Section */}
-                <div className="bg-white rounded-lg shadow-md p-6 mt-8">
+                <div className="bg-white rounded-lg shadow-md p-6 mt-8 w-full">
                     <h3 className="text-xl font-bold text-gray-800 mb-6">
                         Update Payment Details
                     </h3>
@@ -1276,19 +1274,29 @@ const UserProfile = () => {
                         >
                             Select Company
                         </label>
-                        <select
-                            id="company-select-fallback"
-                            value={selectedCompany}
-                            onChange={(e) => setSelectedCompany(e.target.value)}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        >
-                            <option value="">-- Select Company --</option>
-                            {companies.map((company) => (
-                                <option key={company._id} value={company._id}>
-                                    {company.companyName}
-                                </option>
-                            ))}
-                        </select>
+                        <Autocomplete
+                            options={companies}
+                            getOptionLabel={(option) => option.companyName || ''}
+                            isOptionEqualToValue={(option, value) => option._id === value._id}
+                            value={companies.find(c => c._id === selectedCompany) || null}
+                            onChange={(event, newValue) => {
+                                setSelectedCompany(newValue ? newValue._id : '');
+                            }}
+                            filterOptions={(options, { inputValue }) => {
+                                return options.filter((option) =>
+                                    option.companyName?.toLowerCase().includes(inputValue.toLowerCase())
+                                );
+                            }}
+                            noOptionsText="No companies found"
+                            renderInput={(params) => (
+                                <TextField
+                                    {...params}
+                                    placeholder="Search Company"
+                                    variant="outlined"
+                                    InputLabelProps={{ shrink: true }}
+                                />
+                            )}
+                        />
                     </div>
 
                     {/* Invoices Table */}
@@ -1339,8 +1347,8 @@ const UserProfile = () => {
                                                                 invoice.status === "Paid"
                                                                     ? "success"
                                                                     : invoice.status === "Unpaid"
-                                                                    ? "error"
-                                                                    : "warning"
+                                                                        ? "error"
+                                                                        : "warning"
                                                             }
                                                         />
                                                     </TableCell>
@@ -1621,6 +1629,10 @@ const UserProfile = () => {
                             </Button>
                         </DialogActions>
                     </Dialog>
+                </div>
+                {/* Payment Details Update Section */}
+                <div className="bg-white rounded-lg shadow-md mt-8">
+                    <img src={qrCode} alt="logo" className="w-52 h-52 object-fit" />
                 </div>
             </div>
         </div>

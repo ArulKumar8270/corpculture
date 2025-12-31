@@ -213,6 +213,7 @@ const EditProduct = () => {
 
         if (validationErrors.length > 0) {
             validationErrors.forEach((error) => toast.warning(error));
+            setLoading(true);
             return;
         }
         try {
@@ -282,6 +283,8 @@ const EditProduct = () => {
             //server error
             error.response.status === 500 &&
                 toast.error("Something went wrong! Please try after sometime.");
+        } finally {
+            setLoading(true);
         }
     };
 

@@ -28,8 +28,8 @@ const AddServiceProduct = () => {
 
     const [companies, setCompanies] = useState([]);
     const [gstOptions, setGstOptions] = useState([]); // Stores GST types with their percentages
-    const [purchaseProducts, setPurchaseProducts] = useState([]); // New state for products from purchases API
-    const [loadingProducts, setLoadingProducts] = useState(false); // New state for product loading
+    const [materials, setMaterials] = useState([]); // State for materials list
+    const [loadingMaterials, setLoadingMaterials] = useState(false); // State for material loading
     const [loadingCompanies, setLoadingCompanies] = useState(false); // New state for company loading
     const [companyPage, setCompanyPage] = useState(1);
     const [companyTotalCount, setCompanyTotalCount] = useState(0);
@@ -40,7 +40,7 @@ const AddServiceProduct = () => {
     useEffect(() => {
         fetchCompanies(1, false); // Load first 10 companies
         fetchGstOptions();
-        fetchPurchaseProducts(); // Fetch purchase products on mount
+        fetchMaterials(); // Fetch materials on mount
     }, []);
 
     // Debounced search effect
@@ -150,37 +150,26 @@ const AddServiceProduct = () => {
             setGstOptions([]);
         }
     };
-    // New function to fetch products from the purchases API
-    const fetchPurchaseProducts = async () => {
-        setLoadingProducts(true);
+    // Function to fetch materials from the materials API
+    const fetchMaterials = async () => {
+        setLoadingMaterials(true);
         try {
-            const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/purchases${auth?.user !== 1 ? '' :`?category=${auth?.user?.department}`}`, {
+            const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/materials`, {
                 headers: {
                     Authorization: auth?.token,
                 },
             });
             if (data?.success) {
-                const uniqueProductsMap = new Map();
-                data.purchases.forEach(purchase => {
-                    // Ensure product exists, has an ID, productCode, and productCode is a non-empty string
-                    if (purchase.productName && typeof purchase.productName.productCode === 'string' && purchase.productName.productCode.length > 0) {
-                        // Use productCode as the key to group by productCode
-                        // If multiple purchases have the same productCode, we only add one entry for that productCode.
-                        // The value stored will be the product definition object.
-                        if (!uniqueProductsMap.has(purchase.productName.productCode)) {
-                            uniqueProductsMap.set(purchase.productName.productCode, purchase);
-                        }
-                    }
-                });
-                // Convert map values to an array of unique product definition objects
-                setPurchaseProducts(Array.from(uniqueProductsMap.values()));
+                setMaterials(data.materials || []);
             } else {
-                console.error(data?.message || 'Failed to fetch purchase products.');
+                console.error(data?.message || 'Failed to fetch materials.');
+                toast.error(data?.message || 'Failed to fetch materials.');
             }
         } catch (error) {
-            console.error('Error fetching purchase products:', error);
+            console.error('Error fetching materials:', error);
+            toast.error('Something went wrong while fetching materials.');
         } finally {
-            setLoadingProducts(false);
+            setLoadingMaterials(false);
         }
     };
 
@@ -354,31 +343,35 @@ const AddServiceProduct = () => {
                         fullWidth
                     />
 
-                    {/* Replaced TextField with Autocomplete for Product Name */}
+                    {/* Replaced TextField with Autocomplete for Product Name - Using Materials */}
                     <Autocomplete
-                        options={purchaseProducts}
-                        // Display both product name and product code
-                        getOptionLabel={(option) => `${option?.productName?.productName || ''}`}
+                        options={materials}
+                        getOptionLabel={(option) => option?.name || ''}
                         isOptionEqualToValue={(option, value) => option._id === value._id}
-                        // Find the product definition object based on the stored product ID for display
-                        value={purchaseProducts.find(p => p._id === productName) || null}
+                        value={materials.find(m => m._id === productName) || null}
                         onChange={(event, newValue) => {
-                            // Set the _id of the selected product definition to state
+                            // Set the _id of the selected material to state
                             setProductName(newValue ? newValue._id : '');
                         }}
-                        loading={loadingProducts}
+                        loading={loadingMaterials}
+                        filterOptions={(options, { inputValue }) => {
+                            return options.filter((option) =>
+                                option.name?.toLowerCase().includes(inputValue.toLowerCase())
+                            );
+                        }}
+                        noOptionsText="No materials found"
                         renderInput={(params) => (
                             <TextField
                                 {...params}
                                 label="Product Name"
-                                placeholder="Search Product Name"
+                                placeholder="Search Material Name"
                                 variant="outlined"
                                 size="small"
                                 InputProps={{
                                     ...params.InputProps,
                                     endAdornment: (
                                         <>
-                                            {loadingProducts ? <CircularProgress color="inherit" size={20} /> : null}
+                                            {loadingMaterials ? <CircularProgress color="inherit" size={20} /> : null}
                                             {params.InputProps.endAdornment}
                                         </>
                                     ),
@@ -480,6 +473,7 @@ const AddServiceProduct = () => {
                         InputProps={{
                             readOnly: true,
                         }}
+                        disabled
                     />
 
                     <div className="md:col-span-2 flex justify-start gap-3 mt-4">

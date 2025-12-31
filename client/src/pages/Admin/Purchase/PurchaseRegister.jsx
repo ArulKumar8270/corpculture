@@ -194,7 +194,7 @@ const PurchaseRegister = () => {
             if (response.data?.success) {
                 // Call the new API to update or create material
                 let materialResponse = await axios.post(`${import.meta.env.VITE_SERVER_URL}/api/v1/materials/update-or-create`, {
-                    name: productName,
+                    name: productName.productName,
                     unit: purchaseData.quantity,
                 });
                 if (materialResponse.data?.success) {

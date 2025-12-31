@@ -23,6 +23,8 @@ const CompanyToggleHeader = () => {
     } = useAuth();
     const [showCompanyModal, setShowCompanyModal] = useState(false);
 
+    console.log(companyDetails, 'selectedCompany', selectedCompany);
+
     // Initialize isCompanyEnabled from localStorage
     useEffect(() => {
         const storedCompanyEnabled = localStorage.getItem('isCompanyEnabled');
@@ -92,7 +94,7 @@ const CompanyToggleHeader = () => {
             <label className="flex items-center gap-2 text-white text-sm font-medium cursor-pointer hover:bg-white/10 rounded-lg px-3 py-2 transition-all duration-200">
                 <input
                     type="checkbox"
-                    checked={isCompanyEnabled}
+                    checked={isCompanyEnabled || selectedCompany !== ''}
                     className="accent-cyan-300 w-4 h-4 rounded focus:ring-2 focus:ring-cyan-400"
                     onChange={handleToggleCompany}
                 />
@@ -103,7 +105,7 @@ const CompanyToggleHeader = () => {
             </label>
 
             {/* Company Selector Dropdown */}
-            {isCompanyEnabled && (
+            {(isCompanyEnabled || selectedCompany !== '') && (
                 <FormControl sx={{ m: 0, minWidth: 140 }} size="small">
                     <InputLabel 
                         id="company-select-label" 
@@ -159,7 +161,7 @@ const CompanyToggleHeader = () => {
             {/* Company Registration Modal */}
             {showCompanyModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto relative">
+                    <div className="bg-white rounded-xl max-w-xl w-full max-h-[90vh] overflow-y-auto relative">
                         {/* Close button */}
                         <button
                             onClick={handleCloseCompanyModal}

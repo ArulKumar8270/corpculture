@@ -81,7 +81,6 @@ const CreateProduct = () => {
                 if (res.status === 200) {
                     setCategories(res.data.categories);
                 }
-                setLoading(false);
             } catch (error) {
                 console.error("Error fetching categories:", error);
                 toast.error(
@@ -207,14 +206,17 @@ const CreateProduct = () => {
             // required field checks
             if (!logo) {
                 toast.warning("Please Add Brand Logo");
+                setIsSubmit(false);
                 return;
             }
             // if (specs.length <= 1) {
             //     toast.warning("Please Add Minimum 2 Specifications");
+            //     setIsSubmit(false);
             //     return;
             // }
             if (images.length <= 0) {
                 toast.warning("Please Add Product Images");
+                setIsSubmit(false);
                 return;
             }
 
@@ -268,8 +270,13 @@ const CreateProduct = () => {
             console.error("Error:", error);
             setIsSubmit(false);
             //server error
-            error.response.status === 500 &&
+            if (error.response?.status === 500) {
                 toast.error("Something went wrong! Please try after sometime.");
+            } else if (error.response?.data?.message) {
+                toast.error(error.response.data.message);
+            } else {
+                toast.error("An error occurred. Please try again.");
+            }
         }
     };
 

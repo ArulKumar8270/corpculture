@@ -40,7 +40,7 @@ export const createMaterial = async (req, res) => {
 // Get all materials
 export const getAllMaterials = async (req, res) => {
     try {
-        const materials = await Material.find({ isActive: true }).populate('name')
+        const materials = await Material.find({ isActive: true })
             .sort({ createdAt: -1 });
 
         res.status(200).json({

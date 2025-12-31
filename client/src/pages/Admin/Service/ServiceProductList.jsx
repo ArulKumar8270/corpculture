@@ -63,7 +63,7 @@ const ServiceProductList = () => {
     // Filter products based on search term
     const filteredProducts = serviceProducts.filter(product => {
         const companyName = product.company?.companyName?.toLowerCase() || '';
-        const productName = product.productName?.productName?.productName?.toLowerCase() || '';
+        const productName = product.productName?.name?.toLowerCase() || '';
         const lowerCaseSearchTerm = searchTerm.toLowerCase();
 
         return companyName.includes(lowerCaseSearchTerm) || productName.includes(lowerCaseSearchTerm);
@@ -116,7 +116,7 @@ const ServiceProductList = () => {
                                     <TableRow key={product._id}>
                                         <TableCell>{index + 1}</TableCell>
                                         <TableCell>{product.company?.companyName || 'N/A'}</TableCell>
-                                        <TableCell>{product.productName?.productName?.productName || 'N/A'}</TableCell>
+                                        <TableCell>{product.productName?.name || 'N/A'}</TableCell>
                                         <TableCell>{product.sku}</TableCell>
                                         <TableCell>{product.hsn}</TableCell>
                                         <TableCell>{product.quantity}</TableCell>
