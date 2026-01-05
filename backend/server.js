@@ -37,9 +37,11 @@ const __dirname = dirname(__filename);
 
 //local imports
 import connectDB from "./config/database.js";
+import mongoose from "mongoose";
 import authRoute from "./routes/authRoute.js";
 import productRoute from "./routes/productRoute.js";
 import userRoute from "./routes/userRoute.js";
+import { dropGstTypeUniqueIndex } from "./models/gstModel.js";
 
 //rest object
 const app = express();
@@ -70,6 +72,11 @@ app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 // app.use(express.static(path.join(__dirname, "../client/dist")));
 //connect DB
 connectDB();
+
+// Drop unique index on gstType to allow duplicates once DB is connected
+mongoose.connection.once('connected', async () => {
+    await dropGstTypeUniqueIndex();
+});
 
 //port
 const PORT = process.env.PORT || 8080;

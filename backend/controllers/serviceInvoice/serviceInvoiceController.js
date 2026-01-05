@@ -1,6 +1,7 @@
 import ServiceInvoice from "../../models/serviceInvoiceModel.js";
 import Company from "../../models/companyModel.js"; // Assuming Company model path
 import ServiceProduct from "../../models/serviceProductModel.js"; // Assuming ServiceProduct model path
+import Material from "../../models/materialModel.js"; // Import Material model for reducing units
 import cloudinary from "cloudinary";
 // Helper function to calculate totals
 const calculateInvoiceTotals = (products) => {
@@ -34,6 +35,8 @@ export const createServiceInvoice = async (req, res) => {
             description,
             tax, // Optional tax from frontend, or calculated here
             invoiceDate,
+            quotationDate, // Date when quotation was created
+            movedToInvoiceDate, // Date when quotation was moved to invoice
             assignedTo,
             sendTo,
             invoiceType,
@@ -108,6 +111,8 @@ export const createServiceInvoice = async (req, res) => {
             tax: tax || 0, // Use provided tax or default to 0
             grandTotal,
             invoiceDate: invoiceDate || Date.now(),
+            quotationDate: invoiceType === 'quotation' ? (quotationDate || invoiceDate || Date.now()) : quotationDate, // Set quotationDate if creating a quotation
+            movedToInvoiceDate: movedToInvoiceDate, // Set when moving from quotation to invoice
             assignedTo,
             sendTo,
             invoiceType,
@@ -122,9 +127,15 @@ export const createServiceInvoice = async (req, res) => {
             .populate('companyId') // Populate company details
             .populate({
                 path: 'products.productId', // Populate product details
-                populate: {
-                    path: 'gstType',        // Then populate gstType inside the product
-                }
+                populate: [
+                    {
+                        path: 'gstType',        // Then populate gstType inside the product
+                    },
+                    {
+                        path: 'productName',    // Populate productName (Material) inside the product
+                        // Material model doesn't have nested productName, so no further populate needed
+                    }
+                ]
             })
             .populate('assignedTo'); // Populate assignedTo user details
 
@@ -219,12 +230,8 @@ export const getAllServiceInvoices = async (req, res) => {
                         path: "gstType", // populate gstType inside productId
                     },
                     {
-                        path: "productName", // populate productName inside productId
-                        populate: [
-                            {
-                                path: "productName", // also go deeper if productName itself references another model
-                            },
-                        ],
+                        path: "productName", // populate productName (Material) inside productId
+                        // Material model doesn't have nested productName, so no further populate needed
                     },
                 ],
             })
@@ -273,12 +280,8 @@ export const getServiceInvoicesAssignedTo = async (req, res) => {
                         path: "gstType", // populate gstType inside productId
                     },
                     {
-                        path: "productName", // populate productName inside productId
-                        populate: [
-                            {
-                                path: "productName", // also go deeper if productName itself references another model
-                            },
-                        ],
+                        path: "productName", // populate productName (Material) inside productId
+                        // Material model doesn't have nested productName, so no further populate needed
                     },
                 ],
             })
@@ -320,12 +323,8 @@ export const getServiceInvoiceById = async (req, res) => {
                         path: "gstType", // populate gstType inside productId
                     },
                     {
-                        path: "productName", // populate productName inside productId
-                        populate: [
-                            {
-                                path: "productName", // also go deeper if productName itself references another model
-                            },
-                        ],
+                        path: "productName", // populate productName (Material) inside productId
+                        // Material model doesn't have nested productName, so no further populate needed
                     },
                 ],
             })
@@ -366,6 +365,8 @@ export const updateServiceInvoice = async (req, res) => {
             status,
             invoiceDate,
             invoiceLink, // <-- Add invoiceLink here
+            quotationDate, // Date when quotation was created
+            movedToInvoiceDate, // Date when quotation was moved to invoice
             assignedTo,
             sendTo,
             invoiceType,
@@ -379,6 +380,11 @@ export const updateServiceInvoice = async (req, res) => {
         if (!serviceInvoice) {
             return res.status(404).send({ success: false, message: 'Service Invoice not found.' });
         }
+
+        // Check if moving from quotation to invoice BEFORE updating invoiceType
+        const wasQuotation = serviceInvoice.invoiceType === 'quotation';
+        const isMovingToInvoice = invoiceType === 'invoice' && wasQuotation;
+        console.log(`[Material Reduction] Invoice check - Current type: ${serviceInvoice.invoiceType}, New type: ${invoiceType}, isMovingToInvoice: ${isMovingToInvoice}`);
 
         // Update fields if provided
         if (companyId) {
@@ -439,6 +445,8 @@ export const updateServiceInvoice = async (req, res) => {
         if (tax !== undefined) serviceInvoice.tax = tax;
         if (status) serviceInvoice.status = status;
         if (invoiceDate) serviceInvoice.invoiceDate = invoiceDate;
+        if (quotationDate) serviceInvoice.quotationDate = quotationDate; // Preserve quotation date
+        if (movedToInvoiceDate) serviceInvoice.movedToInvoiceDate = movedToInvoiceDate; // Track when moved to invoice
         if (assignedTo) serviceInvoice.assignedTo = assignedTo;
         if (sendTo) serviceInvoice.sendTo = sendTo;
         if (staus) serviceInvoice.staus = staus;
@@ -447,8 +455,90 @@ export const updateServiceInvoice = async (req, res) => {
         if (paymentAmount) serviceInvoice.paymentAmount = paymentAmount;
         if (invoiceNumber) serviceInvoice.invoiceNumber = invoiceNumber;
         if (invoiceLink !== undefined) serviceInvoice.invoiceLink = invoiceLink; // Update invoiceLink
+        
+        // When moving from quotation to invoice, preserve the original invoiceDate as quotationDate
+        if (isMovingToInvoice) {
+            if (!serviceInvoice.quotationDate && serviceInvoice.invoiceDate) {
+                serviceInvoice.quotationDate = serviceInvoice.invoiceDate;
+            }
+            serviceInvoice.movedToInvoiceDate = new Date();
+        }
 
         await serviceInvoice.save();
+
+        // Reduce material units when moving from quotation to invoice
+        if (isMovingToInvoice && serviceInvoice.products && serviceInvoice.products.length > 0) {
+            console.log(`[Material Reduction] Starting material reduction for ${serviceInvoice.products.length} products`);
+            try {
+                // Fetch the invoice with populated products to get material details
+                const populatedInvoice = await ServiceInvoice.findById(serviceInvoice._id)
+                    .populate({
+                        path: 'products.productId',
+                        populate: {
+                            path: 'productName' // Populate Material
+                        }
+                    });
+
+                console.log(`[Material Reduction] Populated invoice with ${populatedInvoice.products.length} products`);
+
+                // Reduce material units for each product
+                for (const product of populatedInvoice.products) {
+                    console.log(`[Material Reduction] Processing product:`, {
+                        productId: product.productId?._id,
+                        quantity: product.quantity,
+                        hasProductId: !!product.productId,
+                        hasProductName: !!product.productId?.productName
+                    });
+
+                    const serviceProduct = product.productId;
+                    if (serviceProduct && serviceProduct.productName) {
+                        const material = serviceProduct.productName;
+                        // Material model has 'name' field directly
+                        const materialName = material.name;
+                        const quantityToReduce = product.quantity;
+
+                        console.log(`[Material Reduction] Material found: ${materialName}, Quantity to reduce: ${quantityToReduce}`);
+
+                        if (materialName && quantityToReduce > 0) {
+                            try {
+                                // Find the material and reduce its unit
+                                const materialDoc = await Material.findOne({ name: materialName });
+                                if (materialDoc) {
+                                    const currentUnit = Number(materialDoc.unit) || 0;
+                                    const unitToSubtract = Number(quantityToReduce) || 0;
+                                    const newUnit = currentUnit - unitToSubtract; // Allow negative values
+                                    
+                                    const updatedMaterial = await Material.findOneAndUpdate(
+                                        { name: materialName },
+                                        { unit: String(newUnit) },
+                                        { new: true }
+                                    );
+                                    console.log(`[Material Reduction] SUCCESS - Material ${materialName} reduced by ${unitToSubtract} units. Old unit: ${currentUnit}, New unit: ${newUnit}${newUnit < 0 ? ' (NEGATIVE)' : ''}`);
+                                } else {
+                                    console.warn(`[Material Reduction] Material ${materialName} not found in database`);
+                                }
+                            } catch (materialError) {
+                                console.error(`[Material Reduction] Error reducing material ${materialName}:`, materialError);
+                                // Continue with other products even if one fails
+                            }
+                        } else {
+                            console.warn(`[Material Reduction] Skipping product - materialName: ${materialName}, quantityToReduce: ${quantityToReduce}`);
+                        }
+                    } else {
+                        console.warn(`[Material Reduction] Product missing serviceProduct or productName:`, {
+                            hasServiceProduct: !!serviceProduct,
+                            hasProductName: !!serviceProduct?.productName
+                        });
+                    }
+                }
+                console.log("[Material Reduction] Material units reduction process completed");
+            } catch (error) {
+                console.error("[Material Reduction] Error in material reduction process:", error);
+                // Don't fail the invoice update if material reduction fails
+            }
+        } else {
+            console.log(`[Material Reduction] Skipping - isMovingToInvoice: ${isMovingToInvoice}, products length: ${serviceInvoice.products?.length || 0}`);
+        }
 
         // Populate the products field after saving
         // This will replace the `productName` ID with the actual document
@@ -459,12 +549,8 @@ export const updateServiceInvoice = async (req, res) => {
                     path: "gstType", // populate gstType inside productId
                 },
                 {
-                    path: "productName", // populate productName inside productId
-                    populate: [
-                        {
-                            path: "productName", // also go deeper if productName itself references another model
-                        },
-                    ],
+                    path: "productName", // populate productName (Material) inside productId
+                    // Material model doesn't have nested productName, so no further populate needed
                 },
             ],
         })

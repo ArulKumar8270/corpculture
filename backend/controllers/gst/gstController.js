@@ -14,10 +14,10 @@ export const createGst = async (req, res) => {
         }
 
         // Check if GST type already exists
-        const existingGst = await GST.findOne({ gstType });
-        if (existingGst) {
-            return res.status(409).send({ success: false, message: 'GST Type already exists' });
-        }
+        // const existingGst = await GST.findOne({ gstType });
+        // if (existingGst) {
+        //     return res.status(409).send({ success: false, message: 'GST Type already exists' });
+        // }
 
         const newGst = await new GST({ gstType, gstPercentage }).save();
         res.status(201).send({ success: true, message: 'GST Type created successfully', gst: newGst });

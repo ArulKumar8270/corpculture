@@ -17,7 +17,7 @@ const employeeSchema = new mongoose.Schema(
             required: true,
         },
         designation: {
-            type: String,
+            type: [String],
         },
         idCradNo: {
             type: String,
@@ -31,23 +31,22 @@ const employeeSchema = new mongoose.Schema(
             required: true,
         },
         pincode: {
-            type: String,
+            type: [String],
             trim: true,
         },
         employeeType: {
-            type: String,
+            type: [String],
             required: true,
-            enum: ['Service', 'Sales', "Rentals"], // Restrict values to 'Service' or 'Sales'
+            enum: ['Service', 'Sales', "Rentals"], // Restrict values to 'Service', 'Sales', or 'Rentals'
         },
         hireDate: {
             type: Date,
             default: Date.now,
         },
-        department: {
-            type: String,
+        department: [{
             type: mongoose.Schema.Types.ObjectId,
             ref: "Category"
-        },
+        }],
         userId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "User",
@@ -58,6 +57,26 @@ const employeeSchema = new mongoose.Schema(
             min: 0,
         },
         image: {
+            type: String,
+            trim: true,
+        },
+        parentName: {
+            type: String,
+            trim: true,
+        },
+        parentPhone: {
+            type: String,
+            trim: true,
+        },
+        parentAddress: {
+            type: String,
+            trim: true,
+        },
+        parentRelation: {
+            type: String,
+            trim: true,
+        },
+        idProof: {
             type: String,
             trim: true,
         },

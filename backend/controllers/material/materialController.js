@@ -109,12 +109,18 @@ export const updateMaterial = async (req, res) => {
             }
         }
 
+        // Update material - convert unit to number for calculation, then back to string
+        // Allow negative units to be stored
+        const currentUnit = Number(material.unit) || 0;
+        const unitToSubtract = Number(unit) || 0;
+        const newUnit = currentUnit - unitToSubtract; // Allow negative values
+        
         // Update material
         material = await Material.findOneAndUpdate(
             { name: req.params.name },
             {
                 name,
-                unit: material.unit - unit,
+                unit: String(newUnit), // Convert back to string to match schema
                 description,
             },
             { new: true, runValidators: true }

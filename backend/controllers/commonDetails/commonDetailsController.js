@@ -64,12 +64,19 @@ export const getCommonDetails = async (req, res) => {
 // Update Common Details (updates the single document)
 export const updateCommonDetails = async (req, res) => {
     try {
-        const { invoiceCount, reportCount } = req.body;
+        const { invoiceCount, reportCount, globalInvoiceFormat, fromMail } = req.body;
+
+        // Build update object with only provided fields
+        const updateData = {};
+        if (invoiceCount !== undefined) updateData.invoiceCount = invoiceCount;
+        if (reportCount !== undefined) updateData.reportCount = reportCount;
+        if (globalInvoiceFormat !== undefined) updateData.globalInvoiceFormat = globalInvoiceFormat;
+        if (fromMail !== undefined) updateData.fromMail = fromMail;
 
         // Find the single document and update it
         const updatedDetails = await CommonDetails.findOneAndUpdate(
             {}, // Empty filter to find the first (and ideally only) document
-            { $set: { invoiceCount, reportCount } },
+            { $set: updateData },
             { new: true, runValidators: true, upsert: true } // upsert: true creates if not found
         );
 

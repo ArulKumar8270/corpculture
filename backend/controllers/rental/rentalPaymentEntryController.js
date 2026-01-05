@@ -532,6 +532,7 @@ export const updateRentalPaymentEntry = async (req, res) => {
             invoiceLink,
             invoiceType,
             status,
+            assignedTo,
             products: productsRaw, // New: array of products (may be JSON string from FormData)
         } = req.body;
 
@@ -732,6 +733,7 @@ export const updateRentalPaymentEntry = async (req, res) => {
         if (transferDate !== undefined) entry.transferDate = transferDate;
         if (companyNamePayment !== undefined) entry.companyNamePayment = companyNamePayment;
         if (otherPaymentMode !== undefined) entry.otherPaymentMode = otherPaymentMode;
+        if (assignedTo) entry.assignedTo = assignedTo;
 
         await entry.save();
 

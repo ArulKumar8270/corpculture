@@ -132,6 +132,14 @@ const serviceInvoiceSchema = new mongoose.Schema({
         type: Date,
         default: Date.now,
     },
+    quotationDate: {
+        type: Date,
+        // Original date when quotation was created (preserved when moved to invoice)
+    },
+    movedToInvoiceDate: {
+        type: Date,
+        // Date when quotation was moved to invoice
+    },
     invoiceLink: {
         type: [String], // Changed to an array of strings to allow multiple URLs
         trim: true,
