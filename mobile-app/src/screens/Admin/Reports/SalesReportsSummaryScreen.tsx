@@ -11,35 +11,78 @@ import { useNavigation } from '@react-navigation/native';
 // @ts-ignore - @expo/vector-icons is available via expo dependency
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
+import { useSelector } from 'react-redux';
+import { RootState } from '../../../store';
+import axios from 'axios';
+import { getApiBaseUrl } from '../../../services/api';
 
 interface ReportData {
   id: string;
   name: string;
   count: number;
-  path: string;
+  screen: string;
 }
 
 const SalesReportsSummaryScreen = () => {
   const navigation = useNavigation();
+  const { token } = useSelector((state: RootState) => state.auth);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reportData, setReportData] = useState<ReportData[]>([]);
 
   useEffect(() => {
-    // Simulate API call delay to fetch data
-    // In a real application, these counts would be fetched from your backend API
-    const timer = setTimeout(() => {
-      const data: ReportData[] = [
-        { id: 'products', name: 'Products', count: 350, path: '/admin/reports/sales/products' },
-        { id: 'categories', name: 'Product Categories', count: 25, path: '/admin/reports/sales/categories' },
-        { id: 'orders', name: 'Orders', count: 85, path: '/admin/reports/sales/orders' },
-      ];
-      setReportData(data);
-      setLoading(false);
-    }, 500);
+    const fetchData = async () => {
+      if (!token) {
+        setError("Authentication token not available. Please log in.");
+        setLoading(false);
+        return;
+      }
 
-    return () => clearTimeout(timer);
-  }, []);
+      try {
+        setLoading(true);
+        setError(null);
+
+        // Use Promise.allSettled to fetch all data concurrently
+        const [productsRes, ordersRes] = await Promise.allSettled([
+          // Sales Products API call
+          axios.get(`${getApiBaseUrl()}/product/seller-product`, {
+            headers: { Authorization: token }
+          }),
+          // Sales Orders API call
+          axios.get(`${getApiBaseUrl()}/user/admin-orders?page=1&limit=1`, {
+            headers: { Authorization: token }
+          })
+        ]);
+
+        // Get products count
+        const productsCount = productsRes?.value?.data?.products?.length ?? 0;
+        
+        // Get orders total count from response
+        const ordersCount = ordersRes?.value?.data?.totalCount ?? 0;
+
+        // Construct the report data
+        const data: ReportData[] = [
+          { id: 'salesProducts', name: 'All Sales Products', count: productsCount, screen: 'AllProducts' },
+          { id: 'salesOrders', name: 'Sales Orders', count: ordersCount, screen: 'AdminOrders' },
+        ];
+        setReportData(data);
+      } catch (err) {
+        console.error('Error loading sales overview data:', err);
+        setError('Failed to load sales overview data.');
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: 'Failed to load sales overview data.',
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (token) {
+      fetchData();
+    }
+  }, [token]);
 
   const handleViewDetails = (item: ReportData) => {
     if (item.count === 0) {
@@ -50,12 +93,9 @@ const SalesReportsSummaryScreen = () => {
       });
       return;
     }
-    Toast.show({
-      type: 'info',
-      text1: 'Info',
-      text2: `Navigating to ${item.name} list.`,
-    });
-    // Navigation would be implemented when those screens are available
+
+    // Navigate to appropriate screen
+    (navigation as any).navigate(item.screen);
   };
 
   const renderReportItem = ({ item }: { item: ReportData }) => (
@@ -96,7 +136,44 @@ const SalesReportsSummaryScreen = () => {
           onPress={() => {
             setError(null);
             setLoading(true);
-            setTimeout(() => setLoading(false), 500);
+            // Retry fetching data
+            const fetchData = async () => {
+              if (!token) {
+                setError("Authentication token not available.");
+                setLoading(false);
+                return;
+              }
+
+              try {
+                const [productsRes, ordersRes] = await Promise.allSettled([
+                  axios.get(`${getApiBaseUrl()}/product/seller-product`, {
+                    headers: { Authorization: token }
+                  }),
+                  axios.get(`${getApiBaseUrl()}/user/admin-orders?page=1&limit=1`, {
+                    headers: { Authorization: token }
+                  })
+                ]);
+
+                const productsCount = productsRes?.value?.data?.products?.length ?? 0;
+                const ordersCount = ordersRes?.value?.data?.totalCount ?? 0;
+
+                setReportData([
+                  { id: 'salesProducts', name: 'All Sales Products', count: productsCount, screen: 'AllProducts' },
+                  { id: 'salesOrders', name: 'Sales Orders', count: ordersCount, screen: 'AdminOrders' },
+                ]);
+              } catch (err) {
+                console.error('Error loading sales overview data:', err);
+                setError('Failed to load sales overview data.');
+              } finally {
+                setLoading(false);
+              }
+            };
+
+            if (token) {
+              fetchData();
+            } else {
+              setLoading(false);
+            }
           }}
         >
           <Text style={styles.retryButtonText}>Retry</Text>

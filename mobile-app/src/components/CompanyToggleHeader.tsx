@@ -19,6 +19,7 @@ import axios from 'axios';
 // @ts-ignore - @expo/vector-icons is available via expo dependency
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { getApiBaseUrl } from '../services/api';
 
 interface CompanyToggleHeaderProps {
   onCompanyChange?: (enabled: boolean) => void;
@@ -41,18 +42,39 @@ const CompanyToggleHeader: React.FC<CompanyToggleHeaderProps> = ({
   useFocusEffect(
     React.useCallback(() => {
       loadCompanySettings();
-      // Also reload if company is enabled
-      if (isCompanyEnabled && isAuthenticated && token) {
-        fetchCompanyDetails();
-      }
-    }, [isAuthenticated, token])
+    }, [])
   );
 
+  // Fetch company details when auth is loaded and company is enabled or selected
   useEffect(() => {
-    if (isAuthenticated && token && isCompanyEnabled) {
+    const checkAndFetch = async () => {
+      if (isAuthenticated && token && user) {
+        try {
+          const storedCompanyEnabled = await AsyncStorage.getItem('isCompanyEnabled');
+          const storedSelectedCompany = await AsyncStorage.getItem('selectedCompany');
+          const shouldFetch = storedCompanyEnabled === 'true' || (storedSelectedCompany && storedSelectedCompany !== 'null' && storedSelectedCompany !== '');
+          
+          if (shouldFetch) {
+            // Small delay to ensure state is updated from AsyncStorage
+            setTimeout(() => {
+              fetchCompanyDetails();
+            }, 100);
+          }
+        } catch (error) {
+          console.error('Error checking company settings:', error);
+        }
+      }
+    };
+    
+    checkAndFetch();
+  }, [isAuthenticated, token, user]);
+
+  // Also fetch when company is enabled or selected company changes
+  useEffect(() => {
+    if (isAuthenticated && token && user && (isCompanyEnabled || selectedCompany)) {
       fetchCompanyDetails();
     }
-  }, [isAuthenticated, token, isCompanyEnabled]);
+  }, [isAuthenticated, token, user, isCompanyEnabled, selectedCompany]);
 
   const loadCompanySettings = async () => {
     try {
@@ -72,12 +94,19 @@ const CompanyToggleHeader: React.FC<CompanyToggleHeaderProps> = ({
 
   const fetchCompanyDetails = async () => {
     if (!isAuthenticated || !token || !user) return;
+    
+    // Fetch company details if company is enabled OR if there's a selected company
+    if (!isCompanyEnabled && !selectedCompany) return;
+    
     try {
       let response;
       if (user.role === 0 && user.phone) {
         response = await axios.get(
-          `${process.env.EXPO_PUBLIC_API_URL || 'https://nicknameinfo.net/corpculture/api/v1'}/company/user-company/${user.phone}`,
-          { headers: { Authorization: token || '' } }
+          `${getApiBaseUrl()}/company/user-company/${user.phone}`,
+          { 
+            headers: { Authorization: token || '' },
+            timeout: 30000,
+          }
         );
         if (response.data?.success && response.data.company) {
           const companies = Array.isArray(response.data.company)
@@ -87,8 +116,11 @@ const CompanyToggleHeader: React.FC<CompanyToggleHeaderProps> = ({
         }
       } else {
         response = await axios.get(
-          `${process.env.EXPO_PUBLIC_API_URL || 'https://nicknameinfo.net/corpculture/api/v1'}/company/all?limit=1000`,
-          { headers: { Authorization: token || '' } }
+          `${getApiBaseUrl()}/company/all?limit=1000`,
+          { 
+            headers: { Authorization: token || '' },
+            timeout: 30000,
+          }
         );
         if (response.data?.success && response.data.companies) {
           dispatch(setCompanyDetails(response.data.companies));

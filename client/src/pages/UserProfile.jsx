@@ -747,19 +747,33 @@ const UserProfile = () => {
                         >
                             Select Company
                         </label>
-                        <select
-                            id="company-select"
-                            value={selectedCompany}
-                            onChange={(e) => setSelectedCompany(e.target.value)}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        >
-                            <option value="">-- Select Company --</option>
-                            {companies.map((company) => (
-                                <option key={company._id} value={company._id}>
-                                    {company.companyName}
-                                </option>
-                            ))}
-                        </select>
+                        <Autocomplete
+                            options={companies}
+                            getOptionLabel={(option) => option.companyName || ''}
+                            isOptionEqualToValue={(option, value) => option._id === value._id}
+                            value={companies.find(c => c._id === selectedCompany) || null}
+                            onChange={(event, newValue) => {
+                                setSelectedCompany(newValue ? newValue._id : '');
+                            }}
+                            filterOptions={(options, { inputValue }) => {
+                                if (!inputValue || inputValue.trim() === '') {
+                                    return [];
+                                }
+                                return options.filter((option) =>
+                                    option.companyName?.toLowerCase().includes(inputValue.toLowerCase())
+                                );
+                            }}
+                            noOptionsText="No companies found"
+                            openOnFocus={false}
+                            renderInput={(params) => (
+                                <TextField
+                                    {...params}
+                                    placeholder="Search Company"
+                                    variant="outlined"
+                                    InputLabelProps={{ shrink: true }}
+                                />
+                            )}
+                        />
                     </div>
 
                     {/* Invoices Table */}
@@ -1092,6 +1106,40 @@ const UserProfile = () => {
                             </Button>
                         </DialogActions>
                     </Dialog>
+                </div>
+
+                {/* Account Information Section */}
+                <div className="bg-white rounded-lg shadow-md p-6 mt-8">
+                    <h3 className="text-xl font-bold text-gray-800 mb-6">
+                        Account Information
+                    </h3>
+                    <div className="space-y-3">
+                        <div className="flex justify-between items-center border-b pb-2">
+                            <span className="text-gray-600 font-medium">Bank Name:</span>
+                            <span className="font-bold text-gray-900">HDFC BANK</span>
+                        </div>
+                        <div className="flex justify-between items-center border-b pb-2">
+                            <span className="text-gray-600 font-medium">A/C NO:</span>
+                            <span className="font-bold text-gray-900">50200041713896</span>
+                        </div>
+                        <div className="flex justify-between items-center border-b pb-2">
+                            <span className="text-gray-600 font-medium">A/C Name:</span>
+                            <span className="font-bold text-gray-900">CORPCULTURE</span>
+                        </div>
+                        <div className="flex justify-between items-center border-b pb-2">
+                            <span className="text-gray-600 font-medium">IFSC Code:</span>
+                            <span className="font-bold text-gray-900">HDFC0000492</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <span className="text-gray-600 font-medium">Branch:</span>
+                            <span className="font-bold text-gray-900">Kilpauk</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* QR Code Section */}
+                <div className="bg-white rounded-lg shadow-md p-6 mt-8 flex justify-center">
+                    <img src={qrCode} alt="QR Code" className="w-52 h-52 object-fit" />
                 </div>
             </div>
         );
@@ -1630,9 +1678,39 @@ const UserProfile = () => {
                         </DialogActions>
                     </Dialog>
                 </div>
-                {/* Payment Details Update Section */}
-                <div className="bg-white rounded-lg shadow-md mt-8">
-                    <img src={qrCode} alt="logo" className="w-52 h-52 object-fit" />
+                
+                {/* Account Information Section */}
+                <div className="bg-white rounded-lg shadow-md p-6 mt-8 w-full">
+                    <h3 className="text-xl font-bold text-gray-800 mb-6">
+                        Account Information
+                    </h3>
+                    <div className="space-y-3">
+                        <div className="flex justify-between items-center border-b pb-2">
+                            <span className="text-gray-600 font-medium">Bank Name:</span>
+                            <span className="font-bold text-gray-900">HDFC BANK</span>
+                        </div>
+                        <div className="flex justify-between items-center border-b pb-2">
+                            <span className="text-gray-600 font-medium">A/C NO:</span>
+                            <span className="font-bold text-gray-900">50200041713896</span>
+                        </div>
+                        <div className="flex justify-between items-center border-b pb-2">
+                            <span className="text-gray-600 font-medium">A/C Name:</span>
+                            <span className="font-bold text-gray-900">CORPCULTURE</span>
+                        </div>
+                        <div className="flex justify-between items-center border-b pb-2">
+                            <span className="text-gray-600 font-medium">IFSC Code:</span>
+                            <span className="font-bold text-gray-900">HDFC0000492</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <span className="text-gray-600 font-medium">Branch:</span>
+                            <span className="font-bold text-gray-900">Kilpauk</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* QR Code Section */}
+                <div className="bg-white rounded-lg shadow-md p-6 mt-8 w-full flex justify-center">
+                    <img src={qrCode} alt="QR Code" className="w-52 h-52 object-fit" />
                 </div>
             </div>
         </div>

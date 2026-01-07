@@ -25,31 +25,17 @@ const CompanyToggleHeader = () => {
 
     console.log(companyDetails, 'selectedCompany', selectedCompany);
 
-    // Initialize isCompanyEnabled from localStorage
-    useEffect(() => {
-        const storedCompanyEnabled = localStorage.getItem('isCompanyEnabled');
-        if (storedCompanyEnabled !== null) {
-            setIsCompanyEnabled(JSON.parse(storedCompanyEnabled));
-        }
-    }, []);
-
-    // Update localStorage whenever isCompanyEnabled changes
+    // Update localStorage whenever isCompanyEnabled changes (state is already initialized from context)
     useEffect(() => {
         localStorage.setItem('isCompanyEnabled', JSON.stringify(isCompanyEnabled));
     }, [isCompanyEnabled]);
 
-    // Initialize selectedCompany from localStorage
-    useEffect(() => {
-        const storedSelectedCompany = localStorage.getItem('selectedCompany');
-        if (storedSelectedCompany !== null && storedSelectedCompany !== 'null') {
-            setSelectedCompany(storedSelectedCompany);
-        }
-    }, []);
-
-    // Update localStorage whenever selectedCompany changes
+    // Update localStorage whenever selectedCompany changes (state is already initialized from context)
     useEffect(() => {
         if (selectedCompany) {
             localStorage.setItem('selectedCompany', selectedCompany);
+        } else if (selectedCompany === null || selectedCompany === '') {
+            localStorage.removeItem('selectedCompany');
         }
     }, [selectedCompany]);
 
@@ -94,7 +80,7 @@ const CompanyToggleHeader = () => {
             <label className="flex items-center gap-2 text-white text-sm font-medium cursor-pointer hover:bg-white/10 rounded-lg px-3 py-2 transition-all duration-200">
                 <input
                     type="checkbox"
-                    checked={isCompanyEnabled || selectedCompany !== ''}
+                    checked={isCompanyEnabled}
                     className="accent-cyan-300 w-4 h-4 rounded focus:ring-2 focus:ring-cyan-400"
                     onChange={handleToggleCompany}
                 />

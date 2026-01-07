@@ -73,6 +73,37 @@ export const updateCommonDetails = async (req, res) => {
         if (globalInvoiceFormat !== undefined) updateData.globalInvoiceFormat = globalInvoiceFormat;
         if (fromMail !== undefined) updateData.fromMail = fromMail;
 
+        // If globalInvoiceFormat is being updated, extract the starting number from it
+        // and sync the invoiceCount to match the format's starting number
+        // This ensures the count always matches what the format indicates
+        if (globalInvoiceFormat !== undefined) {
+            // Extract the last number sequence from the format (e.g., "00001" from "CC/26-27/00001")
+            const lastNumberMatch = globalInvoiceFormat.match(/(\d+)(?!.*\d)/);
+            if (lastNumberMatch) {
+                const startingNumber = parseInt(lastNumberMatch[1]);
+                
+                // Always sync the count to match the format's starting number
+                // unless invoiceCount is explicitly provided (user override)
+                if (invoiceCount === undefined && startingNumber > 0) {
+                    const currentDetails = await CommonDetails.findOne({});
+                    if (currentDetails) {
+                        const currentCount = currentDetails.invoiceCount || 0;
+                        // Sync the count to match the format's starting number
+                        // This allows resetting the count when format is updated
+                        updateData.invoiceCount = startingNumber;
+                        console.log(`[Common Details] Syncing invoice count from format: ${startingNumber} (was ${currentCount})`);
+                    } else {
+                        // If no existing details, use the starting number from format
+                        updateData.invoiceCount = startingNumber;
+                        console.log(`[Common Details] Initializing invoice count from format: ${startingNumber}`);
+                    }
+                } else if (invoiceCount !== undefined) {
+                    // If invoiceCount is explicitly provided, use it (user override)
+                    console.log(`[Common Details] Using explicitly provided invoice count: ${invoiceCount}`);
+                }
+            }
+        }
+
         // Find the single document and update it
         const updatedDetails = await CommonDetails.findOneAndUpdate(
             {}, // Empty filter to find the first (and ideally only) document

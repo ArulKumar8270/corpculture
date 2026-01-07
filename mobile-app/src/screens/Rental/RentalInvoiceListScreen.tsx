@@ -35,6 +35,8 @@ const RentalInvoiceListScreen = () => {
   const [invoiceCount, setInvoiceCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
   const [expandedEntries, setExpandedEntries] = useState<Set<string>>(new Set());
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<any>(null);
@@ -613,6 +615,27 @@ const RentalInvoiceListScreen = () => {
     return invoiceNumberMatch || companyNameMatch || statusMatch || dateMatch;
   });
 
+  // Reset page to 0 when search term changes
+  useEffect(() => {
+    setPage(0);
+  }, [searchTerm]);
+
+  // Pagination handlers
+  const handleChangePage = (newPage: number) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (newRowsPerPage: number) => {
+    setRowsPerPage(newRowsPerPage);
+    setPage(0); // Reset to first page when changing rows per page
+  };
+
+  // Get paginated data
+  const paginatedEntries = filteredEntries.slice(
+    page * rowsPerPage,
+    page * rowsPerPage + rowsPerPage
+  );
+
   const renderEntry = ({ item }: { item: any }) => {
     const isExpanded = expandedEntries.has(item._id);
     const isUploadingThis = uploading === item._id;
@@ -905,7 +928,7 @@ const RentalInvoiceListScreen = () => {
         <ActivityIndicator size="large" color="#007AFF" style={styles.loader} />
       ) : (
         <FlatList
-          data={filteredEntries}
+          data={paginatedEntries}
           renderItem={renderEntry}
           keyExtractor={(item) => item._id}
           refreshing={loading}
@@ -917,6 +940,57 @@ const RentalInvoiceListScreen = () => {
                 No rental {invoiceType === 'invoice' ? 'invoices' : 'quotations'} found
               </Text>
             </View>
+          }
+          ListFooterComponent={
+            filteredEntries.length > 0 ? (
+              <View style={styles.paginationContainer}>
+                <View style={styles.paginationControls}>
+                  <TouchableOpacity
+                    style={[styles.paginationButton, page === 0 && styles.paginationButtonDisabled]}
+                    onPress={() => handleChangePage(page - 1)}
+                    disabled={page === 0}
+                  >
+                    <Text style={[styles.paginationButtonText, page === 0 && styles.paginationButtonTextDisabled]}>
+                      Previous
+                    </Text>
+                  </TouchableOpacity>
+                  <Text style={styles.paginationText}>
+                    Page {page + 1} of {Math.ceil(filteredEntries.length / rowsPerPage) || 1}
+                  </Text>
+                  <TouchableOpacity
+                    style={[
+                      styles.paginationButton,
+                      page >= Math.ceil(filteredEntries.length / rowsPerPage) - 1 && styles.paginationButtonDisabled
+                    ]}
+                    onPress={() => handleChangePage(page + 1)}
+                    disabled={page >= Math.ceil(filteredEntries.length / rowsPerPage) - 1}
+                  >
+                    <Text
+                      style={[
+                        styles.paginationButtonText,
+                        page >= Math.ceil(filteredEntries.length / rowsPerPage) - 1 && styles.paginationButtonTextDisabled
+                      ]}
+                    >
+                      Next
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.rowsPerPageContainer}>
+                  <Text style={styles.rowsPerPageLabel}>Rows per page: </Text>
+                  <TouchableOpacity
+                    style={styles.rowsPerPageButton}
+                    onPress={() => {
+                      const options = [5, 10, 25, 50];
+                      const currentIndex = options.indexOf(rowsPerPage);
+                      const nextIndex = (currentIndex + 1) % options.length;
+                      handleChangeRowsPerPage(options[nextIndex]);
+                    }}
+                  >
+                    <Text style={styles.rowsPerPageText}>{rowsPerPage}</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : null
           }
         />
       )}
@@ -1340,6 +1414,59 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+  },
+  paginationContainer: {
+    padding: 15,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+  },
+  paginationControls: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  paginationButton: {
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    backgroundColor: '#019ee3',
+    borderRadius: 5,
+  },
+  paginationButtonDisabled: {
+    backgroundColor: '#ccc',
+  },
+  paginationButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  paginationButtonTextDisabled: {
+    color: '#999',
+  },
+  paginationText: {
+    fontSize: 14,
+    color: '#333',
+  },
+  rowsPerPageContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rowsPerPageLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginRight: 10,
+  },
+  rowsPerPageButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 5,
+  },
+  rowsPerPageText: {
+    fontSize: 14,
+    color: '#019ee3',
+    fontWeight: '600',
   },
   header: {
     padding: 15,

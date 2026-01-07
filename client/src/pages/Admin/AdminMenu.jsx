@@ -742,7 +742,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                                         Rental Over all Details
                                                     </div>
                                                 </NavLink>)}
-                                                {/* {hasPermission('reportsSales') && (
+                                                {hasPermission('reportsSales') && (
                                                     <NavLink
                                                         to="./salesReportsSummary"
                                                         onClick={scrollToTop}
@@ -757,7 +757,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                                             Sales Over all Details
                                                         </div>
                                                     </NavLink>
-                                                )} */}
+                                                )}
                                                 {hasPermission('reportsEmployeeList') && (
                                                     <NavLink
                                                         to="./employee"
@@ -877,6 +877,20 @@ const AdminMenu = ({ toggleMenu }) => {
                                         >
                                             <div className="h-10 px-8 flex items-center">
                                                 Menu setting
+                                            </div>
+                                        </NavLink>)}
+                                        {hasPermission('otherSettingsSettings') && (<NavLink
+                                            to="./settings"
+                                            onClick={scrollToTop}
+                                            className={({ isActive }) =>
+                                                `rounded-lg mx-2 my-1 transition-all ${isActive
+                                                    ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
+                                                    : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
+                                                }`
+                                            }
+                                        >
+                                            <div className="h-10 px-8 flex items-center">
+                                                Settings
                                             </div>
                                         </NavLink>)}
                                         {hasPermission('salesAllCategory') && (

@@ -450,11 +450,11 @@ const AddServiceProduct = () => {
                         </Select>
                     </FormControl>
 
-                    {isAdmin && (
+                    {isAdmin ?  (
                         <TextField
-                            label="Commission"
+                            label="Partner Profit"
                             type="number"
-                            placeholder="Enter Commission"
+                            placeholder="Enter Partner Profit"
                             value={commission}
                             onChange={(e) => setCommission(e.target.value)}
                             fullWidth
@@ -462,7 +462,7 @@ const AddServiceProduct = () => {
                             size="small"
                             inputProps={{ step: "0.01" }}
                         />
-                    )}
+                    ) : null}
 
                     <TextField
                         label="Total Amount"

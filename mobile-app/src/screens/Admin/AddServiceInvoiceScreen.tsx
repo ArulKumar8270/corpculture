@@ -66,7 +66,8 @@ const AddServiceInvoiceScreen = () => {
   const [companies, setCompanies] = useState<any[]>([]);
   const [availableProducts, setAvailableProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [invoices, setInvoices] = useState(0);
+  const [invoices, setInvoices] = useState<string | number>(0);
+  const [globalInvoiceFormat, setGlobalInvoiceFormat] = useState('');
   const [companyPickerVisible, setCompanyPickerVisible] = useState(false);
   const [productPickerVisible, setProductPickerVisible] = useState(false);
   const [deliveryAddressPickerVisible, setDeliveryAddressPickerVisible] = useState(false);
@@ -150,6 +151,39 @@ const AddServiceInvoiceScreen = () => {
     }, [route.params])
   );
 
+  // Helper function to generate invoice number based on format
+  const generateInvoiceNumber = (invoiceCount: number, format: string): string => {
+    if (!format || format.trim() === '') {
+      return invoiceCount.toString();
+    }
+
+    // Extract prefix (non-numeric part) and number part from format
+    const match = format.match(/^([^0-9]*)(\d+)$/);
+    
+    if (match) {
+      const prefix = match[1] || '';
+      const numberPart = match[2] || '';
+      const numberDigits = numberPart.length;
+      
+      // Format invoiceCount with the same number of digits as in the format
+      const formattedNumber = invoiceCount.toString().padStart(numberDigits, '0');
+      
+      return prefix + formattedNumber;
+    } else {
+      // If format doesn't match pattern, try to find last number sequence
+      const lastNumberMatch = format.match(/(\d+)(?!.*\d)/);
+      if (lastNumberMatch) {
+        const numberDigits = lastNumberMatch[1].length;
+        const prefix = format.substring(0, format.lastIndexOf(lastNumberMatch[1]));
+        const formattedNumber = invoiceCount.toString().padStart(numberDigits, '0');
+        return prefix + formattedNumber;
+      }
+      
+      // Fallback: append count to format
+      return format + invoiceCount.toString();
+    }
+  };
+
   const fetchInvoicesCount = async () => {
     try {
       const { data } = await axios.get(`${getApiBaseUrl()}/common-details`, {
@@ -158,7 +192,13 @@ const AddServiceInvoiceScreen = () => {
         },
       });
       if (data?.success) {
-        setInvoices(data.commonDetails?.invoiceCount + 1 || 1);
+        const invoiceCount = data.commonDetails?.invoiceCount + 1 || 1;
+        const format = data.commonDetails?.globalInvoiceFormat || '';
+        setGlobalInvoiceFormat(format);
+        
+        // Generate invoice number based on format
+        const invoiceNumber = generateInvoiceNumber(invoiceCount, format);
+        setInvoices(invoiceNumber);
       }
     } catch (error) {
       console.error('Error fetching invoice count:', error);

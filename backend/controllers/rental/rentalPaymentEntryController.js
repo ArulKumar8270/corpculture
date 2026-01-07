@@ -2,6 +2,7 @@ import RentalPaymentEntry from "../../models/rentalPaymentEntryModel.js";
 import cloudinary from "cloudinary";
 import rentalProductModel from "../../models/rentalProductModel.js";
 import Company from "../../models/companyModel.js";
+import CommonDetails from "../../models/commonDetailsModel.js";
 
 // Helper to calculate counts
 const calculateCountAmount = (machineOld, entryNew, freeC, extraAmt) => {
@@ -60,12 +61,87 @@ const calculateProductTotal = (machine, a3Config, a4Config, a5Config) => {
     return totalWithGST + commissionAmount;
 };
 
+// Helper function to generate invoice number based on format
+const generateInvoiceNumber = (invoiceCount, format) => {
+    if (!format || format.trim() === '') {
+        return invoiceCount.toString();
+    }
+
+    // Get current date for year replacement
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    const currentYearShort = currentYear.toString().slice(-2);
+    const nextYearShort = (currentYear + 1).toString().slice(-2);
+    const yearRange = `${currentYearShort}-${nextYearShort}`;
+    const fullYearRange = `${currentYear}-${currentYear + 1}`;
+
+    // Replace date/year patterns in the format
+    let processedFormat = format;
+    
+    // IMPORTANT: Replace year range patterns FIRST, then handle single years
+    // Step 1: Replace year range patterns (e.g., "26-27" with current year range)
+    processedFormat = processedFormat.replace(/\d{2}-\d{2}/g, yearRange); // Replace YY-YY pattern
+    processedFormat = processedFormat.replace(/\d{4}-\d{4}/g, fullYearRange); // Replace YYYY-YYYY pattern
+    
+    // Step 2: Handle single year patterns, but skip years that are part of a range
+    // Replace standalone 2-digit years (not preceded or followed by a dash)
+    processedFormat = processedFormat.replace(/\b(\d{2})\b/g, (match, yearStr, offset, string) => {
+        // Check if this match is part of a range pattern (has dash before or after)
+        const before = string[offset - 1];
+        const after = string[offset + match.length];
+        
+        // If it's part of a range (has dash before or after), don't replace
+        if (before === '-' || after === '-') {
+            return match;
+        }
+        
+        const num = parseInt(yearStr);
+        // Only replace if it's a standalone 2-digit year (20-99)
+        if (num >= 20 && num <= 99) {
+            return currentYearShort;
+        }
+        return match;
+    });
+    
+    // Replace standalone 4-digit years (not preceded or followed by a dash)
+    processedFormat = processedFormat.replace(/\b(\d{4})\b/g, (match, yearStr, offset, string) => {
+        // Check if this match is part of a range pattern (has dash before or after)
+        const before = string[offset - 1];
+        const after = string[offset + match.length];
+        
+        // If it's part of a range (has dash before or after), don't replace
+        if (before === '-' || after === '-') {
+            return match;
+        }
+        
+        const num = parseInt(yearStr);
+        // Only replace if it's a standalone 4-digit year (2000-2099)
+        if (num >= 2000 && num <= 2099) {
+            return currentYear.toString();
+        }
+        return match;
+    });
+
+    // Extract the last number sequence (sequential number part)
+    const lastNumberMatch = processedFormat.match(/(\d+)(?!.*\d)/);
+    
+    if (lastNumberMatch) {
+        const numberDigits = lastNumberMatch[1].length;
+        const prefix = processedFormat.substring(0, processedFormat.lastIndexOf(lastNumberMatch[1]));
+        const formattedNumber = invoiceCount.toString().padStart(numberDigits, '0');
+        return prefix + formattedNumber;
+    }
+    
+    // Fallback: append count to processed format
+    return processedFormat + invoiceCount.toString().padStart(5, '0');
+};
+
 // Create a new rental payment entry
 export const createRentalPaymentEntry = async (req, res) => {
     try {
         const {
             machineId,
-            invoiceNumber,
+            // invoiceNumber: providedInvoiceNumber, // IGNORED - backend generates from global count only
             sendDetailsTo,
             remarks,
             companyId,
@@ -76,6 +152,88 @@ export const createRentalPaymentEntry = async (req, res) => {
             status,
             products: productsRaw, // New: array of products (may be JSON string from FormData)
         } = req.body;
+
+        // ============================================
+        // CRITICAL: ALWAYS generate invoice number from GLOBAL COUNT ONLY
+        // ============================================
+        // We NEVER use existing invoice numbers to determine the next number
+        // We NEVER query the database for existing invoices
+        // The global count in CommonDetails is the ABSOLUTE source of truth
+        // ============================================
+        
+        let invoiceNumber = null;
+        let nextInvoiceCount = null; // Store this for later use in increment
+        
+        if (invoiceType !== 'quotation') {
+            console.log(`[Rental Invoice Generation] ===== STARTING INVOICE NUMBER GENERATION =====`);
+            console.log(`[Rental Invoice Generation] Request body invoiceType: ${invoiceType}`);
+            console.log(`[Rental Invoice Generation] Request body invoiceNumber (if any): ${req.body.invoiceNumber || 'NONE - GOOD!'}`);
+            
+            // Fetch global invoice count and format
+            const commonDetails = await CommonDetails.findOne({});
+            
+            if (!commonDetails) {
+                console.error(`[Rental Invoice Generation] ERROR: Global invoice settings not found!`);
+                return res.status(500).send({ 
+                    success: false, 
+                    message: 'Global invoice settings not found. Please configure invoice settings first.' 
+                });
+            }
+
+            // Ensure invoiceCount is a number (not string)
+            let currentCount = typeof commonDetails.invoiceCount === 'number' 
+                ? commonDetails.invoiceCount 
+                : parseInt(commonDetails.invoiceCount) || 0;
+            
+            const globalFormat = commonDetails.globalInvoiceFormat || '';
+            
+            // If format has a starting number, sync the count to match it ONLY if count is way off
+            // This ensures the count matches the format's starting number, but only syncs once
+            // After that, the count should increment normally
+            if (globalFormat) {
+                const lastNumberMatch = globalFormat.match(/(\d+)(?!.*\d)/);
+                if (lastNumberMatch) {
+                    const formatStartingNumber = parseInt(lastNumberMatch[1]);
+                    // Only sync if the count is significantly different (more than 10 off)
+                    // This prevents resetting the count every time if it's just slightly off
+                    // The format's starting number is just a template, not a hard reset
+                    if (formatStartingNumber > 0) {
+                        // Only sync if current count is way off (more than 10 invoices ahead/behind)
+                        // This allows the count to increment normally after initial sync
+                        const difference = Math.abs(currentCount - formatStartingNumber);
+                        if (difference > 10) {
+                            console.log(`[Rental Invoice Generation] Syncing count from format: ${formatStartingNumber} (was ${currentCount}, difference: ${difference})`);
+                            // Update the count in the database to match the format
+                            await CommonDetails.findOneAndUpdate(
+                                {},
+                                { $set: { invoiceCount: formatStartingNumber } },
+                                { new: true, upsert: true }
+                            );
+                            currentCount = formatStartingNumber;
+                        } else {
+                            console.log(`[Rental Invoice Generation] Count is close to format starting number (${formatStartingNumber}), using current count: ${currentCount}`);
+                        }
+                    }
+                }
+            }
+            
+            // Use currentCount + 1 for the next invoice number
+            // DO NOT query existing invoices - use ONLY the global count
+            nextInvoiceCount = currentCount + 1;
+            
+            // Generate invoice number from global count and format ONLY
+            invoiceNumber = generateInvoiceNumber(nextInvoiceCount, globalFormat);
+            
+            console.log(`[Rental Invoice Generation] ===== USING GLOBAL COUNT ONLY =====`);
+            console.log(`[Rental Invoice Generation] Global count from DB: ${currentCount}`);
+            console.log(`[Rental Invoice Generation] Next count (currentCount + 1): ${nextInvoiceCount}`);
+            console.log(`[Rental Invoice Generation] Global format: ${globalFormat}`);
+            console.log(`[Rental Invoice Generation] Generated invoice number: ${invoiceNumber}`);
+            console.log(`[Rental Invoice Generation] NOT checking existing invoices - using global count only`);
+            console.log(`[Rental Invoice Generation] ===== END INVOICE NUMBER GENERATION =====`);
+        } else {
+            console.log(`[Rental Invoice Generation] This is a quotation - no invoice number needed`);
+        }
         // Parse products if it's a JSON string (from FormData)
         let products = null;
         if (productsRaw) {
@@ -151,14 +309,13 @@ export const createRentalPaymentEntry = async (req, res) => {
             grandTotal = productTotal;
 
             // Create entry with old format
-            const newEntry = new RentalPaymentEntry({
+            const entryData = {
                 machineId,
                 invoiceNumber,
                 rentalId,
                 companyId,
                 sendDetailsTo,
                 countImageUpload: countImageUploadUrl,
-                assignedTo,
                 invoiceType,
                 remarks,
                 a3Config,
@@ -166,9 +323,68 @@ export const createRentalPaymentEntry = async (req, res) => {
                 a5Config,
                 grandTotal: grandTotal.toFixed(2),
                 status: status || 'Unpaid',
-            });
+            };
+
+            // Only include assignedTo if it's a valid value (not undefined, null, or empty string)
+            if (assignedTo && assignedTo !== 'undefined' && assignedTo !== 'null' && assignedTo.toString().trim() !== '') {
+                entryData.assignedTo = assignedTo;
+            }
+
+            const newEntry = new RentalPaymentEntry(entryData);
 
             await newEntry.save();
+
+            // Increment global invoice count if invoice was created (not quotation)
+            // This ensures the count is incremented after successful invoice creation
+            // IMPORTANT: This increment happens AFTER the invoice is saved, using the count that was used to generate the invoice
+            if (invoiceType !== 'quotation' && invoiceNumber && nextInvoiceCount !== null) {
+                try {
+                    console.log(`[Rental Invoice Generation] ===== INCREMENTING GLOBAL INVOICE COUNT =====`);
+                    console.log(`[Rental Invoice Generation] Before increment: Count should be ${nextInvoiceCount - 1}`);
+                    console.log(`[Rental Invoice Generation] After increment: Count should be ${nextInvoiceCount}`);
+                    
+                    // CRITICAL: Use atomic increment to prevent race conditions
+                    // This MUST increment the global count by 1
+                    const beforeIncrement = nextInvoiceCount - 1;
+                    const updatedDetails = await CommonDetails.findOneAndUpdate(
+                        {},
+                        { $inc: { invoiceCount: 1 } },
+                        { new: true, upsert: true }
+                    );
+                    
+                    const actualNewCount = updatedDetails?.invoiceCount || 0;
+                    
+                    console.log(`[Rental Invoice Generation] Invoice count incremented successfully!`);
+                    console.log(`[Rental Invoice Generation] Before increment: ${beforeIncrement}`);
+                    console.log(`[Rental Invoice Generation] Expected after increment: ${nextInvoiceCount}`);
+                    console.log(`[Rental Invoice Generation] Actual new count from DB: ${actualNewCount}`);
+                    console.log(`[Rental Invoice Generation] Invoice number: ${invoiceNumber}`);
+                    console.log(`[Rental Invoice Generation] ===== END INCREMENT =====`);
+                    
+                    // Verify the count matches what we expect
+                    if (actualNewCount !== nextInvoiceCount) {
+                        console.error(`[Rental Invoice Generation] ERROR: Count mismatch! Expected: ${nextInvoiceCount}, Actual: ${actualNewCount}`);
+                        console.error(`[Rental Invoice Generation] This indicates the increment may have failed or been overridden!`);
+                    } else {
+                        console.log(`[Rental Invoice Generation] ✓ SUCCESS: Count incremented correctly from ${beforeIncrement} to ${actualNewCount}`);
+                    }
+                    
+                    // Double-check by fetching the count again to ensure it persisted
+                    const verifyDetails = await CommonDetails.findOne({});
+                    if (verifyDetails && verifyDetails.invoiceCount !== actualNewCount) {
+                        console.error(`[Rental Invoice Generation] CRITICAL: Count verification failed! Expected: ${actualNewCount}, Found in DB: ${verifyDetails.invoiceCount}`);
+                    } else {
+                        console.log(`[Rental Invoice Generation] ✓ Verification: Count persisted correctly in DB: ${verifyDetails?.invoiceCount}`);
+                    }
+                } catch (error) {
+                    console.error('[Rental Invoice Generation] CRITICAL ERROR incrementing invoice count:', error);
+                    console.error('[Rental Invoice Generation] Error details:', error.message);
+                    console.error('[Rental Invoice Generation] Stack:', error.stack);
+                    // This is critical - if count increment fails, the system will be out of sync
+                }
+            } else {
+                console.log(`[Rental Invoice Generation] Skipping count increment - invoiceType: ${invoiceType}, invoiceNumber: ${invoiceNumber}, nextInvoiceCount: ${nextInvoiceCount}`);
+            }
 
             const populatedInvoice = await RentalPaymentEntry.findById(newEntry._id)
                 .populate("companyId")
@@ -258,21 +474,79 @@ export const createRentalPaymentEntry = async (req, res) => {
             }
 
             // Create new entry with products array
-            const newEntry = new RentalPaymentEntry({
+            const entryData = {
                 products: productsArray,
                 invoiceNumber,
                 rentalId,
                 companyId,
                 sendDetailsTo,
                 countImageUpload: countImageUploadUrl,
-                assignedTo,
                 invoiceType,
                 remarks,
                 status: status || 'Unpaid',
                 grandTotal: grandTotal.toFixed(2),
-            });
+            };
+
+            // Only include assignedTo if it's a valid value (not undefined, null, or empty string)
+            if (assignedTo && assignedTo !== 'undefined' && assignedTo !== 'null' && assignedTo.toString().trim() !== '') {
+                entryData.assignedTo = assignedTo;
+            }
+
+            const newEntry = new RentalPaymentEntry(entryData);
 
             await newEntry.save();
+
+            // Increment global invoice count if invoice was created (not quotation)
+            // This ensures the count is incremented after successful invoice creation
+            // IMPORTANT: This increment happens AFTER the invoice is saved, using the count that was used to generate the invoice
+            if (invoiceType !== 'quotation' && invoiceNumber && nextInvoiceCount !== null) {
+                try {
+                    console.log(`[Rental Invoice Generation] ===== INCREMENTING GLOBAL INVOICE COUNT =====`);
+                    console.log(`[Rental Invoice Generation] Before increment: Count should be ${nextInvoiceCount - 1}`);
+                    console.log(`[Rental Invoice Generation] After increment: Count should be ${nextInvoiceCount}`);
+                    
+                    // CRITICAL: Use atomic increment to prevent race conditions
+                    // This MUST increment the global count by 1
+                    const beforeIncrement = nextInvoiceCount - 1;
+                    const updatedDetails = await CommonDetails.findOneAndUpdate(
+                        {},
+                        { $inc: { invoiceCount: 1 } },
+                        { new: true, upsert: true }
+                    );
+                    
+                    const actualNewCount = updatedDetails?.invoiceCount || 0;
+                    
+                    console.log(`[Rental Invoice Generation] Invoice count incremented successfully!`);
+                    console.log(`[Rental Invoice Generation] Before increment: ${beforeIncrement}`);
+                    console.log(`[Rental Invoice Generation] Expected after increment: ${nextInvoiceCount}`);
+                    console.log(`[Rental Invoice Generation] Actual new count from DB: ${actualNewCount}`);
+                    console.log(`[Rental Invoice Generation] Invoice number: ${invoiceNumber}`);
+                    console.log(`[Rental Invoice Generation] ===== END INCREMENT =====`);
+                    
+                    // Verify the count matches what we expect
+                    if (actualNewCount !== nextInvoiceCount) {
+                        console.error(`[Rental Invoice Generation] ERROR: Count mismatch! Expected: ${nextInvoiceCount}, Actual: ${actualNewCount}`);
+                        console.error(`[Rental Invoice Generation] This indicates the increment may have failed or been overridden!`);
+                    } else {
+                        console.log(`[Rental Invoice Generation] ✓ SUCCESS: Count incremented correctly from ${beforeIncrement} to ${actualNewCount}`);
+                    }
+                    
+                    // Double-check by fetching the count again to ensure it persisted
+                    const verifyDetails = await CommonDetails.findOne({});
+                    if (verifyDetails && verifyDetails.invoiceCount !== actualNewCount) {
+                        console.error(`[Rental Invoice Generation] CRITICAL: Count verification failed! Expected: ${actualNewCount}, Found in DB: ${verifyDetails.invoiceCount}`);
+                    } else {
+                        console.log(`[Rental Invoice Generation] ✓ Verification: Count persisted correctly in DB: ${verifyDetails?.invoiceCount}`);
+                    }
+                } catch (error) {
+                    console.error('[Rental Invoice Generation] CRITICAL ERROR incrementing invoice count:', error);
+                    console.error('[Rental Invoice Generation] Error details:', error.message);
+                    console.error('[Rental Invoice Generation] Stack:', error.stack);
+                    // This is critical - if count increment fails, the system will be out of sync
+                }
+            } else {
+                console.log(`[Rental Invoice Generation] Skipping count increment - invoiceType: ${invoiceType}, invoiceNumber: ${invoiceNumber}, nextInvoiceCount: ${nextInvoiceCount}`);
+            }
 
             const populatedInvoice = await RentalPaymentEntry.findById(newEntry._id)
                 .populate("companyId")
@@ -542,6 +816,38 @@ export const updateRentalPaymentEntry = async (req, res) => {
             return res.status(404).send({ success: false, message: 'Rental Payment Entry not found.' });
         }
 
+        // Check if moving from quotation to invoice BEFORE updating invoiceType
+        const wasQuotation = entry.invoiceType === 'quotation';
+        const isMovingToInvoice = invoiceType === 'invoice' && wasQuotation;
+
+        // Generate invoice number from global settings when moving from quotation to invoice
+        let finalInvoiceNumber = invoiceNumber;
+        if (isMovingToInvoice && !invoiceNumber) {
+            // Fetch global invoice count and format
+            const commonDetails = await CommonDetails.findOne({});
+            
+            if (!commonDetails) {
+                return res.status(500).send({ 
+                    success: false, 
+                    message: 'Global invoice settings not found. Please configure invoice settings first.' 
+                });
+            }
+
+            // Ensure invoiceCount is a number (not string)
+            const currentCount = typeof commonDetails.invoiceCount === 'number' 
+                ? commonDetails.invoiceCount 
+                : parseInt(commonDetails.invoiceCount) || 0;
+            
+            // Use currentCount + 1 for the next invoice number
+            const nextInvoiceCount = currentCount + 1;
+            const globalFormat = commonDetails.globalInvoiceFormat || '';
+            
+            // Generate invoice number from global count and format
+            finalInvoiceNumber = generateInvoiceNumber(nextInvoiceCount, globalFormat);
+            
+            console.log(`[Rental Move to Invoice] Global count: ${currentCount}, Next count: ${nextInvoiceCount}, Format: ${globalFormat}, Generated: ${finalInvoiceNumber}`);
+        }
+
         // Parse products if it's a JSON string (from FormData)
         let products = null;
         if (productsRaw) {
@@ -723,7 +1029,8 @@ export const updateRentalPaymentEntry = async (req, res) => {
         if (companyId) entry.companyId = companyId;
         if (invoiceLink) entry.invoiceLink = invoiceLink;
         if (invoiceType) entry.invoiceType = invoiceType;
-        if (invoiceNumber) entry.invoiceNumber = invoiceNumber;
+        // Use finalInvoiceNumber (generated from global count if moving to invoice) or provided invoiceNumber
+        if (finalInvoiceNumber) entry.invoiceNumber = finalInvoiceNumber;
         entry.countImageUpload = countImageUploadUrl;
         if (status) entry.status = status;
         if (modeOfPayment !== undefined) entry.modeOfPayment = modeOfPayment;
@@ -736,6 +1043,20 @@ export const updateRentalPaymentEntry = async (req, res) => {
         if (assignedTo) entry.assignedTo = assignedTo;
 
         await entry.save();
+
+        // Increment global invoice count when moving from quotation to invoice
+        if (isMovingToInvoice && finalInvoiceNumber) {
+            try {
+                await CommonDetails.findOneAndUpdate(
+                    {},
+                    { $inc: { invoiceCount: 1 } },
+                    { new: true, upsert: true }
+                );
+            } catch (error) {
+                console.error('Error incrementing invoice count:', error);
+                // Don't fail the request if count increment fails
+            }
+        }
 
         // Populate the entry with all necessary data
         const populatedInvoice = await RentalPaymentEntry.findById(id)

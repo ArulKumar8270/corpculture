@@ -61,6 +61,8 @@ const CartScreen = () => {
   const [newUserName, setNewUserName] = useState('');
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserPhone, setNewUserPhone] = useState('');
+  const [newUserDesignation, setNewUserDesignation] = useState('');
+  const [newUserDob, setNewUserDob] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
@@ -82,6 +84,8 @@ const CartScreen = () => {
             mobile: user.mobile,
             email: user.email,
             name: user.name,
+            designation: user.designation || '',
+            dob: user.dob || '',
           }))
         );
       }
@@ -163,7 +167,13 @@ const CartScreen = () => {
     let companyPayload = {
       contactPersons: [
         ...existingUsers,
-        { name: newUserName, mobile: newUserPhone, email: newUserEmail },
+        { 
+          name: newUserName, 
+          mobile: newUserPhone, 
+          email: newUserEmail,
+          designation: newUserDesignation,
+          dob: newUserDob
+        },
       ],
     };
 
@@ -189,6 +199,8 @@ const CartScreen = () => {
       setNewUserEmail('');
       setNewUserName('');
       setNewUserPhone('');
+      setNewUserDesignation('');
+      setNewUserDob('');
       setIsLoading(false);
 
       if (response.status === 200) {
@@ -564,6 +576,19 @@ const CartScreen = () => {
                   onChangeText={setNewUserPhone}
                   placeholder="Enter Phone"
                   keyboardType="phone-pad"
+                />
+                <TextInput
+                  style={styles.formInput}
+                  value={newUserDesignation}
+                  onChangeText={setNewUserDesignation}
+                  placeholder="Enter Designation"
+                />
+                <TextInput
+                  style={styles.formInput}
+                  value={newUserDob}
+                  onChangeText={setNewUserDob}
+                  placeholder="Date of Birth (YYYY-MM-DD)"
+                  keyboardType="default"
                 />
                 <TouchableOpacity
                   style={styles.addUserButton}

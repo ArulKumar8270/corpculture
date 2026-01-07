@@ -35,6 +35,8 @@ const RentalInvoiceForm = () => {
     const [contactOptions, setContactOptions] = useState([]);
     const [selectedProduct, setSelectedProduct] = useState(null);
     const [invoices, setInvoices] = useState(null);
+    const [invoiceCount, setInvoiceCount] = useState(0);
+    const [globalInvoiceFormat, setGlobalInvoiceFormat] = useState('');
     // {{ edit_1 }}
     const [formData, setFormData] = useState({
         companyId: companyId ? companyId : '',
@@ -72,6 +74,61 @@ const RentalInvoiceForm = () => {
         fetchInvoicesCounts();
     }, [rentalId]);
 
+    // Helper function to generate invoice number based on format
+    const generateInvoiceNumber = (invoiceCount, format) => {
+        if (!format || format.trim() === '') {
+            // If no format, return the count as string
+            return invoiceCount.toString();
+        }
+
+        // Get current date for year replacement
+        const currentDate = new Date();
+        const currentYear = currentDate.getFullYear();
+        const currentYearShort = currentYear.toString().slice(-2);
+        const nextYearShort = (currentYear + 1).toString().slice(-2);
+        const yearRange = `${currentYearShort}-${nextYearShort}`;
+        const fullYearRange = `${currentYear}-${currentYear + 1}`;
+
+        // Replace date/year patterns in the format
+        let processedFormat = format;
+        
+        // Replace year patterns (e.g., "26-27" with current year range like "26-27")
+        // Match patterns like: YY-YY, YYYY-YYYY, or any date-like pattern
+        processedFormat = processedFormat.replace(/\d{2}-\d{2}/g, yearRange); // Replace YY-YY pattern
+        processedFormat = processedFormat.replace(/\d{4}-\d{4}/g, fullYearRange); // Replace YYYY-YYYY pattern
+        
+        // Also handle single year patterns
+        processedFormat = processedFormat.replace(/\b\d{2}\b/g, (match) => {
+            // If it's a 2-digit number that looks like a year (20-99), replace with current year
+            const num = parseInt(match);
+            if (num >= 20 && num <= 99) {
+                return currentYearShort;
+            }
+            return match;
+        });
+        processedFormat = processedFormat.replace(/\b\d{4}\b/g, (match) => {
+            // If it's a 4-digit year (2000-2099), replace with current year
+            const num = parseInt(match);
+            if (num >= 2000 && num <= 2099) {
+                return currentYear.toString();
+            }
+            return match;
+        });
+
+        // Extract the last number sequence (sequential number part)
+        const lastNumberMatch = processedFormat.match(/(\d+)(?!.*\d)/);
+        
+        if (lastNumberMatch) {
+            const numberDigits = lastNumberMatch[1].length;
+            const prefix = processedFormat.substring(0, processedFormat.lastIndexOf(lastNumberMatch[1]));
+            const formattedNumber = invoiceCount.toString().padStart(numberDigits, '0');
+            return prefix + formattedNumber;
+        }
+        
+        // Fallback: append count to processed format
+        return processedFormat + invoiceCount.toString().padStart(5, '0');
+    };
+
     const fetchInvoicesCounts = async () => {
         try {
             setLoading(true);
@@ -81,7 +138,16 @@ const RentalInvoiceForm = () => {
                 },
             });
             if (data) {
-                setInvoices(data.commonDetails?.invoiceCount + 1 || 1);
+                // Use the actual global invoiceCount value (not +1)
+                const count = data.commonDetails?.invoiceCount || 0;
+                const format = data.commonDetails?.globalInvoiceFormat || '';
+                setGlobalInvoiceFormat(format);
+                // Store count + 1 for the next invoice number
+                setInvoiceCount(count + 1);
+                
+                // Generate invoice number based on format using count + 1
+                const invoiceNumber = generateInvoiceNumber(count + 1, format);
+                setInvoices(invoiceNumber);
             } else {
                 alert(data?.message || 'Failed to fetch service invoices.');
             }
@@ -574,11 +640,10 @@ const RentalInvoiceForm = () => {
 
     const handleUpdateInvoiceCount = async () => {
         try {
+            // The backend endpoint automatically increments by 1, so we don't need to send the count
             const { data } = await axios.put(
                 `${import.meta.env.VITE_SERVER_URL}/api/v1/common-details/increment-invoice`,
-                {
-                    invoiceCount: invoices,
-                },
+                {},
                 {
                     headers: {
                         Authorization: auth.token,
@@ -588,6 +653,7 @@ const RentalInvoiceForm = () => {
             if (data?.success) {
                 // Update the local state
                 setInvoices(null);
+                setInvoiceCount(0);
             }
         } catch (error) {
             console.error('Error updating invoice count:', error);
@@ -626,7 +692,9 @@ const RentalInvoiceForm = () => {
             const data = new FormData();
             data.append('rentalId', rentalId || '');
             if (invoiceType !== "quotation") {
-                data.append('invoiceNumber', invoices);
+                // Invoice number is now generated by the backend from global settings
+                // Only send invoiceNumber for quotations or when updating existing invoices
+                // data.append('invoiceNumber', invoices);
             }
             // Use companyId from URL params if available, otherwise use formData.companyId
             const finalCompanyId = companyId || formData.companyId;
@@ -644,7 +712,9 @@ const RentalInvoiceForm = () => {
             }
             data.append('sendDetailsTo', formData.sendDetailsTo);
             data.append('remarks', formData.remarks || '');
-            data.append('assignedTo', employeeName || '');
+            if (employeeName) {
+                data.append('assignedTo', employeeName);
+            }
             data.append('invoiceType', invoiceType || '');
 
             // Check if using multiple products or single product (backward compatibility)
@@ -713,7 +783,8 @@ const RentalInvoiceForm = () => {
 
             if (res.data?.success) {
                 if (!id && invoiceType !== "quotation") {
-                    await handleUpdateInvoiceCount();
+                    // Invoice count is now incremented automatically by the backend
+                    // await handleUpdateInvoiceCount();
                 }
                 
                 // Calculate total amount - handle both single and multiple products

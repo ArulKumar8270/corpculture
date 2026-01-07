@@ -21,9 +21,10 @@ import {
     MenuItem, // Added MenuItem
     TextField,
     Collapse,
-    IconButton
+    IconButton,
+    TablePagination
 } from '@mui/material';
-import { Visibility as VisibilityIcon, UploadFile as UploadFileIcon, ExpandMore as ExpandMoreIcon, ExpandLess as ExpandLessIcon } from '@mui/icons-material';
+import { Visibility as VisibilityIcon, UploadFile as UploadFileIcon, ExpandMore as ExpandMoreIcon, ExpandLess as ExpandLessIcon, Edit as EditIcon } from '@mui/icons-material';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../context/auth';
@@ -65,9 +66,61 @@ function RentalInvoiceList(props) {
     const [isInvoiceSend, setInvoiceSend] = useState(false);
     const [expandedEntries, setExpandedEntries] = useState(new Set()); // Track expanded entries
     const [currentInvoice, setCurrentInvoice] = useState(null); // Store current invoice for filtering
+    const [users, setUsers] = useState([]); // State for users list
+    const [openReassignModal, setOpenReassignModal] = useState(false); // State for reassign modal
+    const [selectedEntryId, setSelectedEntryId] = useState(null); // State for selected entry ID
+    const [selectedUserId, setSelectedUserId] = useState(''); // State for selected user in reassign modal
+    const [reassigning, setReassigning] = useState(false); // State for reassign loading
+    const [page, setPage] = useState(0); // Pagination state
+    const [rowsPerPage, setRowsPerPage] = useState(10); // Pagination state
     useEffect(() => {
         fetchRentalEntries();
+        fetchUsers();
     }, [auth.token, props.invoice]);
+
+    const fetchUsers = async () => {
+        try {
+            // First, fetch employees
+            const employeeRes = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/employee/all`, {
+                headers: {
+                    Authorization: auth.token,
+                },
+            });
+            
+            if (employeeRes.data?.success) {
+                // Filter employees by employeeType (Service or Sales)
+                const serviceAndSalesEmployees = employeeRes.data.employees.filter(
+                    emp => emp.employeeType === 'Service' || emp.employeeType === 'Sales'
+                );
+                
+                // Extract userIds from filtered employees
+                const userIds = serviceAndSalesEmployees.map(emp => emp.userId).filter(Boolean);
+                
+                if (userIds.length > 0) {
+                    // Fetch users for those userIds
+                    const userRes = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/auth/all-users`, {
+                        headers: {
+                            Authorization: auth.token,
+                        },
+                    });
+                    
+                    // Filter users to only include those with matching userIds
+                    const filteredUsers = (userRes.data.users || []).filter(user => 
+                        userIds.includes(user._id)
+                    );
+                    setUsers(filteredUsers);
+                } else {
+                    setUsers([]);
+                }
+            } else {
+                setUsers([]);
+            }
+        } catch (error) {
+            console.error("Error fetching users:", error);
+            toast.error("Failed to fetch users.");
+            setUsers([]);
+        }
+    };
 
     // Effect to filter rental entries based on search query
     useEffect(() => {
@@ -90,6 +143,7 @@ function RentalInvoiceList(props) {
                 return invoiceNumberMatch || companyNameMatch || dateMatch || statusMatch;
             });
             setFilteredRentalEntries(filtered);
+            setPage(0); // Reset to first page when search query changes
         };
 
         filterData();
@@ -146,7 +200,8 @@ function RentalInvoiceList(props) {
                 },
             });
             if (data?.success) {
-                setInvoiceCount(data.commonDetails?.invoiceCount + 1 || 1);
+                // Store the actual global invoiceCount value + 1 for next invoice
+                setInvoiceCount((data.commonDetails?.invoiceCount || 0) + 1);
             } else {
                 alert(data?.message || 'Failed to fetch service invoices.');
             }
@@ -402,27 +457,91 @@ function RentalInvoiceList(props) {
 
     const handleUpdateInvoiceCount = async () => {
         try {
+            // The backend endpoint automatically increments by 1
             const { data } = await axios.put(
                 `${import.meta.env.VITE_SERVER_URL}/api/v1/common-details/increment-invoice`,
-                {
-                    invoiceCount: invoiceCount,
-                },
+                {},
                 {
                     headers: {
                         Authorization: auth.token,
                     },
                 }
             );
+            if (data?.success) {
+                // Refresh the invoice count after incrementing
+                fetchInvoicesCount();
+            }
         } catch (error) {
             console.error('Error updating invoice count:', error);
         }
     }
 
+    // Helper function to generate invoice number based on format
+    const generateInvoiceNumber = (invoiceCount, format) => {
+        if (!format || format.trim() === '') {
+            return invoiceCount.toString();
+        }
+
+        // Get current date for year replacement
+        const currentDate = new Date();
+        const currentYear = currentDate.getFullYear();
+        const currentYearShort = currentYear.toString().slice(-2);
+        const nextYearShort = (currentYear + 1).toString().slice(-2);
+        const yearRange = `${currentYearShort}-${nextYearShort}`;
+        const fullYearRange = `${currentYear}-${currentYear + 1}`;
+
+        // Replace date/year patterns in the format
+        let processedFormat = format;
+        
+        // Replace year patterns (e.g., "26-27" with current year range like "26-27")
+        processedFormat = processedFormat.replace(/\d{2}-\d{2}/g, yearRange); // Replace YY-YY pattern
+        processedFormat = processedFormat.replace(/\d{4}-\d{4}/g, fullYearRange); // Replace YYYY-YYYY pattern
+        
+        // Also handle single year patterns
+        processedFormat = processedFormat.replace(/\b\d{2}\b/g, (match) => {
+            const num = parseInt(match);
+            if (num >= 20 && num <= 99) {
+                return currentYearShort;
+            }
+            return match;
+        });
+        processedFormat = processedFormat.replace(/\b\d{4}\b/g, (match) => {
+            const num = parseInt(match);
+            if (num >= 2000 && num <= 2099) {
+                return currentYear.toString();
+            }
+            return match;
+        });
+
+        // Extract the last number sequence (sequential number part)
+        const lastNumberMatch = processedFormat.match(/(\d+)(?!.*\d)/);
+        
+        if (lastNumberMatch) {
+            const numberDigits = lastNumberMatch[1].length;
+            const prefix = processedFormat.substring(0, processedFormat.lastIndexOf(lastNumberMatch[1]));
+            const formattedNumber = invoiceCount.toString().padStart(numberDigits, '0');
+            return prefix + formattedNumber;
+        }
+        
+        // Fallback: append count to processed format
+        return processedFormat + invoiceCount.toString().padStart(5, '0');
+    };
+
     const onMoveToInvoice = async (status, entry) => {
         try {
+            // Fetch global invoice format
+            const { data: commonData } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/common-details`, {
+                headers: {
+                    Authorization: auth.token,
+                },
+            });
+            
+            const format = commonData?.commonDetails?.globalInvoiceFormat || '';
+            const generatedInvoiceNumber = generateInvoiceNumber(invoiceCount, format);
+            
             const payload = {
                 invoiceType: status,
-                invoiceNumber: invoiceCount,
+                // Invoice number is now generated by the backend from global settings
             };
 
             const res = await axios.put(
@@ -435,7 +554,8 @@ function RentalInvoiceList(props) {
                 }
             );
             if (res.data) {
-                handleUpdateInvoiceCount();
+                // Invoice count is now incremented automatically by the backend
+                // DO NOT call handleUpdateInvoiceCount() - backend handles it
                 fetchRentalEntries();
                 alert(res.data.message || 'Moved to invoice successfully!');
             } else {
@@ -464,6 +584,67 @@ function RentalInvoiceList(props) {
 
     const isExpanded = (entryId) => {
         return expandedEntries.has(entryId);
+    };
+
+    const handleOpenReassignModal = (entryId, currentAssignedToId) => {
+        setSelectedEntryId(entryId);
+        setSelectedUserId(currentAssignedToId || '');
+        setOpenReassignModal(true);
+    };
+
+    const handleCloseReassignModal = () => {
+        setOpenReassignModal(false);
+        setSelectedEntryId(null);
+        setSelectedUserId('');
+    };
+
+    const handleReassign = async () => {
+        if (!selectedUserId) {
+            toast.error('Please select a user to assign.');
+            return;
+        }
+        if (!selectedEntryId) {
+            toast.error('Entry ID is missing.');
+            return;
+        }
+        try {
+            setReassigning(true);
+            const res = await axios.put(
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/${selectedEntryId}`,
+                {
+                    assignedTo: selectedUserId,
+                },
+                {
+                    headers: {
+                        Authorization: auth.token,
+                    },
+                }
+            );
+
+            if (res.data?.success) {
+                toast.success('Rental invoice reassigned successfully!');
+                handleCloseReassignModal();
+                // Refresh the entries list
+                fetchRentalEntries();
+            } else {
+                toast.error(res.data?.message || 'Failed to reassign rental invoice.');
+            }
+        } catch (error) {
+            console.error('Error reassigning rental invoice:', error);
+            toast.error('Error reassigning rental invoice.');
+        } finally {
+            setReassigning(false);
+        }
+    };
+
+    // Pagination handlers
+    const handleChangePage = (event, newPage) => {
+        setPage(newPage);
+    };
+
+    const handleChangeRowsPerPage = (event) => {
+        setRowsPerPage(parseInt(event.target.value, 10));
+        setPage(0); // Reset to first page when changing rows per page
     };
 
     if (loading) {
@@ -515,7 +696,9 @@ function RentalInvoiceList(props) {
                                 </TableRow>
                             </TableHead>
                             <TableBody>
-                                {filteredRentalEntries.map((entry) => {
+                                {filteredRentalEntries
+                                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                                    .map((entry) => {
                                     const hasMultipleProducts = entry.products && Array.isArray(entry.products) && entry.products.length > 0;
                                     const hasProducts = hasMultipleProducts || entry.machineId;
                                     const expanded = isExpanded(entry._id);
@@ -552,11 +735,25 @@ function RentalInvoiceList(props) {
                                                         </a>
                                                     ) : 'No Image'}
                                                 </TableCell>
-                                                <TableCell>{entry?.assignedTo ? (
-                                                    <Chip label={entry.assignedTo?.name} size="small" color="primary" variant="outlined" />
-                                                ) : (
-                                                    'N/A'
-                                                )}</TableCell>
+                                                <TableCell>
+                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                        {entry?.assignedTo ? (
+                                                            <Chip label={entry.assignedTo?.name} size="small" color="primary" variant="outlined" />
+                                                        ) : (
+                                                            'N/A'
+                                                        )}
+                                                        {hasPermission("rentalInvoice") && (
+                                                            <IconButton
+                                                                size="small"
+                                                                onClick={() => handleOpenReassignModal(entry._id, entry?.assignedTo?._id)}
+                                                                sx={{ ml: 0.5 }}
+                                                                title="Reassign"
+                                                            >
+                                                                <EditIcon fontSize="small" />
+                                                            </IconButton>
+                                                        )}
+                                                    </Box>
+                                                </TableCell>
                                                 <TableCell>
                                                     <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#1976d2' }}>
                                                         ₹{entry.grandTotal ? parseFloat(entry.grandTotal).toFixed(2) : '0.00'}
@@ -709,6 +906,18 @@ function RentalInvoiceList(props) {
                             </TableBody>
                         </Table>
                     </TableContainer>
+                )}
+                {/* Pagination Component */}
+                {filteredRentalEntries.length > 0 && (
+                    <TablePagination
+                        rowsPerPageOptions={[5, 10, 25, 50]}
+                        component="div"
+                        count={filteredRentalEntries.length}
+                        rowsPerPage={rowsPerPage}
+                        page={page}
+                        onPageChange={handleChangePage}
+                        onRowsPerPageChange={handleChangeRowsPerPage}
+                    />
                 )}
             </Paper>
             {/* Payment Details Update Modal */}
@@ -932,6 +1141,44 @@ function RentalInvoiceList(props) {
                     }
                     } color="primary" variant="contained">
                         Save changes
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Reassign Modal */}
+            <Dialog open={openReassignModal} onClose={handleCloseReassignModal}>
+                <DialogTitle>Reassign Rental Invoice</DialogTitle>
+                <DialogContent>
+                    <FormControl fullWidth margin="normal" size="small">
+                        <InputLabel id="reassign-user-label">Select User</InputLabel>
+                        <Select
+                            labelId="reassign-user-label"
+                            id="selectedUserId"
+                            name="selectedUserId"
+                            value={selectedUserId}
+                            onChange={(e) => setSelectedUserId(e.target.value)}
+                            label="Select User"
+                        >
+                            <MenuItem value="">--Select User--</MenuItem>
+                            {users?.map((user) => (
+                                <MenuItem key={user._id} value={user._id}>
+                                    {user.name} {user.email ? `(${user.email})` : ''}
+                                </MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleCloseReassignModal} color="primary">
+                        Cancel
+                    </Button>
+                    <Button 
+                        onClick={handleReassign} 
+                        color="primary" 
+                        variant="contained"
+                        disabled={reassigning || !selectedUserId}
+                    >
+                        {reassigning ? <CircularProgress size={24} /> : 'Reassign'}
                     </Button>
                 </DialogActions>
             </Dialog>

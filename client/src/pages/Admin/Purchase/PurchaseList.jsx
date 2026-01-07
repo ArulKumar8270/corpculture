@@ -164,15 +164,27 @@ const PurchaseList = () => {
                     Material Summary
                 </Typography>
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 2 }}>
-                    {sortedProductGroups.map((group) => (
-                        <Chip
-                            key={group.name}
-                            label={`${group.name}: ${group.totalQuantity}`}
-                            color="primary"
-                            variant="outlined"
-                            sx={{ fontWeight: 'medium' }}
-                        />
-                    ))}
+                    {sortedProductGroups.map((group) => {
+                        const isNegative = group.totalQuantity < 0;
+                        return (
+                            <Chip
+                                key={group.name}
+                                label={`${group.name}: ${group.totalQuantity}`}
+                                color={isNegative ? "error" : "primary"}
+                                variant="outlined"
+                                sx={{ 
+                                    fontWeight: 'medium',
+                                    ...(isNegative && {
+                                        color: 'red',
+                                        borderColor: 'red',
+                                        '& .MuiChip-label': {
+                                            color: 'red'
+                                        }
+                                    })
+                                }}
+                            />
+                        );
+                    })}
                 </Box>
                 {/* <Divider sx={{ my: 2 }} />
                 <TableContainer sx={{ maxHeight: 250 }}>

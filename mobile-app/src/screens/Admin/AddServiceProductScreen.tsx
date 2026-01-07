@@ -43,7 +43,8 @@ const AddServiceProductScreen = () => {
 
   const [companies, setCompanies] = useState<any[]>([]);
   const [gstOptions, setGstOptions] = useState<any[]>([]);
-  const [purchaseProducts, setPurchaseProducts] = useState<any[]>([]);
+  const [materials, setMaterials] = useState<any[]>([]);
+  const [loadingMaterials, setLoadingMaterials] = useState(false);
   const [companyPickerVisible, setCompanyPickerVisible] = useState(false);
   const [productPickerVisible, setProductPickerVisible] = useState(false);
   const [gstPickerVisible, setGstPickerVisible] = useState(false);
@@ -56,7 +57,7 @@ const AddServiceProductScreen = () => {
   useEffect(() => {
     fetchCompanies(1, false); // Load first 10 companies
     fetchGstOptions();
-    fetchPurchaseProducts();
+    fetchMaterials();
   }, []);
 
   // Debounced search effect
@@ -178,27 +179,33 @@ const AddServiceProductScreen = () => {
     }
   };
 
-  const fetchPurchaseProducts = async () => {
+  const fetchMaterials = async () => {
+    setLoadingMaterials(true);
     try {
-      const url = `${getApiBaseUrl()}/purchases${user?.role !== 1 ? `?category=${user?.department}` : ''}`;
-      const { data } = await axios.get(url, {
+      const { data } = await axios.get(`${getApiBaseUrl()}/materials`, {
         headers: {
           Authorization: token || '',
         },
+        timeout: 30000,
       });
       if (data?.success) {
-        const uniqueProductsMap = new Map();
-        data.purchases.forEach((purchase: any) => {
-          if (purchase.productName && typeof purchase.productName.productCode === 'string' && purchase.productName.productCode.length > 0) {
-            if (!uniqueProductsMap.has(purchase.productName.productCode)) {
-              uniqueProductsMap.set(purchase.productName.productCode, purchase);
-            }
-          }
+        setMaterials(data.materials || []);
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: data?.message || 'Failed to fetch materials.',
         });
-        setPurchaseProducts(Array.from(uniqueProductsMap.values()));
       }
     } catch (error) {
-      console.error('Error fetching purchase products:', error);
+      console.error('Error fetching materials:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Something went wrong while fetching materials.',
+      });
+    } finally {
+      setLoadingMaterials(false);
     }
   };
 
@@ -330,7 +337,7 @@ const AddServiceProductScreen = () => {
   };
 
   const selectedCompany = companies.find((c) => c._id === company);
-  const selectedProduct = purchaseProducts.find((p) => p._id === productName);
+  const selectedMaterial = materials.find((m) => m._id === productName);
   const selectedGstTypes = gstOptions.filter((gst) => gstTypeIds.includes(gst._id));
 
   return (
@@ -363,7 +370,7 @@ const AddServiceProductScreen = () => {
             disabled={!company}
           >
             <Text style={[styles.pickerButtonText, !productName && styles.placeholder]}>
-              {selectedProduct ? selectedProduct.productName?.productName : 'Select a Product'}
+              {selectedMaterial ? selectedMaterial.name : 'Select a Material'}
             </Text>
             <Icon name="arrow-drop-down" size={24} color="#666" />
           </TouchableOpacity>
@@ -569,29 +576,36 @@ const AddServiceProductScreen = () => {
           onPress={() => setProductPickerVisible(false)}
         >
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Select Product</Text>
-            <FlatList
-              data={purchaseProducts}
-              keyExtractor={(item) => item._id}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.modalItem}
-                  onPress={() => {
-                    setProductName(item._id);
-                    setProductPickerVisible(false);
-                  }}
-                >
-                  <Text style={styles.modalItemText}>
-                    {item.productName?.productName || 'N/A'}
-                  </Text>
-                </TouchableOpacity>
-              )}
-              ListEmptyComponent={
-                <View style={styles.emptyContainer}>
-                  <Text style={styles.emptyText}>No products found</Text>
-                </View>
-              }
-            />
+            <Text style={styles.modalTitle}>Select Material</Text>
+            {loadingMaterials ? (
+              <View style={styles.emptyContainer}>
+                <ActivityIndicator size="small" color="#019ee3" />
+                <Text style={styles.emptyText}>Loading materials...</Text>
+              </View>
+            ) : (
+              <FlatList
+                data={materials}
+                keyExtractor={(item) => item._id}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={styles.modalItem}
+                    onPress={() => {
+                      setProductName(item._id);
+                      setProductPickerVisible(false);
+                    }}
+                  >
+                    <Text style={styles.modalItemText}>
+                      {item.name || 'N/A'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                ListEmptyComponent={
+                  <View style={styles.emptyContainer}>
+                    <Text style={styles.emptyText}>No materials found</Text>
+                  </View>
+                }
+              />
+            )}
           </View>
         </TouchableOpacity>
       </Modal>

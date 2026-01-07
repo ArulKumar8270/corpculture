@@ -17,42 +17,77 @@ import {
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-// import axios from 'axios'; // Uncomment if you fetch real data
-// import { useAuth } from '../../../context/auth'; // Uncomment if you need auth context
+import axios from 'axios';
+import { useAuth } from '../../../context/auth';
 
 const SalesReportsSummary = () => {
     const navigate = useNavigate();
-    // const { auth } = useAuth(); // Uncomment if you need auth context
+    const { auth } = useAuth();
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    // Sample data for demonstration
-    // In a real application, these counts would be fetched from your backend API
+    // Initialize reportData as an empty array, it will be populated after fetching
     const [reportData, setReportData] = useState([]);
 
     useEffect(() => {
-        setLoading(true);
-        setError(null);
-        try {
-            // Simulate API call delay to fetch data
-            setTimeout(() => {
+        const fetchData = async () => {
+            setLoading(true);
+            setError(null);
+            
+            // Ensure auth token is available before making API calls
+            if (!auth?.token) {
+                setError("Authentication token not available. Please log in.");
+                setLoading(false);
+                return;
+            }
+
+            try {
+                // Use Promise.allSettled to fetch all data concurrently
+                // This allows individual requests to fail without stopping others
+                const [
+                    productsRes,
+                    ordersRes
+                ] = await Promise.allSettled([
+                    // Sales Products API call
+                    axios.get(
+                        `${import.meta.env.VITE_SERVER_URL}/api/v1/product/seller-product`,
+                        { headers: { Authorization: auth.token } }
+                    ),
+                    // Sales Orders API call
+                    axios.get(
+                        `${import.meta.env.VITE_SERVER_URL}/api/v1/user/admin-orders?page=1&limit=1`,
+                        { headers: { Authorization: auth.token } }
+                    )
+                ]);
+
+                // Get products count
+                const productsCount = productsRes?.value?.data?.products?.length ?? 0;
+                
+                // Get orders total count from response
+                const ordersCount = ordersRes?.value?.data?.totalCount ?? 0;
+
+                // Construct the report data based on successful responses
                 const data = [
-                    { id: 'products', name: 'Products', count: 350, path: '/admin/reports/sales/products' },
-                    { id: 'categories', name: 'Product Categories', count: 25, path: '/admin/reports/sales/categories' },
-                    { id: 'orders', name: 'Orders', count: 85, path: '/admin/reports/sales/orders' },
+                    { id: 'salesProducts', name: 'All Sales Products', count: productsCount, path: '../all-products' },
+                    { id: 'salesOrders', name: 'Sales Orders', count: ordersCount, path: '../orders' },
                 ];
                 setReportData(data);
+            } catch (err) {
+                console.error('Error loading sales overview data:', err);
+                setError('Failed to load sales overview data.');
+                toast.error('Failed to load sales overview data.');
+            } finally {
                 setLoading(false);
-            }, 500);
-        } catch (err) {
-            console.error('Error loading sales overview data:', err);
-            setError('Failed to load sales overview data.');
-            setLoading(false);
+            }
+        };
+
+        // Only call fetchData if auth token is available
+        if (auth?.token) {
+            fetchData();
         }
-    }, []);
+    }, [auth.token]); // Re-run effect if auth token changes
 
     const handleViewDetails = (path, categoryName) => {
-        toast.info(`Navigating to ${categoryName} list.`);
         navigate(path);
     };
 

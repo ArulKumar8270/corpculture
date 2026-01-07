@@ -89,6 +89,7 @@ const menuStructure = [
             { name: "All Company", key: "otherSettingsAllCompany", permissions: ['view', 'add', 'edit', 'delete'] },
             { name: "GST", key: "otherSettingsGst", permissions: ['view', 'add', 'edit', 'delete'] },
             { name: "Menu setting", key: "otherSettingsMenuSetting", permissions: ['view', 'edit'] }, // This page itself
+            { name: "Settings", key: "otherSettingsSettings", permissions: ['view', 'edit'] },
             { name: "Credit", key: "otherSettingsCredit", permissions: ['view', 'add', 'edit', 'delete'] },
             { name: "Gift", key: "otherSettingsGift", permissions: ['view', 'add', 'edit', 'delete'] },
         ]

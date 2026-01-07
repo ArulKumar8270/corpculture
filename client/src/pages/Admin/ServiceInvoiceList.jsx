@@ -21,7 +21,8 @@ import {
     FormControl, // Added FormControl
     InputLabel, // Added InputLabel
     Select, // Added Select
-    MenuItem // Added MenuItem
+    MenuItem, // Added MenuItem
+    TablePagination
 } from '@mui/material';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
@@ -34,6 +35,7 @@ import LinkIcon from '@mui/icons-material/Link'; // Import LinkIcon
 import Stack from '@mui/material/Stack'; // Import Stack for layout
 import Chip from '@mui/material/Chip'; // Import Chip for assignedTo UI
 import DeleteIcon from '@mui/icons-material/Delete'; // Import DeleteIcon
+import EditIcon from '@mui/icons-material/Edit'; // Import EditIcon for reassign
 
 // Row component for each invoice, allowing expansion to show products
 function InvoiceRow(props) {
@@ -48,6 +50,9 @@ function InvoiceRow(props) {
     const [balanceAmount, setBalanceAmount] = useState(0)
     const [pendingAmount, setPendingAmount] = useState(0)
     const [isInvoiceSend, setInvoiceSend] = useState(false)
+    const [openReassignModal, setOpenReassignModal] = useState(false); // State for reassign modal
+    const [selectedUserId, setSelectedUserId] = useState(''); // State for selected user in reassign modal
+    const [reassigning, setReassigning] = useState(false); // State for reassign loading
     const [paymentForm, setPaymentForm] = useState({ // State for payment form data
         modeOfPayment: invoice.modeOfPayment || '',
         bankName: invoice.bankName || '',
@@ -242,27 +247,95 @@ function InvoiceRow(props) {
 
     const handleUpdateInvoiceCount = async () => {
         try {
+            // The backend endpoint automatically increments by 1
             const { data } = await axios.put(
                 `${import.meta.env.VITE_SERVER_URL}/api/v1/common-details/increment-invoice`,
-                {
-                    invoiceCount: invoiceCount,
-                },
+                {},
                 {
                     headers: {
                         Authorization: auth.token,
                     },
                 }
             );
+            if (data?.success) {
+                // Refresh the invoice count after incrementing
+                fetchInvoicesCount();
+            }
         } catch (error) {
             console.error('Error updating invoice count:', error);
         }
     }
 
+    // Helper function to generate invoice number based on format
+    const generateInvoiceNumber = (invoiceCount, format) => {
+        if (!format || format.trim() === '') {
+            return invoiceCount.toString();
+        }
+
+        // Get current date for year replacement
+        const currentDate = new Date();
+        const currentYear = currentDate.getFullYear();
+        const currentYearShort = currentYear.toString().slice(-2);
+        const nextYearShort = (currentYear + 1).toString().slice(-2);
+        const yearRange = `${currentYearShort}-${nextYearShort}`;
+        const fullYearRange = `${currentYear}-${currentYear + 1}`;
+
+        // Replace date/year patterns in the format
+        let processedFormat = format;
+        
+        // Replace year patterns (e.g., "26-27" with current year range like "26-27")
+        processedFormat = processedFormat.replace(/\d{2}-\d{2}/g, yearRange); // Replace YY-YY pattern
+        processedFormat = processedFormat.replace(/\d{4}-\d{4}/g, fullYearRange); // Replace YYYY-YYYY pattern
+        
+        // Also handle single year patterns
+        processedFormat = processedFormat.replace(/\b\d{2}\b/g, (match) => {
+            const num = parseInt(match);
+            if (num >= 20 && num <= 99) {
+                return currentYearShort;
+            }
+            return match;
+        });
+        processedFormat = processedFormat.replace(/\b\d{4}\b/g, (match) => {
+            const num = parseInt(match);
+            if (num >= 2000 && num <= 2099) {
+                return currentYear.toString();
+            }
+            return match;
+        });
+
+        // Extract the last number sequence (sequential number part)
+        const lastNumberMatch = processedFormat.match(/(\d+)(?!.*\d)/);
+        
+        if (lastNumberMatch) {
+            const numberDigits = lastNumberMatch[1].length;
+            const prefix = processedFormat.substring(0, processedFormat.lastIndexOf(lastNumberMatch[1]));
+            const formattedNumber = invoiceCount.toString().padStart(numberDigits, '0');
+            return prefix + formattedNumber;
+        }
+        
+        // Fallback: append count to processed format
+        return processedFormat + invoiceCount.toString().padStart(5, '0');
+    };
+
     const onMoveToInvoice = async (status) => {
         try {
+            // Fetch global invoice format
+            const { data: commonData } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/common-details`, {
+                headers: {
+                    Authorization: auth.token,
+                },
+            });
+            
+            const format = commonData?.commonDetails?.globalInvoiceFormat || '';
+            const generatedInvoiceNumber = generateInvoiceNumber(invoiceCount, format);
+            
             const payload = {
                 invoiceType: status,
-                invoiceNumber: invoiceCount,
+                // Invoice number is now generated by the backend from global settings
+                // Preserve the original quotation date
+                quotationDate: invoice.invoiceDate,
+                // Set the moved to invoice date to current date
+                movedToInvoiceDate: new Date(),
             };
 
             const res = await axios.put(
@@ -276,7 +349,8 @@ function InvoiceRow(props) {
             );
 
             if (res.data?.success) {
-                handleUpdateInvoiceCount()
+                // Invoice count is now incremented automatically by the backend
+                // DO NOT call handleUpdateInvoiceCount() - backend handles it
                 props.onInvoiceUpdate();
                 alert(res.data.message || 'Moved to invoice successfully!');
             } else {
@@ -342,6 +416,50 @@ function InvoiceRow(props) {
         }
     };
 
+    const handleOpenReassignModal = () => {
+        setSelectedUserId(invoice?.assignedTo?._id || '');
+        setOpenReassignModal(true);
+    };
+
+    const handleCloseReassignModal = () => {
+        setOpenReassignModal(false);
+        setSelectedUserId('');
+    };
+
+    const handleReassign = async () => {
+        if (!selectedUserId) {
+            toast.error('Please select a user to assign.');
+            return;
+        }
+        try {
+            setReassigning(true);
+            const res = await axios.put(
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/update/${invoice._id}`,
+                {
+                    assignedTo: selectedUserId,
+                },
+                {
+                    headers: {
+                        Authorization: auth.token,
+                    },
+                }
+            );
+
+            if (res.data?.success) {
+                toast.success('Invoice reassigned successfully!');
+                handleCloseReassignModal();
+                props.onInvoiceUpdate(); // Refresh the list
+            } else {
+                toast.error(res.data?.message || 'Failed to reassign invoice.');
+            }
+        } catch (error) {
+            console.error('Error reassigning invoice:', error);
+            toast.error('Error reassigning invoice.');
+        } finally {
+            setReassigning(false);
+        }
+    };
+
     return (
         <>
             <TableRow sx={{ '& > *': { borderBottom: 'unset' } }}>
@@ -382,11 +500,23 @@ function InvoiceRow(props) {
                 {/* <TableCell>{invoice.status}</TableCell> */}
                 <TableCell>{new Date(invoice.invoiceDate).toLocaleDateString()}</TableCell>
                 <TableCell>
-                    {invoice?.assignedTo ? (
-                        <Chip label={invoice.assignedTo?.name} size="small" color="primary" variant="outlined" />
-                    ) : (
-                        'N/A'
-                    )}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        {invoice?.assignedTo ? (
+                            <Chip label={invoice.assignedTo?.name} size="small" color="primary" variant="outlined" />
+                        ) : (
+                            'N/A'
+                        )}
+                        {hasPermission("serviceInvoice") && (
+                            <IconButton
+                                size="small"
+                                onClick={handleOpenReassignModal}
+                                sx={{ ml: 0.5 }}
+                                title="Reassign"
+                            >
+                                <EditIcon fontSize="small" />
+                            </IconButton>
+                        )}
+                    </Box>
                 </TableCell>
                 <TableCell>
                     {hasPermission("serviceInvoice") ? <Button variant="outlined" size="small" sx={{ mr: 1 }} onClick={handleEdit}>Edit</Button> : null}
@@ -449,6 +579,24 @@ function InvoiceRow(props) {
                 <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={9}>
                     <Collapse in={open} timeout="auto" unmountOnExit>
                         <Box sx={{ margin: 1 }}>
+                            {/* Date Information */}
+                            {invoice.invoiceType === 'invoice' && (invoice.quotationDate || invoice.movedToInvoiceDate) && (
+                                <Box sx={{ mb: 2, p: 2, bgcolor: 'background.paper', borderRadius: 1 }}>
+                                    <Typography variant="subtitle2" gutterBottom>
+                                        Date Information:
+                                    </Typography>
+                                    {invoice.quotationDate && (
+                                        <Typography variant="body2" color="text.secondary">
+                                            Quotation Date: {new Date(invoice.quotationDate).toLocaleDateString()}
+                                        </Typography>
+                                    )}
+                                    {invoice.movedToInvoiceDate && (
+                                        <Typography variant="body2" color="text.secondary">
+                                            Moved to Invoice Date: {new Date(invoice.movedToInvoiceDate).toLocaleDateString()}
+                                        </Typography>
+                                    )}
+                                </Box>
+                            )}
                             <Typography variant="h6" gutterBottom component="div">
                                 Products
                             </Typography>
@@ -464,18 +612,27 @@ function InvoiceRow(props) {
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
-                                    {invoice.products.map((product) => (
-                                        <TableRow key={product?.productId?._id || product._id}>
-                                            <TableCell component="th" scope="row">
-                                                {product.productId?.productName?.productName?.productName || product.productName}
-                                            </TableCell>
-                                            <TableCell>{product.productId?.sku || 'N/A'}</TableCell>
-                                            <TableCell>{product.productId?.hsn || 'N/A'}</TableCell>
-                                            <TableCell align="right">{product.quantity}</TableCell>
-                                            <TableCell align="right">{product.rate.toFixed(2)}</TableCell>
-                                            <TableCell align="right">{product.totalAmount.toFixed(2)}</TableCell>
-                                        </TableRow>
-                                    ))}
+                                    {invoice.products.map((product) => {
+                                        // Get product name with fallback for different structures
+                                        const productName = product.productId?.productName?.name || 
+                                                           product.productId?.productName?.productName?.name || 
+                                                           product.productId?.productName?.productName?.productName || 
+                                                           product.productName || 
+                                                           'N/A';
+                                        
+                                        return (
+                                            <TableRow key={product?.productId?._id || product._id}>
+                                                <TableCell component="th" scope="row">
+                                                    {productName}
+                                                </TableCell>
+                                                <TableCell>{product.productId?.sku || 'N/A'}</TableCell>
+                                                <TableCell>{product.productId?.hsn || 'N/A'}</TableCell>
+                                                <TableCell align="right">{product.quantity}</TableCell>
+                                                <TableCell align="right">{product.rate.toFixed(2)}</TableCell>
+                                                <TableCell align="right">{product.totalAmount.toFixed(2)}</TableCell>
+                                            </TableRow>
+                                        );
+                                    })}
                                 </TableBody>
                             </Table>
                         </Box>
@@ -710,6 +867,44 @@ function InvoiceRow(props) {
                     </Button>
                 </DialogActions>
             </Dialog>
+
+            {/* Reassign Modal */}
+            <Dialog open={openReassignModal} onClose={handleCloseReassignModal}>
+                <DialogTitle>Reassign Invoice</DialogTitle>
+                <DialogContent>
+                    <FormControl fullWidth margin="normal" size="small">
+                        <InputLabel id="reassign-user-label">Select User</InputLabel>
+                        <Select
+                            labelId="reassign-user-label"
+                            id="selectedUserId"
+                            name="selectedUserId"
+                            value={selectedUserId}
+                            onChange={(e) => setSelectedUserId(e.target.value)}
+                            label="Select User"
+                        >
+                            <MenuItem value="">--Select User--</MenuItem>
+                            {props.users?.map((user) => (
+                                <MenuItem key={user._id} value={user._id}>
+                                    {user.name} {user.email ? `(${user.email})` : ''}
+                                </MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleCloseReassignModal} color="primary">
+                        Cancel
+                    </Button>
+                    <Button 
+                        onClick={handleReassign} 
+                        color="primary" 
+                        variant="contained"
+                        disabled={reassigning || !selectedUserId}
+                    >
+                        {reassigning ? <CircularProgress size={24} /> : 'Reassign'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </>
     );
 }
@@ -719,6 +914,9 @@ const ServiceInvoiceList = (props) => {
     const [invoiceCount, setInvoiceCount] = useState(0);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState(''); // New state for search term
+    const [users, setUsers] = useState([]); // State for users list
+    const [page, setPage] = useState(0); // Pagination state
+    const [rowsPerPage, setRowsPerPage] = useState(10); // Pagination state
     const { auth, userPermissions } = useAuth();
     const navigate = useNavigate(); // Initialize useNavigate
 
@@ -771,7 +969,8 @@ const ServiceInvoiceList = (props) => {
                 },
             });
             if (data?.success) {
-                setInvoiceCount(data.commonDetails?.invoiceCount + 1 || 1);
+                // Store the actual global invoiceCount value + 1 for next invoice
+                setInvoiceCount((data.commonDetails?.invoiceCount || 0) + 1);
             } else {
                 alert(data?.message || 'Failed to fetch service invoices.');
             }
@@ -780,8 +979,53 @@ const ServiceInvoiceList = (props) => {
         }
     };
 
+    const fetchUsers = async () => {
+        try {
+            // First, fetch employees
+            const employeeRes = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/employee/all`, {
+                headers: {
+                    Authorization: auth.token,
+                },
+            });
+            
+            if (employeeRes.data?.success) {
+                // Filter employees by employeeType (Service or Sales)
+                const serviceAndSalesEmployees = employeeRes.data.employees.filter(
+                    emp => emp.employeeType === 'Service' || emp.employeeType === 'Sales'
+                );
+                
+                // Extract userIds from filtered employees
+                const userIds = serviceAndSalesEmployees.map(emp => emp.userId).filter(Boolean);
+                
+                if (userIds.length > 0) {
+                    // Fetch users for those userIds
+                    const userRes = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/auth/all-users`, {
+                        headers: {
+                            Authorization: auth.token,
+                        },
+                    });
+                    
+                    // Filter users to only include those with matching userIds
+                    const filteredUsers = (userRes.data.users || []).filter(user => 
+                        userIds.includes(user._id)
+                    );
+                    setUsers(filteredUsers);
+                } else {
+                    setUsers([]);
+                }
+            } else {
+                setUsers([]);
+            }
+        } catch (error) {
+            console.error("Error fetching users:", error);
+            toast.error("Failed to fetch users.");
+            setUsers([]);
+        }
+    };
+
     useEffect(() => {
         fetchInvoices();
+        fetchUsers();
     }, [auth.token, props?.invoice]);
 
     // Filter invoices based on search term
@@ -795,6 +1039,21 @@ const ServiceInvoiceList = (props) => {
             new Date(invoice.invoiceDate).toLocaleDateString().toLowerCase().includes(lowerCaseSearchTerm)
         );
     });
+
+    // Reset page to 0 when search term changes
+    useEffect(() => {
+        setPage(0);
+    }, [searchTerm]);
+
+    // Pagination handlers
+    const handleChangePage = (event, newPage) => {
+        setPage(newPage);
+    };
+
+    const handleChangeRowsPerPage = (event) => {
+        setRowsPerPage(parseInt(event.target.value, 10));
+        setPage(0); // Reset to first page when changing rows per page
+    };
 
     if (loading) {
         return (
@@ -853,13 +1112,27 @@ const ServiceInvoiceList = (props) => {
                                         </TableCell>
                                     </TableRow>
                                 ) : (
-                                    filteredInvoices?.map((invoice) => (
-                                        <InvoiceRow key={invoice._id} invoice={invoice} navigate={navigate} onInvoiceUpdate={fetchInvoices} invoiceType={props?.invoice} invoiceCount={invoiceCount} />
-                                    ))
+                                    filteredInvoices
+                                        ?.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                                        .map((invoice) => (
+                                            <InvoiceRow key={invoice._id} invoice={invoice} navigate={navigate} onInvoiceUpdate={fetchInvoices} invoiceType={props?.invoice} invoiceCount={invoiceCount} users={users} />
+                                        ))
                                 )}
                             </TableBody>
                         </Table>
                     </TableContainer>
+                    {/* Pagination Component */}
+                    {filteredInvoices?.length > 0 && (
+                        <TablePagination
+                            rowsPerPageOptions={[5, 10, 25, 50]}
+                            component="div"
+                            count={filteredInvoices.length}
+                            rowsPerPage={rowsPerPage}
+                            page={page}
+                            onPageChange={handleChangePage}
+                            onRowsPerPageChange={handleChangeRowsPerPage}
+                        />
+                    )}
                 </Paper>
             </>
         </Box>

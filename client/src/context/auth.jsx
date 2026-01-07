@@ -13,24 +13,20 @@ const AuthProvider = ({ children }) => {
     });
     const [isAdmin, setIsAdmin] = useState(0);
     const [isContextLoading, setIsContextLoading] = useState(true);
-    const [isCompanyEnabled, setIsCompanyEnabled] = useState(false);
+    // Initialize isCompanyEnabled directly from localStorage to prevent checkbox from being unchecked on refresh
+    const [isCompanyEnabled, setIsCompanyEnabled] = useState(() => {
+        const stored = localStorage.getItem('isCompanyEnabled');
+        return stored !== null ? JSON.parse(stored) : false;
+    });
     const [companyDetails, setCompanyDetails] = useState(null); // {{ edit_6 }}
     const [refetch, setRefetch] = useState(false); // {{ edit_7 }}
-    const [selectedCompany, setSelectedCompany] = useState(null); // {{ edit_8 }}
+    // Initialize selectedCompany directly from localStorage
+    const [selectedCompany, setSelectedCompany] = useState(() => {
+        const stored = localStorage.getItem('selectedCompany');
+        return stored !== null && stored !== 'null' && stored !== '' ? stored : null;
+    });
     const [userPermissions, setUserPermissions] = useState([]);
     const [loadingPermissions, setLoadingPermissions] = useState(true);
-
-    // Initialize company settings from localStorage
-    useEffect(() => {
-        const storedCompanyEnabled = localStorage.getItem('isCompanyEnabled');
-        const storedSelectedCompany = localStorage.getItem('selectedCompany');
-        if (storedCompanyEnabled !== null) {
-            setIsCompanyEnabled(JSON.parse(storedCompanyEnabled));
-        }
-        if (storedSelectedCompany !== null && storedSelectedCompany !== 'null' && storedSelectedCompany !== '') {
-            setSelectedCompany(storedSelectedCompany);
-        }
-    }, []);
 
     // Update localStorage whenever company state changes
     useEffect(() => {

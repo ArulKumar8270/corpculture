@@ -17,6 +17,7 @@ import GST from "./OtherSettings/GST";
 import AdminEmployees from "./adminemployees";
 import MenuSetting from "./OtherSettings/MenuSetting";
 import CompanyList from "./OtherSettings/CompanyList";
+import Settings from "./OtherSettings/Settings";
 import AddServiceProduct from "./Service/AddServiceProduct";
 import ServiceProductList from "./Service/ServiceProductList";
 import RentalProductList from "./Rental/RentalProductList";
@@ -109,6 +110,7 @@ const AdminDashboard = () => {
                             <Route path="employee_details/:id?" element={<EmployeeDetails />} />
                             <Route path="addEmployee/:employeeId?" element={<AddEmployee />} />
                             <Route path="menuSetting" element={<MenuSetting />} />
+                            <Route path="settings" element={<Settings />} />
                             <Route path="addServiceProduct" element={<AddServiceProduct />} />
                             <Route path="serviceProductList" element={<ServiceProductList />} />
                             <Route path="rentalProductList" element={<RentalProductList />} />

@@ -8,9 +8,10 @@ import { toast } from 'react-toastify';
 import TextField from "@mui/material/TextField";
 import MenuItem from "@mui/material/MenuItem";
 import Button from "@mui/material/Button";
-import { InputAdornment, Select } from '@mui/material';
+import { InputAdornment, Select, FormControl, InputLabel, Chip, OutlinedInput, Box } from '@mui/material';
 import CategoryIcon from '@mui/icons-material/Category'; // For voucher type
 import { PhotoCamera } from '@mui/icons-material';
+import Typography from '@mui/material/Typography';
 
 const AddEmployee = () => {
     const { auth } = useAuth();
@@ -22,13 +23,18 @@ const AddEmployee = () => {
         email: '',
         phone: '',
         address: '',
-        pincode: '',
-        employeeType: '',
-        designation: '',
+        pincode: [],
+        employeeType: [],
+        designation: [],
         idCradNo: '',
-        department: '',
+        department: [],
         salary: '',
         image: '',
+        parentName: '',
+        parentPhone: '',
+        parentAddress: '',
+        parentRelation: '',
+        idProof: '',
     });
 
     const [errors, setErrors] = useState({});
@@ -85,14 +91,21 @@ const AddEmployee = () => {
                         email: employeeData.email || '',
                         phone: employeeData.phone || '',
                         address: employeeData.address || '',
-                        pincode: employeeData.pincode || '',
-                        employeeType: employeeData.employeeType || '',
-                        designation: employeeData.designation || '',
+                        pincode: Array.isArray(employeeData.pincode) ? employeeData.pincode : (employeeData.pincode ? [employeeData.pincode] : []),
+                        employeeType: Array.isArray(employeeData.employeeType) ? employeeData.employeeType : (employeeData.employeeType ? [employeeData.employeeType] : []),
+                        designation: Array.isArray(employeeData.designation) ? employeeData.designation : (employeeData.designation ? [employeeData.designation] : []),
                         idCradNo: employeeData.idCradNo || '',
-                        // Assuming department might be populated (object with _id) or just an ID string
-                        department: employeeData.department?._id || employeeData.department || '',
+                        // Handle department as array or single value
+                        department: Array.isArray(employeeData.department) 
+                            ? employeeData.department.map(d => d._id || d)
+                            : (employeeData.department?._id || employeeData.department ? [employeeData.department?._id || employeeData.department] : []),
                         salary: employeeData.salary || '',
                         image: employeeData.image || '',
+                        parentName: employeeData.parentName || '',
+                        parentPhone: employeeData.parentPhone || '',
+                        parentAddress: employeeData.parentAddress || '',
+                        parentRelation: employeeData.parentRelation || '',
+                        idProof: employeeData.idProof || '',
                     });
                 } catch (error) {
                     console.error("Error fetching employee for edit:", error);
@@ -109,8 +122,9 @@ const AddEmployee = () => {
             setIsEditMode(false);
             // Clear form data if switching from edit to add mode
             setFormData({
-                name: '', email: '', phone: '', address: '', pincode: '', employeeType: '',
-                designation: '', idCradNo: '', department: '', salary: '', image: '',
+                name: '', email: '', phone: '', address: '', pincode: [], employeeType: [],
+                designation: [], idCradNo: '', department: [], salary: '', image: '',
+                parentName: '', parentPhone: '', parentAddress: '', parentRelation: '', idProof: '',
             });
         }
     }, [employeeId, auth?.token, navigate]); // Depend on employeeId and auth.token
@@ -121,6 +135,58 @@ const AddEmployee = () => {
         setFormData({ ...formData, [name]: value });
         // Clear error for the field when it's being edited
         setErrors({ ...errors, [name]: undefined });
+    };
+
+    const handleMultiSelectChange = (e) => {
+        const { name, value } = e.target;
+        setFormData({ ...formData, [name]: typeof value === 'string' ? value.split(',') : value });
+        // Clear error for the field when it's being edited
+        setErrors({ ...errors, [name]: undefined });
+    };
+
+    const handlePincodeAdd = (e) => {
+        if (e.key === 'Enter' && e.target.value.trim()) {
+            const newPincode = e.target.value.trim();
+            // Validate pincode (6 digits)
+            if (/^\d{6}$/.test(newPincode)) {
+                if (!formData.pincode.includes(newPincode)) {
+                    setFormData({ ...formData, pincode: [...formData.pincode, newPincode] });
+                    e.target.value = '';
+                } else {
+                    toast.warning('Pincode already added');
+                }
+            } else {
+                toast.error('Please enter a valid 6-digit pincode');
+            }
+            e.preventDefault();
+        }
+    };
+
+    const handlePincodeDelete = (pincodeToDelete) => {
+        setFormData({
+            ...formData,
+            pincode: formData.pincode.filter(p => p !== pincodeToDelete)
+        });
+    };
+
+    const handleDesignationAdd = (e) => {
+        if (e.key === 'Enter' && e.target.value.trim()) {
+            const newDesignation = e.target.value.trim();
+            if (!formData.designation.includes(newDesignation)) {
+                setFormData({ ...formData, designation: [...formData.designation, newDesignation] });
+                e.target.value = '';
+            } else {
+                toast.warning('Designation already added');
+            }
+            e.preventDefault();
+        }
+    };
+
+    const handleDesignationDelete = (designationToDelete) => {
+        setFormData({
+            ...formData,
+            designation: formData.designation.filter(d => d !== designationToDelete)
+        });
     };
 
     const handleUploadImage = async () => {
@@ -174,6 +240,51 @@ const AddEmployee = () => {
         input.click();
     };
 
+    const handleUploadIdProof = async () => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.pdf,.jpg,.jpeg,.png';
+
+        input.onchange = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            // Validate file size (max 5MB)
+            if (file.size > 5 * 1024 * 1024) {
+                toast.error('File size should be less than 5MB');
+                return;
+            }
+
+            const formDataUpload = new FormData();
+            formDataUpload.append("file", file);
+            try {
+                setLoading(true);
+                const res = await axios.post(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/auth/upload-file`,
+                    formDataUpload,
+                    {
+                        headers: {
+                            Authorization: auth?.token
+                        },
+                    }
+                );
+                if (res.data?.success && res.data?.fileUrl) {
+                    setFormData({ ...formData, idProof: res.data.fileUrl });
+                    toast.success('ID Proof uploaded successfully');
+                } else {
+                    toast.error('Failed to upload ID Proof');
+                }
+            } catch (error) {
+                console.error("ID Proof upload error:", error);
+                toast.error(error.response?.data?.message || 'Error uploading ID Proof');
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        input.click();
+    };
+
     const validateForm = () => {
         let newErrors = {};
         if (!formData.name.trim()) newErrors.name = "Name is required";
@@ -184,7 +295,7 @@ const AddEmployee = () => {
         }
         if (!formData.phone.trim()) newErrors.phone = "Phone is required";
         if (!formData.address.trim()) newErrors.address = "Address is required";
-        if (!formData.employeeType) newErrors.employeeType = "Employee Type is required";
+        if (!formData.employeeType || formData.employeeType.length === 0) newErrors.employeeType = "Employee Type is required";
 
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
@@ -325,36 +436,88 @@ const AddEmployee = () => {
                             error={!!errors.address}
                             helperText={errors.address}
                         />
-                        <TextField
-                            label="Pincode"
-                            name="pincode"
-                            value={formData.pincode}
-                            onChange={handleInputChange}
-                            variant="outlined"
-                            size="small"
-                            fullWidth
-                            inputProps={{ maxLength: 6 }}
-                        />
-                        <TextField
-                            select
-                            label="Employee Type"
-                            name="employeeType"
-                            value={formData.employeeType}
-                            onChange={handleInputChange}
-                            variant="outlined"
-                            size="small"
-                            fullWidth
-                            required
-                            error={!!errors.employeeType}
-                            helperText={errors.employeeType}
-                        >
-                            {employeeTypes.map((type) => (
-                                <MenuItem key={type} value={type}>
-                                    {type}
-                                </MenuItem>
-                            ))}
-                        </TextField>
+                        <div className="flex flex-col gap-2">
+                            <label className="text-sm font-medium text-gray-700">Pincode(s)</label>
+                            <TextField
+                                placeholder="Enter pincode and press Enter (6 digits)"
+                                variant="outlined"
+                                size="small"
+                                fullWidth
+                                onKeyDown={handlePincodeAdd}
+                                inputProps={{ maxLength: 6, pattern: '[0-9]*' }}
+                                helperText="Press Enter to add pincode"
+                            />
+                            {formData.pincode.length > 0 && (
+                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 1 }}>
+                                    {formData.pincode.map((pincode, index) => (
+                                        <Chip
+                                            key={index}
+                                            label={pincode}
+                                            onDelete={() => handlePincodeDelete(pincode)}
+                                            size="small"
+                                            color="primary"
+                                            variant="outlined"
+                                        />
+                                    ))}
+                                </Box>
+                            )}
+                        </div>
+                        <FormControl fullWidth size="small" required error={!!errors.employeeType}>
+                            <InputLabel id="employee-type-label">Employee Type</InputLabel>
+                            <Select
+                                labelId="employee-type-label"
+                                id="employeeType"
+                                name="employeeType"
+                                multiple
+                                value={formData.employeeType}
+                                onChange={handleMultiSelectChange}
+                                input={<OutlinedInput label="Employee Type" />}
+                                renderValue={(selected) => (
+                                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                                        {selected.map((value) => (
+                                            <Chip key={value} label={value} size="small" />
+                                        ))}
+                                    </Box>
+                                )}
+                            >
+                                {employeeTypes.map((type) => (
+                                    <MenuItem key={type} value={type}>
+                                        {type}
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                            {errors.employeeType && (
+                                <p style={{ color: '#d32f2f', fontSize: '0.75rem', margin: '3px 14px 0' }}>
+                                    {errors.employeeType}
+                                </p>
+                            )}
+                        </FormControl>
 
+                        <div className="flex flex-col gap-2">
+                            <label className="text-sm font-medium text-gray-700">Designation(s)</label>
+                            <TextField
+                                placeholder="Enter designation and press Enter"
+                                variant="outlined"
+                                size="small"
+                                fullWidth
+                                onKeyDown={handleDesignationAdd}
+                                helperText="Press Enter to add designation"
+                            />
+                            {formData.designation.length > 0 && (
+                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 1 }}>
+                                    {formData.designation.map((designation, index) => (
+                                        <Chip
+                                            key={index}
+                                            label={designation}
+                                            onDelete={() => handleDesignationDelete(designation)}
+                                            size="small"
+                                            color="secondary"
+                                            variant="outlined"
+                                        />
+                                    ))}
+                                </Box>
+                            )}
+                        </div>
                         <TextField
                             label="ID Card Number"
                             name="idCradNo"
@@ -409,22 +572,126 @@ const AddEmployee = () => {
                             </div>
                             <p className="text-xs text-gray-500">Supported formats: JPG, PNG (Max 5MB)</p>
                         </div>
-                        <label>Department</label>
-                        <Select
-                            value={formData.department}
-                            name='department'
+
+                        {/* ID Proof Upload Section */}
+                        <div className="flex flex-col gap-2">
+                            <label className="text-sm font-medium text-gray-700">ID Proof Document</label>
+                            <div className="flex items-center gap-3">
+                                {formData.idProof ? (
+                                    <div className="flex items-center gap-2">
+                                        <a 
+                                            href={formData.idProof} 
+                                            target="_blank" 
+                                            rel="noopener noreferrer"
+                                            className="text-[#019ee3] hover:underline flex items-center gap-1"
+                                        >
+                                            <span>View ID Proof</span>
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                            </svg>
+                                        </a>
+                                        <button
+                                            type="button"
+                                            onClick={() => setFormData({ ...formData, idProof: '' })}
+                                            className="bg-red-500 text-white rounded px-2 py-1 text-xs hover:bg-red-600"
+                                        >
+                                            Remove
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <Button
+                                        type="button"
+                                        variant="outlined"
+                                        onClick={handleUploadIdProof}
+                                        disabled={loading}
+                                        sx={{
+                                            borderColor: '#019ee3',
+                                            color: '#019ee3',
+                                            '&:hover': {
+                                                borderColor: '#0180b8',
+                                                bgcolor: '#e6fbff',
+                                            },
+                                        }}
+                                    >
+                                        Upload ID Proof
+                                    </Button>
+                                )}
+                            </div>
+                            <p className="text-xs text-gray-500">Supported formats: PDF, JPG, PNG (Max 5MB)</p>
+                        </div>
+
+                        {/* Parent Details Section */}
+                        <Typography variant="h6" sx={{ mt: 2, mb: 1, color: '#019ee3', fontWeight: 'bold' }}>
+                            Parent/Guardian Details
+                        </Typography>
+                        <TextField
+                            label="Parent/Guardian Name"
+                            name="parentName"
+                            value={formData.parentName}
                             onChange={handleInputChange}
-                            label="Category"
-                            endAdornment={
-                                <InputAdornment position="end">
-                                    <CategoryIcon />
-                                </InputAdornment>
-                            }
-                        >
-                            {categories?.map((cat) => (
-                                <MenuItem key={cat._id} value={cat._id}>{cat.name}</MenuItem>
-                            ))}
-                        </Select>
+                            variant="outlined"
+                            size="small"
+                            fullWidth
+                        />
+                        <TextField
+                            label="Parent/Guardian Phone"
+                            name="parentPhone"
+                            value={formData.parentPhone}
+                            onChange={handleInputChange}
+                            variant="outlined"
+                            size="small"
+                            fullWidth
+                        />
+                        <TextField
+                            label="Parent/Guardian Relation"
+                            name="parentRelation"
+                            value={formData.parentRelation}
+                            onChange={handleInputChange}
+                            variant="outlined"
+                            size="small"
+                            fullWidth
+                            placeholder="e.g., Father, Mother, Guardian"
+                        />
+                        <TextField
+                            label="Parent/Guardian Address"
+                            name="parentAddress"
+                            value={formData.parentAddress}
+                            onChange={handleInputChange}
+                            variant="outlined"
+                            size="small"
+                            fullWidth
+                            multiline
+                            rows={3}
+                        />
+                        <label>Department</label>
+                        <FormControl fullWidth size="small">
+                            <InputLabel id="department-label">Department</InputLabel>
+                            <Select
+                                labelId="department-label"
+                                id="department"
+                                name="department"
+                                multiple
+                                value={formData.department}
+                                onChange={handleMultiSelectChange}
+                                input={<OutlinedInput label="Department" endAdornment={
+                                    <InputAdornment position="end">
+                                        <CategoryIcon />
+                                    </InputAdornment>
+                                } />}
+                                renderValue={(selected) => (
+                                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                                        {selected.map((value) => {
+                                            const category = categories.find(cat => cat._id === value);
+                                            return <Chip key={value} label={category?.name || value} size="small" />;
+                                        })}
+                                    </Box>
+                                )}
+                            >
+                                {categories?.map((cat) => (
+                                    <MenuItem key={cat._id} value={cat._id}>{cat.name}</MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
                         <TextField
                             label="Salary"
                             name="salary"
@@ -501,7 +768,9 @@ const AddEmployee = () => {
                                         {formData.name || 'Employee Name'}
                                     </h4>
                                     <p className="text-sm text-gray-600 mb-2">
-                                        {formData.designation || 'Designation'}
+                                        {formData.designation && formData.designation.length > 0
+                                            ? (Array.isArray(formData.designation) ? formData.designation.join(', ') : formData.designation)
+                                            : 'Designation'}
                                     </p>
                                     <div className="bg-[#e6fbff] rounded-lg px-3 py-2 mt-2">
                                         <p className="text-xs font-semibold text-[#019ee3]">
@@ -516,15 +785,17 @@ const AddEmployee = () => {
                                 <div className="flex justify-between items-center py-1">
                                     <span className="text-xs font-semibold text-gray-600">Department:</span>
                                     <span className="text-sm font-bold text-gray-800">
-                                        {formData.department
-                                            ? categories.find(cat => cat._id === formData.department)?.name || 'N/A'
+                                        {formData.department && formData.department.length > 0
+                                            ? formData.department.map(id => categories.find(cat => cat._id === id)?.name).filter(Boolean).join(', ') || 'N/A'
                                             : 'N/A'}
                                     </span>
                                 </div>
                                 <div className="flex justify-between items-center py-1">
                                     <span className="text-xs font-semibold text-gray-600">Type:</span>
                                     <span className="text-sm font-bold text-gray-800">
-                                        {formData.employeeType || 'N/A'}
+                                        {formData.employeeType && formData.employeeType.length > 0
+                                            ? formData.employeeType.join(', ')
+                                            : 'N/A'}
                                     </span>
                                 </div>
                                 <div className="flex justify-between items-center py-1">
@@ -539,11 +810,11 @@ const AddEmployee = () => {
                                         {formData.email || 'N/A'}
                                     </span>
                                 </div>
-                                {formData.pincode && (
+                                {formData.pincode && formData.pincode.length > 0 && (
                                     <div className="flex justify-between items-center py-1">
                                         <span className="text-xs font-semibold text-gray-600">Pincode:</span>
                                         <span className="text-sm font-bold text-gray-800">
-                                            {formData.pincode}
+                                            {Array.isArray(formData.pincode) ? formData.pincode.join(', ') : formData.pincode}
                                         </span>
                                     </div>
                                 )}
@@ -569,11 +840,11 @@ const AddEmployee = () => {
                                 {formData.address || 'N/A'}
                             </span>
                         </div>
-                        {formData.pincode && (
+                        {formData.pincode && formData.pincode.length > 0 && (
                             <div className="flex justify-between">
                                 <span className="text-sm font-semibold text-gray-600">Pincode:</span>
                                 <span className="text-sm text-gray-800">
-                                    {formData.pincode}
+                                    {Array.isArray(formData.pincode) ? formData.pincode.join(', ') : formData.pincode}
                                 </span>
                             </div>
                         )}

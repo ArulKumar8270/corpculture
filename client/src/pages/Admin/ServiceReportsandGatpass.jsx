@@ -17,7 +17,15 @@ import {
     Chip,
     TextField, // Import TextField for search input
     TablePagination,
-    Grid
+    Grid,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    FormControl,
+    InputLabel,
+    Select,
+    MenuItem
 } from '@mui/material';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import EditIcon from '@mui/icons-material/Edit';
@@ -32,7 +40,7 @@ import { useAuth } from '../../context/auth';
 
 const ServiceReportsandGatpass = (props) => {
     const navigate = useNavigate();
-    const { auth } = useAuth();
+    const { auth, userPermissions } = useAuth();
     const [reports, setReports] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -45,6 +53,15 @@ const ServiceReportsandGatpass = (props) => {
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [totalCount, setTotalCount] = useState(0);
+    const [users, setUsers] = useState([]); // State for users list
+    const [openReassignModal, setOpenReassignModal] = useState(false); // State for reassign modal
+    const [selectedReportId, setSelectedReportId] = useState(null); // State for selected report ID
+    const [selectedUserId, setSelectedUserId] = useState(''); // State for selected user in reassign modal
+    const [reassigning, setReassigning] = useState(false); // State for reassign loading
+
+    const hasPermission = (key) => {
+        return userPermissions.some(p => p.key === key && p.actions.includes('edit')) || auth?.user?.role === 1;
+    };
 
     const fetchReports = async (
         from = '',
@@ -99,8 +116,53 @@ const ServiceReportsandGatpass = (props) => {
                 page,
                 rowsPerPage
             );
+            fetchUsers();
         }
     }, [auth?.token, props?.reportType, page, rowsPerPage]);
+
+    const fetchUsers = async () => {
+        try {
+            // First, fetch employees
+            const employeeRes = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/employee/all`, {
+                headers: {
+                    Authorization: auth.token,
+                },
+            });
+            
+            if (employeeRes.data?.success) {
+                // Filter employees by employeeType (Service or Sales)
+                const serviceAndSalesEmployees = employeeRes.data.employees.filter(
+                    emp => emp.employeeType === 'Service' || emp.employeeType === 'Sales'
+                );
+                
+                // Extract userIds from filtered employees
+                const userIds = serviceAndSalesEmployees.map(emp => emp.userId).filter(Boolean);
+                
+                if (userIds.length > 0) {
+                    // Fetch users for those userIds
+                    const userRes = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/auth/all-users`, {
+                        headers: {
+                            Authorization: auth.token,
+                        },
+                    });
+                    
+                    // Filter users to only include those with matching userIds
+                    const filteredUsers = (userRes.data.users || []).filter(user => 
+                        userIds.includes(user._id)
+                    );
+                    setUsers(filteredUsers);
+                } else {
+                    setUsers([]);
+                }
+            } else {
+                setUsers([]);
+            }
+        } catch (error) {
+            console.error("Error fetching users:", error);
+            toast.error("Failed to fetch users.");
+            setUsers([]);
+        }
+    };
 
     const handleEdit = (reportId) => {
         // Navigate to an edit page for the report
@@ -179,6 +241,64 @@ const ServiceReportsandGatpass = (props) => {
         setAssignedToFilter('');
         setPage(0);
         fetchReports('', '', '', '', 0, rowsPerPage);
+    };
+
+    const handleOpenReassignModal = (reportId, currentAssignedToId) => {
+        setSelectedReportId(reportId);
+        setSelectedUserId(currentAssignedToId || '');
+        setOpenReassignModal(true);
+    };
+
+    const handleCloseReassignModal = () => {
+        setOpenReassignModal(false);
+        setSelectedReportId(null);
+        setSelectedUserId('');
+    };
+
+    const handleReassign = async () => {
+        if (!selectedUserId) {
+            toast.error('Please select a user to assign.');
+            return;
+        }
+        if (!selectedReportId) {
+            toast.error('Report ID is missing.');
+            return;
+        }
+        try {
+            setReassigning(true);
+            const res = await axios.put(
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/report/${selectedReportId}`,
+                {
+                    assignedTo: selectedUserId,
+                },
+                {
+                    headers: {
+                        Authorization: auth.token,
+                    },
+                }
+            );
+
+            if (res.data?.success) {
+                toast.success('Report reassigned successfully!');
+                handleCloseReassignModal();
+                // Refresh the reports list
+                fetchReports(
+                    fromDate,
+                    toDate,
+                    companyNameFilter,
+                    assignedToFilter,
+                    page,
+                    rowsPerPage
+                );
+            } else {
+                toast.error(res.data?.message || 'Failed to reassign report.');
+            }
+        } catch (error) {
+            console.error('Error reassigning report:', error);
+            toast.error('Error reassigning report.');
+        } finally {
+            setReassigning(false);
+        }
     };
 
     if (loading) {
@@ -331,11 +451,23 @@ const ServiceReportsandGatpass = (props) => {
                                             <TableCell>{report.description || 'N/A'}</TableCell>
                                             <TableCell>{new Date(report.createdAt).toLocaleDateString()}</TableCell>
                                             <TableCell>
-                                                {report?.assignedTo ? (
-                                                    <Chip label={report.assignedTo?.name} size="small" color="primary" variant="outlined" />
-                                                ) : (
-                                                    'N/A'
-                                                )}
+                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                    {report?.assignedTo ? (
+                                                        <Chip label={report.assignedTo?.name} size="small" color="primary" variant="outlined" />
+                                                    ) : (
+                                                        'N/A'
+                                                    )}
+                                                    {hasPermission("report") && (
+                                                        <IconButton
+                                                            size="small"
+                                                            onClick={() => handleOpenReassignModal(report._id, report?.assignedTo?._id)}
+                                                            sx={{ ml: 0.5 }}
+                                                            title="Reassign"
+                                                        >
+                                                            <EditIcon fontSize="small" />
+                                                        </IconButton>
+                                                    )}
+                                                </Box>
                                             </TableCell>
                                             <TableCell align="center">
                                                 <Tooltip title="Send Report">
@@ -452,6 +584,44 @@ const ServiceReportsandGatpass = (props) => {
                     onRowsPerPageChange={handleChangeRowsPerPage}
                 />
             </Paper>
+
+            {/* Reassign Modal */}
+            <Dialog open={openReassignModal} onClose={handleCloseReassignModal}>
+                <DialogTitle>Reassign Report</DialogTitle>
+                <DialogContent>
+                    <FormControl fullWidth margin="normal" size="small">
+                        <InputLabel id="reassign-user-label">Select User</InputLabel>
+                        <Select
+                            labelId="reassign-user-label"
+                            id="selectedUserId"
+                            name="selectedUserId"
+                            value={selectedUserId}
+                            onChange={(e) => setSelectedUserId(e.target.value)}
+                            label="Select User"
+                        >
+                            <MenuItem value="">--Select User--</MenuItem>
+                            {users?.map((user) => (
+                                <MenuItem key={user._id} value={user._id}>
+                                    {user.name} {user.email ? `(${user.email})` : ''}
+                                </MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleCloseReassignModal} color="primary">
+                        Cancel
+                    </Button>
+                    <Button 
+                        onClick={handleReassign} 
+                        color="primary" 
+                        variant="contained"
+                        disabled={reassigning || !selectedUserId}
+                    >
+                        {reassigning ? <CircularProgress size={24} /> : 'Reassign'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 };
