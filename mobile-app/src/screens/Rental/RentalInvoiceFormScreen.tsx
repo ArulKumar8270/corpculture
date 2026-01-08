@@ -181,31 +181,73 @@ const RentalInvoiceFormScreen = () => {
       return invoiceCount.toString();
     }
 
-    // Extract prefix (non-numeric part) and number part from format
-    const match = format.match(/^([^0-9]*)(\d+)$/);
+    // Get current date for year replacement
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    const currentYearShort = currentYear.toString().slice(-2);
+    const nextYearShort = (currentYear + 1).toString().slice(-2);
+    const yearRange = `${currentYearShort}-${nextYearShort}`;
+    const fullYearRange = `${currentYear}-${currentYear + 1}`;
+
+    // Replace date/year patterns in the format
+    let processedFormat = format;
     
-    if (match) {
-      const prefix = match[1] || '';
-      const numberPart = match[2] || '';
-      const numberDigits = numberPart.length;
+    // IMPORTANT: Replace year range patterns FIRST, then handle single years
+    // Step 1: Replace year range patterns (e.g., "26-27" with current year range)
+    processedFormat = processedFormat.replace(/\d{2}-\d{2}/g, yearRange); // Replace YY-YY pattern
+    processedFormat = processedFormat.replace(/\d{4}-\d{4}/g, fullYearRange); // Replace YYYY-YYYY pattern
+    
+    // Step 2: Handle single year patterns, but skip years that are part of a range
+    // Replace standalone 2-digit years (not preceded or followed by a dash)
+    processedFormat = processedFormat.replace(/\b(\d{2})\b/g, (match, yearStr, offset, string) => {
+      // Check if this match is part of a range pattern (has dash before or after)
+      const before = string[offset - 1];
+      const after = string[offset + match.length];
       
-      // Format invoiceCount with the same number of digits as in the format
-      const formattedNumber = invoiceCount.toString().padStart(numberDigits, '0');
-      
-      return prefix + formattedNumber;
-    } else {
-      // If format doesn't match pattern, try to find last number sequence
-      const lastNumberMatch = format.match(/(\d+)(?!.*\d)/);
-      if (lastNumberMatch) {
-        const numberDigits = lastNumberMatch[1].length;
-        const prefix = format.substring(0, format.lastIndexOf(lastNumberMatch[1]));
-        const formattedNumber = invoiceCount.toString().padStart(numberDigits, '0');
-        return prefix + formattedNumber;
+      // If it's part of a range (has dash before or after), don't replace
+      if (before === '-' || after === '-') {
+        return match;
       }
       
-      // Fallback: append count to format
-      return format + invoiceCount.toString();
+      const num = parseInt(yearStr);
+      // Only replace if it's a standalone 2-digit year (20-99)
+      if (num >= 20 && num <= 99) {
+        return currentYearShort;
+      }
+      return match;
+    });
+    
+    // Replace standalone 4-digit years (not preceded or followed by a dash)
+    processedFormat = processedFormat.replace(/\b(\d{4})\b/g, (match, yearStr, offset, string) => {
+      // Check if this match is part of a range pattern (has dash before or after)
+      const before = string[offset - 1];
+      const after = string[offset + match.length];
+      
+      // If it's part of a range (has dash before or after), don't replace
+      if (before === '-' || after === '-') {
+        return match;
+      }
+      
+      const num = parseInt(yearStr);
+      // Only replace if it's a standalone 4-digit year (2000-2099)
+      if (num >= 2000 && num <= 2099) {
+        return currentYear.toString();
+      }
+      return match;
+    });
+
+    // Extract the last number sequence (sequential number part)
+    const lastNumberMatch = processedFormat.match(/(\d+)(?!.*\d)/);
+    
+    if (lastNumberMatch) {
+      const numberDigits = lastNumberMatch[1].length;
+      const prefix = processedFormat.substring(0, processedFormat.lastIndexOf(lastNumberMatch[1]));
+      const formattedNumber = invoiceCount.toString().padStart(numberDigits, '0');
+      return prefix + formattedNumber;
     }
+    
+    // Fallback: append count to processed format
+    return processedFormat + invoiceCount.toString().padStart(5, '0');
   };
 
   const fetchInvoicesCounts = async () => {
@@ -735,23 +777,9 @@ const RentalInvoiceFormScreen = () => {
     return true;
   };
 
-  const handleUpdateInvoiceCount = async () => {
-    try {
-      await axios.put(
-        `${getApiBaseUrl()}/common-details/increment-invoice`,
-        {
-          invoiceCount: invoices,
-        },
-        {
-          headers: {
-            Authorization: token || '',
-          },
-        }
-      );
-    } catch (error) {
-      console.error('Error updating invoice count:', error);
-    }
-  };
+  // REMOVED: handleUpdateInvoiceCount function
+  // Invoice count is now incremented automatically by the backend
+  // No need to call increment-invoice endpoint
 
   const updateStatusToRental = async (rentalId: string, status: string) => {
     try {
@@ -899,7 +927,9 @@ const RentalInvoiceFormScreen = () => {
       const data = new FormData();
       data.append('rentalId', rentalId || '');
       if (invoiceType !== 'quotation') {
-        data.append('invoiceNumber', invoices?.toString() || '');
+        // Invoice number is now generated by the backend from global settings
+        // Only send invoiceNumber for quotations or when updating existing invoices
+        // data.append('invoiceNumber', invoices?.toString() || '');
       }
       const finalCompanyId = companyIdFromParams || formData.companyId;
       if (!finalCompanyId) {
@@ -1052,7 +1082,8 @@ const RentalInvoiceFormScreen = () => {
 
       if (res.data?.success) {
         if (!entryId && invoiceType !== 'quotation') {
-          await handleUpdateInvoiceCount();
+          // Invoice count is now incremented automatically by the backend
+          // await handleUpdateInvoiceCount();
         }
         if (!entryId) {
           await updateStatusToRental(rentalId || '', 'Completed');

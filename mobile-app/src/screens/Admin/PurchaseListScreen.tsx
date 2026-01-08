@@ -362,13 +362,25 @@ const PurchaseListScreen = () => {
       <View style={styles.summaryCard}>
         <Text style={styles.summaryTitle}>Material Summary</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipContainer}>
-          {sortedProductGroups.map((group) => (
-            <View key={group.name} style={styles.chip}>
-              <Text style={styles.chipText}>
-                {group.name}: {group.totalQuantity}
-              </Text>
-            </View>
-          ))}
+          {sortedProductGroups.map((group) => {
+            const isNegative = group.totalQuantity < 0;
+            return (
+              <View 
+                key={group.name} 
+                style={[
+                  styles.chip,
+                  isNegative && styles.chipNegative
+                ]}
+              >
+                <Text style={[
+                  styles.chipText,
+                  isNegative && styles.chipTextNegative
+                ]}>
+                  {group.name}: {group.totalQuantity}
+                </Text>
+              </View>
+            );
+          })}
         </ScrollView>
       </View>
 
@@ -493,10 +505,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#019ee3',
   },
+  chipNegative: {
+    backgroundColor: '#ffebee',
+    borderColor: '#FF3B30',
+  },
   chipText: {
     fontSize: 12,
     color: '#019ee3',
     fontWeight: '600',
+  },
+  chipTextNegative: {
+    color: '#FF3B30',
   },
   searchContainer: {
     flexDirection: 'row',

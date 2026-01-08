@@ -223,7 +223,7 @@ function RentalInvoiceList(props) {
     const onSendInvoice = async (invoice) => {
         setInvoiceSend(true)
         try {
-            const res = await axios.post('https://n8n.nicknameinfo.net/webhook/f8d3ad37-a38e-4a38-a06e-09c74fdc3b91', { invoiceId: invoice?._id });
+            const res = await axios.post('https://n8n.nicknameinfo.net/webhook/60f841c0-76d9-47c3-8a4c-7129ceca00df', { invoiceId: invoice});
             if (res) {
                 setInvoiceSend(false)
             }
@@ -656,7 +656,7 @@ function RentalInvoiceList(props) {
     }
 
     return (
-        <Box sx={{ p: 3, bgcolor: 'background.default', minHeight: '100vh' }}>
+        <Box sx={{ p: 3, bgcolor: 'background.default', minHeight: '100vh', width: '87%' }}>
             <div className='flex justify-between items-center'>
                 <Typography variant="h5" component="h1" gutterBottom sx={{ mb: 2, color: '#019ee3', fontWeight: 'bold' }}>
                     {props?.invoice === "invoice" ? "Invoices" : "Quotations"} List
@@ -782,7 +782,7 @@ function RentalInvoiceList(props) {
                                                         {hasPermission("rentalInvoice") ? <Button variant="outlined" size="small" onClick={() => handleEdit(entry._id)}>
                                                             Edit
                                                         </Button> : null}
-                                                        <Button variant="outlined" size="small" onClick={() => onSendInvoice(entry)}>
+                                                        <Button variant="outlined" size="small" onClick={() => onSendInvoice(entry._id)}>
                                                             {isInvoiceSend ? <CircularProgress size={24} /> : `Send ${props?.invoice === "quotation" ? "Quotation" : "Invoice"}`}
                                                         </Button>
                                                         {props?.invoice === "quotation" ? <Button variant="outlined" size="small" sx={{ my: 1 }} onClick={() => onMoveToInvoice("invoice", entry)}>Move to invoice</Button>

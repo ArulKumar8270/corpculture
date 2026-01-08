@@ -54,6 +54,8 @@ import AdminCommission from "./AdminCommission";
 import EmployeeDetails from "./EmployeeDetails";
 import OldInvoicesList from "./OldInvoicesList";
 import CreditManagement from "./CreditManagement";
+import EmployeeActivityLogForm from "../Employee/EmployeeActivityLogForm";
+import ActivityLogReport from "./Reports/ActivityLogReport";
 
 const AdminDashboard = () => {
     const navigate = useNavigate();
@@ -159,6 +161,8 @@ const AdminDashboard = () => {
                             <Route path="rentalQuotationsReport/:companyId?" element={<RentalInvoiceReport type={"quotation"}/>} />
                             <Route path="rentalReportsReport/:companyId?" element={<ServiceReportsReport type={"rental"}/>} />
                             <Route path="oldInvoices" element={<OldInvoicesList />} />
+                            <Route path="activity-log" element={<EmployeeActivityLogForm />} />
+                            <Route path="activityLogReport" element={<ActivityLogReport />} />
                         </Routes>
                     </div>
                 </div>

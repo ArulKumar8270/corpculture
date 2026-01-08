@@ -9,6 +9,7 @@ import PaymentCards from "./PaymentCards";
 import SeoData from "../../SEO/SeoData";
 import { GiHamburgerMenu } from "react-icons/gi";
 import { useEffect, useState } from "react";
+import EmployeeActivityLogForm from "../Employee/EmployeeActivityLogForm";
 
 const Dashboard = () => {
     const navigate = useNavigate();
@@ -64,6 +65,10 @@ const Dashboard = () => {
                             <Route
                                 path="profile/deactivate"
                                 element={<Deactivate />}
+                            />
+                            <Route
+                                path="activity-log"
+                                element={<EmployeeActivityLogForm />}
                             />
                         </Routes>
                     </div>

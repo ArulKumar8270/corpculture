@@ -13,6 +13,7 @@ const ReportsDashboard = () => {
         { name: 'Sales Reports', path: '/admin/reports/sales' },
         { name: 'Employee Reports', path: '/admin/reports/employee' },
         { name: 'User Commission Reports', path: '/admin/reports/user-commission' },
+        { name: 'Activity Log Reports', path: '../activityLogReport' },
     ];
 
     return (

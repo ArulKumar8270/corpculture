@@ -14,6 +14,7 @@ import invoiceRoutes from "./routes/invoiceRoute.js";
 import categoryRoutes from "./routes/categoryRoutes.js";
 import companyRoutes from "./routes/companyRoute.js";
 import employeeRoutes from "./routes/employeeRoute.js";
+import employeeActivityLogRoutes from "./routes/employeeActivityLogRoute.js";
 import commissionRoutes from "./routes/commissionRoutes.js";
 import gstRoutes from "./routes/gstRoutes.js";
 import permissionRoutes from "./routes/permissionRoutes.js";
@@ -96,6 +97,7 @@ app.use("/api/v1/old-invoice", oldInvoiceRoutes); // Old invoice routes
 app.use('/api/v1/category', categoryRoutes);
 app.use('/api/v1/company', companyRoutes);
 app.use('/api/v1/employee', employeeRoutes);
+app.use('/api/v1/employee-activity-log', employeeActivityLogRoutes);
 app.use("/api/v1/commissions", commissionRoutes);
 app.use("/api/v1/gst", gstRoutes);
 app.use("/api/v1/service-products", serviceProductRoutes);

@@ -2,88 +2,179 @@
 
 This document lists the recent changes made to the web client that need to be implemented in the mobile app.
 
-## 1. Invoice Number Generation Based on Global Invoice Format
+## 1. Enhanced Invoice Number Generation with Year Replacement
 
 ### Files to Update:
 - `src/screens/Admin/AddServiceInvoiceScreen.tsx`
 - `src/screens/Rental/RentalInvoiceFormScreen.tsx`
 
 ### Changes Required:
-1. **Add state for `globalInvoiceFormat`**:
-   ```typescript
-   const [globalInvoiceFormat, setGlobalInvoiceFormat] = useState('');
-   ```
 
-2. **Create helper function to generate invoice number**:
-   ```typescript
-   const generateInvoiceNumber = (invoiceCount: number, format: string): string => {
-     if (!format || format.trim() === '') {
-       return invoiceCount.toString();
-     }
+**Update the `generateInvoiceNumber` function** to handle year replacement patterns:
 
-     // Extract prefix (non-numeric part) and number part from format
-     const match = format.match(/^([^0-9]*)(\d+)$/);
-     
-     if (match) {
-       const prefix = match[1] || '';
-       const numberPart = match[2] || '';
-       const numberDigits = numberPart.length;
-       
-       // Format invoiceCount with the same number of digits as in the format
-       const formattedNumber = invoiceCount.toString().padStart(numberDigits, '0');
-       
-       return prefix + formattedNumber;
-     } else {
-       // If format doesn't match pattern, try to find last number sequence
-       const lastNumberMatch = format.match(/(\d+)(?!.*\d)/);
-       if (lastNumberMatch) {
-         const numberDigits = lastNumberMatch[1].length;
-         const prefix = format.substring(0, format.lastIndexOf(lastNumberMatch[1]));
-         const formattedNumber = invoiceCount.toString().padStart(numberDigits, '0');
-         return prefix + formattedNumber;
-       }
-       
-       // Fallback: append count to format
-       return format + invoiceCount.toString();
-     }
-   };
-   ```
-
-3. **Update `fetchInvoicesCount` / `fetchInvoicesCounts` function**:
-   - Fetch both `invoiceCount` and `globalInvoiceFormat` from `/api/v1/common-details`
-   - Generate invoice number using the format pattern
-   - Store the formatted invoice number in state
-
-4. **Update invoice number usage**:
-   - Use the generated formatted invoice number instead of just the count
-
-### Example Implementation:
 ```typescript
-const fetchInvoicesCount = async () => {
-  try {
-    const { data } = await axios.get(`${getApiBaseUrl()}/common-details`, {
-      headers: {
-        Authorization: token || '',
-      },
-    });
-    if (data?.success) {
-      const invoiceCount = data.commonDetails?.invoiceCount + 1 || 1;
-      const format = data.commonDetails?.globalInvoiceFormat || '';
-      setGlobalInvoiceFormat(format);
-      
-      // Generate invoice number based on format
-      const invoiceNumber = generateInvoiceNumber(invoiceCount, format);
-      setInvoices(invoiceNumber);
-    }
-  } catch (error) {
-    console.error('Error fetching invoice count:', error);
+const generateInvoiceNumber = (invoiceCount: number, format: string): string => {
+  if (!format || format.trim() === '') {
+    return invoiceCount.toString();
   }
+
+  // Get current date for year replacement
+  const currentDate = new Date();
+  const currentYear = currentDate.getFullYear();
+  const currentYearShort = currentYear.toString().slice(-2);
+  const nextYearShort = (currentYear + 1).toString().slice(-2);
+  const yearRange = `${currentYearShort}-${nextYearShort}`;
+  const fullYearRange = `${currentYear}-${currentYear + 1}`;
+
+  // Replace date/year patterns in the format
+  let processedFormat = format;
+  
+  // IMPORTANT: Replace year range patterns FIRST, then handle single years
+  // Step 1: Replace year range patterns (e.g., "26-27" with current year range)
+  processedFormat = processedFormat.replace(/\d{2}-\d{2}/g, yearRange); // Replace YY-YY pattern
+  processedFormat = processedFormat.replace(/\d{4}-\d{4}/g, fullYearRange); // Replace YYYY-YYYY pattern
+  
+  // Step 2: Handle single year patterns, but skip years that are part of a range
+  // Replace standalone 2-digit years (not preceded or followed by a dash)
+  processedFormat = processedFormat.replace(/\b(\d{2})\b/g, (match, yearStr, offset, string) => {
+    // Check if this match is part of a range pattern (has dash before or after)
+    const before = string[offset - 1];
+    const after = string[offset + match.length];
+    
+    // If it's part of a range (has dash before or after), don't replace
+    if (before === '-' || after === '-') {
+      return match;
+    }
+    
+    const num = parseInt(yearStr);
+    // Only replace if it's a standalone 2-digit year (20-99)
+    if (num >= 20 && num <= 99) {
+      return currentYearShort;
+    }
+    return match;
+  });
+  
+  // Replace standalone 4-digit years (not preceded or followed by a dash)
+  processedFormat = processedFormat.replace(/\b(\d{4})\b/g, (match, yearStr, offset, string) => {
+    // Check if this match is part of a range pattern (has dash before or after)
+    const before = string[offset - 1];
+    const after = string[offset + match.length];
+    
+    // If it's part of a range (has dash before or after), don't replace
+    if (before === '-' || after === '-') {
+      return match;
+    }
+    
+    const num = parseInt(yearStr);
+    // Only replace if it's a standalone 4-digit year (2000-2099)
+    if (num >= 2000 && num <= 2099) {
+      return currentYear.toString();
+    }
+    return match;
+  });
+
+  // Extract the last number sequence (sequential number part)
+  const lastNumberMatch = processedFormat.match(/(\d+)(?!.*\d)/);
+  
+  if (lastNumberMatch) {
+    const numberDigits = lastNumberMatch[1].length;
+    const prefix = processedFormat.substring(0, processedFormat.lastIndexOf(lastNumberMatch[1]));
+    const formattedNumber = invoiceCount.toString().padStart(numberDigits, '0');
+    return prefix + formattedNumber;
+  }
+  
+  // Fallback: append count to processed format
+  return processedFormat + invoiceCount.toString().padStart(5, '0');
 };
 ```
 
+### Key Changes:
+- Added year replacement logic for patterns like `26-27`, `2026-2027`, `26`, `2026`
+- Properly handles year ranges vs standalone years
+- Replaces year patterns with current year before processing the sequential number
+
 ---
 
-## 2. Pagination for Invoice Lists
+## 2. Backend-Generated Invoice Numbers (CRITICAL)
+
+### Files to Update:
+- `src/screens/Admin/AddServiceInvoiceScreen.tsx`
+- `src/screens/Rental/RentalInvoiceFormScreen.tsx`
+- `src/screens/Admin/ServiceInvoiceListScreen.tsx` (if moving quotations to invoices)
+- `src/screens/Rental/RentalQuotationListScreen.tsx` (if moving quotations to invoices)
+
+### Changes Required:
+
+**IMPORTANT**: The backend now generates invoice numbers automatically from the global count. The frontend should NOT send invoice numbers.
+
+1. **Remove invoice number from payload** when creating invoices:
+   ```typescript
+   // OLD (remove this):
+   const payload = {
+     invoiceNumber: invoices, // ❌ Remove this
+     companyId,
+     // ... other fields
+   };
+
+   // NEW (backend generates it):
+   const payload = {
+     // invoiceNumber is now generated by the backend from global settings
+     // Only send invoiceNumber for quotations or when updating existing invoices
+     companyId,
+     // ... other fields
+   };
+   ```
+
+2. **Remove manual invoice count increment calls**:
+   ```typescript
+   // OLD (remove this):
+   if (!invoiceId && invoiceType !== 'quotation') {
+     await updateInvoiceCount(); // ❌ Remove this
+   }
+
+   // NEW (backend handles it automatically):
+   // Invoice count is now incremented automatically by the backend
+   // No need to call updateInvoiceCount()
+   ```
+
+3. **Remove invoice number from "move to invoice" payload**:
+   ```typescript
+   // OLD (remove invoiceNumber):
+   const payload = {
+     invoiceType: 'invoice',
+     invoiceNumber: generatedInvoiceNumber, // ❌ Remove this
+   };
+
+   // NEW (backend generates it):
+   const payload = {
+     invoiceType: 'invoice',
+     // Invoice number is now generated by the backend from global settings
+   };
+   ```
+
+4. **Remove or update `updateInvoiceCount` function**:
+   - The function can be removed entirely, or kept for reference but not called
+   - Backend automatically increments the count after creating invoices
+
+---
+
+## 3. Invoice Number Generation from Global Count (Backend Behavior)
+
+### Understanding:
+The backend now:
+- Generates invoice numbers from the global `invoiceCount` in `CommonDetails`
+- Syncs the count from the format's starting number if the difference is > 10
+- Automatically increments the count after creating invoices
+- Never queries existing invoices to determine the next number
+
+### Mobile App Impact:
+- The mobile app should NOT send invoice numbers when creating new invoices
+- The mobile app should NOT call the increment-invoice endpoint
+- The mobile app can still display the generated invoice number from the API response
+
+---
+
+## 4. Pagination for Invoice Lists
 
 ### Files to Update:
 - `src/screens/Admin/ServiceInvoiceListScreen.tsx`
@@ -108,147 +199,214 @@ const fetchInvoicesCount = async () => {
    };
    ```
 
-3. **Update data fetching**:
-   - Slice the filtered data based on pagination before rendering
-   - Use `FlatList` with pagination controls or implement custom pagination UI
+3. **Reset page when search term changes**:
+   ```typescript
+   useEffect(() => {
+     setPage(0); // Reset to first page when search term changes
+   }, [searchTerm]);
+   ```
 
-4. **Add pagination UI component**:
-   - Add pagination controls (Previous/Next buttons, page numbers, rows per page selector)
-   - Reset page to 0 when search term changes
+4. **Slice filtered data for pagination**:
+   ```typescript
+   const paginatedData = filteredInvoices.slice(
+     page * rowsPerPage,
+     page * rowsPerPage + rowsPerPage
+   );
+   ```
 
-### Example Implementation:
-```typescript
-// In the component
-const paginatedData = filteredInvoices.slice(
-  page * rowsPerPage,
-  page * rowsPerPage + rowsPerPage
-);
-
-// Add pagination controls in render
-<View style={styles.paginationContainer}>
-  <TouchableOpacity
-    onPress={() => handleChangePage(page - 1)}
-    disabled={page === 0}
-  >
-    <Text>Previous</Text>
-  </TouchableOpacity>
-  <Text>Page {page + 1} of {Math.ceil(filteredInvoices.length / rowsPerPage)}</Text>
-  <TouchableOpacity
-    onPress={() => handleChangePage(page + 1)}
-    disabled={page >= Math.ceil(filteredInvoices.length / rowsPerPage) - 1}
-  >
-    <Text>Next</Text>
-  </TouchableOpacity>
-</View>
-```
+5. **Add pagination UI**:
+   ```typescript
+   <View style={styles.paginationContainer}>
+     <TouchableOpacity
+       onPress={() => handleChangePage(page - 1)}
+       disabled={page === 0}
+       style={[styles.paginationButton, page === 0 && styles.paginationButtonDisabled]}
+     >
+       <Text>Previous</Text>
+     </TouchableOpacity>
+     <Text style={styles.paginationText}>
+       Page {page + 1} of {Math.ceil(filteredInvoices.length / rowsPerPage)}
+     </Text>
+     <TouchableOpacity
+       onPress={() => handleChangePage(page + 1)}
+       disabled={page >= Math.ceil(filteredInvoices.length / rowsPerPage) - 1}
+       style={[styles.paginationButton, page >= Math.ceil(filteredInvoices.length / rowsPerPage) - 1 && styles.paginationButtonDisabled]}
+     >
+       <Text>Next</Text>
+     </TouchableOpacity>
+   </View>
+   ```
 
 ---
 
-## 3. Sales Reports Summary Update
+## 5. Sales Reports Summary Update
 
 ### File to Update:
 - `src/screens/Admin/Reports/SalesReportsSummaryScreen.tsx`
 
 ### Changes Required:
 1. **Update API calls** to fetch real data:
-   - Remove placeholder/mock data
-   - Fetch from `/api/v1/product/seller-product` for products count
-   - Fetch from `/api/v1/user/admin-orders?page=1&limit=1` for orders count (use `totalCount`)
-
-2. **Update report data structure**:
    ```typescript
-   const data: ReportData[] = [
-     { 
-       id: 'salesProducts', 
-       name: 'All Sales Products', 
-       count: productsCount, 
-       screen: 'AllProducts' // or appropriate screen name
-     },
-     { 
-       id: 'salesOrders', 
-       name: 'Sales Orders', 
-       count: ordersCount, 
-       screen: 'AdminOrders' // or appropriate screen name
-     },
-   ];
+   const fetchData = async () => {
+     if (!token) {
+       setError("Authentication token not available.");
+       setLoading(false);
+       return;
+     }
+
+     try {
+       setLoading(true);
+       const [productsRes, ordersRes] = await Promise.allSettled([
+         axios.get(`${getApiBaseUrl()}/product/seller-product`, {
+           headers: { Authorization: token }
+         }),
+         axios.get(`${getApiBaseUrl()}/user/admin-orders?page=1&limit=1`, {
+           headers: { Authorization: token }
+         })
+       ]);
+
+       const productsCount = productsRes?.value?.data?.products?.length ?? 0;
+       const ordersCount = ordersRes?.value?.data?.totalCount ?? 0;
+
+       setReportData([
+         { id: 'salesProducts', name: 'All Sales Products', count: productsCount, screen: 'AllProducts' },
+         { id: 'salesOrders', name: 'Sales Orders', count: ordersCount, screen: 'AdminOrders' },
+       ]);
+     } catch (err) {
+       console.error('Error loading sales overview data:', err);
+       setError('Failed to load sales overview data.');
+     } finally {
+       setLoading(false);
+     }
+   };
    ```
 
-3. **Add authentication token**:
-   - Use `useSelector` to get token from Redux store
-   - Include token in API calls
+2. **Update report data structure** to show only sales-related reports
 
-4. **Update navigation**:
-   - Navigate to appropriate screens when clicking on report items
+---
 
-### Example Implementation:
+## 6. Settings Screen - Separate Save for Global Invoice Format
+
+### File to Update:
+- `src/screens/Admin/SettingsScreen.tsx` (if exists)
+
+### Changes Required:
+1. **Add separate save function for Global Invoice Format**:
+   ```typescript
+   const handleSaveInvoiceFormat = async () => {
+     try {
+       setSavingInvoiceFormat(true);
+       const { data } = await axios.put(
+         `${getApiBaseUrl()}/common-details`,
+         {
+           globalInvoiceFormat: globalInvoiceFormat,
+           // Preserve fromMail - don't send it to avoid overwriting
+         },
+         {
+           headers: {
+             Authorization: token || '',
+           },
+         }
+       );
+       if (data?.success) {
+         Toast.show({
+           type: 'success',
+           text1: 'Invoice format saved successfully!',
+         });
+       } else {
+         Toast.show({
+           type: 'error',
+           text1: data?.message || 'Failed to save invoice format',
+         });
+       }
+     } catch (error) {
+       console.error('Error saving invoice format:', error);
+       Toast.show({
+         type: 'error',
+         text1: 'Failed to save invoice format',
+       });
+     } finally {
+       setSavingInvoiceFormat(false);
+     }
+   };
+   ```
+
+2. **Add separate save button** next to the Global Invoice Format input field
+
+---
+
+## 7. Purchase List - Negative Values in Red (Optional)
+
+### File to Update:
+- `src/screens/Admin/PurchaseListScreen.tsx` (if exists and shows material summary)
+
+### Changes Required:
+If the mobile app has a material summary section similar to the web client, update chips to show negative values in red:
+
 ```typescript
-const SalesReportsSummaryScreen = () => {
-  const navigation = useNavigation();
-  const { token } = useSelector((state: RootState) => state.auth);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [reportData, setReportData] = useState<ReportData[]>([]);
+{sortedProductGroups.map((group) => {
+  const isNegative = group.totalQuantity < 0;
+  return (
+    <View
+      key={group.name}
+      style={[
+        styles.chip,
+        isNegative && styles.chipNegative
+      ]}
+    >
+      <Text style={[styles.chipText, isNegative && styles.chipTextNegative]}>
+        {group.name}: {group.totalQuantity}
+      </Text>
+    </View>
+  );
+})}
+```
 
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!token) {
-        setError("Authentication token not available.");
-        setLoading(false);
-        return;
-      }
-
-      try {
-        setLoading(true);
-        const [productsRes, ordersRes] = await Promise.allSettled([
-          axios.get(`${getApiBaseUrl()}/product/seller-product`, {
-            headers: { Authorization: token }
-          }),
-          axios.get(`${getApiBaseUrl()}/user/admin-orders?page=1&limit=1`, {
-            headers: { Authorization: token }
-          })
-        ]);
-
-        const productsCount = productsRes?.value?.data?.products?.length ?? 0;
-        const ordersCount = ordersRes?.value?.data?.totalCount ?? 0;
-
-        setReportData([
-          { id: 'salesProducts', name: 'All Sales Products', count: productsCount, screen: 'AllProducts' },
-          { id: 'salesOrders', name: 'Sales Orders', count: ordersCount, screen: 'AdminOrders' },
-        ]);
-      } catch (err) {
-        console.error('Error loading sales overview data:', err);
-        setError('Failed to load sales overview data.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (token) {
-      fetchData();
-    }
-  }, [token]);
-
-  // ... rest of component
-};
+Add styles:
+```typescript
+chipNegative: {
+  borderColor: 'red',
+  borderWidth: 1,
+},
+chipTextNegative: {
+  color: 'red',
+},
 ```
 
 ---
 
-## 4. Summary of All Changes
+## Summary of All Changes
 
-### Priority 1 (High):
-1. ✅ Invoice number generation based on global invoice format
-   - `AddServiceInvoiceScreen.tsx`
-   - `RentalInvoiceFormScreen.tsx`
+### Priority 1 (Critical - Must Implement):
+1. ✅ **Backend-Generated Invoice Numbers**
+   - Remove invoice number from create invoice payload
+   - Remove manual increment-invoice calls
+   - Remove invoice number from "move to invoice" payload
+   - Files: `AddServiceInvoiceScreen.tsx`, `RentalInvoiceFormScreen.tsx`, `ServiceInvoiceListScreen.tsx`, `RentalQuotationListScreen.tsx`
 
-### Priority 2 (Medium):
-2. ✅ Pagination for invoice lists
-   - `ServiceInvoiceListScreen.tsx`
-   - `RentalInvoiceListScreen.tsx`
+2. ✅ **Enhanced Invoice Number Generation**
+   - Update `generateInvoiceNumber` function with year replacement logic
+   - Files: `AddServiceInvoiceScreen.tsx`, `RentalInvoiceFormScreen.tsx`
 
-### Priority 3 (Low):
-3. ✅ Sales Reports Summary update
-   - `SalesReportsSummaryScreen.tsx`
+### Priority 2 (High - Should Implement):
+3. ✅ **Pagination for Invoice Lists**
+   - Add pagination state and handlers
+   - Add pagination UI
+   - Files: `ServiceInvoiceListScreen.tsx`, `RentalInvoiceListScreen.tsx`
+
+### Priority 3 (Medium):
+4. ✅ **Sales Reports Summary Update**
+   - Fetch real data from API
+   - File: `SalesReportsSummaryScreen.tsx`
+
+5. ✅ **Settings - Separate Save for Global Invoice Format**
+   - Add separate save function and button
+   - File: `SettingsScreen.tsx` (if exists)
+
+### Priority 4 (Low - Optional):
+6. ✅ **Purchase List - Negative Values in Red**
+   - Update material summary chips
+   - File: `PurchaseListScreen.tsx` (if exists)
 
 ---
 
@@ -256,14 +414,17 @@ const SalesReportsSummaryScreen = () => {
 
 After implementing these changes, test:
 
-- [ ] Invoice numbers are generated correctly with format (e.g., "CC1001", "CC1002")
-- [ ] Invoice numbers fall back to simple count if no format is set
+- [ ] Invoice numbers are generated correctly with format including year replacement (e.g., "CC/26-27/00002")
+- [ ] Invoice numbers are generated by backend (check API response)
+- [ ] No invoice numbers are sent from mobile app when creating invoices
+- [ ] No increment-invoice API calls are made from mobile app
 - [ ] Pagination works correctly in Service Invoice List
 - [ ] Pagination works correctly in Rental Invoice List
 - [ ] Page resets when search term changes
 - [ ] Sales Reports Summary shows correct product count
 - [ ] Sales Reports Summary shows correct orders count
-- [ ] Navigation works from Sales Reports Summary to respective screens
+- [ ] Settings screen has separate save for Global Invoice Format (if exists)
+- [ ] Negative values show in red in Purchase List (if applicable)
 - [ ] All API calls include authentication tokens
 - [ ] Error handling works for failed API calls
 
@@ -271,10 +432,24 @@ After implementing these changes, test:
 
 ## Notes
 
+- **CRITICAL**: The backend now generates invoice numbers automatically. The mobile app should NOT send invoice numbers when creating new invoices.
+- **CRITICAL**: The mobile app should NOT call the increment-invoice endpoint. The backend handles this automatically.
 - All API endpoints should use `getApiBaseUrl()` helper function
 - All API calls should include `Authorization` header with token
 - Use `Promise.allSettled` for concurrent API calls to handle individual failures gracefully
 - Follow existing code patterns and styling in the mobile app
 - Use TypeScript types appropriately
 - Handle loading and error states properly
+- The year replacement logic is important for formats like `CC/26-27/00001` to work correctly
 
+---
+
+## Implementation Order
+
+1. **First**: Update invoice number generation functions with year replacement
+2. **Second**: Remove invoice numbers from create invoice payloads
+3. **Third**: Remove increment-invoice API calls
+4. **Fourth**: Add pagination to invoice lists
+5. **Fifth**: Update Sales Reports Summary
+6. **Sixth**: Add separate save for Global Invoice Format in Settings (if exists)
+7. **Seventh**: Add negative value styling in Purchase List (if applicable)

@@ -537,6 +537,24 @@ const UserProfile = () => {
                     </div>
                 </div>
 
+                {/* Activity Log Button */}
+                {employee && (
+                    <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+                        <div className="flex justify-center">
+                            <Link
+                                to={
+                                    auth?.user?.role === 1
+                                        ? "/admin/dashboard/activity-log"
+                                        : "/user/dashboard/activity-log"
+                                }
+                                className="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg transition duration-200 shadow-md hover:shadow-lg"
+                            >
+                                Fill Activity Log
+                            </Link>
+                        </div>
+                    </div>
+                )}
+
                 {/* Additional Details Section */}
                 <div className="bg-white rounded-lg shadow-md p-6 mb-8">
                     <div className="space-y-4">

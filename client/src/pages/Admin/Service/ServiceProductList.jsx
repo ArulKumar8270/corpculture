@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
-import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Button, Typography, TextField } from '@mui/material'; // Import TextField
+import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Button, Typography, TextField, Pagination, Box } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useAuth } from '../../../context/auth';
@@ -12,10 +12,17 @@ const ServiceProductList = () => {
     const navigate = useNavigate();
     const [serviceProducts, setServiceProducts] = useState([]);
     const [searchTerm, setSearchTerm] = useState(''); // New state for search term
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(10);
 
     useEffect(() => {
         fetchServiceProducts();
     }, []);
+
+    // Reset to page 1 when search term changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm]);
 
     const hasPermission = (key) => {
         return userPermissions.some(p => p.key === key && p.actions.includes('edit')) || auth?.user?.role === 1;
@@ -69,6 +76,16 @@ const ServiceProductList = () => {
         return companyName.includes(lowerCaseSearchTerm) || productName.includes(lowerCaseSearchTerm);
     });
 
+    // Calculate pagination
+    const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const paginatedProducts = filteredProducts.slice(startIndex, endIndex);
+
+    const handlePageChange = (event, value) => {
+        setCurrentPage(value);
+    };
+
     return (
         <div className="p-4">
             <div className="flex justify-between items-center mb-6">
@@ -111,10 +128,10 @@ const ServiceProductList = () => {
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {filteredProducts.length > 0 ? ( // Use filteredProducts here
-                                filteredProducts.map((product, index) => (
+                            {paginatedProducts.length > 0 ? (
+                                paginatedProducts.map((product, index) => (
                                     <TableRow key={product._id}>
-                                        <TableCell>{index + 1}</TableCell>
+                                        <TableCell>{startIndex + index + 1}</TableCell>
                                         <TableCell>{product.company?.companyName || 'N/A'}</TableCell>
                                         <TableCell>{product.productName?.name || 'N/A'}</TableCell>
                                         <TableCell>{product.sku}</TableCell>
@@ -169,6 +186,18 @@ const ServiceProductList = () => {
                         </TableBody>
                     </Table>
                 </TableContainer>
+                {filteredProducts.length > 0 && (
+                    <Box display="flex" justifyContent="center" alignItems="center" mt={3} mb={2}>
+                        <Pagination
+                            count={totalPages}
+                            page={currentPage}
+                            onChange={handlePageChange}
+                            color="primary"
+                            showFirstButton
+                            showLastButton
+                        />
+                    </Box>
+                )}
             </Paper>
         </div>
     );
