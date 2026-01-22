@@ -102,10 +102,33 @@ export const createRentalPaymentEntry = async (req, res) => {
             countImageUpload,
             assignedTo,
             invoiceType,
+            invoiceDate, // Add invoiceDate
             rentalId,
             status,
             products: productsRaw, // New: array of products (may be JSON string from FormData)
         } = req.body;
+
+        // Parse invoiceDate from string (FormData sends it as ISO string) to Date object
+        let parsedInvoiceDate = null;
+        if (invoiceDate) {
+            // If it's already a Date object, use it
+            if (invoiceDate instanceof Date) {
+                parsedInvoiceDate = invoiceDate;
+            } else if (typeof invoiceDate === 'string' && invoiceDate.trim() !== '') {
+                // If it's a string, try to parse it
+                const dateObj = new Date(invoiceDate);
+                // Check if it's a valid date
+                if (!isNaN(dateObj.getTime())) {
+                    parsedInvoiceDate = dateObj;
+                    console.log(`[Rental Invoice Create] Parsed invoiceDate: ${parsedInvoiceDate.toISOString()} from input: ${invoiceDate}`);
+                } else {
+                    console.log(`[Rental Invoice Create] Invalid invoiceDate string: ${invoiceDate}`);
+                }
+            }
+        }
+        // If no valid invoiceDate provided, use current date
+        const finalInvoiceDate = parsedInvoiceDate || new Date();
+        console.log(`[Rental Invoice Create] Final invoiceDate: ${finalInvoiceDate.toISOString()}`);
 
         // ============================================
         // CRITICAL: ALWAYS generate invoice number from GLOBAL COUNT ONLY
@@ -246,6 +269,7 @@ export const createRentalPaymentEntry = async (req, res) => {
                 sendDetailsTo,
                 countImageUpload: countImageUploadUrl,
                 invoiceType,
+                invoiceDate: finalInvoiceDate, // Use parsed invoice date
                 remarks,
                 a3Config,
                 a4Config,
@@ -411,6 +435,7 @@ export const createRentalPaymentEntry = async (req, res) => {
                 sendDetailsTo,
                 countImageUpload: countImageUploadUrl,
                 invoiceType,
+                invoiceDate: finalInvoiceDate, // Use parsed invoice date
                 remarks,
                 status: status || 'Unpaid',
                 grandTotal: grandTotal.toFixed(2),
@@ -734,10 +759,30 @@ export const updateRentalPaymentEntry = async (req, res) => {
             paymentAmount,
             invoiceLink,
             invoiceType,
+            invoiceDate, // Add invoiceDate
             status,
             assignedTo,
             products: productsRaw, // New: array of products (may be JSON string from FormData)
         } = req.body;
+
+        // Parse invoiceDate from string (FormData sends it as ISO string) to Date object
+        let parsedInvoiceDate = null;
+        if (invoiceDate !== undefined) {
+            // If it's already a Date object, use it
+            if (invoiceDate instanceof Date) {
+                parsedInvoiceDate = invoiceDate;
+            } else if (typeof invoiceDate === 'string' && invoiceDate.trim() !== '') {
+                // If it's a string, try to parse it
+                const dateObj = new Date(invoiceDate);
+                // Check if it's a valid date
+                if (!isNaN(dateObj.getTime())) {
+                    parsedInvoiceDate = dateObj;
+                    console.log(`[Rental Invoice Update] Parsed invoiceDate: ${parsedInvoiceDate.toISOString()} from input: ${invoiceDate}`);
+                } else {
+                    console.log(`[Rental Invoice Update] Invalid invoiceDate string: ${invoiceDate}`);
+                }
+            }
+        }
 
         let entry = await RentalPaymentEntry.findById(id);
 
@@ -957,6 +1002,16 @@ export const updateRentalPaymentEntry = async (req, res) => {
         // Update other fields
         if (sendDetailsTo) entry.sendDetailsTo = sendDetailsTo;
         if (remarks !== undefined) entry.remarks = remarks;
+        // Update invoiceDate if provided (parsedInvoiceDate will be null if invalid or not provided)
+        if (invoiceDate !== undefined) {
+            if (parsedInvoiceDate) {
+                entry.invoiceDate = parsedInvoiceDate;
+            } else if (invoiceDate === null || invoiceDate === '') {
+                // Allow clearing the invoice date
+                entry.invoiceDate = null;
+            }
+            // If invoiceDate is provided but invalid, keep existing value (don't update)
+        }
         if (pendingAmount) entry.pendingAmount = pendingAmount;
         if (tdsAmount) entry.tdsAmount = tdsAmount;
         if (paymentAmountType) entry.paymentAmountType = paymentAmountType;

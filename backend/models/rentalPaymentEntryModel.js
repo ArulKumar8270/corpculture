@@ -110,6 +110,9 @@ const rentalPaymentEntrySchema = new mongoose.Schema({
         type: Date,
         default: Date.now,
     },
+    invoiceDate: {
+        type: Date,
+    },
     modeOfPayment: {
         type: String,
         trim: true,

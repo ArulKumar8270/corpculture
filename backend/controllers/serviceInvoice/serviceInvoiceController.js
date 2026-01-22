@@ -619,7 +619,7 @@ export const updateServiceInvoice = async (req, res) => {
         if (description) serviceInvoice.description = description;
         if (tax !== undefined) serviceInvoice.tax = tax;
         if (status) serviceInvoice.status = status;
-        if (invoiceDate) serviceInvoice.invoiceDate = invoiceDate;
+        if (invoiceDate !== undefined) serviceInvoice.invoiceDate = invoiceDate; // Update invoice date (check for undefined, not just truthy)
         if (quotationDate) serviceInvoice.quotationDate = quotationDate; // Preserve quotation date
         if (movedToInvoiceDate) serviceInvoice.movedToInvoiceDate = movedToInvoiceDate; // Track when moved to invoice
         // Only update assignedTo if it's a valid value (not undefined, null, or empty string)
