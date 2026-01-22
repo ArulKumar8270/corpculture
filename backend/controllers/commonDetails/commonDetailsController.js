@@ -74,32 +74,41 @@ export const updateCommonDetails = async (req, res) => {
         if (fromMail !== undefined) updateData.fromMail = fromMail;
 
         // If globalInvoiceFormat is being updated, extract the starting number from it
-        // and sync the invoiceCount to match the format's starting number
+        // and automatically sync the invoiceCount to match the format's starting number
         // This ensures the count always matches what the format indicates
-        if (globalInvoiceFormat !== undefined) {
+        if (globalInvoiceFormat !== undefined && globalInvoiceFormat.trim() !== '') {
             // Extract the last number sequence from the format (e.g., "00001" from "CC/26-27/00001")
+            // This regex finds the last sequence of digits in the string
             const lastNumberMatch = globalInvoiceFormat.match(/(\d+)(?!.*\d)/);
+            
             if (lastNumberMatch) {
-                const startingNumber = parseInt(lastNumberMatch[1]);
+                const extractedNumber = parseInt(lastNumberMatch[1]);
                 
-                // Always sync the count to match the format's starting number
+                // Always extract and use the number from globalInvoiceFormat as invoiceCount
                 // unless invoiceCount is explicitly provided (user override)
-                if (invoiceCount === undefined && startingNumber > 0) {
+                if (invoiceCount === undefined) {
+                    // Automatically set invoiceCount from the format
+                    updateData.invoiceCount = extractedNumber;
+                    
                     const currentDetails = await CommonDetails.findOne({});
-                    if (currentDetails) {
-                        const currentCount = currentDetails.invoiceCount || 0;
-                        // Sync the count to match the format's starting number
-                        // This allows resetting the count when format is updated
-                        updateData.invoiceCount = startingNumber;
-                        console.log(`[Common Details] Syncing invoice count from format: ${startingNumber} (was ${currentCount})`);
-                    } else {
-                        // If no existing details, use the starting number from format
-                        updateData.invoiceCount = startingNumber;
-                        console.log(`[Common Details] Initializing invoice count from format: ${startingNumber}`);
-                    }
-                } else if (invoiceCount !== undefined) {
+                    const currentCount = currentDetails?.invoiceCount || 0;
+                    
+                    console.log(`[Common Details] Auto-extracted invoice count from globalInvoiceFormat: ${extractedNumber}`);
+                    console.log(`[Common Details] Previous invoice count: ${currentCount}`);
+                    console.log(`[Common Details] New invoice count (from format): ${extractedNumber}`);
+                } else {
                     // If invoiceCount is explicitly provided, use it (user override)
-                    console.log(`[Common Details] Using explicitly provided invoice count: ${invoiceCount}`);
+                    console.log(`[Common Details] Using explicitly provided invoice count: ${invoiceCount} (format had: ${extractedNumber})`);
+                }
+            } else {
+                // If format doesn't contain a number, log a warning but don't change invoiceCount
+                console.log(`[Common Details] Warning: globalInvoiceFormat "${globalInvoiceFormat}" does not contain a number sequence. Invoice count will not be auto-updated.`);
+                if (invoiceCount === undefined) {
+                    // If no number in format and no invoiceCount provided, keep existing count
+                    const currentDetails = await CommonDetails.findOne({});
+                    if (currentDetails?.invoiceCount !== undefined) {
+                        console.log(`[Common Details] Keeping existing invoice count: ${currentDetails.invoiceCount}`);
+                    }
                 }
             }
         }

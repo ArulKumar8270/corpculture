@@ -13,6 +13,10 @@ import {
     FormHelperText,
     Autocomplete
 } from '@mui/material';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import dayjs from 'dayjs';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../context/auth';
@@ -44,6 +48,7 @@ const RentalInvoiceForm = () => {
         sendDetailsTo: '',
         countImageFile: null,
         remarks: '',
+        invoiceDate: dayjs(), // Invoice date with default to today
         a3Config: { bwOldCount: '', bwNewCount: '' },
         a4Config: { bwOldCount: '', bwNewCount: '' },
         a5Config: { bwOldCount: '', bwNewCount: '' },
@@ -229,6 +234,7 @@ const RentalInvoiceForm = () => {
                             sendDetailsTo: entry?.sendDetailsTo || '',
                             countImageFile: null,
                             remarks: entry.remarks || '',
+                            invoiceDate: entry.invoiceDate ? dayjs(entry.invoiceDate) : dayjs(), // Set invoice date if exists, otherwise default to today
                             a3Config: {
                                 bwOldCount: entry.a3Config?.bwOldCount ?? 0,
                                 bwNewCount: entry.a3Config?.bwNewCount ?? 0,
@@ -712,6 +718,7 @@ const RentalInvoiceForm = () => {
             }
             data.append('sendDetailsTo', formData.sendDetailsTo);
             data.append('remarks', formData.remarks || '');
+            data.append('invoiceDate', formData.invoiceDate ? formData.invoiceDate.toISOString() : new Date().toISOString()); // Add invoice date
             if (employeeName) {
                 data.append('assignedTo', employeeName);
             }
@@ -835,6 +842,7 @@ const RentalInvoiceForm = () => {
                     sendDetailsTo: '',
                     countImageFile: null,
                     remarks: '',
+                    invoiceDate: dayjs(), // Reset to today
                     basePrice: '',
                     a3Config: { bwOldCount: '', bwNewCount: '' },
                     a4Config: { bwOldCount: '', bwNewCount: '' },
@@ -922,6 +930,7 @@ const RentalInvoiceForm = () => {
                     countImageFile: null,
                     basePrice: '',
                     remarks: '',
+                    invoiceDate: dayjs(), // Reset to today
                     a3Config: { bwOldCount: '', bwNewCount: '', colorOldCount: '', colorNewCount: '', colorScanningOldCount: '', colorScanningNewCount: '' },
                     a4Config: { bwOldCount: '', bwNewCount: '', colorOldCount: '', colorNewCount: '', colorScanningOldCount: '', colorScanningNewCount: '' },
                     a5Config: { bwOldCount: '', bwNewCount: '', colorOldCount: '', colorNewCount: '', colorScanningOldCount: '', colorScanningNewCount: '' },
@@ -1350,6 +1359,23 @@ const RentalInvoiceForm = () => {
                             </Select>
                             {errors.sendDetailsTo && <FormHelperText>{errors.sendDetailsTo}</FormHelperText>}
                         </FormControl>
+
+                        <LocalizationProvider dateAdapter={AdapterDayjs}>
+                            <DatePicker
+                                label="Invoice Date"
+                                value={formData.invoiceDate}
+                                onChange={(newValue) => {
+                                    setFormData(prev => ({ ...prev, invoiceDate: newValue }));
+                                }}
+                                slotProps={{
+                                    textField: {
+                                        fullWidth: true,
+                                        size: 'small',
+                                        margin: 'normal',
+                                    },
+                                }}
+                            />
+                        </LocalizationProvider>
 
                         {/* <Box>
                             <Typography variant="subtitle1" gutterBottom>Count Image Upload:</Typography>

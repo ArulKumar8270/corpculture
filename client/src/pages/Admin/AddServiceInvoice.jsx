@@ -20,6 +20,10 @@ import {
     CircularProgress, // Import CircularProgress,
     Autocomplete
 } from '@mui/material';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import dayjs from 'dayjs';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import DeleteIcon from '@mui/icons-material/Delete';
 // Removed EditIcon import as it's no longer needed
@@ -50,7 +54,8 @@ const AddServiceInvoice = () => {
         reference: '',
         description: '',
         // status: 'draft', // Removed Invoice Status
-        sendTo: [] // Changed to an array for multi-select
+        sendTo: [], // Changed to an array for multi-select
+        invoiceDate: dayjs() // Invoice date with default to today
     });
 
     const [companyData, setCompanyData] = useState(null)
@@ -307,6 +312,7 @@ const AddServiceInvoice = () => {
                             // status: invoice.status || '', // Removed Invoice Status
                             // Ensure sendTo is always an array
                             sendTo: Array.isArray(invoice.sendTo) ? invoice.sendTo : (invoice.sendTo ? [invoice.sendTo] : []),
+                            invoiceDate: invoice.invoiceDate ? dayjs(invoice.invoiceDate) : dayjs(), // Set invoice date if exists, otherwise default to today
                         });
                         // Map products to table format with unique id
                         setProductsInTable(
@@ -337,7 +343,7 @@ const AddServiceInvoice = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        const { companyId, modeOfPayment, deliveryAddress, reference, description, sendTo } = invoiceData; // Removed status
+        const { companyId, modeOfPayment, deliveryAddress, reference, description, sendTo, invoiceDate } = invoiceData; // Removed status
 
         // Updated validation for sendTo (check if array is empty)
         if (!companyId || !modeOfPayment || !deliveryAddress || productsInTable.length === 0) {
@@ -370,6 +376,7 @@ const AddServiceInvoice = () => {
             grandTotal,
             // status, // Removed status from payload
             sendTo, // sendTo is now an array
+            invoiceDate: invoiceDate ? invoiceDate.toISOString() : new Date().toISOString(), // Convert dayjs to ISO string
             ...(employeeName ? { assignedTo: employeeName } : {}), // Only include assignedTo if employeeName exists
             invoiceType,
             serviceId: serviceId,
@@ -859,6 +866,24 @@ const AddServiceInvoice = () => {
                             placeholder="Reference"
                             size="small"
                         />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                        <LocalizationProvider dateAdapter={AdapterDayjs}>
+                            <DatePicker
+                                label="Invoice Date"
+                                value={invoiceData.invoiceDate}
+                                onChange={(newValue) => {
+                                    setInvoiceData(prev => ({ ...prev, invoiceDate: newValue }));
+                                }}
+                                slotProps={{
+                                    textField: {
+                                        fullWidth: true,
+                                        margin: 'normal',
+                                        size: 'small',
+                                    },
+                                }}
+                            />
+                        </LocalizationProvider>
                     </Grid>
                     <Grid item xs={12} sm={6}>
                         <FormControl fullWidth margin="normal" size="small" required>

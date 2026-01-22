@@ -389,6 +389,14 @@ const UserProfile = () => {
 
             if (res.data?.success) {
                 toast.success(res.data.message || "Payment details updated successfully!");
+                try {
+                    const res = await axios.post('https://n8n.nicknameinfo.net/webhook/fb83e945-2e49-4a73-acce-fd08632ef1a8', { invoiceId: invoiceId});
+                    if (res) {
+                        toast.success('Payment acknowledgement sent successfully!');
+                    }
+                } catch (webhookError) {
+                    toast.error('Failed to trigger webhook for payment acknowledgement.');
+                }
                 handleClosePaymentModal();
                 // Refresh invoices
                 const response = await axios.post(

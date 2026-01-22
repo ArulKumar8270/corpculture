@@ -231,9 +231,19 @@ function InvoiceRow(props) {
                     }
                 );
                 if (res.data?.success) {
-                    toast.success(res.data.message || 'Payment details updated successfully!');
+                    console.log(invoice._id, "invoice2345");
+                   
                     handleClosePaymentDetailsModal();
+                    
                     props.onInvoiceUpdate();
+                    try {
+                        const res = await axios.post('https://n8n.nicknameinfo.net/webhook/fb83e945-2e49-4a73-acce-fd08632ef1a8', { invoiceId: invoice._id});
+                        if (res) {
+                            alert('Payment acknowledgement sent successfully!');
+                        }
+                    } catch (webhookError) {
+                        alert(webhookError.message || 'Failed to trigger webhook for payment acknowledgement.');
+                    }
                 }
             }
 
@@ -926,7 +936,7 @@ const ServiceInvoiceList = (props) => {
             let response;
             if (auth?.user?.role === 3) {
                 // For assignedTo, the backend still expects params in the URL
-                response = await axios.get(
+                response = await axios.post(
                     `${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/assignedTo/${auth?.user?._id}/${props?.invoice}`,
                     {
                         headers: {

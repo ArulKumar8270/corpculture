@@ -118,7 +118,7 @@ const ServiceProductList = () => {
                                 <TableCell className="font-semibold">S.No</TableCell>
                                 <TableCell className="font-semibold">Company</TableCell>
                                 <TableCell className="font-semibold">Product Name</TableCell>
-                                <TableCell className="font-semibold">SKU</TableCell>
+                                {/* <TableCell className="font-semibold">SKU</TableCell> */}
                                 <TableCell className="font-semibold">HSN</TableCell>
                                 <TableCell className="font-semibold">Quantity</TableCell>
                                 <TableCell className="font-semibold">Rate</TableCell>
@@ -134,7 +134,7 @@ const ServiceProductList = () => {
                                         <TableCell>{startIndex + index + 1}</TableCell>
                                         <TableCell>{product.company?.companyName || 'N/A'}</TableCell>
                                         <TableCell>{product.productName?.name || 'N/A'}</TableCell>
-                                        <TableCell>{product.sku}</TableCell>
+                                        {/* <TableCell>{product.sku}</TableCell> */}
                                         <TableCell>{product.hsn}</TableCell>
                                         <TableCell>{product.quantity}</TableCell>
                                         <TableCell>{product.rate}</TableCell>

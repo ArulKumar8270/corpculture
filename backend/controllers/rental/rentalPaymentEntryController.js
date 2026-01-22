@@ -62,78 +62,32 @@ const calculateProductTotal = (machine, a3Config, a4Config, a5Config) => {
 };
 
 // Helper function to generate invoice number based on format
+// Helper function to generate invoice number based on format
+// Preserves the format structure (year, prefix, etc.) and only replaces the sequential number part
 const generateInvoiceNumber = (invoiceCount, format) => {
     if (!format || format.trim() === '') {
         return invoiceCount.toString();
     }
 
-    // Get current date for year replacement
-    const currentDate = new Date();
-    const currentYear = currentDate.getFullYear();
-    const currentYearShort = currentYear.toString().slice(-2);
-    const nextYearShort = (currentYear + 1).toString().slice(-2);
-    const yearRange = `${currentYearShort}-${nextYearShort}`;
-    const fullYearRange = `${currentYear}-${currentYear + 1}`;
-
-    // Replace date/year patterns in the format
-    let processedFormat = format;
+    // DO NOT replace year patterns - preserve them as-is from the format template
+    // The format template (e.g., "CC/23-24/00001") should be used as-is, only the number part changes
     
-    // IMPORTANT: Replace year range patterns FIRST, then handle single years
-    // Step 1: Replace year range patterns (e.g., "26-27" with current year range)
-    processedFormat = processedFormat.replace(/\d{2}-\d{2}/g, yearRange); // Replace YY-YY pattern
-    processedFormat = processedFormat.replace(/\d{4}-\d{4}/g, fullYearRange); // Replace YYYY-YYYY pattern
-    
-    // Step 2: Handle single year patterns, but skip years that are part of a range
-    // Replace standalone 2-digit years (not preceded or followed by a dash)
-    processedFormat = processedFormat.replace(/\b(\d{2})\b/g, (match, yearStr, offset, string) => {
-        // Check if this match is part of a range pattern (has dash before or after)
-        const before = string[offset - 1];
-        const after = string[offset + match.length];
-        
-        // If it's part of a range (has dash before or after), don't replace
-        if (before === '-' || after === '-') {
-            return match;
-        }
-        
-        const num = parseInt(yearStr);
-        // Only replace if it's a standalone 2-digit year (20-99)
-        if (num >= 20 && num <= 99) {
-            return currentYearShort;
-        }
-        return match;
-    });
-    
-    // Replace standalone 4-digit years (not preceded or followed by a dash)
-    processedFormat = processedFormat.replace(/\b(\d{4})\b/g, (match, yearStr, offset, string) => {
-        // Check if this match is part of a range pattern (has dash before or after)
-        const before = string[offset - 1];
-        const after = string[offset + match.length];
-        
-        // If it's part of a range (has dash before or after), don't replace
-        if (before === '-' || after === '-') {
-            return match;
-        }
-        
-        const num = parseInt(yearStr);
-        // Only replace if it's a standalone 4-digit year (2000-2099)
-        if (num >= 2000 && num <= 2099) {
-            return currentYear.toString();
-        }
-        return match;
-    });
-
-    // Extract the last number sequence (sequential number part)
-    const lastNumberMatch = processedFormat.match(/(\d+)(?!.*\d)/);
+    // Extract the last number sequence (sequential number part) from the original format
+    const lastNumberMatch = format.match(/(\d+)(?!.*\d)/);
     
     if (lastNumberMatch) {
+        // Get the number of digits in the template (e.g., "00001" has 5 digits)
         const numberDigits = lastNumberMatch[1].length;
-        const prefix = processedFormat.substring(0, processedFormat.lastIndexOf(lastNumberMatch[1]));
+        // Get the prefix (everything before the last number sequence)
+        const prefix = format.substring(0, format.lastIndexOf(lastNumberMatch[1]));
+        // Format the invoice count with the same number of digits (e.g., 6 → "00006")
         const formattedNumber = invoiceCount.toString().padStart(numberDigits, '0');
+        // Return prefix + formatted number (e.g., "CC/23-24/" + "00006" = "CC/23-24/00006")
         return prefix + formattedNumber;
     }
     
-    // Fallback: append count to processed format
-    return processedFormat + invoiceCount.toString().padStart(5, '0');
+    // Fallback: append count to format if no number pattern found
+    return format + invoiceCount.toString().padStart(5, '0');
 };
 
 // Create a new rental payment entry
@@ -180,45 +134,20 @@ export const createRentalPaymentEntry = async (req, res) => {
                 });
             }
 
-            // Ensure invoiceCount is a number (not string)
+            const globalFormat = commonDetails.globalInvoiceFormat || '';
+            
+            // Use the stored invoiceCount from DB (this is the actual current count)
+            // The format is just a template - we preserve its structure (year, prefix) but use DB count
             let currentCount = typeof commonDetails.invoiceCount === 'number' 
                 ? commonDetails.invoiceCount 
                 : parseInt(commonDetails.invoiceCount) || 0;
             
-            const globalFormat = commonDetails.globalInvoiceFormat || '';
-            
-            // If format has a starting number, sync the count to match it ONLY if count is way off
-            // This ensures the count matches the format's starting number, but only syncs once
-            // After that, the count should increment normally
-            if (globalFormat) {
-                const lastNumberMatch = globalFormat.match(/(\d+)(?!.*\d)/);
-                if (lastNumberMatch) {
-                    const formatStartingNumber = parseInt(lastNumberMatch[1]);
-                    // Only sync if the count is significantly different (more than 10 off)
-                    // This prevents resetting the count every time if it's just slightly off
-                    // The format's starting number is just a template, not a hard reset
-                    if (formatStartingNumber > 0) {
-                        // Only sync if current count is way off (more than 10 invoices ahead/behind)
-                        // This allows the count to increment normally after initial sync
-                        const difference = Math.abs(currentCount - formatStartingNumber);
-                        if (difference > 10) {
-                            console.log(`[Rental Invoice Generation] Syncing count from format: ${formatStartingNumber} (was ${currentCount}, difference: ${difference})`);
-                            // Update the count in the database to match the format
-                            await CommonDetails.findOneAndUpdate(
-                                {},
-                                { $set: { invoiceCount: formatStartingNumber } },
-                                { new: true, upsert: true }
-                            );
-                            currentCount = formatStartingNumber;
-                        } else {
-                            console.log(`[Rental Invoice Generation] Count is close to format starting number (${formatStartingNumber}), using current count: ${currentCount}`);
-                        }
-                    }
-                }
-            }
+            console.log(`[Rental Invoice Generation] Using stored invoiceCount from DB: ${currentCount}`);
+            console.log(`[Rental Invoice Generation] Global format template: "${globalFormat}"`);
+            console.log(`[Rental Invoice Generation] Format will be preserved (year, prefix) - only number will be replaced`);
             
             // Use currentCount + 1 for the next invoice number
-            // DO NOT query existing invoices - use ONLY the global count
+            // The format structure (year, prefix) will be preserved, only the number part changes
             nextInvoiceCount = currentCount + 1;
             
             // Generate invoice number from global count and format ONLY
@@ -833,14 +762,20 @@ export const updateRentalPaymentEntry = async (req, res) => {
                 });
             }
 
-            // Ensure invoiceCount is a number (not string)
-            const currentCount = typeof commonDetails.invoiceCount === 'number' 
+            const globalFormat = commonDetails.globalInvoiceFormat || '';
+            
+            // Use the stored invoiceCount from DB (this is the actual current count)
+            // The format is just a template - we preserve its structure (year, prefix) but use DB count
+            let currentCount = typeof commonDetails.invoiceCount === 'number' 
                 ? commonDetails.invoiceCount 
                 : parseInt(commonDetails.invoiceCount) || 0;
             
+            console.log(`[Rental Move to Invoice] Using stored invoiceCount from DB: ${currentCount}`);
+            console.log(`[Rental Move to Invoice] Global format template: "${globalFormat}"`);
+            console.log(`[Rental Move to Invoice] Format will be preserved (year, prefix) - only number will be replaced`);
+            
             // Use currentCount + 1 for the next invoice number
             const nextInvoiceCount = currentCount + 1;
-            const globalFormat = commonDetails.globalInvoiceFormat || '';
             
             // Generate invoice number from global count and format
             finalInvoiceNumber = generateInvoiceNumber(nextInvoiceCount, globalFormat);

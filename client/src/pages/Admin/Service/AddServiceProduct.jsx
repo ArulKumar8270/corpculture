@@ -51,6 +51,11 @@ const AddServiceProduct = () => {
             return;
         }
 
+        // Don't search if a company is already selected
+        if (company) {
+            return;
+        }
+
         const searchTimer = setTimeout(() => {
             // Reset to page 1 when search changes
             fetchCompanies(1, false, companySearch);
@@ -58,11 +63,11 @@ const AddServiceProduct = () => {
 
         return () => clearTimeout(searchTimer);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [companySearch]);
+    }, [companySearch, company]);
 
-    // Load more companies in background after initial load (only when no search)
+    // Load more companies in background after initial load (only when no search and no company selected)
     useEffect(() => {
-        if (!companySearch && companies.length > 0 && companies.length < companyTotalCount && companyPage === 1) {
+        if (!company && !companySearch && companies.length > 0 && companies.length < companyTotalCount && companyPage === 1) {
             // Load next batch in background after a short delay (only after first page loads)
             const timer = setTimeout(() => {
                 loadMoreCompanies();
@@ -70,7 +75,7 @@ const AddServiceProduct = () => {
             return () => clearTimeout(timer);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [companies.length, companyTotalCount, companyPage, companySearch]);
+    }, [company, companies.length, companyTotalCount, companyPage, companySearch]);
 
     // Fetch product data if editing
     useEffect(() => {
@@ -226,16 +231,25 @@ const AddServiceProduct = () => {
         }
 
         try {
+            // Generate timestamp for SKU (format: YYYYMMDDHHmmss)
+            const now = new Date();
+            const timestamp = now.getFullYear().toString() +
+                String(now.getMonth() + 1).padStart(2, '0') +
+                String(now.getDate()).padStart(2, '0') +
+                String(now.getHours()).padStart(2, '0') +
+                String(now.getMinutes()).padStart(2, '0') +
+                String(now.getSeconds()).padStart(2, '0');
+            
             const productData = {
                 company,
                 productName, // productName is now the _id
-                sku: sku ? sku : `${productName}-${hsn}-${quantity}-${rate}-${gstTypeIds.join('-')}${isAdmin ? `-${commission}` : ''}`,
+                sku: sku ? sku : `${productName}-${hsn}-${quantity}-${rate}-${gstTypeIds.join('-')}${isAdmin ? `-${commission}` : ''}-${timestamp}`,
                 hsn,
                 quantity: parseInt(quantity),
                 rate: parseFloat(rate),
                 gstType: gstTypeIds, // Send the array of IDs
                 totalAmount: parseFloat(totalAmount),
-                ...(isAdmin && { commission: parseFloat(commission) }), // Add commission to payload only for admin
+                commission: parseFloat(commission)
             };
 
             if (product_id) {
@@ -300,13 +314,27 @@ const AddServiceProduct = () => {
                         value={companies.find(c => c._id === company) || null} // Find the object based on stored ID for display
                         onChange={(event, newValue) => {
                             setCompany(newValue ? newValue._id : ''); // Set the _id to state
+                            // Clear search when company is selected to prevent reload
+                            if (newValue) {
+                                setCompanySearch('');
+                            }
                         }}
-                        onInputChange={(event, newInputValue) => {
-                            setCompanySearch(newInputValue);
+                        onInputChange={(event, newInputValue, reason) => {
+                            // Only update search if:
+                            // 1. User is typing (reason === 'input')
+                            // 2. User cleared the input (reason === 'clear')
+                            // Don't update when reason is 'reset' (option selected) to prevent reload
+                            if (reason === 'input') {
+                                setCompanySearch(newInputValue);
+                            } else if (reason === 'clear') {
+                                setCompanySearch('');
+                                setCompany(''); // Also clear the selected company
+                            }
+                            // Ignore 'reset' reason to prevent reload after selection
                         }}
                         onOpen={() => {
-                            // Load more companies when dropdown opens if needed (only if no search)
-                            if (!companySearch && companies.length < companyTotalCount && !loadingMoreCompanies) {
+                            // Load more companies when dropdown opens if needed (only if no search and no company selected)
+                            if (!company && !companySearch && companies.length < companyTotalCount && !loadingMoreCompanies) {
                                 loadMoreCompanies();
                             }
                         }}
@@ -314,8 +342,8 @@ const AddServiceProduct = () => {
                         ListboxProps={{
                             onScroll: (e) => {
                                 const { target } = e;
-                                // Load more when user scrolls near bottom
-                                if (target.scrollTop + target.clientHeight >= target.scrollHeight - 50) {
+                                // Load more when user scrolls near bottom (only if no company selected)
+                                if (!company && target.scrollTop + target.clientHeight >= target.scrollHeight - 50) {
                                     if (companies.length < companyTotalCount && !loadingMoreCompanies) {
                                         loadMoreCompanies();
                                     }
@@ -450,7 +478,7 @@ const AddServiceProduct = () => {
                         </Select>
                     </FormControl>
 
-                    {isAdmin ?  (
+                    {/* {isAdmin ?  ( */}
                         <TextField
                             label="Partner Profit"
                             type="number"
@@ -462,7 +490,7 @@ const AddServiceProduct = () => {
                             size="small"
                             inputProps={{ step: "0.01" }}
                         />
-                    ) : null}
+                    {/* // ) : null} */}
 
                     <TextField
                         label="Total Amount"
