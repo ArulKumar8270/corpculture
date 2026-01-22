@@ -614,7 +614,7 @@ function InvoiceRow(props) {
                                 <TableHead>
                                     <TableRow>
                                         <TableCell>Product Name</TableCell>
-                                        <TableCell>SKU</TableCell>
+                                        {/* <TableCell>SKU</TableCell> */}
                                         <TableCell>HSN</TableCell>
                                         <TableCell align="right">Quantity</TableCell>
                                         <TableCell align="right">Rate</TableCell>
@@ -635,7 +635,7 @@ function InvoiceRow(props) {
                                                 <TableCell component="th" scope="row">
                                                     {productName}
                                                 </TableCell>
-                                                <TableCell>{product.productId?.sku || 'N/A'}</TableCell>
+                                                {/* <TableCell>{product.productId?.sku || 'N/A'}</TableCell> */}
                                                 <TableCell>{product.productId?.hsn || 'N/A'}</TableCell>
                                                 <TableCell align="right">{product.quantity}</TableCell>
                                                 <TableCell align="right">{product.rate.toFixed(2)}</TableCell>

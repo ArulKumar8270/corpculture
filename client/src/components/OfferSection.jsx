@@ -51,6 +51,7 @@ const BookShowcase = () => {
       address: "", // Reset address
       location: "", // Reset location
       oldServiceId: "", // Reset oldServiceId
+      rentalType: '',
       serviceImage: null, // Reset serviceImage
     });
     setErrors({});
@@ -76,6 +77,7 @@ const BookShowcase = () => {
       address: "", // Reset address
       location: "", // Reset location
       oldServiceId: "", // Reset oldServiceId
+      rentalType: '',
       serviceImage: null, // Reset serviceImage
     });
     setErrors({});
@@ -98,9 +100,10 @@ const BookShowcase = () => {
     address: "", // Initialize address
     location: "", // Initialize location
     oldServiceId: "", // Initialize oldServiceId
-    serviceType: selectedService?.id,
+    rentalType: selectedService?.id,
     serviceTitle: selectedService?.title, // Set the serviceType based on the selected service
     serviceImage: null, // Initialize serviceImage to null
+    // rentalType
   });
   const [errors, setErrors] = useState({});
   const [submitStatus, setSubmitStatus] = useState(null);
@@ -213,6 +216,7 @@ const BookShowcase = () => {
       email: company.contactPersons?.[0]?.email || "", // Assuming first contact person
       address: company.billingAddress || "", // Map billingAddress to form.address
       location: company.city || "", // Map city to form.location
+      rentalType: selectedService?.id,
       // Do not set oldServiceId here, as it's for Rework type
     }));
     setFetchedCompanies([]); // Clear the list after selection
@@ -295,6 +299,7 @@ const BookShowcase = () => {
         rentalType: selectedService?.id,
         rentalTitle: selectedService?.title, // Set the serviceType based on the selected service
         serviceImage: null, // Reset serviceImage to null after submission
+        rentalType: selectedService?.id,
       });
       setErrors({});
       setFetchedServices([]); // Clear fetched services after successful submission

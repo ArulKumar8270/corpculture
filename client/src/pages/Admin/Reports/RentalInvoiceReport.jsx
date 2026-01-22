@@ -157,7 +157,7 @@ const RentalInvoiceReport = (props) => {
             'Company': invoice.companyId?.companyName || 'N/A',
             'Machine Model': invoice.machineId?.modelName || 'N/A',
             'Machine Serial No.': invoice.machineId?.serialNo || 'N/A',
-            'Invoice Date': new Date(invoice.createdAt).toLocaleDateString(), // Using createdAt as invoice date
+            'Invoice Date': invoice.invoiceDate ? new Date(invoice.invoiceDate).toLocaleDateString() : (invoice.entryDate ? new Date(invoice.entryDate).toLocaleDateString() : (invoice.createdAt ? new Date(invoice.createdAt).toLocaleDateString() : 'N/A')), // Use invoiceDate, fallback to entryDate, then createdAt
             'Grand Total': 'N/A', // Placeholder: Grand Total not in sample response
             'Mode of Payment': invoice.modeOfPayment || 'N/A',
             'Bank Name': invoice.bankName || 'N/A',
@@ -298,7 +298,7 @@ const RentalInvoiceReport = (props) => {
                                         <TableCell>{invoice.invoiceNumber}</TableCell>
                                         <TableCell>{invoice.companyId?.companyName || 'N/A'}</TableCell>
                                         <TableCell>{`${invoice.machineId?.modelName || 'N/A'} / ${invoice.machineId?.serialNo || 'N/A'}`}</TableCell>
-                                        <TableCell>{new Date(invoice.createdAt).toLocaleDateString()}</TableCell>
+                                        <TableCell>{invoice.invoiceDate ? new Date(invoice.invoiceDate).toLocaleDateString() : (invoice.entryDate ? new Date(invoice.entryDate).toLocaleDateString() : (invoice.createdAt ? new Date(invoice.createdAt).toLocaleDateString() : 'N/A'))}</TableCell>
                                         <TableCell>N/A</TableCell> {/* Grand Total placeholder */}
                                         <TableCell>
                                             <p>Mode: {invoice?.modeOfPayment || 'N/A'}</p>

@@ -136,9 +136,10 @@ function RentalInvoiceList(props) {
                 const companyNameMatch = entry.companyId?.companyName?.toLowerCase().includes(lowercasedQuery);
                 const statusMatch = entry.paymentAmountType?.toLowerCase().includes(lowercasedQuery);
 
-                // Date matching: Convert createdAt to a date string (e.g., "YYYY-MM-DD")
-                const createdAtDate = entry.createdAt ? new Date(entry.createdAt).toISOString().split('T')[0] : '';
-                const dateMatch = createdAtDate.includes(lowercasedQuery);
+                // Date matching: Convert invoiceDate (or entryDate/createdAt as fallback) to a date string (e.g., "YYYY-MM-DD")
+                const invoiceDateValue = entry.invoiceDate || entry.entryDate || entry.createdAt;
+                const invoiceDateStr = invoiceDateValue ? new Date(invoiceDateValue).toISOString().split('T')[0] : '';
+                const dateMatch = invoiceDateStr.includes(lowercasedQuery);
 
                 return invoiceNumberMatch || companyNameMatch || dateMatch || statusMatch;
             });
@@ -688,6 +689,7 @@ function RentalInvoiceList(props) {
                                     <TableCell>Serial No.</TableCell>
                                     <TableCell>Model Name</TableCell>
                                     <TableCell>Send Details To</TableCell>
+                                    <TableCell>Invoice Date</TableCell>
                                     <TableCell>Image</TableCell>
                                     <TableCell>Assinged To</TableCell>
                                     <TableCell>Grand Total</TableCell>
@@ -728,6 +730,7 @@ function RentalInvoiceList(props) {
                                                 <TableCell>{displayMachine?.serialNo || 'N/A'}</TableCell>
                                                 <TableCell>{displayMachine?.modelName || 'N/A'}</TableCell>
                                                 <TableCell>{entry.sendDetailsTo || 'N/A'}</TableCell>
+                                                <TableCell>{entry.invoiceDate ? new Date(entry.invoiceDate).toLocaleDateString() : (entry.entryDate ? new Date(entry.entryDate).toLocaleDateString() : (entry.createdAt ? new Date(entry.createdAt).toLocaleDateString() : 'N/A'))}</TableCell>
                                                 <TableCell>
                                                     {displayImage?.url ? (
                                                         <a href={displayImage.url} target="_blank" rel="noopener noreferrer">
@@ -1100,7 +1103,7 @@ function RentalInvoiceList(props) {
                                     {companyPendingInvoice
                                         ?.filter(pendingInv => pendingInv._id !== currentInvoice?._id) // Filter out the current invoice
                                         .map((pendingInv) => {
-                                            return <MenuItem key={pendingInv._id} value={pendingInv._id}>{new Date(pendingInv.invoiceDate || pendingInv.createdAt).toLocaleDateString() + " - Rs " + pendingInv?.grandTotal}</MenuItem>
+                                            return <MenuItem key={pendingInv._id} value={pendingInv._id}>{new Date(pendingInv.invoiceDate || pendingInv.entryDate || pendingInv.createdAt).toLocaleDateString() + " - Rs " + pendingInv?.grandTotal}</MenuItem>
                                         })}
                                 </Select>
                             </FormControl>
