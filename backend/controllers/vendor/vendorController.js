@@ -3,28 +3,48 @@ import Vendor from "../../models/vendorModel.js";
 // Create Vendor
 export const createVendor = async (req, res) => {
     try {
-        const { companyName, companyAddress, city, state, pincode, gstNumber, mobileNumber, mailId, personName } = req.body;
+        const { companyName, companyAddress, city, state, pincode, gstNumber, contactPersons } = req.body;
 
-        // Basic Validation
-        if (!companyName || !companyAddress || !city || !state || !pincode || !mobileNumber || !mailId || !personName) {
-            return res.status(400).send({ success: false, message: 'All required fields must be provided.' });
+        if (!companyName || !companyAddress || !city || !state || !pincode) {
+            return res.status(400).send({ success: false, message: 'All required company fields must be provided.' });
+        }
+        if (!contactPersons || !Array.isArray(contactPersons) || contactPersons.length === 0) {
+            return res.status(400).send({ success: false, message: 'At least one contact person is required.' });
         }
 
-        // Check for unique fields
-        const existingMobile = await Vendor.findOne({ mobileNumber });
-        if (existingMobile) {
-            return res.status(409).send({ success: false, message: 'Vendor with this mobile number already exists.' });
+        for (const cp of contactPersons) {
+            if (!cp.mobileNumber || !cp.mailId || !cp.personName) {
+                return res.status(400).send({ success: false, message: 'Each contact must have mobile number, mail ID and person name.' });
+            }
         }
-        const existingMail = await Vendor.findOne({ mailId });
-        if (existingMail) {
-            return res.status(409).send({ success: false, message: 'Vendor with this mail ID already exists.' });
+
+        // Check unique mobile/mail across all vendors' contactPersons
+        for (const cp of contactPersons) {
+            const existing = await Vendor.findOne({
+                'contactPersons.mobileNumber': cp.mobileNumber.trim(),
+            });
+            if (existing) {
+                return res.status(409).send({ success: false, message: `Mobile number ${cp.mobileNumber} is already used by another vendor.` });
+            }
+            const existingMail = await Vendor.findOne({
+                'contactPersons.mailId': cp.mailId.trim().toLowerCase(),
+            });
+            if (existingMail) {
+                return res.status(409).send({ success: false, message: `Mail ID ${cp.mailId} is already used by another vendor.` });
+            }
         }
-        if (gstNumber) {
-            const existingGst = await Vendor.findOne({ gstNumber });
+        if (gstNumber && gstNumber.trim()) {
+            const existingGst = await Vendor.findOne({ gstNumber: gstNumber.trim() });
             if (existingGst) {
                 return res.status(409).send({ success: false, message: 'Vendor with this GST number already exists.' });
             }
         }
+
+        const normalizedContacts = contactPersons.map((cp) => ({
+            mobileNumber: cp.mobileNumber.trim(),
+            mailId: cp.mailId.trim().toLowerCase(),
+            personName: cp.personName.trim(),
+        }));
 
         const newVendor = new Vendor({
             companyName,
@@ -32,10 +52,8 @@ export const createVendor = async (req, res) => {
             city,
             state,
             pincode,
-            gstNumber,
-            mobileNumber,
-            mailId,
-            personName,
+            gstNumber: gstNumber ? gstNumber.trim() : undefined,
+            contactPersons: normalizedContacts,
         });
 
         await newVendor.save();
@@ -50,12 +68,31 @@ export const createVendor = async (req, res) => {
 export const getAllVendors = async (req, res) => {
     try {
         const vendors = await Vendor.find({}).sort({ createdAt: -1 });
-        res.status(200).send({ success: true, message: 'All Vendors fetched', vendors });
+        const normalized = vendors.map((v) => normalizeVendor(v));
+        res.status(200).send({ success: true, message: 'All Vendors fetched', vendors: normalized });
     } catch (error) {
         console.error("Error in getAllVendors:", error);
         res.status(500).send({ success: false, message: 'Error in getting all vendors', error });
     }
 };
+
+// Normalize vendor so frontend always gets contactPersons array
+function normalizeVendor(vendor) {
+    const doc = vendor.toObject ? vendor.toObject() : vendor;
+    if (doc.contactPersons && doc.contactPersons.length > 0) {
+        return doc;
+    }
+    if (doc.mobileNumber || doc.mailId || doc.personName) {
+        doc.contactPersons = [{
+            mobileNumber: doc.mobileNumber || '',
+            mailId: doc.mailId || '',
+            personName: doc.personName || '',
+        }];
+    } else {
+        doc.contactPersons = [];
+    }
+    return doc;
+}
 
 // Get Single Vendor by ID
 export const getVendorById = async (req, res) => {
@@ -66,7 +103,8 @@ export const getVendorById = async (req, res) => {
         if (!vendor) {
             return res.status(404).send({ success: false, message: 'Vendor not found' });
         }
-        res.status(200).send({ success: true, message: 'Vendor fetched successfully', vendor });
+        const normalized = normalizeVendor(vendor);
+        res.status(200).send({ success: true, message: 'Vendor fetched successfully', vendor: normalized });
     } catch (error) {
         console.error("Error in getVendorById:", error);
         res.status(500).send({ success: false, message: 'Error in getting vendor', error });
@@ -77,32 +115,54 @@ export const getVendorById = async (req, res) => {
 export const updateVendor = async (req, res) => {
     try {
         const { id } = req.params;
-        const { companyName, companyAddress, city, state, pincode, gstNumber, mobileNumber, mailId, personName } = req.body;
+        const { companyName, companyAddress, city, state, pincode, gstNumber, contactPersons } = req.body;
 
-        // Basic Validation for update
-        if (!companyName || !companyAddress || !city || !state || !pincode || !mobileNumber || !mailId || !personName) {
-            return res.status(400).send({ success: false, message: 'All required fields must be provided for update.' });
+        if (!companyName || !companyAddress || !city || !state || !pincode) {
+            return res.status(400).send({ success: false, message: 'All required company fields must be provided for update.' });
+        }
+        if (!contactPersons || !Array.isArray(contactPersons) || contactPersons.length === 0) {
+            return res.status(400).send({ success: false, message: 'At least one contact person is required.' });
         }
 
-        // Check for unique fields, excluding the current document
-        const existingMobile = await Vendor.findOne({ mobileNumber, _id: { $ne: id } });
-        if (existingMobile) {
-            return res.status(409).send({ success: false, message: 'Another Vendor with this mobile number already exists.' });
-        }
-        const existingMail = await Vendor.findOne({ mailId, _id: { $ne: id } });
-        if (existingMail) {
-            return res.status(409).send({ success: false, message: 'Another Vendor with this mail ID already exists.' });
-        }
-        if (gstNumber) {
-            const existingGst = await Vendor.findOne({ gstNumber, _id: { $ne: id } });
-            if (existingGst) {
-                return res.status(409).send({ success: false, message: 'Another Vendor with this GST number already exists.' });
+        for (const cp of contactPersons) {
+            if (!cp.mobileNumber || !cp.mailId || !cp.personName) {
+                return res.status(400).send({ success: false, message: 'Each contact must have mobile number, mail ID and person name.' });
             }
         }
 
+        // Check unique mobile/mail in other vendors (exclude current)
+        for (const cp of contactPersons) {
+            const existing = await Vendor.findOne({
+                _id: { $ne: id },
+                'contactPersons.mobileNumber': cp.mobileNumber.trim(),
+            });
+            if (existing) {
+                return res.status(409).send({ success: false, message: `Mobile number ${cp.mobileNumber} is already used by another vendor.` });
+            }
+            const existingMail = await Vendor.findOne({
+                _id: { $ne: id },
+                'contactPersons.mailId': cp.mailId.trim().toLowerCase(),
+            });
+            if (existingMail) {
+                return res.status(409).send({ success: false, message: `Mail ID ${cp.mailId} is already used by another vendor.` });
+            }
+        }
+        if (gstNumber && gstNumber.trim()) {
+            const existingGst = await Vendor.findOne({ gstNumber: gstNumber.trim(), _id: { $ne: id } });
+            if (existingGst) {
+                return res.status(409).send({ success: false, message: 'Another vendor with this GST number already exists.' });
+            }
+        }
+
+        const normalizedContacts = contactPersons.map((cp) => ({
+            mobileNumber: cp.mobileNumber.trim(),
+            mailId: cp.mailId.trim().toLowerCase(),
+            personName: cp.personName.trim(),
+        }));
+
         const updatedVendor = await Vendor.findByIdAndUpdate(
             id,
-            { companyName, companyAddress, city, state, pincode, gstNumber, mobileNumber, mailId, personName },
+            { companyName, companyAddress, city, state, pincode, gstNumber: gstNumber ? gstNumber.trim() : undefined, contactPersons: normalizedContacts },
             { new: true, runValidators: true }
         );
 

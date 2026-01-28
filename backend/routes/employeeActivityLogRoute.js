@@ -7,6 +7,7 @@ import {
     updateActivityLogController,
     deleteActivityLogController,
     getAllActivityLogsController,
+    updateActivityLogStatusAdminController,
 } from "../controllers/employee/employeeActivityLogController.js";
 
 const router = express.Router();
@@ -28,6 +29,9 @@ router.delete("/delete/:id", requireSignIn, deleteActivityLogController);
 
 // Get All Activity Logs || GET (Admin only)
 router.get("/admin/all", isAdmin, getAllActivityLogsController);
+
+// Update Activity Log Status || PUT (Admin only)
+router.put("/admin/status/:id", isAdmin, updateActivityLogStatusAdminController);
 
 export default router;
 

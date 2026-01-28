@@ -378,6 +378,7 @@ export const getAllServiceInvoices = async (req, res) => {
             })
             .populate('companyId')
             .populate('assignedTo')
+            .populate('serviceId', 'serviceTitle') // include service title for invoice list
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(limit);
@@ -427,6 +428,7 @@ export const getServiceInvoicesAssignedTo = async (req, res) => {
                 ],
             })
             .populate('assignedTo') // Populate product details
+            .populate('serviceId', 'serviceTitle') // include service title for invoice list
             .sort({ createdAt: -1 }); // Find services by phone number
 
         if (!serviceInvoices || serviceInvoices.length === 0) {

@@ -14,8 +14,8 @@ export const createActivityLogController = async (req, res) => {
             km,
             inTime,
             outTime,
+            status,
             callType,
-            leaveOrWork,
             assignedTo,
             remarks,
         } = req.body;
@@ -71,8 +71,8 @@ export const createActivityLogController = async (req, res) => {
             km: km || 0,
             inTime: inTime || null,
             outTime: outTime || null,
+            status: status === "PAID" || status === "UNPAID" ? status : undefined,
             callType: callType || null,
-            leaveOrWork: leaveOrWork || null,
             assignedTo: assignedTo || null,
             remarks: remarks || null,
         });
@@ -225,7 +225,6 @@ export const updateActivityLogController = async (req, res) => {
             inTime,
             outTime,
             callType,
-            leaveOrWork,
             assignedTo,
             remarks,
         } = req.body;
@@ -263,7 +262,6 @@ export const updateActivityLogController = async (req, res) => {
                 inTime: inTime || null,
                 outTime: outTime || null,
                 callType: callType || null,
-                leaveOrWork: leaveOrWork || null,
                 assignedTo: assignedTo || null,
                 remarks: remarks || null,
             },
@@ -339,7 +337,7 @@ export const deleteActivityLogController = async (req, res) => {
 // Get all activity logs (Admin only)
 export const getAllActivityLogsController = async (req, res) => {
     try {
-        const { page = 1, limit = 10, employeeId, fromDate, toDate } = req.query;
+        const { page = 1, limit = 10, employeeId, fromDate, toDate, status } = req.query;
 
         let query = {};
 
@@ -358,6 +356,11 @@ export const getAllActivityLogsController = async (req, res) => {
                 endOfDay.setHours(23, 59, 59, 999);
                 query.date.$lte = endOfDay;
             }
+        }
+
+        // Filter by payment status if provided
+        if (status && (status === "PAID" || status === "UNPAID")) {
+            query.status = status;
         }
 
         const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -387,6 +390,52 @@ export const getAllActivityLogsController = async (req, res) => {
         res.status(500).send({
             success: false,
             message: "Error in fetching activity logs",
+            error: error.message,
+        });
+    }
+};
+
+// Update activity log status (Admin only)
+export const updateActivityLogStatusAdminController = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { status } = req.body;
+
+        if (status !== "PAID" && status !== "UNPAID") {
+            return res.status(400).send({
+                success: false,
+                message: "Invalid status. Allowed: PAID, UNPAID",
+            });
+        }
+
+        const activityLog = await EmployeeActivityLog.findByIdAndUpdate(
+            id,
+            { status },
+            { new: true, runValidators: true }
+        )
+            .populate("employeeId", "name email")
+            .populate("userId", "name email")
+            .populate("fromCompany", "companyName")
+            .populate("toCompany", "companyName")
+            .populate("assignedTo", "name email");
+
+        if (!activityLog) {
+            return res.status(404).send({
+                success: false,
+                message: "Activity log not found",
+            });
+        }
+
+        res.status(200).send({
+            success: true,
+            message: "Status updated successfully",
+            activityLog,
+        });
+    } catch (error) {
+        console.error("Error updating activity log status:", error);
+        res.status(500).send({
+            success: false,
+            message: "Error in updating activity log status",
             error: error.message,
         });
     }

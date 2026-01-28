@@ -46,6 +46,11 @@ const employeeActivityLogSchema = new mongoose.Schema(
             type: String,
             trim: true,
         },
+        status: {
+            type: String,
+            enum: ["PAID", "UNPAID"],
+            default: "UNPAID",
+        },
         callType: {
             type: String,
             enum: [
@@ -56,11 +61,6 @@ const employeeActivityLogSchema = new mongoose.Schema(
                 "CHEQUE COLLATION",
                 "BILL SIGNATURE",
             ],
-            required: false,
-        },
-        leaveOrWork: {
-            type: String,
-            enum: ["LEAVE", "WORK"],
             required: false,
         },
         assignedTo: {

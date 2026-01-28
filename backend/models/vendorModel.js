@@ -1,5 +1,20 @@
 import mongoose from "mongoose";
 
+const contactPersonSchema = new mongoose.Schema(
+    {
+        mobileNumber: { type: String, required: true, trim: true },
+        mailId: {
+            type: String,
+            required: true,
+            trim: true,
+            lowercase: true,
+            match: [/.+@.+\..+/, "Please fill a valid email address"],
+        },
+        personName: { type: String, required: true, trim: true },
+    },
+    { _id: false }
+);
+
 const vendorSchema = new mongoose.Schema({
     companyName: {
         type: String,
@@ -22,34 +37,23 @@ const vendorSchema = new mongoose.Schema({
         trim: true,
     },
     pincode: {
-        type: String, // Storing as string to handle leading zeros or non-numeric formats
+        type: String,
         required: true,
         trim: true,
     },
     gstNumber: {
         type: String,
         trim: true,
-        unique: true, // GST number should be unique
-        sparse: true, // Allows multiple documents to have null/undefined gstNumber
+        unique: true,
+        sparse: true,
     },
-    mobileNumber: {
-        type: String,
-        required: true,
-        trim: true,
-        unique: true, // Mobile number should be unique
-    },
-    mailId: {
-        type: String,
-        required: true,
-        trim: true,
-        lowercase: true,
-        unique: true, // Mail ID should be unique
-        match: [/.+@.+\..+/, 'Please fill a valid email address'], // Basic email validation
-    },
-    personName: {
-        type: String,
-        required: true,
-        trim: true,
+    // Optional legacy fields for backward compatibility (existing vendors)
+    mobileNumber: { type: String, trim: true },
+    mailId: { type: String, trim: true, lowercase: true },
+    personName: { type: String, trim: true },
+    contactPersons: {
+        type: [contactPersonSchema],
+        default: [],
     },
 }, { timestamps: true });
 
