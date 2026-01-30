@@ -1,18 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom'; // Import useParams
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
-    TextField, Button, Paper, Typography, InputAdornment
+    TextField,
+    Button,
+    Paper,
+    Typography,
+    InputAdornment,
+    Box,
+    IconButton,
 } from '@mui/material';
-import CalendarTodayIcon from '@mui/icons-material/CalendarToday'; // For Company Address (calendar icon)
-import LabelIcon from '@mui/icons-material/Label'; // For City (tag icon)
-import ReceiptIcon from '@mui/icons-material/Receipt'; // For Pincode (receipt icon)
-import LockIcon from '@mui/icons-material/Lock'; // For GST Number (lock icon)
-import PhoneIcon from '@mui/icons-material/Phone'; // For Mobile Number (phone icon)
-import MailOutlineIcon from '@mui/icons-material/MailOutline'; // For Mail Id (mail icon)
-import PersonIcon from '@mui/icons-material/Person'; // For Person Name (person icon)
-import HomeIcon from '@mui/icons-material/Home'; // For Company Address (general address icon, if calendar is not suitable)
+import AddIcon from '@mui/icons-material/Add';
+import DeleteIcon from '@mui/icons-material/Delete';
+import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import LabelIcon from '@mui/icons-material/Label';
+import ReceiptIcon from '@mui/icons-material/Receipt';
+import LockIcon from '@mui/icons-material/Lock';
+import PhoneIcon from '@mui/icons-material/Phone';
+import MailOutlineIcon from '@mui/icons-material/MailOutline';
+import PersonIcon from '@mui/icons-material/Person';
+import HomeIcon from '@mui/icons-material/Home';
 
 
 const AddVendor = () => {
@@ -26,9 +34,9 @@ const AddVendor = () => {
     const [state, setState] = useState('');
     const [pincode, setPincode] = useState('');
     const [gstNumber, setGstNumber] = useState('');
-    const [mobileNumber, setMobileNumber] = useState('');
-    const [mailId, setMailId] = useState('');
-    const [personName, setPersonName] = useState('');
+    const [contactPersons, setContactPersons] = useState([
+        { mobileNumber: '', mailId: '', personName: '' },
+    ]);
 
     // Fetch vendor data if ID is present (edit mode)
     useEffect(() => {
@@ -44,9 +52,10 @@ const AddVendor = () => {
                         setState(vendor.state || '');
                         setPincode(vendor.pincode || '');
                         setGstNumber(vendor.gstNumber || '');
-                        setMobileNumber(vendor.mobileNumber || '');
-                        setMailId(vendor.mailId || '');
-                        setPersonName(vendor.personName || '');
+                        const persons = vendor.contactPersons?.length
+                            ? vendor.contactPersons
+                            : [{ mobileNumber: vendor.mobileNumber || '', mailId: vendor.mailId || '', personName: vendor.personName || '' }];
+                        setContactPersons(persons.map((p) => ({ mobileNumber: p.mobileNumber || '', mailId: p.mailId || '', personName: p.personName || '' })));
                     } else {
                         toast.error(data?.message || 'Failed to fetch vendor details.');
                         handleViewVendors() // Redirect if vendor not found
@@ -61,12 +70,38 @@ const AddVendor = () => {
         }
     }, [id, navigate]);
 
+    const addContactPerson = () => {
+        setContactPersons((prev) => [...prev, { mobileNumber: '', mailId: '', personName: '' }]);
+    };
+
+    const removeContactPerson = (index) => {
+        if (contactPersons.length <= 1) {
+            toast.error('At least one contact person is required.');
+            return;
+        }
+        setContactPersons((prev) => prev.filter((_, i) => i !== index));
+    };
+
+    const handleContactPersonChange = (index, field, value) => {
+        setContactPersons((prev) => {
+            const next = [...prev];
+            next[index] = { ...next[index], [field]: value };
+            return next;
+        });
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
 
-        // Basic validation
-        if (!companyName || !companyAddress || !city || !state || !pincode || !mobileNumber || !mailId || !personName) {
-            toast.error('Please fill in all required fields.');
+        const validContacts = contactPersons.filter(
+            (p) => p.mobileNumber?.trim() && p.mailId?.trim() && p.personName?.trim()
+        );
+        if (!companyName || !companyAddress || !city || !state || !pincode) {
+            toast.error('Please fill in all required company fields.');
+            return;
+        }
+        if (validContacts.length === 0) {
+            toast.error('Please add at least one contact person with Mobile, Mail and Person Name.');
             return;
         }
 
@@ -76,10 +111,8 @@ const AddVendor = () => {
             city,
             state,
             pincode,
-            gstNumber, // GST number is optional in the backend model, but required in your frontend validation
-            mobileNumber,
-            mailId,
-            personName,
+            gstNumber,
+            contactPersons: validContacts,
         };
 
         try {
@@ -102,9 +135,7 @@ const AddVendor = () => {
                     setState('');
                     setPincode('');
                     setGstNumber('');
-                    setMobileNumber('');
-                    setMailId('');
-                    setPersonName('');
+                    setContactPersons([{ mobileNumber: '', mailId: '', personName: '' }]);
                 }
                 handleViewVendors() // Navigate to vendor list after success
             } else {
@@ -223,57 +254,99 @@ const AddVendor = () => {
                             InputProps={{
                                 endAdornment: (
                                     <InputAdornment position="end">
-                                        <LockIcon /> {/* Using Lock icon as per image */}
-                                    </InputAdornment>
-                                ),
-                            }}
-                        />
-                        <TextField
-                            label="Mobile Number"
-                            value={mobileNumber}
-                            onChange={(e) => setMobileNumber(e.target.value)}
-                            fullWidth
-                            variant="outlined"
-                            size="small"
-                            InputProps={{
-                                endAdornment: (
-                                    <InputAdornment position="end">
-                                        <PhoneIcon /> {/* Using Phone icon as per image */}
-                                    </InputAdornment>
-                                ),
-                            }}
-                        />
-                        <TextField
-                            label="Mail Id"
-                            value={mailId}
-                            onChange={(e) => setMailId(e.target.value)}
-                            fullWidth
-                            variant="outlined"
-                            size="small"
-                            InputProps={{
-                                endAdornment: (
-                                    <InputAdornment position="end">
-                                        <MailOutlineIcon /> {/* Using Mail icon as per image */}
-                                    </InputAdornment>
-                                ),
-                            }}
-                        />
-                        <TextField
-                            label="Person Name"
-                            value={personName}
-                            onChange={(e) => setPersonName(e.target.value)}
-                            fullWidth
-                            variant="outlined"
-                            size="small"
-                            InputProps={{
-                                endAdornment: (
-                                    <InputAdornment position="end">
-                                        <PersonIcon /> {/* Using Person icon as per image */}
+                                        <LockIcon />
                                     </InputAdornment>
                                 ),
                             }}
                         />
                     </div>
+
+                    <Typography variant="subtitle1" sx={{ fontWeight: 600, mt: 3, mb: 2 }}>
+                        Contact Persons
+                    </Typography>
+                    {contactPersons.map((person, index) => (
+                        <Box
+                            key={index}
+                            sx={{
+                                display: 'flex',
+                                flexWrap: 'wrap',
+                                gap: 2,
+                                alignItems: 'flex-start',
+                                mb: 2,
+                                p: 2,
+                                borderRadius: 1,
+                                bgcolor: index % 2 === 0 ? 'rgba(1, 158, 227, 0.06)' : 'rgba(0,0,0,0.02)',
+                            }}
+                        >
+                            <TextField
+                                label="Mobile Number"
+                                value={person.mobileNumber}
+                                onChange={(e) => handleContactPersonChange(index, 'mobileNumber', e.target.value)}
+                                fullWidth
+                                variant="outlined"
+                                size="small"
+                                sx={{ flex: { xs: '1 1 100%', sm: '1 1 200px' } }}
+                                InputProps={{
+                                    endAdornment: (
+                                        <InputAdornment position="end">
+                                            <PhoneIcon />
+                                        </InputAdornment>
+                                    ),
+                                }}
+                            />
+                            <TextField
+                                label="Mail Id"
+                                value={person.mailId}
+                                onChange={(e) => handleContactPersonChange(index, 'mailId', e.target.value)}
+                                fullWidth
+                                variant="outlined"
+                                size="small"
+                                type="email"
+                                sx={{ flex: { xs: '1 1 100%', sm: '1 1 200px' } }}
+                                InputProps={{
+                                    endAdornment: (
+                                        <InputAdornment position="end">
+                                            <MailOutlineIcon />
+                                        </InputAdornment>
+                                    ),
+                                }}
+                            />
+                            <TextField
+                                label="Person Name"
+                                value={person.personName}
+                                onChange={(e) => handleContactPersonChange(index, 'personName', e.target.value)}
+                                fullWidth
+                                variant="outlined"
+                                size="small"
+                                sx={{ flex: { xs: '1 1 100%', sm: '1 1 200px' } }}
+                                InputProps={{
+                                    endAdornment: (
+                                        <InputAdornment position="end">
+                                            <PersonIcon />
+                                        </InputAdornment>
+                                    ),
+                                }}
+                            />
+                            <IconButton
+                                color="error"
+                                onClick={() => removeContactPerson(index)}
+                                disabled={contactPersons.length <= 1}
+                                sx={{ mt: 0.5 }}
+                                title="Remove contact"
+                            >
+                                <DeleteIcon />
+                            </IconButton>
+                        </Box>
+                    ))}
+                    <Button
+                        type="button"
+                        variant="outlined"
+                        startIcon={<AddIcon />}
+                        onClick={addContactPerson}
+                        sx={{ mb: 2 }}
+                    >
+                        Add Contact Person
+                    </Button>
 
                     <div className="flex justify-start mt-6">
                         <Button

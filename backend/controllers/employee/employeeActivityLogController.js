@@ -39,35 +39,49 @@ export const createActivityLogController = async (req, res) => {
             });
         }
 
-        // Validate company references if provided
-        if (fromCompany) {
-            const fromCompanyExists = await Company.findById(fromCompany);
-            if (!fromCompanyExists) {
-                return res.status(404).send({
-                    success: false,
-                    message: "From Company not found",
-                });
-            }
+        // Require existing company references (no company creation from this flow)
+        if (!fromCompany) {
+            return res.status(400).send({
+                success: false,
+                message: "From Company is required. Please select an existing company.",
+            });
+        }
+        if (!toCompany) {
+            return res.status(400).send({
+                success: false,
+                message: "To Company is required. Please select an existing company.",
+            });
+        }
+        if (fromCompany === toCompany) {
+            return res.status(400).send({
+                success: false,
+                message: "From Company and To Company cannot be the same",
+            });
         }
 
-        if (toCompany) {
-            const toCompanyExists = await Company.findById(toCompany);
-            if (!toCompanyExists) {
-                return res.status(404).send({
-                    success: false,
-                    message: "To Company not found",
-                });
-            }
+        const fromCompanyExists = await Company.findById(fromCompany);
+        if (!fromCompanyExists) {
+            return res.status(404).send({
+                success: false,
+                message: "From Company not found",
+            });
+        }
+        const toCompanyExists = await Company.findById(toCompany);
+        if (!toCompanyExists) {
+            return res.status(404).send({
+                success: false,
+                message: "To Company not found",
+            });
         }
 
         const activityLog = new EmployeeActivityLog({
             employeeId: employee._id,
             userId,
             date,
-            fromCompany: fromCompany || null,
-            fromCompanyName: fromCompanyName || null,
-            toCompany: toCompany || null,
-            toCompanyName: toCompanyName || null,
+            fromCompany,
+            fromCompanyName: fromCompanyName || fromCompanyExists.companyName || null,
+            toCompany,
+            toCompanyName: toCompanyName || toCompanyExists.companyName || null,
             km: km || 0,
             inTime: inTime || null,
             outTime: outTime || null,
@@ -229,7 +243,13 @@ export const updateActivityLogController = async (req, res) => {
             remarks,
         } = req.body;
 
-        // Validate company references if provided
+        // Validate company references if provided (must be existing companies; no creation from this flow)
+        if (fromCompany && toCompany && fromCompany === toCompany) {
+            return res.status(400).send({
+                success: false,
+                message: "From Company and To Company cannot be the same",
+            });
+        }
         if (fromCompany) {
             const fromCompanyExists = await Company.findById(fromCompany);
             if (!fromCompanyExists) {
@@ -239,7 +259,6 @@ export const updateActivityLogController = async (req, res) => {
                 });
             }
         }
-
         if (toCompany) {
             const toCompanyExists = await Company.findById(toCompany);
             if (!toCompanyExists) {

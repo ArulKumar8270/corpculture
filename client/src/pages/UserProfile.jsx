@@ -545,19 +545,21 @@ const UserProfile = () => {
                     </div>
                 </div>
 
-                {/* Activity Log Button */}
+                {/* Activity Log & Leave Application Buttons */}
                 {employee && (
                     <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-                        <div className="flex justify-center">
+                        <div className="flex flex-wrap justify-center gap-4">
                             <Link
-                                to={
-                                    auth?.user?.role === 1
-                                        ? "/admin/dashboard/activity-log"
-                                        : "/user/dashboard/activity-log"
-                                }
+                                to={"/admin/dashboard/activity-log"}
                                 className="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg transition duration-200 shadow-md hover:shadow-lg"
                             >
                                 Fill Activity Log
+                            </Link>
+                            <Link
+                                to={"/admin/dashboard/leave-application"}
+                                className="bg-[#019ee3] hover:bg-[#0180bb] text-white font-semibold py-3 px-6 rounded-lg transition duration-200 shadow-md hover:shadow-lg"
+                            >
+                                Leave Application
                             </Link>
                         </div>
                     </div>

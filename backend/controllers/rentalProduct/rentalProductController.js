@@ -26,6 +26,7 @@ export const createRentalProduct = async (req, res) => {
     try {
         const {
             company, branch, department, modelName, serialNo, hsn, basePrice, gstType, paymentDate,
+            openingDate, closingDate,
             modelSpecs, a3Config, a4Config, a5Config,
             commission
         } = req.body;
@@ -67,6 +68,8 @@ export const createRentalProduct = async (req, res) => {
             gstType,
             commission,
             paymentDate: new Date(paymentDate),
+            openingDate: openingDate ? new Date(openingDate) : undefined,
+            closingDate: closingDate ? new Date(closingDate) : undefined,
             modelSpecs: modelSpecs || {},
             a3Config: parseConfigFields(a3Config),
             a4Config: parseConfigFields(a4Config),
@@ -145,6 +148,7 @@ export const updateRentalProduct = async (req, res) => {
         const { id } = req.params;
         const {
             company, branch, department, modelName, serialNo, hsn, basePrice, gstType, paymentDate,
+            openingDate, closingDate,
             modelSpecs, a3Config, a4Config, a5Config, employeeId, commission
         } = req.body;
 
@@ -187,6 +191,8 @@ export const updateRentalProduct = async (req, res) => {
                 gstType,
                 commission,
                 paymentDate: new Date(paymentDate),
+                openingDate: openingDate ? new Date(openingDate) : undefined,
+                closingDate: closingDate ? new Date(closingDate) : undefined,
                 modelSpecs: modelSpecs || {},
                 a3Config: parseConfigFields(a3Config),
                 a4Config: parseConfigFields(a4Config),

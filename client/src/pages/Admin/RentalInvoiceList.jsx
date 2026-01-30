@@ -20,6 +20,7 @@ import {
     Select, // Added Select
     MenuItem, // Added MenuItem
     TextField,
+    Autocomplete, // Added Autocomplete
     Collapse,
     IconButton,
     TablePagination
@@ -57,9 +58,14 @@ function RentalInvoiceList(props) {
     });
     const [invoiceCount, setInvoiceCount] = useState(0);
     const [searchQuery, setSearchQuery] = useState(''); // State for search query
+    const [rentalTypeFilter, setRentalTypeFilter] = useState('');
+    const [rentalTitleFilter, setRentalTitleFilter] = useState('');
+    const [employeeFilter, setEmployeeFilter] = useState('');
+    const [companyFilter, setCompanyFilter] = useState('');
+    const [statusFilter, setStatusFilter] = useState('');
     const [filteredRentalEntries, setFilteredRentalEntries] = useState([]); // State for filtered entries
     const [companyPendingInvoice, setCompanyPendingInvoice] = useState([])
-    const [selectedInvliceId, setSelectedInvliceId] = useState(null)
+    const [selectedInvoiceIds, setSelectedInvoiceIds] = useState([])
     const [balanceAmount, setBalanceAmount] = useState(0)
     const [pendingAmount, setPendingAmount] = useState(0)
     const [deletingLink, setDeletingLink] = useState(false);
@@ -122,33 +128,57 @@ function RentalInvoiceList(props) {
         }
     };
 
-    // Effect to filter rental entries based on search query
+    // Effect to filter rental entries based on filters + search query
     useEffect(() => {
         const filterData = () => {
-            if (!searchQuery) {
-                setFilteredRentalEntries(rentalEntries);
-                return;
+            let filtered = rentalEntries;
+
+            // Apply dropdown filters first
+            if (rentalTypeFilter) {
+                filtered = filtered.filter(entry => {
+                    const entryType = typeof entry.rentalId === 'object' && entry.rentalId?.rentalType ? entry.rentalId.rentalType : null;
+                    return entryType === rentalTypeFilter;
+                });
+            }
+            if (rentalTitleFilter) {
+                filtered = filtered.filter(entry => {
+                    const entryTitle = typeof entry.rentalId === 'object' && entry.rentalId?.rentalTitle ? entry.rentalId.rentalTitle : null;
+                    return entryTitle === rentalTitleFilter;
+                });
+            }
+            if (employeeFilter) {
+                filtered = filtered.filter(entry => entry.assignedTo?.name === employeeFilter);
+            }
+            if (companyFilter) {
+                filtered = filtered.filter(entry => entry.companyId?.companyName === companyFilter);
+            }
+            if (statusFilter) {
+                filtered = filtered.filter(entry => entry.status === statusFilter);
             }
 
-            const lowercasedQuery = searchQuery.toLowerCase();
-            const filtered = rentalEntries.filter(entry => {
-                const invoiceNumberMatch = props.invoice === "invoice" && entry.invoiceNumber?.toString().toLowerCase().includes(lowercasedQuery);
-                const companyNameMatch = entry.companyId?.companyName?.toLowerCase().includes(lowercasedQuery);
-                const statusMatch = entry.paymentAmountType?.toLowerCase().includes(lowercasedQuery);
+            // Then apply text search
+            if (searchQuery) {
+                const lowercasedQuery = searchQuery.toLowerCase();
+                filtered = filtered.filter(entry => {
+                    const invoiceNumberMatch = props.invoice === "invoice" && entry.invoiceNumber?.toString().toLowerCase().includes(lowercasedQuery);
+                    const companyNameMatch = entry.companyId?.companyName?.toLowerCase().includes(lowercasedQuery);
+                    const statusMatch = entry.paymentAmountType?.toLowerCase().includes(lowercasedQuery);
 
-                // Date matching: Convert invoiceDate (or entryDate/createdAt as fallback) to a date string (e.g., "YYYY-MM-DD")
-                const invoiceDateValue = entry.invoiceDate || entry.entryDate || entry.createdAt;
-                const invoiceDateStr = invoiceDateValue ? new Date(invoiceDateValue).toISOString().split('T')[0] : '';
-                const dateMatch = invoiceDateStr.includes(lowercasedQuery);
+                    // Date matching: Convert invoiceDate (or entryDate/createdAt as fallback) to a date string (e.g., "YYYY-MM-DD")
+                    const invoiceDateValue = entry.invoiceDate || entry.entryDate || entry.createdAt;
+                    const invoiceDateStr = invoiceDateValue ? new Date(invoiceDateValue).toISOString().split('T')[0] : '';
+                    const dateMatch = invoiceDateStr.includes(lowercasedQuery);
 
-                return invoiceNumberMatch || companyNameMatch || dateMatch || statusMatch;
-            });
+                    return invoiceNumberMatch || companyNameMatch || dateMatch || statusMatch;
+                });
+            }
+
             setFilteredRentalEntries(filtered);
-            setPage(0); // Reset to first page when search query changes
+            setPage(0); // Reset to first page when filters or search query changes
         };
 
         filterData();
-    }, [searchQuery, rentalEntries, props.invoice]); // Re-run filter when query or original data changes
+    }, [searchQuery, rentalEntries, props.invoice, rentalTypeFilter, rentalTitleFilter, employeeFilter, companyFilter, statusFilter]); // Re-run filter when query, filters, or original data changes
 
 
     const fetchRentalEntries = async () => {
@@ -210,6 +240,42 @@ function RentalInvoiceList(props) {
             console.error("Error fetching service invoices:", error);
         }
     };
+
+    // Options for filter dropdowns, derived from current rental entries
+    const rentalTypes = React.useMemo(() => {
+        const types = rentalEntries
+            ?.map((entry) => (typeof entry.rentalId === 'object' && entry.rentalId?.rentalType) ? entry.rentalId.rentalType : null)
+            .filter(Boolean) || [];
+        return [...new Set(types)].sort();
+    }, [rentalEntries]);
+
+    const rentalTitles = React.useMemo(() => {
+        const titles = rentalEntries
+            ?.map((entry) => (typeof entry.rentalId === 'object' && entry.rentalId?.rentalTitle) ? entry.rentalId.rentalTitle : null)
+            .filter(Boolean) || [];
+        return [...new Set(titles)].sort();
+    }, [rentalEntries]);
+
+    const employeeNames = React.useMemo(() => {
+        const names = rentalEntries
+            ?.map((entry) => entry.assignedTo?.name)
+            .filter(Boolean) || [];
+        return [...new Set(names)].sort();
+    }, [rentalEntries]);
+
+    const companyNames = React.useMemo(() => {
+        const names = rentalEntries
+            ?.map((entry) => entry.companyId?.companyName)
+            .filter(Boolean) || [];
+        return [...new Set(names)].sort();
+    }, [rentalEntries]);
+
+    const statuses = React.useMemo(() => {
+        const sts = rentalEntries
+            ?.map((entry) => entry.status)
+            .filter(Boolean) || [];
+        return [...new Set(sts)].sort();
+    }, [rentalEntries]);
 
     const hasPermission = (key) => {
         return userPermissions.some(p => p.key === key && p.actions.includes('edit')) || auth?.user?.role === 1;
@@ -316,98 +382,152 @@ function RentalInvoiceList(props) {
 
     const handleClosePaymentDetailsModal = () => {
         setOpenPaymentModal(false);
-        setCurrentInvoice(null); // Clear current invoice when closing
-        setSelectedInvliceId(null); // Reset selected invoice
-        // Optionally reset form here if needed, but it's re-initialized on open
+        setCurrentInvoice(null);
+        setSelectedInvoiceIds([]);
+    };
+
+    const selectedAllocatedTotal = companyPendingInvoice
+        ?.filter((inv) => selectedInvoiceIds.includes(inv._id))
+        .reduce((sum, inv) => sum + Number(inv?.grandTotal || 0), 0) || 0;
+    const remainingToAllocate = Math.max(0, (balanceAmount || 0) - selectedAllocatedTotal);
+
+    const togglePendingInvoiceSelection = (pendingInv) => {
+        const id = pendingInv._id;
+        const amount = Number(pendingInv?.grandTotal || 0);
+        setSelectedInvoiceIds((prev) => {
+            if (prev.includes(id)) return prev.filter((x) => x !== id);
+            const currentTotal = companyPendingInvoice
+                ?.filter((inv) => prev.includes(inv._id))
+                .reduce((s, inv) => s + Number(inv?.grandTotal || 0), 0) || 0;
+            if (currentTotal + amount <= (balanceAmount || 0)) return [...prev, id];
+            return prev;
+        });
     };
 
     const handlePaymentFormChange = async (e) => {
         const { name, value } = e.target;
         setPaymentForm(prev => ({ ...prev, [name]: value }));
         if (name === "paymentAmount") {
+            setSelectedInvoiceIds([]);
             if (value < currentInvoice?.grandTotal) {
                 let balanceAmount = currentInvoice?.grandTotal - value;
-                setPendingAmount(balanceAmount)
-                setBalanceAmount(0)
+                setPendingAmount(balanceAmount);
+                setBalanceAmount(0);
             } else {
                 let balanceAmount = value - currentInvoice?.grandTotal;
-                setBalanceAmount(balanceAmount)
-                setPendingAmount(0)
+                setBalanceAmount(balanceAmount);
+                setPendingAmount(0);
                 try {
                     let response = await axios.post(
                         `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/all`,
-                        { companyId: paymentForm?.companyId, tdsAmount: { $eq: null }, status: { $ne: "Paid" } }, // Send invoiceType in the request body
-                        {
-                            headers: {
-                                Authorization: auth.token,
-                            },
-                        }
+                        { companyId: currentInvoice?.companyId || paymentForm?.companyId, tdsAmount: { $eq: null }, status: { $ne: "Paid" } },
+                        { headers: { Authorization: auth.token } }
                     );
-                    setCompanyPendingInvoice(response.data?.entries)
+                    setCompanyPendingInvoice(response.data?.entries || []);
                 } catch (err) {
-                    console.log(err, "Api error")
+                    console.log(err, "Api error");
                 }
             }
-
         }
-
     };
 
-    const handleSavePaymentDetails = async (balanceAmount) => {
-
-        let status = "Paid"
-        if (balanceAmount && selectedInvliceId) {
-            status = "Unpaid"
-        } else if (Number(paymentForm?.paymentAmount) >= Number(paymentForm?.grandTotal) || paymentForm.paymentAmountType === 'TDS') {
-            status = "Paid"
-        } else {
-            status = "Unpaid"
+    const buildPaymentPayload = (paymentAmount, isFullPayment = false) => {
+        const status = isFullPayment ? "Paid" : "Unpaid";
+        const payload = {
+            modeOfPayment: paymentForm.modeOfPayment,
+            bankName: paymentForm.bankName,
+            transactionDetails: paymentForm.transactionDetails,
+            chequeDate: paymentForm.chequeDate,
+            transferDate: paymentForm.transferDate,
+            companyNamePayment: paymentForm.companyNamePayment,
+            otherPaymentMode: paymentForm.otherPaymentMode,
+            paymentAmountType: paymentForm.paymentAmountType,
+            paymentAmount: Number(paymentAmount),
+            tdsAmount: 0,
+            pendingAmount: 0,
+            status,
+        };
+        if (paymentForm.paymentAmountType === 'TDS') {
+            payload.tdsAmount = pendingAmount || 0;
+        } else if (paymentForm.paymentAmountType === 'Pending') {
+            payload.pendingAmount = pendingAmount || 0;
         }
+        return payload;
+    };
+
+    const handleSavePaymentDetails = async (targetInvoiceIdArg, amountArg) => {
+        const isMultiSave = typeof targetInvoiceIdArg === 'string' && amountArg != null;
         try {
-            const payload = {
-                modeOfPayment: paymentForm.modeOfPayment,
-                bankName: paymentForm.bankName,
-                transactionDetails: paymentForm.transactionDetails,
-                chequeDate: paymentForm.chequeDate,
-                transferDate: paymentForm.transferDate,
-                companyNamePayment: paymentForm.companyNamePayment,
-                otherPaymentMode: paymentForm.otherPaymentMode,
-                paymentAmountType: paymentForm.paymentAmountType,
-                paymentAmount: balanceAmount ? balanceAmount : paymentForm?.paymentAmount >= paymentForm?.grandTotal ? paymentForm?.grandTotal : paymentForm?.paymentAmount,
-                tdsAmount: 0, // Default to 0, will be updated if type is TDS
-                pendingAmount: 0, // Default to 0, will be updated if type is Pending
-                status: status,
+            if (isMultiSave) {
+                const payload = buildPaymentPayload(amountArg, amountArg >= (companyPendingInvoice?.find((i) => i._id === targetInvoiceIdArg)?.grandTotal || 0));
+                await axios.put(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/${targetInvoiceIdArg}`,
+                    payload,
+                    { headers: { Authorization: auth.token } }
+                );
+                return;
+            }
+
+            const currentInvoicePayment = Number(paymentForm?.paymentAmount) >= Number(paymentForm?.grandTotal)
+                ? Number(paymentForm?.grandTotal)
+                : Number(paymentForm?.paymentAmount);
+            const currentPayload = buildPaymentPayload(
+                currentInvoicePayment,
+                Number(paymentForm?.paymentAmount) >= Number(paymentForm?.grandTotal) || paymentForm.paymentAmountType === 'TDS'
+            );
+
+            await axios.put(
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/${paymentForm?.invoiceId}`,
+                currentPayload,
+                { headers: { Authorization: auth.token } }
+            );
+
+            for (const invId of selectedInvoiceIds) {
+                const pendingInv = companyPendingInvoice?.find((i) => i._id === invId);
+                const amt = Number(pendingInv?.grandTotal || 0);
+                if (amt <= 0) continue;
+                await handleSavePaymentDetails(invId, amt);
+            }
+
+            handleClosePaymentDetailsModal();
+            fetchRentalEntries();
+
+            const allocatedInvoices = (selectedInvoiceIds || []).map((invId) => {
+                const inv = companyPendingInvoice?.find((i) => i._id === invId);
+                return inv ? { invoiceId: inv._id, amount: Number(inv?.grandTotal || 0), invoiceDate: inv?.invoiceDate || inv?.entryDate || inv?.createdAt, grandTotal: inv?.grandTotal } : null;
+            }).filter(Boolean);
+
+            const n8nPayload = {
+                invoiceId: currentInvoice?._id,
+                invoice: {
+                    _id: currentInvoice?._id,
+                    grandTotal: currentInvoice?.grandTotal,
+                    invoiceDate: currentInvoice?.invoiceDate || currentInvoice?.entryDate || currentInvoice?.createdAt,
+                    companyId: currentInvoice?.companyId,
+                    invoiceNumber: currentInvoice?.invoiceNumber,
+                },
+                payment: {
+                    modeOfPayment: paymentForm.modeOfPayment,
+                    paymentAmount: Number(paymentForm.paymentAmount) || 0,
+                    bankName: paymentForm.bankName,
+                    transactionDetails: paymentForm.transactionDetails,
+                    chequeDate: paymentForm.chequeDate,
+                    transferDate: paymentForm.transferDate,
+                    companyNamePayment: paymentForm.companyNamePayment,
+                    otherPaymentMode: paymentForm.otherPaymentMode,
+                    paymentAmountType: paymentForm.paymentAmountType,
+                    currentInvoicePayment,
+                },
+                allocatedToInvoices: allocatedInvoices,
             };
 
-            // Conditionally set tdsAmount or pendingAmount based on selected type
-            if (paymentForm.paymentAmountType === 'TDS') {
-                payload.tdsAmount = pendingAmount || 0;
-            } else if (paymentForm.paymentAmountType === 'Pending') {
-                payload.pendingAmount = pendingAmount || 0;
+            try {
+                await axios.post('https://n8n.nicknameinfo.net/webhook/fb83e945-2e49-4a73-acce-fd08632ef1a8', n8nPayload);
+            } catch (webhookError) {
+                console.error('n8n webhook error:', webhookError);
             }
 
-            let updateId = balanceAmount ? selectedInvliceId : paymentForm?.invoiceId;
-
-            if (updateId) {
-                const res = await axios.put(
-                    `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/${updateId}`,
-                    payload,
-                    {
-                        headers: {
-                            Authorization: auth.token,
-                        },
-                    }
-                );
-                if (res.data?.success) {
-                    toast.success(res.data.message || 'Payment details updated successfully!');
-                    handleClosePaymentDetailsModal();
-                    fetchRentalEntries(); // Re-fetch to update the list
-                } else {
-                    toast.error(res.data?.message || 'Failed to update payment details.');
-                }
-            }
-
-
+            toast.success('Payment details updated successfully!');
         } catch (error) {
             console.error('Error updating payment details:', error);
             toast.error(error.response?.data?.message || 'Something went wrong while updating payment details.');
@@ -663,16 +783,112 @@ function RentalInvoiceList(props) {
                     {props?.invoice === "invoice" ? "Invoices" : "Quotations"} List
                 </Typography>
             </div>
-            <TextField
-                fullWidth
-                label={`Search ${props?.invoice === "invoice" ? "Invoices" : "Quotations"} (Company, Payment Mode, Status, Date)`}
-                margin="normal"
-                variant="outlined"
-                size="small"
-                value={searchQuery}
-                onChange={handleSearchChange}
-                sx={{ mb: 3 }}
-            />
+            {/* Filters + Search */}
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 2 }}>
+                <FormControl size="small" sx={{ minWidth: 200 }}>
+                    <InputLabel id="rental-type-filter-label">Rental Type</InputLabel>
+                    <Select
+                        labelId="rental-type-filter-label"
+                        label="Rental Type"
+                        value={rentalTypeFilter}
+                        onChange={(e) => setRentalTypeFilter(e.target.value)}
+                    >
+                        <MenuItem value="">
+                            <em>All</em>
+                        </MenuItem>
+                        {rentalTypes.map((type) => (
+                            <MenuItem key={type} value={type}>
+                                {type}
+                            </MenuItem>
+                        ))}
+                    </Select>
+                </FormControl>
+
+                <FormControl size="small" sx={{ minWidth: 200 }}>
+                    <InputLabel id="rental-title-filter-label">Rental Title</InputLabel>
+                    <Select
+                        labelId="rental-title-filter-label"
+                        label="Rental Title"
+                        value={rentalTitleFilter}
+                        onChange={(e) => setRentalTitleFilter(e.target.value)}
+                    >
+                        <MenuItem value="">
+                            <em>All</em>
+                        </MenuItem>
+                        {rentalTitles.map((title) => (
+                            <MenuItem key={title} value={title}>
+                                {title}
+                            </MenuItem>
+                        ))}
+                    </Select>
+                </FormControl>
+
+                <FormControl size="small" sx={{ minWidth: 200 }}>
+                    <InputLabel id="employee-filter-label">Employee</InputLabel>
+                    <Select
+                        labelId="employee-filter-label"
+                        label="Employee"
+                        value={employeeFilter}
+                        onChange={(e) => setEmployeeFilter(e.target.value)}
+                    >
+                        <MenuItem value="">
+                            <em>All</em>
+                        </MenuItem>
+                        {employeeNames.map((name) => (
+                            <MenuItem key={name} value={name}>
+                                {name}
+                            </MenuItem>
+                        ))}
+                    </Select>
+                </FormControl>
+
+                <Autocomplete
+                    size="small"
+                    options={['', ...companyNames]}
+                    value={companyFilter || ''}
+                    onChange={(event, newValue) => setCompanyFilter(newValue || '')}
+                    getOptionLabel={(option) => option === '' ? 'All' : option}
+                    isOptionEqualToValue={(option, value) => option === value}
+                    sx={{ minWidth: 200 }}
+                    renderInput={(params) => (
+                        <TextField
+                            {...params}
+                            label="Company"
+                            variant="outlined"
+                            placeholder="Search company..."
+                        />
+                    )}
+                    noOptionsText="No companies found"
+                />
+
+                <FormControl size="small" sx={{ minWidth: 160 }}>
+                    <InputLabel id="status-filter-label">Status</InputLabel>
+                    <Select
+                        labelId="status-filter-label"
+                        label="Status"
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                    >
+                        <MenuItem value="">
+                            <em>All</em>
+                        </MenuItem>
+                        {statuses.map((st) => (
+                            <MenuItem key={st} value={st}>
+                                {st}
+                            </MenuItem>
+                        ))}
+                    </Select>
+                </FormControl>
+
+                <TextField
+                    size="small"
+                    sx={{ minWidth: 260, flex: 1 }}
+                    label={`Search ${props?.invoice === "invoice" ? "Invoices" : "Quotations"} (Company, Payment Mode, Status, Date)`}
+                    variant="outlined"
+                    value={searchQuery}
+                    onChange={handleSearchChange}
+                />
+            </Box>
             <Paper elevation={3} sx={{ p: 2, borderRadius: '8px' }}>
                 {filteredRentalEntries.length === 0 ? (
                     <Typography variant="h6" sx={{ textAlign: 'center', mt: 4 }}>
@@ -804,6 +1020,15 @@ function RentalInvoiceList(props) {
                                                         >
                                                             Upload Signed {props?.invoice === "invoice" ? "Invoices" : "Quotations"}
                                                         </Button>
+                                                        {entry.companyId && (
+                                                            <Button
+                                                                variant="outlined"
+                                                                size="small"
+                                                                onClick={() => navigate('/admin/dashboard/activity-log', { state: { preselectedCompany: typeof entry.companyId === 'object' ? entry.companyId : { _id: entry.companyId } } })}
+                                                            >
+                                                                Submit activity
+                                                            </Button>
+                                                        )}
                                                     </Stack>
                                                 </TableCell>
                                             </TableRow>
@@ -1086,29 +1311,54 @@ function RentalInvoiceList(props) {
                         size="small"
                     />
 
-                    {companyPendingInvoice?.length > 0 && balanceAmount > 0 &&
+                    {companyPendingInvoice?.length > 0 && balanceAmount > 0 && (
                         <>
                             <p>Previous Invoice Balance - Rs {balanceAmount.toFixed(2)}</p>
+                            <p><strong>Allocated to selected invoices - Rs {selectedAllocatedTotal.toFixed(2)}</strong></p>
+                            {remainingToAllocate > 0 && (
+                                <p style={{ color: '#666' }}>Remaining to allocate - Rs {remainingToAllocate.toFixed(2)} (select more invoices so total equals balance)</p>
+                            )}
+                            {remainingToAllocate === 0 && selectedInvoiceIds.length > 0 && (
+                                <p style={{ color: 'green' }}>Amount fully allocated.</p>
+                            )}
                             <FormControl fullWidth margin="normal" size="small">
-                                <InputLabel id="mode-of-payment-label">Select Pending Invoice</InputLabel>
-                                <Select
-                                    labelId="mode-of-payment-label"
-                                    id="selectedInvliceId"
-                                    name="selectedInvliceId"
-                                    value={selectedInvliceId}
-                                    onChange={(e) => setSelectedInvliceId(e.target.value)}
-                                    label="Mode Of Payment"
-                                >
-                                    <MenuItem value="">--select Payment Mode--</MenuItem>
+                                <InputLabel id="select-pending-invoices-label" shrink>Select Pending Invoices</InputLabel>
+                                <Box sx={{ mt: 1, maxHeight: 220, overflow: 'auto', border: '1px solid #ccc', borderRadius: 1, p: 1 }}>
                                     {companyPendingInvoice
-                                        ?.filter(pendingInv => pendingInv._id !== currentInvoice?._id) // Filter out the current invoice
+                                        ?.filter((pendingInv) => pendingInv._id !== currentInvoice?._id)
                                         .map((pendingInv) => {
-                                            return <MenuItem key={pendingInv._id} value={pendingInv._id}>{new Date(pendingInv.invoiceDate || pendingInv.entryDate || pendingInv.createdAt).toLocaleDateString() + " - Rs " + pendingInv?.grandTotal}</MenuItem>
+                                            const invAmount = Number(pendingInv?.grandTotal || 0);
+                                            const canSelect = invAmount <= remainingToAllocate || selectedInvoiceIds.includes(pendingInv._id);
+                                            const dateStr = pendingInv.invoiceDate || pendingInv.entryDate || pendingInv.createdAt;
+                                            return (
+                                                <Box
+                                                    key={pendingInv._id}
+                                                    onClick={() => canSelect && togglePendingInvoiceSelection(pendingInv)}
+                                                    sx={{
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: 1,
+                                                        py: 0.5,
+                                                        px: 1,
+                                                        cursor: canSelect ? 'pointer' : 'not-allowed',
+                                                        bgcolor: selectedInvoiceIds.includes(pendingInv._id) ? 'action.selected' : 'transparent',
+                                                        borderRadius: 1,
+                                                    }}
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedInvoiceIds.includes(pendingInv._id)}
+                                                        onChange={() => {}}
+                                                        disabled={!canSelect}
+                                                    />
+                                                    <span>{dateStr ? new Date(dateStr).toLocaleDateString() : 'N/A'} - Rs {pendingInv?.grandTotal}</span>
+                                                </Box>
+                                            );
                                         })}
-                                </Select>
+                                </Box>
                             </FormControl>
                         </>
-                    }
+                    )}
 
                     {/* New: Amount Type Selector */}
                     {pendingAmount > 0 && (
@@ -1133,16 +1383,11 @@ function RentalInvoiceList(props) {
                     <Button onClick={handleClosePaymentDetailsModal} color="primary">
                         Close
                     </Button>
-                    <Button onClick={() => {
-                        handleSavePaymentDetails()
-                        if (balanceAmount) {
-                            setTimeout(() => {
-                                handleSavePaymentDetails(balanceAmount)
-                            }, 2000)
-                        }
-
-                    }
-                    } color="primary" variant="contained">
+                    <Button
+                        onClick={() => handleSavePaymentDetails()}
+                        color="primary"
+                        variant="contained"
+                    >
                         Save changes
                     </Button>
                 </DialogActions>

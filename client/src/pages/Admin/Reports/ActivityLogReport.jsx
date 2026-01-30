@@ -35,6 +35,7 @@ const ActivityLogReport = () => {
     const [fromDate, setFromDate] = useState('');
     const [toDate, setToDate] = useState('');
     const [employeeFilter, setEmployeeFilter] = useState('');
+    const [statusFilter, setStatusFilter] = useState(''); // '', 'PAID', 'UNPAID'
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [totalCount, setTotalCount] = useState(0);
@@ -51,6 +52,7 @@ const ActivityLogReport = () => {
                 fromDate,
                 toDate,
                 employeeFilter,
+                statusFilter,
                 page,
                 rowsPerPage
             );
@@ -82,6 +84,7 @@ const ActivityLogReport = () => {
         from = '',
         to = '',
         employeeId = '',
+        status = '',
         currentPage = page,
         currentRowsPerPage = rowsPerPage
     ) => {
@@ -96,6 +99,7 @@ const ActivityLogReport = () => {
             if (from) queryParams.append('fromDate', from);
             if (to) queryParams.append('toDate', to);
             if (employeeId) queryParams.append('employeeId', employeeId);
+            if (status) queryParams.append('status', status);
 
             const response = await axios.get(
                 `${import.meta.env.VITE_SERVER_URL}/api/v1/employee-activity-log/admin/all?${queryParams.toString()}`,
@@ -127,15 +131,38 @@ const ActivityLogReport = () => {
 
     const handleFilter = () => {
         setPage(0);
-        fetchActivityLogs(fromDate, toDate, employeeFilter, 0, rowsPerPage);
+        fetchActivityLogs(fromDate, toDate, employeeFilter, statusFilter, 0, rowsPerPage);
     };
 
     const handleClearFilters = () => {
         setFromDate('');
         setToDate('');
         setEmployeeFilter('');
+        setStatusFilter('');
         setPage(0);
-        fetchActivityLogs('', '', '', 0, rowsPerPage);
+        fetchActivityLogs('', '', '', '', 0, rowsPerPage);
+    };
+
+    const handleStatusUpdate = async (logId, newStatus) => {
+        try {
+            const { data } = await axios.put(
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/employee-activity-log/admin/status/${logId}`,
+                { status: newStatus },
+                { headers: { Authorization: auth?.token } }
+            );
+
+            if (data?.success) {
+                toast.success('Status updated');
+                setActivityLogs((prev) =>
+                    prev.map((l) => (l._id === logId ? data.activityLog : l))
+                );
+            } else {
+                toast.error(data?.message || 'Failed to update status');
+            }
+        } catch (err) {
+            console.error('Error updating status:', err);
+            toast.error(err.response?.data?.message || 'Failed to update status');
+        }
     };
 
     const handleChangePage = (event, newPage) => {
@@ -157,7 +184,7 @@ const ActivityLogReport = () => {
     };
 
     return (
-        <Box sx={{ p: 3, bgcolor: 'background.default', minHeight: '100vh' }}>
+        <Box sx={{ p: 3, bgcolor: 'background.default', minHeight: '100vh', overflowX: 'auto', width: '91%' }}>
             <Typography
                 variant="h4"
                 component="h1"
@@ -216,6 +243,20 @@ const ActivityLogReport = () => {
                             />
                         )}
                     />
+                    <FormControl sx={{ minWidth: 180 }}>
+                        <InputLabel>Status</InputLabel>
+                        <Select
+                            label="Status"
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value)}
+                        >
+                            <MenuItem value="">
+                                <em>All</em>
+                            </MenuItem>
+                            <MenuItem value="UNPAID">Unpaid</MenuItem>
+                            <MenuItem value="PAID">Paid</MenuItem>
+                        </Select>
+                    </FormControl>
                     <Button
                         variant="contained"
                         color="primary"
@@ -289,7 +330,7 @@ const ActivityLogReport = () => {
                                             Call Type
                                         </TableCell>
                                         <TableCell sx={{ fontWeight: 'bold' }}>
-                                            Leave/Work
+                                            Status
                                         </TableCell>
                                         <TableCell sx={{ fontWeight: 'bold' }}>
                                             Remarks
@@ -346,21 +387,27 @@ const ActivityLogReport = () => {
                                                 )}
                                             </TableCell>
                                             <TableCell>
-                                                {log.leaveOrWork ? (
-                                                    <Chip
-                                                        label={log.leaveOrWork}
-                                                        size="small"
-                                                        color={
-                                                            log.leaveOrWork ===
-                                                            'LEAVE'
-                                                                ? 'error'
-                                                                : 'success'
+                                                <FormControl
+                                                    size="small"
+                                                    sx={{ minWidth: 140 }}
+                                                >
+                                                    <Select
+                                                        value={log.status || 'UNPAID'}
+                                                        onChange={(e) =>
+                                                            handleStatusUpdate(
+                                                                log._id,
+                                                                e.target.value
+                                                            )
                                                         }
-                                                        variant="outlined"
-                                                    />
-                                                ) : (
-                                                    'N/A'
-                                                )}
+                                                    >
+                                                        <MenuItem value="UNPAID">
+                                                            Unpaid
+                                                        </MenuItem>
+                                                        <MenuItem value="PAID">
+                                                            Paid
+                                                        </MenuItem>
+                                                    </Select>
+                                                </FormControl>
                                             </TableCell>
                                             <TableCell>
                                                 {log.remarks || 'N/A'}

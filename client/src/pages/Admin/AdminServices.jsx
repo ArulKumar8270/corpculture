@@ -4,7 +4,7 @@ import { useAuth } from '../../context/auth';
 import Spinner from '../../components/Spinner';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { IconButton, Menu, MenuItem } from '@mui/material'; // Import Material-UI components
+import { IconButton, Menu, MenuItem, FormControl, InputLabel, Select } from '@mui/material'; // Import Material-UI components
 import MoreVertIcon from '@mui/icons-material/MoreVert'; // Icon for the action button
 import EditIcon from '@mui/icons-material/Edit';
 import ReceiptIcon from '@mui/icons-material/Receipt'; // For Invoice
@@ -36,6 +36,15 @@ const AdminServices = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
+  const [serviceTitleFilter, setServiceTitleFilter] = useState('');
+
+  // Unique service titles for filter dropdown (must be before any early return)
+  const serviceTitles = React.useMemo(() => {
+    const titles = allServicesData
+      .map(e => e.serviceTitle)
+      .filter(Boolean);
+    return [...new Set(titles)].sort();
+  }, [allServicesData]);
 
   // State for managing the action menu popover
   const [anchorEl, setAnchorEl] = useState(null);
@@ -117,12 +126,21 @@ const AdminServices = () => {
     const queryParams = new URLSearchParams(location.search);
     const serviceTypeFilter = queryParams.get('serviceType');
 
+    const queryServiceTitle = queryParams.get('serviceTitle');
     let currentFilteredServices = allServicesData;
 
     // 1. Filter by serviceType from URL (if present)
     if (serviceTypeFilter) {
       currentFilteredServices = currentFilteredServices.filter(
         enquiry => enquiry.serviceType === serviceTypeFilter
+      );
+    }
+
+    // 2. Filter by service title (state or URL)
+    const activeServiceTitleFilter = serviceTitleFilter || queryServiceTitle || '';
+    if (activeServiceTitleFilter) {
+      currentFilteredServices = currentFilteredServices.filter(
+        enquiry => enquiry.serviceTitle === activeServiceTitleFilter
       );
     }
 
@@ -180,7 +198,7 @@ const AdminServices = () => {
     }
     setEnquiries(finalFilteredServices);
 
-  }, [allServicesData, activeTab, location.search]);
+  }, [allServicesData, activeTab, location.search, serviceTitleFilter]);
 
   const assignEmployeeToService = async (serviceId, employeeId) => {
     setUpdatingServiceId(serviceId);
@@ -268,7 +286,6 @@ const AdminServices = () => {
     );
   }
 
-  // Add this before the return statement
   const filteredEnquiries = enquiries.filter(enquiry => {
     const term = searchTerm.toLowerCase();
     return (
@@ -283,15 +300,33 @@ const AdminServices = () => {
     <div className="p-6 bg-gradient-to-br from-[#e6fbff] to-[#f7fafd] min-h-screen">
       <h1 className="text-2xl font-bold mb-6 text-[#019ee3]">Service Enquiries</h1>
 
-      {/* Search Field */}
-      <div className="mb-4 w-[83%]">
+      {/* Filters: Service Title + Search */}
+      <div className="mb-4 w-[83%] flex flex-wrap items-center gap-4">
+        <FormControl size="small" sx={{ minWidth: 220 }}>
+          <InputLabel id="service-title-filter-label">Filter by Service Title</InputLabel>
+          <Select
+            labelId="service-title-filter-label"
+            label="Filter by Service Title"
+            value={serviceTitleFilter}
+            onChange={e => setServiceTitleFilter(e.target.value)}
+          >
+            <MenuItem value="">
+              <em>All Service Titles</em>
+            </MenuItem>
+            {serviceTitles.map(title => (
+              <MenuItem key={title} value={title}>
+                {title}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
         <TextField
-          fullWidth
           size="small"
           variant="outlined"
-          placeholder="Search by Company Name, Phone, Email, or Service Title"
+          placeholder="Search by Company, Phone, Email, or Service Title"
           value={searchTerm}
           onChange={e => setSearchTerm(e.target.value)}
+          sx={{ flex: 1, minWidth: 280 }}
         />
       </div>
 

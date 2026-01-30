@@ -66,6 +66,14 @@ const rentalProductSchema = new mongoose.Schema({
         type: Date,
         required: true,
     },
+    openingDate: {
+        type: Date,
+        required: false,
+    },
+    closingDate: {
+        type: Date,
+        required: false,
+    },
     commission: {
         type: Number,
         default: 0,

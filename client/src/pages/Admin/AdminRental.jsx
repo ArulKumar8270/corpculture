@@ -4,7 +4,7 @@ import { useAuth } from '../../context/auth';
 import Spinner from '../../components/Spinner';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { IconButton, Menu, MenuItem } from '@mui/material'; // Import Material-UI components
+import { IconButton, Menu, MenuItem, FormControl, InputLabel, Select } from '@mui/material'; // Import Material-UI components
 import MoreVertIcon from '@mui/icons-material/MoreVert'; // Icon for the action button
 import EditIcon from '@mui/icons-material/Edit';
 import ReceiptIcon from '@mui/icons-material/Receipt'; // For Invoice
@@ -37,6 +37,24 @@ const AdminRental
     const location = useLocation();
     const navigate = useNavigate();
     const [searchTerm, setSearchTerm] = useState('');
+    const [rentalTitleFilter, setRentalTitleFilter] = useState('');
+    const [rentalTypeFilter, setRentalTypeFilter] = useState('');
+
+    // Unique rental titles for filter dropdown (must be before any early return)
+    const rentalTitles = React.useMemo(() => {
+        const titles = allRentalsData
+            .map((e) => e.rentalTitle)
+            .filter(Boolean);
+        return [...new Set(titles)].sort();
+    }, [allRentalsData]);
+
+    // Unique rental types for filter dropdown
+    const rentalTypes = React.useMemo(() => {
+        const types = allRentalsData
+            .map((e) => e.rentalType)
+            .filter(Boolean);
+        return [...new Set(types)].sort();
+    }, [allRentalsData]);
 
     // State for managing the action menu popover
     const [anchorEl, setAnchorEl] = useState(null);
@@ -116,14 +134,24 @@ const AdminRental
     // Filter Rentals and calculate counts whenever allRentalsData, activeTab, or location.search changes
     useEffect(() => {
       const queryParams = new URLSearchParams(location.search);
-      const rentalTypeFilter = queryParams.get('rentalType');
+      const queryRentalType = queryParams.get('rentalType');
+      const queryRentalTitle = queryParams.get('rentalTitle');
 
       let currentFilteredRentals = allRentalsData;
 
-      // 1. Filter by rentalType from URL (if present)
-      if (rentalTypeFilter) {
+      // 1. Filter by rentalType (state or URL)
+      const activeRentalTypeFilter = rentalTypeFilter || queryRentalType || '';
+      if (activeRentalTypeFilter) {
         currentFilteredRentals = currentFilteredRentals.filter(
-          enquiry => enquiry.rentalType === rentalTypeFilter
+          enquiry => enquiry.rentalType === activeRentalTypeFilter
+        );
+      }
+
+      // 2. Filter by rental title (state or URL)
+      const activeRentalTitleFilter = rentalTitleFilter || queryRentalTitle || '';
+      if (activeRentalTitleFilter) {
+        currentFilteredRentals = currentFilteredRentals.filter(
+          enquiry => enquiry.rentalTitle === activeRentalTitleFilter
         );
       }
 
@@ -181,7 +209,7 @@ const AdminRental
       }
       setEnquiries(finalFilteredRentals);
 
-    }, [allRentalsData, activeTab, location.search]);
+    }, [allRentalsData, activeTab, location.search, rentalTitleFilter, rentalTypeFilter]);
 
     const assignEmployeeToRental = async (rentalId, employeeId) => {
       setUpdatingRentalId(rentalId);
@@ -291,13 +319,49 @@ const AdminRental
       <div className="p-6 bg-gradient-to-br from-[#e6fbff] to-[#f7fafd] min-h-screen">
         <h1 className="text-2xl font-bold mb-6 text-[#019ee3]">Rental Enquiries</h1>
 
-        {/* Search Field */}
-        <div className="mb-4 w-[83%]">
+        {/* Filters: Rental Type + Rental Title + Search */}
+        <div className="mb-4 w-[83%] flex flex-wrap items-center gap-4">
+          <FormControl size="small" sx={{ minWidth: 200 }}>
+            <InputLabel id="rental-type-filter-label">Rental Type</InputLabel>
+            <Select
+              labelId="rental-type-filter-label"
+              label="Rental Type"
+              value={rentalTypeFilter}
+              onChange={e => setRentalTypeFilter(e.target.value)}
+            >
+              <MenuItem value="">
+                <em>All Rental Types</em>
+              </MenuItem>
+              {rentalTypes.map((type) => (
+                <MenuItem key={type} value={type}>
+                  {type}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <FormControl size="small" sx={{ minWidth: 220 }}>
+            <InputLabel id="rental-title-filter-label">Filter by Rental Title</InputLabel>
+            <Select
+              labelId="rental-title-filter-label"
+              label="Filter by Rental Title"
+              value={rentalTitleFilter}
+              onChange={e => setRentalTitleFilter(e.target.value)}
+            >
+              <MenuItem value="">
+                <em>All Rental Titles</em>
+              </MenuItem>
+              {rentalTitles.map((title) => (
+                <MenuItem key={title} value={title}>
+                  {title}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
           <TextField
-            fullWidth
             size="small"
+            sx={{ flex: 1, minWidth: 280 }}
             variant="outlined"
-            placeholder="Search by Company Name, Phone, Email, or Rental Title"
+            placeholder="Search by Company, Phone, Email, or Rental Title"
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
           />

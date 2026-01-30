@@ -953,7 +953,6 @@ const AddServiceInvoice = () => {
                         <TableRow sx={{ bgcolor: '#f0f0f0' }}>
                             <TableCell>S.No</TableCell>
                             <TableCell>Product Name</TableCell>
-                            <TableCell>Sku</TableCell>
                             <TableCell>HSN</TableCell>
                             <TableCell align="right">Quantity</TableCell>
                             <TableCell align="right">Rate</TableCell>
@@ -981,7 +980,6 @@ const AddServiceInvoice = () => {
                                     <TableRow key={product.id}> {/* Use the unique 'id' as key */}
                                         <TableCell>{index + 1}</TableCell>
                                         <TableCell>{productName}</TableCell>
-                                        <TableCell>{product.sku}</TableCell>
                                         <TableCell>{product.hsn}</TableCell>
                                         <TableCell align="right">{product.quantity}</TableCell>
                                         <TableCell align="right">{product.rate}</TableCell>

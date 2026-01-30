@@ -56,6 +56,8 @@ import OldInvoicesList from "./OldInvoicesList";
 import CreditManagement from "./CreditManagement";
 import EmployeeActivityLogForm from "../Employee/EmployeeActivityLogForm";
 import ActivityLogReport from "./Reports/ActivityLogReport";
+import EmployeeLeaveForm from "../Employee/EmployeeLeaveForm";
+import LeaveReport from "./Reports/LeaveReport";
 
 const AdminDashboard = () => {
     const navigate = useNavigate();
@@ -163,6 +165,8 @@ const AdminDashboard = () => {
                             <Route path="oldInvoices" element={<OldInvoicesList />} />
                             <Route path="activity-log" element={<EmployeeActivityLogForm />} />
                             <Route path="activityLogReport" element={<ActivityLogReport />} />
+                            <Route path="leave-application" element={<EmployeeLeaveForm />} />
+                            <Route path="leaveReport" element={<LeaveReport />} />
                         </Routes>
                     </div>
                 </div>

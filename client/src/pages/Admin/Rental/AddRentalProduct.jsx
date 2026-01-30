@@ -80,6 +80,7 @@ const AddRentalProduct = () => {
     const { auth } = useAuth();
     // Main form states
     const [company, setCompany] = useState('');
+    const [companyOption, setCompanyOption] = useState(null); // Full company object for Autocomplete display (fixes edit mode)
     const [branch, setBranch] = useState('');
     const [department, setDepartment] = useState('');
     const [modelName, setModelName] = useState('');
@@ -88,7 +89,9 @@ const AddRentalProduct = () => {
     const [basePrice, setBasePrice] = useState('');
     const [gstTypeIds, setGstTypeIds] = useState([]); // Changed to array for multiple selection
     const [paymentDate, setPaymentDate] = useState(null); // dayjs object
-    const [commission, setCommission] = useState(''); // New state for commission
+    const [openingDate, setOpeningDate] = useState(null); // dayjs object
+    const [closingDate, setClosingDate] = useState(null); // dayjs object
+    const [commission, setCommission] = useState('');
 
 
     // Model Specifications checkboxes
@@ -229,7 +232,9 @@ const AddRentalProduct = () => {
             const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/rental-products/${productId}`);
             if (data?.success) {
                 const product = data.rentalProduct;
-                setCompany(product.company?._id || '');
+                const companyId = product.company?._id || '';
+                setCompany(companyId);
+                setCompanyOption(product.company ? { _id: product.company._id, companyName: product.company.companyName } : null);
                 setBranch(product.branch || '');
                 setDepartment(product.department || '');
                 setModelName(product.modelName || '');
@@ -245,7 +250,9 @@ const AddRentalProduct = () => {
                     setGstTypeIds([]);
                 }
                 setPaymentDate(product.paymentDate ? dayjs(product.paymentDate) : null);
-                setCommission(product.commission || ''); // Populate commission
+                setOpeningDate(product.openingDate ? dayjs(product.openingDate) : null);
+                setClosingDate(product.closingDate ? dayjs(product.closingDate) : null);
+                setCommission(product.commission || '');
 
                 setModelSpecs({
                     isA3Selected: product.modelSpecs?.isA3Selected || false,
@@ -284,8 +291,8 @@ const AddRentalProduct = () => {
         e.preventDefault();
 
         // Basic validation
-        if (!company || !branch || !department || !modelName || !serialNo || !hsn || !basePrice || gstTypeIds.length === 0 || !paymentDate || !commission) { // Check gstTypeIds length and commission
-            toast.error('Please fill in all required fields.');
+        if (!company || !branch || !department || !modelName || !serialNo || !hsn || !basePrice || gstTypeIds.length === 0 || !paymentDate) { // Check gstTypeIds length and commission
+        alert('Please fill in all required fields.');
             return;
         }
 
@@ -297,9 +304,11 @@ const AddRentalProduct = () => {
             serialNo,
             hsn,
             basePrice: parseFloat(basePrice),
-            gstType: gstTypeIds, // Send as array
-            paymentDate: paymentDate ? dayjs(paymentDate).utc().startOf('day').toISOString() : null, // Convert dayjs object to ISO string
-            commission: parseFloat(commission), // Include commission in payload
+            gstType: gstTypeIds,
+            paymentDate: paymentDate ? dayjs(paymentDate).utc().startOf('day').toISOString() : null,
+            openingDate: openingDate ? dayjs(openingDate).utc().startOf('day').toISOString() : null,
+            closingDate: closingDate ? dayjs(closingDate).utc().startOf('day').toISOString() : null,
+            commission: parseFloat(commission),
             modelSpecs,
             a3Config: modelSpecs.isA3Selected ? a3Config : {},
             a4Config: modelSpecs.isA4Selected ? a4Config : {},
@@ -323,6 +332,7 @@ const AddRentalProduct = () => {
                     toast.success(data.message || 'Rental product added successfully!');
                     // Clear form
                     setCompany('');
+                    setCompanyOption(null);
                     setBranch('');
                     setDepartment('');
                     setModelName('');
@@ -331,7 +341,9 @@ const AddRentalProduct = () => {
                     setBasePrice('');
                     setGstTypeIds([]); // Clear as array
                     setPaymentDate(null);
-                    setCommission(''); // Clear commission
+                    setOpeningDate(null);
+                    setClosingDate(null);
+                    setCommission('');
                     setModelSpecs({ isA3Selected: false, isA4Selected: false, isA5Selected: false });
                     setA3Config({});
                     setA4Config({});
@@ -370,10 +382,11 @@ const AddRentalProduct = () => {
                         <Autocomplete
                             options={companies}
                             getOptionLabel={(option) => option.companyName || ''}
-                            isOptionEqualToValue={(option, value) => option._id === value._id}
-                            value={companies.find(c => c._id === company) || null}
+                            isOptionEqualToValue={(option, value) => option._id === value?._id}
+                            value={companyOption || companies.find(c => c._id === company) || null}
                             onChange={(event, newValue) => {
                                 setCompany(newValue ? newValue._id : '');
+                                setCompanyOption(newValue || null);
                             }}
                             onInputChange={(event, newInputValue) => {
                                 setCompanySearch(newInputValue);
@@ -504,14 +517,21 @@ const AddRentalProduct = () => {
                             label="Payment Date *"
                             value={paymentDate}
                             onChange={(newValue) => setPaymentDate(newValue)}
-                            renderInput={(params) => (
-                                <TextField
-                                    {...params}
-                                    fullWidth
-                                    variant="outlined"
-                                    size="small"
-                                />
-                            )}
+                            slotProps={{ textField: { fullWidth: true, variant: 'outlined', size: 'small' } }}
+                        />
+
+                        <DatePicker
+                            label="Opening Date"
+                            value={openingDate}
+                            onChange={(newValue) => setOpeningDate(newValue)}
+                            slotProps={{ textField: { fullWidth: true, variant: 'outlined', size: 'small' } }}
+                        />
+
+                        <DatePicker
+                            label="Closing Date"
+                            value={closingDate}
+                            onChange={(newValue) => setClosingDate(newValue)}
+                            slotProps={{ textField: { fullWidth: true, variant: 'outlined', size: 'small' } }}
                         />
 
                         <TextField
