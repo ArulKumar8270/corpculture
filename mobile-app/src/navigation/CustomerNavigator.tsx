@@ -22,6 +22,8 @@ import WishlistScreen from '../screens/Sales/WishlistScreen';
 import ShippingScreen from '../screens/Sales/ShippingScreen';
 import OrderSuccessScreen from '../screens/Sales/OrderSuccessScreen';
 import OrderFailedScreen from '../screens/Sales/OrderFailedScreen';
+import PaymentCardsScreen from '../screens/Common/PaymentCardsScreen';
+import ReviewsScreen from '../screens/Common/ReviewsScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -138,6 +140,16 @@ const ProfileStack = () => (
         title: 'My Wishlist',
         headerRight: () => <CompanyToggleHeader />,
       }}
+    />
+    <Stack.Screen
+      name="PaymentCards"
+      component={PaymentCardsScreen}
+      options={{ title: 'Payment Cards' }}
+    />
+    <Stack.Screen
+      name="Reviews"
+      component={ReviewsScreen}
+      options={{ title: 'My Reviews' }}
     />
   </Stack.Navigator>
 );

@@ -67,17 +67,22 @@ export const getAllServices = async (req, res) => {
             }
         }
 
-        // Calculate skip for pagination
-        const skip = (parseInt(page) - 1) * parseInt(limit);
+        const limitNum = limit !== undefined && limit !== '' ? parseInt(limit, 10) : 10;
+        const pageNum = parseInt(page, 10) || 1;
+        const usePagination = limitNum > 0; // limit=0 means return all (no pagination)
+
+        // Calculate skip for pagination (when using limit)
+        const skip = usePagination ? (pageNum - 1) * limitNum : 0;
 
         // Get total count of documents matching the filters (before pagination)
         const totalCount = await ServiceModel.countDocuments(findQuery);
 
-        // Fetch services with pagination
-        const services = await ServiceModel.find(findQuery)
-            .sort({ createdAt: -1 })
-            .skip(skip)
-            .limit(parseInt(limit));
+        // Fetch services (with or without pagination: limit=0 or very high means return all)
+        let query = ServiceModel.find(findQuery).sort({ createdAt: -1 }).skip(skip);
+        if (usePagination) {
+            query = query.limit(limitNum);
+        }
+        const services = await query;
         
         res.status(200).send({
             success: true,

@@ -79,6 +79,10 @@ const AdminDashboardScreen = () => {
       'Address': 'Profile',
       'PanCard': 'Profile',
       'Deactivate': 'Profile',
+      'ActivityLogForm': 'Employees',
+      'LeaveForm': 'Employees',
+      'ActivityLogReport': 'Reports',
+      'LeaveReport': 'Reports',
     };
     
     const parentStack = nestedScreens[screen];
@@ -328,6 +332,22 @@ const AdminDashboardScreen = () => {
       color: '#607D8B',
     },
     {
+      id: 'activityLogForm',
+      title: 'Activity Log',
+      icon: 'list-alt',
+      screen: 'ActivityLogForm',
+      permissionKey: 'accountSettings',
+      color: '#5C6BC0',
+    },
+    {
+      id: 'leaveForm',
+      title: 'Leave Application',
+      icon: 'event-busy',
+      screen: 'LeaveForm',
+      permissionKey: 'accountSettings',
+      color: '#26A69A',
+    },
+    {
       id: 'reportsDashboard',
       title: 'Reports Dashboard',
       icon: 'dashboard',
@@ -366,6 +386,22 @@ const AdminDashboardScreen = () => {
       screen: 'ServiceReportsReport',
       permissionKey: 'reportsService',
       color: '#009688',
+    },
+    {
+      id: 'activityLogReport',
+      title: 'Activity Log Report',
+      icon: 'assessment',
+      screen: 'ActivityLogReport',
+      permissionKey: 'reports',
+      color: '#5C6BC0',
+    },
+    {
+      id: 'leaveReport',
+      title: 'Leave Report',
+      icon: 'event-note',
+      screen: 'LeaveReport',
+      permissionKey: 'reports',
+      color: '#26A69A',
     },
   ];
 

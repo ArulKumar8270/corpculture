@@ -26,7 +26,6 @@ const ServiceEnquiriesScreen = () => {
   const navigation = useNavigation();
   const { user, token } = useSelector((state: RootState) => state.auth);
   const { hasPermission } = usePermissions();
-  const [enquiries, setEnquiries] = useState<any[]>([]);
   const [allServicesData, setAllServicesData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -38,11 +37,79 @@ const ServiceEnquiriesScreen = () => {
   const [selectedService, setSelectedService] = useState<any>(null);
   const [employeePickerVisible, setEmployeePickerVisible] = useState(false);
   const [selectedEnquiryForEmployee, setSelectedEnquiryForEmployee] = useState<any>(null);
+  const [serviceTitleFilter, setServiceTitleFilter] = useState('');
+  const [serviceTitlePickerVisible, setServiceTitlePickerVisible] = useState(false);
+  const [page, setPage] = useState(0);
+  const rowsPerPage = 10;
 
-  const tabCounts = {
-    new: allServicesData.filter(e => !e.employeeId).length,
-    assigned: allServicesData.filter(e => !!e.employeeId && e.status !== 'Cancelled').length,
-  };
+  // Base filtered data by service title (for counts and list)
+  const baseFiltered = React.useMemo(() => {
+    let list = [...allServicesData];
+    if (serviceTitleFilter) {
+      list = list.filter((e: any) => e.serviceTitle === serviceTitleFilter);
+    }
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      list = list.filter(
+        (e: any) =>
+          e.companyName?.toLowerCase().includes(term) ||
+          e.phone?.toLowerCase().includes(term) ||
+          e.email?.toLowerCase().includes(term) ||
+          e.serviceTitle?.toLowerCase().includes(term)
+      );
+    }
+    return list;
+  }, [allServicesData, serviceTitleFilter, searchTerm]);
+
+  const tabCounts = React.useMemo(
+    () => ({
+      new: baseFiltered.filter((e: any) => !e.employeeId).length,
+      assigned: baseFiltered.filter((e: any) => !!e.employeeId && e.status !== 'Cancelled').length,
+      w_u: baseFiltered.filter((e: any) => e.status === 'Cancelled').length,
+      pending: baseFiltered.filter((e: any) => e.status === 'Pending').length,
+      inProgress: baseFiltered.filter((e: any) => e.status === 'In Progress').length,
+      completed: baseFiltered.filter((e: any) => e.status === 'Completed').length,
+    }),
+    [baseFiltered]
+  );
+
+  const enquiries = React.useMemo(() => {
+    let list: any[] = [];
+    switch (activeTab) {
+      case 'new':
+        list = baseFiltered.filter((e: any) => !e.employeeId);
+        break;
+      case 'assigned':
+        list = baseFiltered.filter((e: any) => !!e.employeeId && e.status !== 'Cancelled');
+        break;
+      case 'w_u':
+        list = baseFiltered.filter((e: any) => e.status === 'Cancelled');
+        break;
+      case 'pending':
+        list = baseFiltered.filter((e: any) => e.status === 'Pending');
+        break;
+      case 'inProgress':
+        list = baseFiltered.filter((e: any) => e.status === 'In Progress');
+        break;
+      case 'completed':
+        list = baseFiltered.filter((e: any) => e.status === 'Completed');
+        break;
+      default:
+        list = baseFiltered;
+    }
+    return list;
+  }, [baseFiltered, activeTab]);
+
+  const paginatedEnquiries = React.useMemo(() => {
+    const start = page * rowsPerPage;
+    return enquiries.slice(start, start + rowsPerPage);
+  }, [enquiries, page]);
+
+  const serviceTitles = React.useMemo(() => {
+    const titles = allServicesData.map((e: any) => e.serviceTitle).filter(Boolean);
+    return [...new Set(titles)].sort();
+  }, [allServicesData]);
+
   useEffect(() => {
     if (token) {
       fetchAllServices();
@@ -51,8 +118,8 @@ const ServiceEnquiriesScreen = () => {
   }, [token]);
 
   useEffect(() => {
-    filterEnquiries();
-  }, [allServicesData, activeTab, searchTerm]);
+    setPage(0);
+  }, [activeTab, serviceTitleFilter, searchTerm]);
 
   const fetchAllServices = async () => {
     try {
@@ -100,35 +167,6 @@ const ServiceEnquiriesScreen = () => {
     } catch (err) {
       console.error('Error fetching employees:', err);
     }
-  };
-
-  const filterEnquiries = () => {
-    let filtered = [...allServicesData];
-
-    // Filter by activeTab
-    switch (activeTab) {
-      case 'new':
-        filtered = filtered.filter(enquiry => !enquiry.employeeId);
-        break;
-      case 'assigned':
-        filtered = filtered.filter(enquiry => !!enquiry.employeeId && enquiry.status !== 'Cancelled');
-        break;
-      default:
-        break;
-    }
-
-    // Filter by search term
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      filtered = filtered.filter(enquiry =>
-        enquiry.companyName?.toLowerCase().includes(term) ||
-        enquiry.phone?.toLowerCase().includes(term) ||
-        enquiry.email?.toLowerCase().includes(term) ||
-        enquiry.serviceTitle?.toLowerCase().includes(term)
-      );
-    }
-
-    setEnquiries(filtered);
   };
 
   const assignEmployeeToService = async (serviceId: string, employeeId: string) => {
@@ -357,9 +395,75 @@ const ServiceEnquiriesScreen = () => {
         />
       </View>
 
+      {/* Service Title Filter */}
+      {user?.role === 1 && serviceTitles.length > 0 && (
+        <View style={styles.filterRow}>
+          <Text style={styles.filterLabel}>Service Title:</Text>
+          <TouchableOpacity
+            style={styles.pickerButton}
+            onPress={() => setServiceTitlePickerVisible(true)}
+          >
+            <Text style={styles.pickerButtonText}>
+              {serviceTitleFilter || 'All'}
+            </Text>
+            <Icon name="arrow-drop-down" size={24} color="#666" />
+          </TouchableOpacity>
+        </View>
+      )}
+      {serviceTitlePickerVisible && (
+        <Modal
+          visible={serviceTitlePickerVisible}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setServiceTitlePickerVisible(false)}
+        >
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setServiceTitlePickerVisible(false)}
+          >
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Service Title</Text>
+              <TouchableOpacity
+                style={styles.modalItem}
+                onPress={() => {
+                  setServiceTitleFilter('');
+                  setServiceTitlePickerVisible(false);
+                }}
+              >
+                <Text style={styles.modalItemText}>All</Text>
+              </TouchableOpacity>
+              {serviceTitles.map((title: string) => (
+                <TouchableOpacity
+                  key={title}
+                  style={styles.modalItem}
+                  onPress={() => {
+                    setServiceTitleFilter(title);
+                    setServiceTitlePickerVisible(false);
+                  }}
+                >
+                  <Text style={styles.modalItemText}>{title}</Text>
+                </TouchableOpacity>
+              ))}
+              <TouchableOpacity
+                style={[styles.modalItem, styles.modalCancel]}
+                onPress={() => setServiceTitlePickerVisible(false)}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+      )}
+
       {/* Tab Navigation */}
       {user?.role === 1 && (
-        <View style={styles.tabContainer}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.tabScroll}
+          contentContainerStyle={styles.tabContainer}
+        >
           <TouchableOpacity
             style={[styles.tab, activeTab === 'new' && styles.activeTab]}
             onPress={() => setActiveTab('new')}
@@ -376,7 +480,39 @@ const ServiceEnquiriesScreen = () => {
               Assigned ({tabCounts.assigned})
             </Text>
           </TouchableOpacity>
-        </View>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'w_u' && styles.activeTab]}
+            onPress={() => setActiveTab('w_u')}
+          >
+            <Text style={[styles.tabText, activeTab === 'w_u' && styles.activeTabText]}>
+              Unwanted ({tabCounts.w_u})
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'pending' && styles.activeTab]}
+            onPress={() => setActiveTab('pending')}
+          >
+            <Text style={[styles.tabText, activeTab === 'pending' && styles.activeTabText]}>
+              Pending ({tabCounts.pending})
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'inProgress' && styles.activeTab]}
+            onPress={() => setActiveTab('inProgress')}
+          >
+            <Text style={[styles.tabText, activeTab === 'inProgress' && styles.activeTabText]}>
+              In Progress ({tabCounts.inProgress})
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'completed' && styles.activeTab]}
+            onPress={() => setActiveTab('completed')}
+          >
+            <Text style={[styles.tabText, activeTab === 'completed' && styles.activeTabText]}>
+              Completed ({tabCounts.completed})
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
       )}
 
       {/* Enquiries List */}
@@ -384,7 +520,7 @@ const ServiceEnquiriesScreen = () => {
         <ActivityIndicator size="large" color="#007AFF" style={styles.loader} />
       ) : (
         <FlatList
-          data={enquiries}
+          data={paginatedEnquiries}
           renderItem={renderEnquiry}
           keyExtractor={(item) => item._id}
           refreshing={loading}
@@ -394,6 +530,32 @@ const ServiceEnquiriesScreen = () => {
               <Icon name="inbox" size={64} color="#ccc" />
               <Text style={styles.emptyText}>No service enquiries found</Text>
             </View>
+          }
+          ListFooterComponent={
+            enquiries.length > rowsPerPage ? (
+              <View style={styles.pagination}>
+                <TouchableOpacity
+                  style={[styles.pageBtn, page === 0 && styles.pageBtnDisabled]}
+                  onPress={() => setPage((p) => Math.max(0, p - 1))}
+                  disabled={page === 0}
+                >
+                  <Text style={styles.pageBtnText}>Previous</Text>
+                </TouchableOpacity>
+                <Text style={styles.pageInfo}>
+                  Page {page + 1} of {Math.ceil(enquiries.length / rowsPerPage)}
+                </Text>
+                <TouchableOpacity
+                  style={[
+                    styles.pageBtn,
+                    page >= Math.ceil(enquiries.length / rowsPerPage) - 1 && styles.pageBtnDisabled,
+                  ]}
+                  onPress={() => setPage((p) => p + 1)}
+                  disabled={page >= Math.ceil(enquiries.length / rowsPerPage) - 1}
+                >
+                  <Text style={styles.pageBtnText}>Next</Text>
+                </TouchableOpacity>
+              </View>
+            ) : null
           }
         />
       )}
@@ -533,19 +695,60 @@ const styles = StyleSheet.create({
     height: 40,
     fontSize: 16,
   },
+  filterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 15,
+    marginBottom: 8,
+  },
+  filterLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginRight: 8,
+  },
+  tabScroll: {
+    maxHeight: 50,
+    marginBottom: 8,
+  },
   tabContainer: {
     flexDirection: 'row',
     paddingHorizontal: 15,
     marginBottom: 10,
   },
   tab: {
-    flex: 1,
     paddingVertical: 10,
-    paddingHorizontal: 15,
-    marginRight: 10,
+    paddingHorizontal: 12,
+    marginRight: 8,
     backgroundColor: '#e0e0e0',
     borderRadius: 8,
     alignItems: 'center',
+  },
+  pageBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    backgroundColor: '#019ee3',
+    borderRadius: 8,
+    marginHorizontal: 8,
+  },
+  pageBtnDisabled: {
+    backgroundColor: '#ccc',
+    opacity: 0.8,
+  },
+  pageBtnText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  pageInfo: {
+    fontSize: 14,
+    color: '#333',
+  },
+  pagination: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
   },
   activeTab: {
     backgroundColor: '#019ee3',

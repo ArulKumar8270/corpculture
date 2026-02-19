@@ -46,6 +46,7 @@ import PurchaseRegisterScreen from '../screens/Admin/PurchaseRegisterScreen';
 
 // Settings
 import SettingsScreen from '../screens/Admin/SettingsScreen';
+import GlobalSettingsScreen from '../screens/Admin/GlobalSettingsScreen';
 import CategoryManagementScreen from '../screens/Admin/CategoryManagementScreen';
 import UserManagementScreen from '../screens/Admin/UserManagementScreen';
 import GSTManagementScreen from '../screens/Admin/GSTManagementScreen';
@@ -85,6 +86,12 @@ import RentalInvoiceReportScreen from '../screens/Admin/Reports/RentalInvoiceRep
 import ServiceEnquiriesReportScreen from '../screens/Admin/Reports/ServiceEnquiriesReportScreen';
 import ServiceInvoicesReportScreen from '../screens/Admin/Reports/ServiceInvoicesReportScreen';
 import ServiceReportsReportScreen from '../screens/Admin/Reports/ServiceReportsReportScreen';
+import ActivityLogReportScreen from '../screens/Admin/Reports/ActivityLogReportScreen';
+import LeaveReportScreen from '../screens/Admin/Reports/LeaveReportScreen';
+
+// Employee HR
+import EmployeeActivityLogFormScreen from '../screens/Admin/EmployeeActivityLogFormScreen';
+import EmployeeLeaveFormScreen from '../screens/Admin/EmployeeLeaveFormScreen';
 
 // Credit Management
 import CreditManagementScreen from '../screens/Admin/CreditManagementScreen';
@@ -266,6 +273,7 @@ const SettingsStack = () => (
     }}
   >
     <Stack.Screen name="SettingsMain" component={SettingsScreen} options={{ headerShown: false }} />
+    <Stack.Screen name="GlobalSettings" component={GlobalSettingsScreen} options={{ title: 'Global Settings' }} />
     <Stack.Screen name="CategoryManagement" component={CategoryManagementScreen} options={{ title: 'Categories' }} />
     <Stack.Screen name="UserManagement" component={UserManagementScreen} options={{ title: 'Users' }} />
     <Stack.Screen name="GSTManagement" component={GSTManagementScreen} options={{ title: 'GST Management' }} />
@@ -320,6 +328,8 @@ const EmployeeStack = () => (
     <Stack.Screen name="EmployeeList" component={EmployeeListScreen} options={{ headerShown: false }} />
     <Stack.Screen name="AddEmployee" component={AddEmployeeScreen} options={{ title: 'Add/Edit Employee' }} />
     <Stack.Screen name="EmployeeDetails" component={EmployeeDetailsScreen} options={{ title: 'Employee Details' }} />
+    <Stack.Screen name="ActivityLogForm" component={EmployeeActivityLogFormScreen} options={{ title: 'Activity Log' }} />
+    <Stack.Screen name="LeaveForm" component={EmployeeLeaveFormScreen} options={{ title: 'Leave Application' }} />
   </Stack.Navigator>
 );
 
@@ -348,6 +358,8 @@ const ReportsStack = () => (
     <Stack.Screen name="ServiceEnquiriesReport" component={ServiceEnquiriesReportScreen} options={{ title: 'Service Enquiries Report' }} />
     <Stack.Screen name="ServiceInvoicesReport" component={ServiceInvoicesReportScreen} options={{ title: 'Service Invoices Report' }} />
     <Stack.Screen name="ServiceReportsReport" component={ServiceReportsReportScreen} options={{ title: 'Service Reports Report' }} />
+    <Stack.Screen name="ActivityLogReport" component={ActivityLogReportScreen} options={{ title: 'Activity Log Report' }} />
+    <Stack.Screen name="LeaveReport" component={LeaveReportScreen} options={{ title: 'Leave Report' }} />
   </Stack.Navigator>
 );
 

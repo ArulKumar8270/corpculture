@@ -20,6 +20,13 @@ const SettingsScreen = () => {
 
   const allSettingsMenu = [
     {
+      id: 'globalSettings',
+      title: 'Global Settings',
+      icon: 'settings',
+      screen: 'GlobalSettings' as never,
+      permissionKey: 'otherSettingsSettings',
+    },
+    {
       id: 'company',
       title: 'Company Management',
       icon: 'business',

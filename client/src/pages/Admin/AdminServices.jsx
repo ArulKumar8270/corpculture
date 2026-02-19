@@ -4,7 +4,7 @@ import { useAuth } from '../../context/auth';
 import Spinner from '../../components/Spinner';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { IconButton, Menu, MenuItem, FormControl, InputLabel, Select } from '@mui/material'; // Import Material-UI components
+import { IconButton, Menu, MenuItem, FormControl, InputLabel, Select, TablePagination } from '@mui/material';
 import MoreVertIcon from '@mui/icons-material/MoreVert'; // Icon for the action button
 import EditIcon from '@mui/icons-material/Edit';
 import ReceiptIcon from '@mui/icons-material/Receipt'; // For Invoice
@@ -37,6 +37,8 @@ const AdminServices = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [serviceTitleFilter, setServiceTitleFilter] = useState('');
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
 
   // Unique service titles for filter dropdown (must be before any early return)
   const serviceTitles = React.useMemo(() => {
@@ -69,7 +71,9 @@ const AdminServices = () => {
   const fetchAllServices = async () => {
     try {
       setLoading(true);
-      const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/service/${auth?.user?.role === 3 ? `assignedTo/${auth?.user?._id}` : "all"}`, {
+      const baseUrl = `${import.meta.env.VITE_SERVER_URL}/api/v1/service/${auth?.user?.role === 3 ? `assignedTo/${auth?.user?._id}` : "all"}`;
+      const url = auth?.user?.role === 3 ? baseUrl : `${baseUrl}?limit=0`;
+      const { data } = await axios.get(url, {
         headers: {
           Authorization: auth.token,
         },
@@ -200,6 +204,11 @@ const AdminServices = () => {
 
   }, [allServicesData, activeTab, location.search, serviceTitleFilter]);
 
+  // Reset to first page when filters or tab change
+  useEffect(() => {
+    setPage(0);
+  }, [activeTab, serviceTitleFilter, searchTerm]);
+
   const assignEmployeeToService = async (serviceId, employeeId) => {
     setUpdatingServiceId(serviceId);
     try {
@@ -295,6 +304,16 @@ const AdminServices = () => {
       (enquiry.serviceTitle && enquiry.serviceTitle.toLowerCase().includes(term))
     );
   });
+
+  const handleChangePage = (_, newPage) => setPage(newPage);
+  const handleChangeRowsPerPage = (e) => {
+    setRowsPerPage(parseInt(e.target.value, 10));
+    setPage(0);
+  };
+  const paginatedEnquiries = filteredEnquiries.slice(
+    page * rowsPerPage,
+    page * rowsPerPage + rowsPerPage
+  );
 
   return (
     <div className="p-6 bg-gradient-to-br from-[#e6fbff] to-[#f7fafd] min-h-screen">
@@ -399,12 +418,12 @@ const AdminServices = () => {
             </tr>
           </thead>
           <tbody>
-            {filteredEnquiries.length === 0 ? (
+            {paginatedEnquiries.length === 0 ? (
               <tr>
-                <td colSpan={16} className="text-center py-6 text-gray-400">No service enquiries found.</td> {/* Updated colspan */}
+                <td colSpan={16} className="text-center py-6 text-gray-400">No service enquiries found.</td>
               </tr>
             ) : (
-              filteredEnquiries.map(enquiry => (
+              paginatedEnquiries.map(enquiry => (
                 <tr key={enquiry._id} className="border-b last:border-b-0 hover:bg-blue-50">
                   {hasPermission("serviceEnquiries") ? <td className="py-2 px-3">
                     <IconButton
@@ -519,6 +538,17 @@ const AdminServices = () => {
             )}
           </tbody>
         </table>
+        <TablePagination
+          component="div"
+          count={filteredEnquiries.length}
+          page={page}
+          onPageChange={handleChangePage}
+          rowsPerPage={rowsPerPage}
+          onRowsPerPageChange={handleChangeRowsPerPage}
+          rowsPerPageOptions={[5, 10, 25, 50, 100]}
+          labelRowsPerPage="Rows per page:"
+          sx={{ borderTop: '1px solid #eee' }}
+        />
       </div>
     </div>
   );

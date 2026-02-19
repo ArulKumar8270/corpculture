@@ -128,6 +128,10 @@ const CustomDrawerContent = (props: CustomDrawerContentProps) => {
       'Address': 'Profile',
       'PanCard': 'Profile',
       'Deactivate': 'Profile',
+      'ActivityLogForm': 'Employees',
+      'LeaveForm': 'Employees',
+      'ActivityLogReport': 'Reports',
+      'LeaveReport': 'Reports',
     };
     
     try {

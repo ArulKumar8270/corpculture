@@ -62,8 +62,8 @@ const SalesReportsSummaryScreen = () => {
 
         // Construct the report data
         const data: ReportData[] = [
-          { id: 'salesProducts', name: 'All Sales Products', count: productsCount, screen: 'AllProducts' },
-          { id: 'salesOrders', name: 'Sales Orders', count: ordersCount, screen: 'AdminOrders' },
+          { id: 'salesProducts', name: 'All Sales Products', count: productsCount, screen: 'Products' },
+          { id: 'salesOrders', name: 'Sales Orders', count: ordersCount, screen: 'Orders' },
         ];
         setReportData(data);
       } catch (err) {

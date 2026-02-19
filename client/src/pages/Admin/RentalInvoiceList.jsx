@@ -196,10 +196,16 @@ function RentalInvoiceList(props) {
                     }
                 );
             } else {
-                // For 'all' invoices, the backend now expects filters in the request body
+                // For 'all' invoices, the backend now expects filters in the request body. Use high limit so all records load (client-side pagination).
                 response = await axios.post(
                     `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/all`,
-                    { invoiceType: props?.invoice, tdsAmount: { $eq: null }, status: { $ne: "Paid" } }, // Send invoiceType in the request body
+                    {
+                        invoiceType: props?.invoice,
+                        tdsAmount: { $eq: null },
+                        status: { $ne: "Paid" },
+                        page: 1,
+                        limit: 10000,
+                    },
                     {
                         headers: {
                             Authorization: auth.token,
