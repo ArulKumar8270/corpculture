@@ -74,7 +74,9 @@ const updateProduct = async (req, res) => {
 
         // Update other product fields
         product.name = req.body.name || product.name;
-        product.warranty = req.body.warranty || product.warranty;
+        product.warranty = req.body.warranty !== undefined ? req.body.warranty : product.warranty;
+        product.corpcultureWarranty = req.body.corpcultureWarranty !== undefined ? req.body.corpcultureWarranty : product.corpcultureWarranty;
+        product.orderReferenceNo = req.body.orderReferenceNo !== undefined ? req.body.orderReferenceNo : product.orderReferenceNo;
         product.stock = req.body.stock || product.stock;
         product.category = req.body.category || product.category;
         product.description = req.body.description || product.description;

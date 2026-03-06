@@ -34,6 +34,7 @@ import employeeBenefitsRoute from "./routes/employeeBenefitsRoute.js";
 import materialRoutes from "./routes/materialRoutes.js"; // Import material routes
 import oldInvoiceRoutes from "./routes/oldInvoiceRoute.js"; // Import old invoice routes
 import creditRoutes from "./routes/creditRoutes.js"; // Import credit routes
+import payslipRoutes from "./routes/payslipRoute.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
@@ -130,6 +131,7 @@ app.use("/api/v1/remainders", remainderRoutes);
 app.use("/api/v1/employee-benefits", employeeBenefitsRoute);
 app.use("/api/v1/materials", materialRoutes); // Material routes
 app.use("/api/v1/credit", creditRoutes); // Credit routes
+app.use("/api/v1/payslip", payslipRoutes);
 
 app.listen(PORT, () => {
     console.log(`SERVER RUNNING ON PORT ${PORT}`);

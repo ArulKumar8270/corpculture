@@ -115,6 +115,14 @@ const productSchema = new mongoose.Schema({
         type: Number,
         default: 1,
     },
+    corpcultureWarranty: {
+        type: String,
+        default: "",
+    },
+    orderReferenceNo: {
+        type: String,
+        default: "",
+    },
     ratings: {
         type: Number,
         default: 0,
