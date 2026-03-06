@@ -82,7 +82,11 @@ const ServiceQuotationListScreen = () => {
       } else {
         response = await axios.post(
           `${getApiBaseUrl()}/service-invoice/all`,
-          { invoiceType: 'quotation' },
+          {
+            invoiceType: 'quotation',
+            page: 1,
+            limit: 10000,
+          },
           {
             headers: {
               Authorization: token || '',

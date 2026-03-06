@@ -89,7 +89,13 @@ const ServiceInvoiceListScreen = () => {
       } else {
         response = await axios.post(
           `${getApiBaseUrl()}/service-invoice/all`,
-          { invoiceType, tdsAmount: { $eq: null }, status: { $ne: 'Paid' } },
+          {
+            invoiceType,
+            tdsAmount: { $eq: null },
+            status: { $ne: 'Paid' },
+            page: 1,
+            limit: 10000,
+          },
           {
             headers: {
               Authorization: token || '',
@@ -394,6 +400,8 @@ const ServiceInvoiceListScreen = () => {
               companyId: selectedInvoice?.companyId?._id || selectedInvoice?.companyId,
               tdsAmount: { $eq: null },
               status: { $ne: 'Paid' },
+              page: 1,
+              limit: 10000,
             },
             {
               headers: {

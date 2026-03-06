@@ -8,10 +8,17 @@ import { useState, useEffect } from "react";
 
 const CartItem = ({ product, inCart }) => {
     const [, , addItems, removeItems, , addLater] = useCart();
-    // console.log(product);
-    const [quantity, setQuantity] = useState(0);
-    const [sendInvoice, setSendInvoice] = useState(false);
-    const [isInstalation, setIsInstalation] = useState(false);
+    const [quantity, setQuantity] = useState(() => Math.max(1, Number(product?.quantity) || 1));
+    const [sendInvoice, setSendInvoice] = useState(product?.sendInvoice ?? false);
+    const [isInstalation, setIsInstalation] = useState(product?.isInstalation ?? false);
+
+    useEffect(() => {
+        const qty = Math.max(1, Number(product?.quantity) || 1);
+        setQuantity(qty);
+        if (qty !== Number(product?.quantity)) {
+            addItems(product, qty, sendInvoice, isInstalation);
+        }
+    }, [product?.productId, product?.quantity]);
 
     useEffect(() => {
         addItems(product, quantity, sendInvoice, isInstalation);

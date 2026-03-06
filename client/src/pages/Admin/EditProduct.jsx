@@ -46,6 +46,8 @@ const EditProduct = () => {
     const [category, setCategory] = useState("");
     const [stock, setStock] = useState();
     const [warranty, setWarranty] = useState();
+    const [corpcultureWarranty, setCorpcultureWarranty] = useState("");
+    const [orderReferenceNo, setOrderReferenceNo] = useState("");
     const [brand, setBrand] = useState("");
     const [images, setImages] = useState([]);
     const [imagesPreview, setImagesPreview] = useState([]);
@@ -226,6 +228,8 @@ const EditProduct = () => {
             formData.append("category", category);
             formData.append("stock", stock);
             formData.append("warranty", warranty);
+            formData.append("corpcultureWarranty", corpcultureWarranty);
+            formData.append("orderReferenceNo", orderReferenceNo);
             formData.append("brandName", brand);
             formData.append("logo", logo);
             formData.append("oldLogo", JSON.stringify(oldLogo));
@@ -305,6 +309,8 @@ const EditProduct = () => {
                 setCategory(res.data.product.category);
                 setStock(res.data.product.stock);
                 setWarranty(res.data.product.warranty);
+                setCorpcultureWarranty(res.data.product.corpcultureWarranty || "");
+                setOrderReferenceNo(res.data.product.orderReferenceNo || "");
                 setBrand(res.data.product.brand.name);
                 setHighlights(res.data.product.highlights || []);
                 setSpecs(res.data.product.specifications || []);
@@ -480,6 +486,24 @@ const EditProduct = () => {
                                     required
                                     value={warranty}
                                     onChange={(e) => setWarranty(e.target.value)}
+                                />
+                            </div>
+                            <div className="flex gap-2 justify-between">
+                                <TextField
+                                    label="Corpculture Warranty"
+                                    variant="outlined"
+                                    size="small"
+                                    placeholder="e.g. 2 Years Extended"
+                                    value={corpcultureWarranty}
+                                    onChange={(e) => setCorpcultureWarranty(e.target.value)}
+                                />
+                                <TextField
+                                    label="Order Reference No"
+                                    variant="outlined"
+                                    size="small"
+                                    placeholder="e.g. ORD-REF-001"
+                                    value={orderReferenceNo}
+                                    onChange={(e) => setOrderReferenceNo(e.target.value)}
                                 />
                             </div>
 

@@ -53,7 +53,8 @@
         {
           "cameraPermission": "The app accesses your camera to capture count images."
         }
-      ]
+      ],
+      "expo-font"
     ],
     "extra": {
       "eas": {

@@ -20,12 +20,13 @@ import DialogContent from "@mui/material/DialogContent";
 import DialogTitle from "@mui/material/DialogTitle";
 import Rating from "@mui/material/Rating";
 import TextField from "@mui/material/TextField";
+import Typography from "@mui/material/Typography";
 import { getDeliveryDate, getDiscount } from "../../utils/functions";
 import MinCategory from "../../components/MinCategory";
 import axios from "axios";
 import { useAuth } from "../../context/auth";
 import { fashionProducts } from "../../utils/fashion";
-import { electronicProducts } from "../../utils/electronics";
+import MUISlider from '@mui/material/Slider';
 import ScrollToTopOnRouteChange from "../../utils/ScrollToTopOnRouteChange";
 import { useCart } from "../../context/cart";
 import SeoData from "../../SEO/SeoData";
@@ -42,8 +43,19 @@ const ProductDetails = () => {
     const [wishlistItems, setWishlistItems] = useState([]);
     const [loading, setLoading] = useState(true);
     const [product, setProduct] = useState({});
+    const [quantity, setQuantity] = useState(1);
 
-    console.log(product, "product96876")
+    // Get price for a given quantity (from priceRange or fallback to discountPrice)
+    const getPriceForQuantity = (qty) => {
+        if (!product?.priceRange?.length) return product?.discountPrice ?? product?.price ?? 0;
+        const range = product.priceRange.find(
+            (r) => qty >= parseFloat(r.from) && qty <= parseFloat(r.to)
+        );
+        return range ? parseFloat(range.price) : (product?.discountPrice ?? product?.price ?? 0);
+    };
+
+    const currentUnitPrice = getPriceForQuantity(quantity);
+    const currentTotal = currentUnitPrice * quantity;
 
     const settings = {
         autoplay: true,
@@ -93,7 +105,7 @@ const ProductDetails = () => {
             priceRange: product.priceRange,
             commissionRange: product.commission,
         };
-        addItems(item, 1);
+        addItems(item, quantity);
     };
 
     const handleDialogClose = () => {
@@ -342,12 +354,6 @@ const ProductDetails = () => {
                                         <span className="text-sm">
                                             {product?.numOfReviews} Reviews
                                         </span>
-                                        <span className="w-[80px] object-contain">
-                                            <img
-                                                src="https://static-assets-web.flixcart.com/fk-p-linchpin-web/fk-cp-zion/img/fa_62673a.png"
-                                                alt="f-assured"
-                                            />
-                                        </span>
                                     </span>
                                     {/* <!-- rating badge --> */}
 
@@ -363,15 +369,69 @@ const ProductDetails = () => {
                                             <span className="text-lg text-gray-400 line-through font-medium">
                                                 ₹ {product?.discountPrice?.toLocaleString()}
                                             </span>
-                                            {/* <span className="text-base text-[#019ee3] font-semibold">
-                                                {getDiscount(
-                                                    product?.price,
-                                                    product?.discountPrice
-                                                )}
-                                                %&nbsp;off
-                                            </span> */}
                                         </div>
                                     </div>
+
+                                    {/* Quantity slider & quantity-based price */}
+                                    {product?.stock > 0 && (
+                                        <div className="rounded-xl border border-[#e6fbff] p-4 bg-gray-50/50 shadow-sm">
+                                            <Typography variant="subtitle1" className="font-semibold text-gray-800 mb-1">
+                                                Quantity
+                                            </Typography>
+                                            <div className="flex items-center gap-4">
+                                                <MUISlider
+                                                    value={quantity}
+                                                    onChange={(e, val) => setQuantity(val)}
+                                                    min={1}
+                                                    max={Math.max(1, product?.stock || 1)}
+                                                    step={1}
+                                                    valueLabelDisplay="on"
+                                                    valueLabelFormat={(v) => v}
+                                                    sx={{
+                                                        color: "#019ee3",
+                                                        maxWidth: 280,
+                                                        "& .MuiSlider-valueLabel": { background: "#019ee3" },
+                                                    }}
+                                                />
+                                                <span className="text-lg font-bold text-gray-800 min-w-[3rem]">
+                                                    {quantity}
+                                                </span>
+                                            </div>
+                                            <div className="mt-3 flex flex-wrap items-baseline gap-2">
+                                                <span className="text-gray-600">Price for {quantity} unit{quantity > 1 ? "s" : ""}:</span>
+                                                <span className="text-xl font-bold text-gray-900">
+                                                    ₹{currentUnitPrice?.toLocaleString()}
+                                                    {quantity > 1 && (
+                                                        <span className="text-base font-normal text-gray-500 ml-1">
+                                                            (Total: ₹{currentTotal?.toLocaleString()})
+                                                        </span>
+                                                    )}
+                                                </span>
+                                            </div>
+                                            {product?.priceRange?.length > 0 && (
+                                                <div className="mt-3 pt-3 border-t border-gray-200">
+                                                    <Typography variant="caption" className="font-semibold text-gray-600 block mb-2">
+                                                        Price by quantity
+                                                    </Typography>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {product.priceRange.map((range, i) => (
+                                                            <span
+                                                                key={i}
+                                                                className={`text-sm px-3 py-1.5 rounded-lg border ${
+                                                                    quantity >= parseFloat(range.from) && quantity <= parseFloat(range.to)
+                                                                        ? "bg-[#019ee3] text-white border-[#019ee3]"
+                                                                        : "bg-white text-gray-600 border-gray-300"
+                                                                }`}
+                                                            >
+                                                                {range.from}-{range.to}: ₹{parseFloat(range.price).toLocaleString()}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
                                     {product?.stock <= 10 && product?.stock > 0 && (
                                         <span className="text-red-600 text-base font-semibold bg-red-50 px-3 py-1 rounded-lg w-fit shadow-sm">
                                             Hurry, Only {product.stock} left!
@@ -379,7 +439,7 @@ const ProductDetails = () => {
                                     )}
                                     {/* <!-- price desc --> */}
                                     {/* <!-- warranty & brand --> */}
-                                    <div className="flex gap-8 mt-4 items-center text-sm">
+                                    <div className="flex flex-wrap gap-8 mt-4 items-center text-sm">
                                         <img
                                             draggable="false"
                                             className="w-20 h-8 p-0.5 border rounded-lg bg-gray-50 object-contain"
@@ -391,12 +451,20 @@ const ProductDetails = () => {
                                                 ? "No Warranty"
                                                 : `${product?.warranty} Year Brand Warranty`}
                                         </span>
-                                        {/* <Link
-                                            className="font-semibold text-[#019ee3] hover:underline -ml-5"
-                                            to="/"
-                                        >
-                                            Know More
-                                        </Link> */}
+                                        {(product?.corpcultureWarranty || product?.orderReferenceNo) && (
+                                            <div className="flex flex-wrap gap-4">
+                                                {product?.corpcultureWarranty && (
+                                                    <span className="font-medium text-gray-700">
+                                                        Corpculture Warranty: {product.corpcultureWarranty}
+                                                    </span>
+                                                )}
+                                                {product?.orderReferenceNo && (
+                                                    <span className="font-medium text-gray-700">
+                                                        Order Ref: {product.orderReferenceNo}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                     {/* <!-- warranty & brand --> */}
 

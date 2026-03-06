@@ -58,6 +58,9 @@ import EmployeeActivityLogForm from "../Employee/EmployeeActivityLogForm";
 import ActivityLogReport from "./Reports/ActivityLogReport";
 import EmployeeLeaveForm from "../Employee/EmployeeLeaveForm";
 import LeaveReport from "./Reports/LeaveReport";
+import PayslipList from "./OtherSettings/PayslipList";
+import AddPayslip from "./OtherSettings/AddPayslip";
+import PayslipView from "./OtherSettings/PayslipView";
 
 const AdminDashboard = () => {
     const navigate = useNavigate();
@@ -167,6 +170,9 @@ const AdminDashboard = () => {
                             <Route path="activityLogReport" element={<ActivityLogReport />} />
                             <Route path="leave-application" element={<EmployeeLeaveForm />} />
                             <Route path="leaveReport" element={<LeaveReport />} />
+                            <Route path="payslip" element={<PayslipList />} />
+                            <Route path="addPayslip" element={<AddPayslip />} />
+                            <Route path="payslip/view/:id" element={<PayslipView />} />
                         </Routes>
                     </div>
                 </div>

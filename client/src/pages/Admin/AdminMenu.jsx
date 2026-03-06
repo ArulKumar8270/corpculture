@@ -89,7 +89,7 @@ const AdminMenu = ({ toggleMenu }) => {
                     serviceInvoiceRes = await axios.get(serviceInvoiceUrl, config);
                 } else {
                     const serviceInvoiceUrl = `${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/all`;
-                    serviceInvoiceRes = await axios.post(serviceInvoiceUrl, { invoiceType: "invoice", tdsAmount: { $eq: null }, status: { $ne: "Paid" } }, config);
+                    serviceInvoiceRes = await axios.post(serviceInvoiceUrl, { invoiceType: "invoice", tdsAmount: { $eq: null }, status: { $ne: "Paid" }, page: 1, limit: 10000 }, config);
                 }
                 const serviceInvoiceCount = serviceInvoiceRes.data?.serviceInvoices?.length;
 
@@ -100,7 +100,7 @@ const AdminMenu = ({ toggleMenu }) => {
                     quotationInvoiceRes = await axios.get(quotationInvoiceUrl, config);
                 } else {
                     const quotationInvoiceUrl = `${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/all`;
-                    quotationInvoiceRes = await axios.post(quotationInvoiceUrl, { invoiceType: "quotation" }, config);
+                    quotationInvoiceRes = await axios.post(quotationInvoiceUrl, { invoiceType: "quotation", page: 1, limit: 10000 }, config);
                 }
                 const quotationInvoiceCount = quotationInvoiceRes.data?.serviceInvoices?.length;
 
@@ -128,7 +128,7 @@ const AdminMenu = ({ toggleMenu }) => {
                     rentalInvoiceRes = await axios.get(rantalInvoiceUrl, config);
                 } else {
                     const rantalInvoiceUrl = `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/all`;
-                    rentalInvoiceRes = await axios.post(rantalInvoiceUrl, { invoiceType: "invoice", tdsAmount: { $eq: null }, status: { $ne: "Paid" } }, config);
+                    rentalInvoiceRes = await axios.post(rantalInvoiceUrl, { invoiceType: "invoice", tdsAmount: { $eq: null }, status: { $ne: "Paid" }, page: 1, limit: 10000 }, config);
                 }
                 const rentalInvoiceCount = rentalInvoiceRes.data?.entries?.length;
 
@@ -139,7 +139,7 @@ const AdminMenu = ({ toggleMenu }) => {
                     rentalQuotationRes = await axios.get(quotationInvoiceUrl, config);
                 } else {
                     const quotationInvoiceUrl = `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/all`;
-                    rentalQuotationRes = await axios.post(quotationInvoiceUrl, { invoiceType: "quotation" }, config);
+                    rentalQuotationRes = await axios.post(quotationInvoiceUrl, { invoiceType: "quotation", page: 1, limit: 10000 }, config);
                 }
                 const rentalQuotationCount = rentalQuotationRes.data?.entries?.length;
 
@@ -925,6 +925,22 @@ const AdminMenu = ({ toggleMenu }) => {
                                                 Settings
                                             </div>
                                         </NavLink>)}
+                                        {hasPermission('otherSettings') && (
+                                            <NavLink
+                                                to="./payslip"
+                                                onClick={scrollToTop}
+                                                className={({ isActive }) =>
+                                                    `rounded-lg mx-2 my-1 transition-all ${isActive
+                                                        ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
+                                                        : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
+                                                    }`
+                                                }
+                                            >
+                                                <div className="h-10 px-8 flex items-center">
+                                                    Payslip
+                                                </div>
+                                            </NavLink>
+                                        )}
                                         {hasPermission('salesAllCategory') && (
                                             <NavLink
                                                 to="./all-category"

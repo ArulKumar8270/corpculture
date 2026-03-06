@@ -59,6 +59,8 @@ import AddCompanyScreen from '../screens/Admin/AddCompanyScreen';
 import AddressScreen from '../screens/Common/AddressScreen';
 import PanCardScreen from '../screens/Common/PanCardScreen';
 import DeactivateScreen from '../screens/Common/DeactivateScreen';
+import PayslipListScreen from '../screens/Common/PayslipListScreen';
+import PayslipViewScreen from '../screens/Common/PayslipViewScreen';
 
 // Employee Management
 import AddEmployeeScreen from '../screens/Admin/AddEmployeeScreen';
@@ -306,6 +308,8 @@ const ProfileStack = () => (
     <Stack.Screen name="Address" component={AddressScreen} options={{ title: 'Address' }} />
     <Stack.Screen name="PanCard" component={PanCardScreen} options={{ title: 'PAN Card' }} />
     <Stack.Screen name="Deactivate" component={DeactivateScreen} options={{ title: 'Deactivate Account' }} />
+    <Stack.Screen name="Payslips" component={PayslipListScreen} options={{ title: 'My Payslips' }} />
+    <Stack.Screen name="PayslipView" component={PayslipViewScreen} options={{ title: 'Payslip' }} />
   </Stack.Navigator>
 );
 

@@ -128,10 +128,22 @@ const CustomDrawerContent = (props: CustomDrawerContentProps) => {
       'Address': 'Profile',
       'PanCard': 'Profile',
       'Deactivate': 'Profile',
+      'Payslips': 'Profile',
+      'PayslipView': 'Profile',
       'ActivityLogForm': 'Employees',
       'LeaveForm': 'Employees',
+      'ReportsDashboard': 'Reports',
+      'CompanyReports': 'Reports',
+      'ServiceReportsSummary': 'Reports',
+      'RentalReportsSummary': 'Reports',
+      'SalesReportsSummary': 'Reports',
+      'RentalInvoiceReport': 'Reports',
+      'ServiceEnquiriesReport': 'Reports',
+      'ServiceInvoicesReport': 'Reports',
+      'ServiceReportsReport': 'Reports',
       'ActivityLogReport': 'Reports',
       'LeaveReport': 'Reports',
+      'EmployeeList': 'Reports',
     };
     
     try {
@@ -188,13 +200,8 @@ const CustomDrawerContent = (props: CustomDrawerContentProps) => {
     }
   };
 
-  // Account Settings Section
+  // Account Settings Section (show for all authenticated users so employees can access My Payslips)
   const renderAccountSettings = () => {
-    // Always show for admins, otherwise check permission
-    if (!isAdmin && !hasPermission('accountSettings', 'view')) {
-      return null;
-    }
-
     return (
       <View style={styles.section}>
         <TouchableOpacity
@@ -221,6 +228,12 @@ const CustomDrawerContent = (props: CustomDrawerContentProps) => {
                 <Text style={styles.menuItemText}>Profile Information</Text>
               </TouchableOpacity>
             )}
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => navigateToScreen('Payslips')}
+            >
+              <Text style={styles.menuItemText}>My Payslips</Text>
+            </TouchableOpacity>
           </View>
         )}
       </View>

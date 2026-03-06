@@ -4,7 +4,7 @@ import { useAuth } from '../../context/auth';
 import Spinner from '../../components/Spinner';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { IconButton, Menu, MenuItem, FormControl, InputLabel, Select } from '@mui/material'; // Import Material-UI components
+import { IconButton, Menu, MenuItem, FormControl, InputLabel, Select, Pagination } from '@mui/material';
 import MoreVertIcon from '@mui/icons-material/MoreVert'; // Icon for the action button
 import EditIcon from '@mui/icons-material/Edit';
 import ReceiptIcon from '@mui/icons-material/Receipt'; // For Invoice
@@ -39,6 +39,8 @@ const AdminRental
     const [searchTerm, setSearchTerm] = useState('');
     const [rentalTitleFilter, setRentalTitleFilter] = useState('');
     const [rentalTypeFilter, setRentalTypeFilter] = useState('');
+    const [page, setPage] = useState(1);
+    const [rowsPerPage, setRowsPerPage] = useState(10);
 
     // Unique rental titles for filter dropdown (must be before any early return)
     const rentalTitles = React.useMemo(() => {
@@ -211,6 +213,9 @@ const AdminRental
 
     }, [allRentalsData, activeTab, location.search, rentalTitleFilter, rentalTypeFilter]);
 
+    // Reset to page 1 when tab, filters, or search changes
+    useEffect(() => setPage(1), [activeTab, rentalTitleFilter, rentalTypeFilter, searchTerm]);
+
     const assignEmployeeToRental = async (rentalId, employeeId) => {
       setUpdatingRentalId(rentalId);
       try {
@@ -304,7 +309,6 @@ const AdminRental
       );
     }
 
-    // Add this before the return statement
     const filteredEnquiries = enquiries.filter(enquiry => {
       const term = searchTerm.toLowerCase();
       return (
@@ -314,6 +318,17 @@ const AdminRental
         (enquiry.rentalTitle && enquiry.rentalTitle.toLowerCase().includes(term))
       );
     });
+
+    const totalCount = filteredEnquiries.length;
+    const totalPages = Math.max(1, Math.ceil(totalCount / rowsPerPage));
+    const startIndex = (page - 1) * rowsPerPage;
+    const paginatedEnquiries = filteredEnquiries.slice(startIndex, startIndex + rowsPerPage);
+
+    const handlePageChange = (_, newPage) => setPage(newPage);
+    const handleRowsPerPageChange = (e) => {
+      setRowsPerPage(Number(e.target.value));
+      setPage(1);
+    };
 
     return (
       <div className="p-6 bg-gradient-to-br from-[#e6fbff] to-[#f7fafd] min-h-screen">
@@ -428,12 +443,12 @@ const AdminRental
               </tr>
             </thead>
             <tbody>
-              {filteredEnquiries.length === 0 ? (
+              {paginatedEnquiries.length === 0 ? (
                 <tr>
                   <td colSpan={14} className="text-center py-6 text-gray-400">No rental enquiries found.</td>
                 </tr>
               ) : (
-                filteredEnquiries.map(enquiry => (
+                paginatedEnquiries.map(enquiry => (
                   <tr key={enquiry._id} className="border-b last:border-b-0 hover:bg-blue-50">
                     {hasPermission("rentalEnquiries") ? <td className="py-2 px-3">
                       <IconButton
@@ -538,6 +553,36 @@ const AdminRental
               )}
             </tbody>
           </table>
+
+          {totalCount > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-4 mt-4 pt-4 border-t">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-600">Rows per page</span>
+                <Select
+                  size="small"
+                  value={rowsPerPage}
+                  onChange={handleRowsPerPageChange}
+                  sx={{ minWidth: 70, height: 36 }}
+                >
+                  <MenuItem value={5}>5</MenuItem>
+                  <MenuItem value={10}>10</MenuItem>
+                  <MenuItem value={25}>25</MenuItem>
+                  <MenuItem value={50}>50</MenuItem>
+                </Select>
+                <span className="text-sm text-gray-600">
+                  {startIndex + 1}-{Math.min(startIndex + rowsPerPage, totalCount)} of {totalCount}
+                </span>
+              </div>
+              <Pagination
+                count={totalPages}
+                page={page}
+                onChange={handlePageChange}
+                color="primary"
+                showFirstButton
+                showLastButton
+              />
+            </div>
+          )}
         </div>
       </div>
     );

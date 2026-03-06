@@ -10,6 +10,8 @@ import SeoData from "../../SEO/SeoData";
 import { GiHamburgerMenu } from "react-icons/gi";
 import { useEffect, useState } from "react";
 import EmployeeActivityLogForm from "../Employee/EmployeeActivityLogForm";
+import Payslips from "./Payslips";
+import PayslipView from "../Admin/OtherSettings/PayslipView";
 
 const Dashboard = () => {
     const navigate = useNavigate();
@@ -70,6 +72,8 @@ const Dashboard = () => {
                                 path="activity-log"
                                 element={<EmployeeActivityLogForm />}
                             />
+                            <Route path="payslips" element={<Payslips />} />
+                            <Route path="payslips/:id" element={<PayslipView />} />
                         </Routes>
                     </div>
                 </div>
