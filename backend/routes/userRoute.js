@@ -5,6 +5,7 @@ import updateWishlist from "../controllers/user/updateWishlist.js";
 import getWishlistProducts from "../controllers/user/getWishlistProducts.js";
 import createSession from "../controllers/user/createSession.js";
 import handleSuccess from "../controllers/user/handleSuccess.js";
+import createOrderWithoutPayment from "../controllers/user/createOrderWithoutPayment.js";
 import getOrders from "../controllers/user/getOrders.js";
 import getOrderDetail from "../controllers/user/getOrderDetail.js";
 import getOrdersByEmployeeId from "../controllers/user/getOrdersByEmpId.js";
@@ -30,6 +31,7 @@ router.get("/wishlist-products", requireSignIn, getWishlistProducts);
 // checkout session - stripe payment
 router.post("/create-checkout-session", createSession);
 router.post("/payment-success", requireSignIn, handleSuccess);
+router.post("/create-order", requireSignIn, createOrderWithoutPayment);
 router.get("/byComapny/:id", getUsersByCompany);
 
 // get user orders

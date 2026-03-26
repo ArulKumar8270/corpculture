@@ -144,6 +144,19 @@ const serviceInvoiceSchema = new mongoose.Schema({
         type: [String], // Changed to an array of strings to allow multiple URLs
         trim: true,
     },
+    signedInvoiceLink: {
+        type: [String],
+        trim: true,
+        default: [],
+    },
+    invoiceSendStatus: {
+        type: String,
+        enum: ["NotSent", "Sent"],
+        default: "NotSent",
+    },
+    invoiceSentAt: {
+        type: Date,
+    },
     assignedTo: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User', // Reference to the User model

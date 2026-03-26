@@ -56,6 +56,11 @@ const employeeSchema = new mongoose.Schema(
             type: Number,
             min: 0,
         },
+        bikeAllowance: {
+            type: Number,
+            min: 0,
+            default: 0,
+        },
         image: {
             type: String,
             trim: true,

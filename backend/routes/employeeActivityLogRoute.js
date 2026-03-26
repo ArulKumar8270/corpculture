@@ -8,6 +8,8 @@ import {
     deleteActivityLogController,
     getAllActivityLogsController,
     updateActivityLogStatusAdminController,
+    getActivityLogByIdAdminController,
+    updateActivityLogAdminController,
 } from "../controllers/employee/employeeActivityLogController.js";
 
 const router = express.Router();
@@ -32,6 +34,12 @@ router.get("/admin/all", isAdmin, getAllActivityLogsController);
 
 // Update Activity Log Status || PUT (Admin only)
 router.put("/admin/status/:id", isAdmin, updateActivityLogStatusAdminController);
+
+// Get Activity Log by ID || GET (Admin only)
+router.get("/admin/:id", isAdmin, getActivityLogByIdAdminController);
+
+// Update Activity Log || PUT (Admin only)
+router.put("/admin/update/:id", isAdmin, updateActivityLogAdminController);
 
 export default router;
 

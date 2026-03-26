@@ -34,6 +34,23 @@ const employeeActivityLogSchema = new mongoose.Schema(
             type: String,
             trim: true,
         },
+        /** Selected route address (service delivery / billing line) */
+        fromAddressLine: {
+            type: String,
+            trim: true,
+        },
+        fromPincode: {
+            type: String,
+            trim: true,
+        },
+        toAddressLine: {
+            type: String,
+            trim: true,
+        },
+        toPincode: {
+            type: String,
+            trim: true,
+        },
         km: {
             type: Number,
             min: 0,

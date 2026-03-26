@@ -34,10 +34,17 @@ router.get("/user-auth", requireSignIn, (req, res) => {
     }
 });
 
-//protected Admin route
-router.get("/admin-auth", isAdmin, (req, res) => {
-    res.status(200).send({
-        ok: true,
+// Admin dashboard access route:
+// Allow Admin (role 1) and Employee (role 3) to open admin UI,
+// but keep admin-only APIs protected by isAdmin elsewhere.
+router.get("/admin-auth", requireSignIn, (req, res) => {
+    const role = Number(req.user?.role);
+    if (role === 1 || role === 3) {
+        return res.status(200).send({ ok: true, role });
+    }
+    return res.status(403).send({
+        ok: false,
+        message: "Access denied. Admin/Employee privileges required.",
     });
 });
 

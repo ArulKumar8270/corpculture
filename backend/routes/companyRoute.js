@@ -1,5 +1,6 @@
 import express from "express";
 import { isAdmin, requireSignIn } from "../middleware/authMiddleware.js";
+import { requirePermission } from "../middleware/permissionMiddleware.js";
 import {
     createCompany,
     updateCompany,
@@ -16,7 +17,7 @@ const router = express.Router();
 router.post("/create", createCompany);
 
 // Get all companys
-router.get("/all", isAdmin, getAllCompanies);
+router.get("/all", requireSignIn, requirePermission("otherSettingsAllCompany", "view"), getAllCompanies);
 
 // Get single company
 router.get("/get/:id", getCompanyById);

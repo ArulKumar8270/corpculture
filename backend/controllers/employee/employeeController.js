@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs"; // Assuming you use bcrypt for password hashing
 // Create a new employee
 export const createEmployeeController = async (req, res) => {
     try {
-        const { name, email, password, phone, address, pincode, employeeType, userId, designation, idCradNo, department, salary, image, parentName, parentPhone, parentAddress, parentRelation, idProof } = req.body;
+        const { name, email, password, phone, address, pincode, employeeType, userId, designation, idCradNo, department, salary, bikeAllowance, image, parentName, parentPhone, parentAddress, parentRelation, idProof } = req.body;
 
         // Validation
         const isValidEmployeeType = Array.isArray(employeeType) ? employeeType.length > 0 : employeeType;
@@ -42,6 +42,7 @@ export const createEmployeeController = async (req, res) => {
             idCradNo,    // Added
             department,  // Added
             salary,      // Added
+            bikeAllowance,
             image,       // Added
             parentName,  // Added
             parentPhone, // Added
@@ -145,7 +146,7 @@ export const getEmployeeByUserIdController = async (req, res) => {
 // Update an employee by ID
 export const updateEmployeeController = async (req, res) => {
     try {
-        const { name, email, phone, address, pincode, employeeType, designation, idCradNo, department, salary, image, parentName, parentPhone, parentAddress, parentRelation, idProof } = req.body;
+        const { name, email, phone, address, pincode, employeeType, designation, idCradNo, department, salary, bikeAllowance, image, parentName, parentPhone, parentAddress, parentRelation, idProof } = req.body;
         const employeeId = req.params.id;
 
         // Find the employee
@@ -168,6 +169,7 @@ export const updateEmployeeController = async (req, res) => {
         employee.idCradNo = idCradNo !== undefined ? idCradNo : employee.idCradNo;       // Added
         employee.department = department !== undefined ? department : employee.department; // Added
         employee.salary = salary !== undefined ? salary : employee.salary;             // Added
+        employee.bikeAllowance = bikeAllowance !== undefined ? bikeAllowance : employee.bikeAllowance;
         employee.image = image !== undefined ? image : employee.image;                 // Added
         employee.parentName = parentName !== undefined ? parentName : employee.parentName; // Added
         employee.parentPhone = parentPhone !== undefined ? parentPhone : employee.parentPhone; // Added

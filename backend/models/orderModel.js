@@ -58,6 +58,12 @@ const orderSchema = new mongoose.Schema({
         ref: "User",
         required: true,
     },
+    /** Reference number provided by customer at checkout */
+    orderReferenceNo: {
+        type: String,
+        required: [true, "Order reference number is required"],
+        trim: true,
+    },
     shippingInfo: {
         address: {
             type: String,

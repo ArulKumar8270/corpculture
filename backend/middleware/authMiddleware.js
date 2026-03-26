@@ -12,8 +12,6 @@ const requireSignIn = asyncHandler(async (req, res, next) => {
 
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-        console.log(decoded, "decoded234");
-
         // Attach user information to the request
         req.user = await UserModel.findById(decoded._id);
 
@@ -42,7 +40,7 @@ const isAdmin = asyncHandler(async (req, res, next) => {
         // Attach user information to the request
         req.user = await UserModel.findById(decoded._id);
         // console.log(req.user);
-        if (!req.user || !req.user.role) {
+        if (!req.user || Number(req.user.role) !== 1) {
             return res
                 .status(403)
                 .json({ message: "Access denied. Admin privileges required." });

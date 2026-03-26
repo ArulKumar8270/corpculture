@@ -62,6 +62,23 @@ export const createPayslipController = async (req, res) => {
 
 export const getAllPayslipsController = async (req, res) => {
     try {
+        const role = Number(req.user?.role);
+        const isAdmin = role === 1;
+
+        // Admin can view all payslips; employees should only see their own records.
+        if (!isAdmin) {
+            const userId = req.user?._id;
+            const employee = userId ? await Employee.findOne({ userId }).lean() : null;
+            if (!employee) {
+                return res.status(200).send({ success: true, payslips: [] });
+            }
+            const payslips = await Payslip.find({ employeeId: employee._id })
+                .sort({ payDate: -1, createdAt: -1 })
+                .lean();
+            const withTotals = payslips.map((p) => normalizePayslip(p));
+            return res.status(200).send({ success: true, payslips: withTotals });
+        }
+
         const payslips = await Payslip.find({})
             .populate("employeeId", "name email designation")
             .sort({ payDate: -1, createdAt: -1 })
@@ -120,7 +137,7 @@ export const getOnePayslipController = async (req, res) => {
         }
         const normalized = normalizePayslip(payslip);
 
-        const isAdmin = req.user && req.user.role === 1;
+        const isAdmin = Number(req.user?.role) === 1;
         if (!isAdmin) {
             const emp = await Employee.findOne({ userId: req.user._id }).lean();
             const slipEmpId = (normalized.employeeId?._id || normalized.employeeId)?.toString();

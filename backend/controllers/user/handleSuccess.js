@@ -9,7 +9,7 @@ import productModel from "../../models/productModel.js";
 const handleSuccess = async (req, res) => {
     try {
         // Retrieve the session ID from the request body
-        const { sessionId, orderItems } = req.body;
+        const { sessionId, orderItems, shippingInfo, orderReferenceNo } = req.body;
 
         // Validate order items and session ID
         if (!orderItems.length) {
@@ -19,6 +19,14 @@ const handleSuccess = async (req, res) => {
             return res
                 .status(503)
                 .send("No sessionId for payment received from client!");
+        }
+
+        const ref = String(orderReferenceNo || "").trim();
+        if (!ref) {
+            return res.status(400).send({
+                success: false,
+                message: "Order reference number is required",
+            });
         }
 
         // Fetch the payment intent associated with the session
@@ -111,23 +119,26 @@ const handleSuccess = async (req, res) => {
             seller: new mongoose.Types.ObjectId(product.seller),
         }));
 
-        // Construct shipping information
-        const shippingObject = {
-            address: session?.customer_details?.address?.line1,
-            city: session?.customer_details?.address?.city,
-            state: session?.customer_details?.address?.state,
-            country: session?.customer_details?.address?.country,
-            pincode: session?.customer_details?.address?.postal_code,
-            phoneNo: session?.customer_details?.phone || "Not Provided",
-            landmark:
-                session?.customer_details?.address?.line2 || "No Landmark",
-        };
+        // Construct shipping information (prefer client-provided shippingInfo from Shipping page)
+        const shippingObject = shippingInfo && typeof shippingInfo === "object"
+            ? shippingInfo
+            : {
+                address: session?.customer_details?.address?.line1,
+                city: session?.customer_details?.address?.city,
+                state: session?.customer_details?.address?.state,
+                country: session?.customer_details?.address?.country,
+                pincode: session?.customer_details?.address?.postal_code,
+                phoneNo: session?.customer_details?.phone || "Not Provided",
+                landmark:
+                    session?.customer_details?.address?.line2 || "No Landmark",
+            };
 
         // Create and save the order in the database
         const combinedOrder = {
             paymentId: paymentIntentId,
             products: orderObject,
             buyer: req.user._id,
+            orderReferenceNo: ref,
             shippingInfo: shippingObject,
             amount: amount,
         };

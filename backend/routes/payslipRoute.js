@@ -1,5 +1,6 @@
 import express from "express";
 import { isAdmin, requireSignIn } from "../middleware/authMiddleware.js";
+import { requirePermission } from "../middleware/permissionMiddleware.js";
 import {
     createPayslipController,
     getAllPayslipsController,
@@ -13,7 +14,7 @@ const router = express.Router();
 router.get("/", (req, res) => res.status(200).json({ success: true, message: "Payslip API" }));
 
 router.post("/create", isAdmin, createPayslipController);
-router.get("/all", isAdmin, getAllPayslipsController);
+router.get("/all", requireSignIn, requirePermission("otherSettingsPayslip", "view"), getAllPayslipsController);
 router.get("/my", requireSignIn, getMyPayslipsController);
 router.get("/:id", requireSignIn, getOnePayslipController);
 

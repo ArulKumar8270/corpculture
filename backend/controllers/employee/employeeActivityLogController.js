@@ -9,8 +9,12 @@ export const createActivityLogController = async (req, res) => {
             date,
             fromCompany,
             fromCompanyName,
+            fromAddressLine,
+            fromPincode,
             toCompany,
             toCompanyName,
+            toAddressLine,
+            toPincode,
             km,
             inTime,
             outTime,
@@ -52,13 +56,6 @@ export const createActivityLogController = async (req, res) => {
                 message: "To Company is required. Please select an existing company.",
             });
         }
-        if (fromCompany === toCompany) {
-            return res.status(400).send({
-                success: false,
-                message: "From Company and To Company cannot be the same",
-            });
-        }
-
         const fromCompanyExists = await Company.findById(fromCompany);
         if (!fromCompanyExists) {
             return res.status(404).send({
@@ -80,8 +77,12 @@ export const createActivityLogController = async (req, res) => {
             date,
             fromCompany,
             fromCompanyName: fromCompanyName || fromCompanyExists.companyName || null,
+            fromAddressLine: fromAddressLine || null,
+            fromPincode: fromPincode || null,
             toCompany,
             toCompanyName: toCompanyName || toCompanyExists.companyName || null,
+            toAddressLine: toAddressLine || null,
+            toPincode: toPincode || null,
             km: km || 0,
             inTime: inTime || null,
             outTime: outTime || null,
@@ -233,8 +234,12 @@ export const updateActivityLogController = async (req, res) => {
             date,
             fromCompany,
             fromCompanyName,
+            fromAddressLine,
+            fromPincode,
             toCompany,
             toCompanyName,
+            toAddressLine,
+            toPincode,
             km,
             inTime,
             outTime,
@@ -244,12 +249,6 @@ export const updateActivityLogController = async (req, res) => {
         } = req.body;
 
         // Validate company references if provided (must be existing companies; no creation from this flow)
-        if (fromCompany && toCompany && fromCompany === toCompany) {
-            return res.status(400).send({
-                success: false,
-                message: "From Company and To Company cannot be the same",
-            });
-        }
         if (fromCompany) {
             const fromCompanyExists = await Company.findById(fromCompany);
             if (!fromCompanyExists) {
@@ -275,8 +274,12 @@ export const updateActivityLogController = async (req, res) => {
                 date,
                 fromCompany: fromCompany || null,
                 fromCompanyName: fromCompanyName || null,
+                fromAddressLine: fromAddressLine || null,
+                fromPincode: fromPincode || null,
                 toCompany: toCompany || null,
                 toCompanyName: toCompanyName || null,
+                toAddressLine: toAddressLine || null,
+                toPincode: toPincode || null,
                 km: km || 0,
                 inTime: inTime || null,
                 outTime: outTime || null,
@@ -348,6 +351,135 @@ export const deleteActivityLogController = async (req, res) => {
         res.status(500).send({
             success: false,
             message: "Error in deleting activity log",
+            error: error.message,
+        });
+    }
+};
+
+// Get Activity Log by ID (Admin only)
+export const getActivityLogByIdAdminController = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const activityLog = await EmployeeActivityLog.findById(id)
+            .populate("employeeId", "name email")
+            .populate("userId", "name email")
+            .populate("fromCompany", "companyName")
+            .populate("toCompany", "companyName")
+            .populate("assignedTo", "name email")
+            .lean();
+
+        if (!activityLog) {
+            return res.status(404).send({
+                success: false,
+                message: "Activity log not found",
+            });
+        }
+
+        return res.status(200).send({
+            success: true,
+            message: "Activity log fetched successfully",
+            activityLog,
+        });
+    } catch (error) {
+        console.error("Error fetching activity log (admin):", error);
+        return res.status(500).send({
+            success: false,
+            message: "Error in fetching activity log",
+            error: error.message,
+        });
+    }
+};
+
+// Update Activity Log (Admin only)
+export const updateActivityLogAdminController = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const {
+            date,
+            fromCompany,
+            fromCompanyName,
+            fromAddressLine,
+            fromPincode,
+            toCompany,
+            toCompanyName,
+            toAddressLine,
+            toPincode,
+            km,
+            inTime,
+            outTime,
+            callType,
+            assignedTo,
+            remarks,
+            status,
+        } = req.body;
+
+        // Validate company references if provided
+        if (fromCompany) {
+            const fromCompanyExists = await Company.findById(fromCompany);
+            if (!fromCompanyExists) {
+                return res.status(404).send({
+                    success: false,
+                    message: "From Company not found",
+                });
+            }
+        }
+        if (toCompany) {
+            const toCompanyExists = await Company.findById(toCompany);
+            if (!toCompanyExists) {
+                return res.status(404).send({
+                    success: false,
+                    message: "To Company not found",
+                });
+            }
+        }
+
+        const activityLog = await EmployeeActivityLog.findByIdAndUpdate(
+            id,
+            {
+                date,
+                fromCompany: fromCompany || null,
+                fromCompanyName: fromCompanyName || null,
+                fromAddressLine: fromAddressLine || null,
+                fromPincode: fromPincode || null,
+                toCompany: toCompany || null,
+                toCompanyName: toCompanyName || null,
+                toAddressLine: toAddressLine || null,
+                toPincode: toPincode || null,
+                km: km || 0,
+                inTime: inTime || null,
+                outTime: outTime || null,
+                callType: callType || null,
+                assignedTo: assignedTo || null,
+                remarks: remarks || null,
+                ...(status ? { status } : {}),
+            },
+            { new: true, runValidators: true }
+        )
+            .populate("employeeId", "name email")
+            .populate("userId", "name email")
+            .populate("fromCompany", "companyName")
+            .populate("toCompany", "companyName")
+            .populate("assignedTo", "name email");
+
+        if (!activityLog) {
+            return res.status(404).send({
+                success: false,
+                message: "Activity log not found",
+            });
+        }
+
+        return res.status(200).send({
+            success: true,
+            message: "Activity log updated successfully",
+            activityLog,
+        });
+    } catch (error) {
+        console.error("Error updating activity log (admin):", error);
+        return res.status(500).send({
+            success: false,
+            message: "Error in updating activity log",
             error: error.message,
         });
     }

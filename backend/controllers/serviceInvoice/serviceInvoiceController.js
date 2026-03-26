@@ -508,6 +508,9 @@ export const updateServiceInvoice = async (req, res) => {
             status,
             invoiceDate,
             invoiceLink, // <-- Add invoiceLink here
+            signedInvoiceLink,
+            invoiceSendStatus,
+            invoiceSentAt,
             quotationDate, // Date when quotation was created
             movedToInvoiceDate, // Date when quotation was moved to invoice
             assignedTo,
@@ -636,6 +639,9 @@ export const updateServiceInvoice = async (req, res) => {
         // Use finalInvoiceNumber (generated from global count if moving to invoice) or provided invoiceNumber
         if (finalInvoiceNumber) serviceInvoice.invoiceNumber = finalInvoiceNumber;
         if (invoiceLink !== undefined) serviceInvoice.invoiceLink = invoiceLink; // Update invoiceLink
+        if (signedInvoiceLink !== undefined) serviceInvoice.signedInvoiceLink = signedInvoiceLink;
+        if (invoiceSendStatus !== undefined) serviceInvoice.invoiceSendStatus = invoiceSendStatus;
+        if (invoiceSentAt !== undefined) serviceInvoice.invoiceSentAt = invoiceSentAt;
         
         // When moving from quotation to invoice, preserve the original invoiceDate as quotationDate
         if (isMovingToInvoice) {

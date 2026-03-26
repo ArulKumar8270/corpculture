@@ -1,5 +1,6 @@
 import orderModel from "../../models/orderModel.js";
 import userModel from "../../models/userModel.js";
+import Employee from "../../models/employeeModel.js";
 
 const getAdminOrders = async (req, res) => {
     try {
@@ -15,6 +16,7 @@ const getAdminOrders = async (req, res) => {
         } = req.query; // Get parameters from query string
 
         let findQuery = {};
+        const role = Number(req.user?.role);
 
         // Filter by orderStatus
         if (orderStatus) {
@@ -22,7 +24,14 @@ const getAdminOrders = async (req, res) => {
         }
 
         // Filter by employeeId
-        if (employeeId) {
+        if (role === 3) {
+            // Employees can only see their own assigned orders
+            const emp = await Employee.findOne({ userId: req.user._id }).select("_id").lean();
+            if (!emp?._id) {
+                return res.status(200).send({ success: true, orders: [], totalCount: 0 });
+            }
+            findQuery.employeeId = emp._id;
+        } else if (employeeId) {
             findQuery.employeeId = employeeId;
         }
 
