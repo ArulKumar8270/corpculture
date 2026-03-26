@@ -315,7 +315,13 @@ const ActivityLogReport = () => {
                                             From Company
                                         </TableCell>
                                         <TableCell sx={{ fontWeight: 'bold' }}>
+                                            From Address
+                                        </TableCell>
+                                        <TableCell sx={{ fontWeight: 'bold' }}>
                                             To Company
+                                        </TableCell>
+                                        <TableCell sx={{ fontWeight: 'bold' }}>
+                                            To Address
                                         </TableCell>
                                         <TableCell sx={{ fontWeight: 'bold' }}>
                                             KM
@@ -334,6 +340,9 @@ const ActivityLogReport = () => {
                                         </TableCell>
                                         <TableCell sx={{ fontWeight: 'bold' }}>
                                             Remarks
+                                        </TableCell>
+                                        <TableCell sx={{ fontWeight: 'bold' }} align="center">
+                                            Actions
                                         </TableCell>
                                     </TableRow>
                                 </TableHead>
@@ -360,10 +369,38 @@ const ActivityLogReport = () => {
                                                     log.fromCompanyName ||
                                                     'N/A'}
                                             </TableCell>
+                                            <TableCell sx={{ maxWidth: 220 }}>
+                                                {log.fromAddressLine ? (
+                                                    <Typography variant="body2" component="span">
+                                                        {log.fromAddressLine}
+                                                        {log.fromPincode
+                                                            ? ` — ${log.fromPincode}`
+                                                            : ''}
+                                                    </Typography>
+                                                ) : (
+                                                    <Typography variant="body2" color="text.secondary">
+                                                        —
+                                                    </Typography>
+                                                )}
+                                            </TableCell>
                                             <TableCell>
                                                 {log.toCompany?.companyName ||
                                                     log.toCompanyName ||
                                                     'N/A'}
+                                            </TableCell>
+                                            <TableCell sx={{ maxWidth: 220 }}>
+                                                {log.toAddressLine ? (
+                                                    <Typography variant="body2" component="span">
+                                                        {log.toAddressLine}
+                                                        {log.toPincode
+                                                            ? ` — ${log.toPincode}`
+                                                            : ''}
+                                                    </Typography>
+                                                ) : (
+                                                    <Typography variant="body2" color="text.secondary">
+                                                        —
+                                                    </Typography>
+                                                )}
                                             </TableCell>
                                             <TableCell>
                                                 {log.km || 'N/A'}
@@ -411,6 +448,19 @@ const ActivityLogReport = () => {
                                             </TableCell>
                                             <TableCell>
                                                 {log.remarks || 'N/A'}
+                                            </TableCell>
+                                            <TableCell align="center">
+                                                <Button
+                                                    size="small"
+                                                    variant="outlined"
+                                                    onClick={() =>
+                                                        navigate('/admin/dashboard/activity-log', {
+                                                            state: { editLogId: log._id },
+                                                        })
+                                                    }
+                                                >
+                                                    Edit
+                                                </Button>
                                             </TableCell>
                                         </TableRow>
                                     ))}

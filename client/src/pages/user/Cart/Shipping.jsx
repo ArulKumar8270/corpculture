@@ -14,13 +14,16 @@ import axios from "axios";
 import { loadStripe } from "@stripe/stripe-js";
 import SeoData from "../../../SEO/SeoData";
 import PriceCard from "./PriceCard";
+import { useNavigate } from "react-router-dom";
 
 const Shipping = () => {
     const Info = localStorage.getItem("shippingInfo");
     const shippingInfo = JSON.parse(Info);
+    const storedOrderRef = localStorage.getItem("orderReferenceNo") || "";
 
     const [cartItems] = useCart();
     const { auth } = useAuth();
+    const navigate = useNavigate();
 
     const [address, setAddress] = useState(shippingInfo?.address);
     const [city, setCity] = useState(shippingInfo?.city);
@@ -29,18 +32,22 @@ const Shipping = () => {
     const [landmark, setLandmark] = useState(shippingInfo?.landmark);
     const [pincode, setPincode] = useState(shippingInfo?.pincode);
     const [phoneNo, setPhoneNo] = useState(shippingInfo?.phoneNo);
+    const [orderReferenceNo, setOrderReferenceNo] = useState(storedOrderRef);
 
     //stripe details
     const publishKey = import.meta.env.VITE_STRIPE_PUBLISH_KEY;
     const secretKey = import.meta.env.VITE_STRIPE_SECRET_KEY;
     let frontendURL = window.location.origin; // Get the frontend URL
 
-    const shippingSubmit = (e) => {
-        e.preventDefault();
-
-        if (phoneNo.length < 10 || phoneNo.length > 10) {
+    const validateAndStoreCheckoutInfo = () => {
+        const ref = String(orderReferenceNo || "").trim();
+        if (!ref) {
+            toast.error("Order Reference Number is required");
+            return false;
+        }
+        if (!phoneNo || String(phoneNo).length !== 10) {
             toast.error("Invalid Mobile Number");
-            return;
+            return false;
         }
         const data = {
             address: address,
@@ -52,6 +59,8 @@ const Shipping = () => {
             phoneNo: phoneNo,
         };
         localStorage.setItem("shippingInfo", JSON.stringify(data));
+        localStorage.setItem("orderReferenceNo", ref);
+        return true;
     };
 
     //PAYMENT USING STRIPE
@@ -87,6 +96,43 @@ const Shipping = () => {
         }
     };
 
+    const handleMakePayment = async (e) => {
+        e?.preventDefault?.();
+        const ok = validateAndStoreCheckoutInfo();
+        if (!ok) return;
+        await handlePayment();
+    };
+
+    const handleSkipPayment = async () => {
+        const ok = validateAndStoreCheckoutInfo();
+        if (!ok) return;
+        try {
+            const ref = (localStorage.getItem("orderReferenceNo") || "").trim();
+            const ship = JSON.parse(localStorage.getItem("shippingInfo") || "null");
+            const { data } = await axios.post(
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/user/create-order`,
+                {
+                    orderItems: cartItems,
+                    shippingInfo: ship,
+                    orderReferenceNo: ref,
+                },
+                {
+                    headers: { Authorization: auth?.token },
+                    timeout: 120000,
+                }
+            );
+            if (data?.success && data?.order?._id) {
+                localStorage.setItem("skipOrderId", String(data.order._id));
+                navigate("/shipping/confirm");
+            } else {
+                toast.error(data?.message || "Failed to place order");
+            }
+        } catch (error) {
+            console.error(error);
+            toast.error(error.response?.data?.message || "Failed to place order");
+        }
+    };
+
     return (
         <>
             <SeoData title="Flipkart: Shipping Details" />
@@ -100,10 +146,22 @@ const Shipping = () => {
                         <div className="w-full px-4 sm:px-0 bg-white py-8 rounded-2xl shadow-lg">
                             <h2 className="text-2xl font-bold text-gray-800 mb-6 px-2">Shipping Details</h2>
                             <form
-                                onSubmit={shippingSubmit}
+                                onSubmit={handleMakePayment}
                                 autoComplete="off"
                                 className="flex flex-col justify-start gap-4 w-full sm:w-3/4 mx-1 sm:mx-8 my-4"
                             >
+                                <TextField
+                                    value={orderReferenceNo}
+                                    onChange={(e) => setOrderReferenceNo(e.target.value)}
+                                    fullWidth
+                                    label="Order Reference Number"
+                                    variant="outlined"
+                                    required
+                                    placeholder="Enter reference number given by customer"
+                                    InputProps={{
+                                        className: "rounded-lg"
+                                    }}
+                                />
                                 <TextField
                                     value={address}
                                     onChange={(e) => setAddress(e.target.value)}
@@ -227,10 +285,17 @@ const Shipping = () => {
 
                                 <button
                                     type="submit"
-                                    onClick={handlePayment}
                                     className="bg-gradient-to-r from-[#fb641b] to-[#ff9f00] hover:from-[#ff7f54] hover:to-[#ffe066] w-full sm:w-[40%] mt-6 py-4 px-2 text-lg font-bold text-white shadow-lg rounded-xl uppercase outline-none transition"
                                 >
                                     Make Payment
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={handleSkipPayment}
+                                    className="bg-gray-900 hover:bg-gray-800 w-full sm:w-[40%] py-4 px-2 text-lg font-bold text-white shadow-lg rounded-xl uppercase outline-none transition"
+                                >
+                                    Place Order (Skip Payment)
                                 </button>
                             </form>
                         </div>

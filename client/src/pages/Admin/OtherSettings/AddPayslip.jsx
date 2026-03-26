@@ -13,6 +13,7 @@ import {
     FormControl,
     InputLabel,
     Grid,
+    Typography,
 } from "@mui/material";
 import dayjs from "dayjs";
 
@@ -44,6 +45,8 @@ const AddPayslip = () => {
     const [earnings, setEarnings] = useState(defaultEarnings);
     const [deductions, setDeductions] = useState(defaultDeductions);
     const [ratings, setRatings] = useState(defaultRatings);
+    const [totalKm, setTotalKm] = useState(0);
+    const [kmLoading, setKmLoading] = useState(false);
 
     useEffect(() => {
         const fetchEmployees = async () => {
@@ -68,8 +71,58 @@ const AddPayslip = () => {
             setEmployeeIdNo(emp.idCradNo || emp.employeeIdNo || "");
             setDesignation(Array.isArray(emp.designation) ? emp.designation[0] : emp.designation || "");
             setDateOfJoining(emp.hireDate ? dayjs(emp.hireDate).format("YYYY-MM-DD") : "");
+            // Auto-fill earnings from employee master
+            setEarnings((prev) => ({
+                ...prev,
+                basic: Number(emp.salary) || 0,
+                bikeAllowance: Number(emp.bikeAllowance) || 0,
+            }));
         }
     }, [employeeId, employees]);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        const fetchTotalKm = async () => {
+            if (!auth?.token) return;
+            if (!employeeId || !payPeriodDate || !payDate) {
+                setTotalKm(0);
+                return;
+            }
+
+            try {
+                setKmLoading(true);
+                const params = new URLSearchParams({
+                    page: "1",
+                    limit: "1000",
+                    employeeId,
+                    fromDate: payPeriodDate,
+                    toDate: payDate,
+                });
+
+                const { data } = await axios.get(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/employee-activity-log/admin/all?${params.toString()}`,
+                    { headers: { Authorization: auth?.token } }
+                );
+
+                if (cancelled) return;
+
+                const logs = Array.isArray(data?.activityLogs) ? data.activityLogs : [];
+                const sum = logs.reduce((s, l) => s + (Number(l?.km) || 0), 0);
+                setTotalKm(sum);
+            } catch (e) {
+                if (cancelled) return;
+                setTotalKm(0);
+            } finally {
+                if (!cancelled) setKmLoading(false);
+            }
+        };
+
+        fetchTotalKm();
+        return () => {
+            cancelled = true;
+        };
+    }, [auth?.token, employeeId, payPeriodDate, payDate]);
 
     const handleEarningChange = (field, value) => setEarnings((p) => ({ ...p, [field]: Number(value) || 0 }));
     const handleDeductionChange = (field, value) => setDeductions((p) => ({ ...p, [field]: Number(value) || 0 }));
@@ -158,6 +211,18 @@ const AddPayslip = () => {
                             <Grid item xs={12} sm={6}>
                                 <TextField fullWidth size="small" type="date" label="Pay Date" value={payDate} onChange={(e) => setPayDate(e.target.value)} InputLabelProps={{ shrink: true }} required />
                             </Grid>
+                            <Grid item xs={12}>
+                                <Paper className="p-3 rounded-xl bg-[#f7fafd] border border-[#e6fbff]">
+                                    <Typography variant="subtitle2" sx={{ color: "#019ee3", fontWeight: "bold" }}>
+                                        Total KM (Activity Logs)
+                                    </Typography>
+                                    <Typography variant="body2" sx={{ color: "#444" }}>
+                                        {kmLoading
+                                            ? "Loading…"
+                                            : `${Number(totalKm || 0).toLocaleString("en-IN")} km (from ${dayjs(payPeriodDate).format("DD/MM/YYYY")} to ${dayjs(payDate).format("DD/MM/YYYY")})`}
+                                    </Typography>
+                                </Paper>
+                            </Grid>
                             <Grid item xs={12} sm={6}>
                                 <TextField fullWidth size="small" type="number" label="Paid Days" value={paidDays} onChange={(e) => setPaidDays(e.target.value)} inputProps={{ min: 0 }} />
                             </Grid>
@@ -168,7 +233,20 @@ const AddPayslip = () => {
                             <Grid item xs={12}><h3 className="font-semibold text-gray-700">Earnings</h3></Grid>
                             {Object.keys(earnings).map((key) => (
                                 <Grid item xs={12} sm={6} key={key}>
-                                    <TextField fullWidth size="small" type="number" label={key.replace(/([A-Z])/g, " $1").trim()} value={earnings[key]} onChange={(e) => handleEarningChange(key, e.target.value)} inputProps={{ min: 0, step: 0.01 }} />
+                                    <TextField
+                                        fullWidth
+                                        size="small"
+                                        type="number"
+                                        label={key.replace(/([A-Z])/g, " $1").trim()}
+                                        value={earnings[key]}
+                                        onChange={(e) => handleEarningChange(key, e.target.value)}
+                                        inputProps={{ min: 0, step: 0.01 }}
+                                        helperText={
+                                            key === "petrolAllowance"
+                                                ? `Total KM in period: ${Number(totalKm || 0).toLocaleString("en-IN")} km`
+                                                : undefined
+                                        }
+                                    />
                                 </Grid>
                             ))}
 

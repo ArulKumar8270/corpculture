@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,9 @@ import {
   Modal,
   FlatList,
   Image,
+  KeyboardAvoidingView,
+  Platform,
+  Keyboard,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 // @ts-ignore
@@ -48,6 +51,12 @@ const AddEmployeeScreen = () => {
   const [departmentModalVisible, setDepartmentModalVisible] = useState(false);
   const [employeeTypeModalVisible, setEmployeeTypeModalVisible] = useState(false);
   const employeeTypes = ['Service', 'Sales', 'Rentals'];
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  const scrollViewRef = useRef<ScrollView>(null);
+  const formSectionY = useRef(0);
+  const addressSectionY = useRef(0);
+  const salarySectionY = useRef(0);
 
   useEffect(() => {
     fetchCategories();
@@ -55,6 +64,34 @@ const AddEmployeeScreen = () => {
       fetchEmployee(employeeId);
     }
   }, []);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => setKeyboardHeight(e.endCoordinates.height)
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setKeyboardHeight(0)
+    );
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
+  const scrollToAddress = () => {
+    setTimeout(() => {
+      const y = formSectionY.current + addressSectionY.current - 120;
+      scrollViewRef.current?.scrollTo({ y: Math.max(0, y), animated: true });
+    }, 100);
+  };
+  const scrollToSalary = () => {
+    setTimeout(() => {
+      const y = formSectionY.current + salarySectionY.current - 120;
+      scrollViewRef.current?.scrollTo({ y: Math.max(0, y), animated: true });
+    }, 100);
+  };
 
   const fetchCategories = async () => {
     try {
@@ -290,8 +327,15 @@ const AddEmployeeScreen = () => {
   const selectedDepartment = categories.find((cat) => cat._id === formData.department);
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.form}>
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}>
+      <ScrollView
+        ref={scrollViewRef}
+        style={styles.container}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 40 + keyboardHeight }]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+      <View style={styles.form} onLayout={(e) => { formSectionY.current = e.nativeEvent.layout.y; }}>
         <Text style={styles.label}>Name *</Text>
         <TextInput
           style={styles.input}
@@ -320,15 +364,18 @@ const AddEmployeeScreen = () => {
           keyboardType="phone-pad"
         />
 
-        <Text style={styles.label}>Address *</Text>
-        <TextInput
-          style={[styles.input, styles.textArea]}
-          value={formData.address}
-          onChangeText={(text) => setFormData({ ...formData, address: text })}
-          placeholder="Enter address"
-          multiline
-          numberOfLines={3}
-        />
+        <View onLayout={(e) => { addressSectionY.current = e.nativeEvent.layout.y; }}>
+          <Text style={styles.label}>Address *</Text>
+          <TextInput
+            style={[styles.input, styles.textArea]}
+            value={formData.address}
+            onChangeText={(text) => setFormData({ ...formData, address: text })}
+            placeholder="Enter address"
+            multiline
+            numberOfLines={3}
+            onFocus={scrollToAddress}
+          />
+        </View>
 
         <Text style={styles.label}>Pincode</Text>
         <TextInput
@@ -378,14 +425,17 @@ const AddEmployeeScreen = () => {
           <Icon name="arrow-drop-down" size={24} color="#666" style={styles.dropdownIcon} />
         </TouchableOpacity>
 
-        <Text style={styles.label}>Salary</Text>
-        <TextInput
-          style={styles.input}
-          value={formData.salary}
-          onChangeText={(text) => setFormData({ ...formData, salary: text.replace(/[^0-9.]/g, '') })}
-          placeholder="Enter salary"
-          keyboardType="numeric"
-        />
+        <View onLayout={(e) => { salarySectionY.current = e.nativeEvent.layout.y; }}>
+          <Text style={styles.label}>Salary</Text>
+          <TextInput
+            style={styles.input}
+            value={formData.salary}
+            onChangeText={(text) => setFormData({ ...formData, salary: text.replace(/[^0-9.]/g, '') })}
+            placeholder="Enter salary"
+            keyboardType="numeric"
+            onFocus={scrollToSalary}
+          />
+        </View>
 
         <Text style={styles.label}>Employee Photo</Text>
         <View style={styles.imageContainer}>
@@ -512,7 +562,8 @@ const AddEmployeeScreen = () => {
           </View>
         </TouchableOpacity>
       </Modal>
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
@@ -520,6 +571,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 40,
   },
   centerContainer: {
     flex: 1,

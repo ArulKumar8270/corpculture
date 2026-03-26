@@ -10,6 +10,8 @@ import {
   FlatList,
   RefreshControl,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 // @ts-ignore
@@ -137,7 +139,8 @@ const EmployeeLeaveFormScreen = () => {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
+      <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
       <Text style={styles.sectionTitle}>Apply for Leave</Text>
 
       <Text style={styles.label}>Leave Type</Text>
@@ -259,7 +262,8 @@ const EmployeeLeaveFormScreen = () => {
       {!loadingLeaves && leaves.length === 0 && (
         <Text style={styles.emptyText}>No leave applications yet</Text>
       )}
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 

@@ -28,7 +28,7 @@ const AdminRoute = () => {
             } catch (error) {
                 console.log(error);
 
-                if (error.response?.status === 401 && !isContextLoading) {
+                if ((error.response?.status === 401 || error.response?.status === 403) && !isContextLoading) {
                     // When isContextLoading becomes false, it means the context has been loaded
                     setTimeout(() => {
                         toast.error("Admin Privileges Required!", {

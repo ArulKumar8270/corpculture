@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -30,6 +30,9 @@ const RentalReportsScreen = () => {
   const [expandedReports, setExpandedReports] = useState<Set<string>>(new Set());
   const [reportType, setReportType] = useState('Rental_Report');
   const [sendingReport, setSendingReport] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const ROWS_PER_PAGE_OPTIONS = [5, 10, 25, 50, 100];
 
   useFocusEffect(
     useCallback(() => {
@@ -223,6 +226,19 @@ const RentalReportsScreen = () => {
     );
   });
 
+  const paginatedReports = useMemo(() => {
+    const start = page * rowsPerPage;
+    return filteredReports.slice(start, start + rowsPerPage);
+  }, [filteredReports, page, rowsPerPage]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [rowsPerPage]);
+
   const renderReport = ({ item }: { item: any }) => {
     const isExpanded = expandedReports.has(item._id);
     const isSendingThis = sendingReport === item._id;
@@ -384,7 +400,7 @@ const RentalReportsScreen = () => {
         <ActivityIndicator size="large" color="#019ee3" style={styles.loader} />
       ) : (
         <FlatList
-          data={filteredReports}
+          data={paginatedReports}
           renderItem={renderReport}
           keyExtractor={(item) => item._id}
           refreshing={loading}
@@ -393,6 +409,47 @@ const RentalReportsScreen = () => {
             <View style={styles.emptyContainer}>
               <Icon name="description" size={64} color="#ccc" />
               <Text style={styles.emptyText}>No Rental_Reports found</Text>
+            </View>
+          }
+          ListFooterComponent={
+            <View style={styles.paginationWrapper}>
+              {filteredReports.length > 0 && (
+                <View style={styles.rowsPerPageRow}>
+                  <Text style={styles.rowsPerPageLabel}>Rows per page:</Text>
+                  <View style={styles.rowsPerPageOptions}>
+                    {ROWS_PER_PAGE_OPTIONS.map((opt) => (
+                      <TouchableOpacity
+                        key={opt}
+                        style={[styles.rowsPerPageBtn, rowsPerPage === opt && styles.rowsPerPageBtnActive]}
+                        onPress={() => setRowsPerPage(opt)}
+                      >
+                        <Text style={[styles.rowsPerPageBtnText, rowsPerPage === opt && styles.rowsPerPageBtnTextActive]}>{opt}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
+              {filteredReports.length > rowsPerPage ? (
+                <View style={styles.pagination}>
+                  <TouchableOpacity
+                    style={[styles.pageBtn, page === 0 && styles.pageBtnDisabled]}
+                    onPress={() => setPage((p) => Math.max(0, p - 1))}
+                    disabled={page === 0}
+                  >
+                    <Text style={styles.pageBtnText}>Previous</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.pageInfo}>
+                    Page {page + 1} of {Math.max(1, Math.ceil(filteredReports.length / rowsPerPage))}
+                  </Text>
+                  <TouchableOpacity
+                    style={[styles.pageBtn, page >= Math.ceil(filteredReports.length / rowsPerPage) - 1 && styles.pageBtnDisabled]}
+                    onPress={() => setPage((p) => p + 1)}
+                    disabled={page >= Math.ceil(filteredReports.length / rowsPerPage) - 1}
+                  >
+                    <Text style={styles.pageBtnText}>Next</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : null}
             </View>
           }
         />
@@ -597,6 +654,24 @@ const styles = StyleSheet.create({
     padding: 50,
     alignItems: 'center',
   },
+  paginationWrapper: {
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#eee',
+  },
+  rowsPerPageRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+  rowsPerPageLabel: { fontSize: 14, color: '#666', marginRight: 8 },
+  rowsPerPageOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  rowsPerPageBtn: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 6, backgroundColor: '#e0e0e0' },
+  rowsPerPageBtnActive: { backgroundColor: '#019ee3' },
+  rowsPerPageBtnText: { fontSize: 14, color: '#333', fontWeight: '500' },
+  rowsPerPageBtnTextActive: { color: '#fff' },
+  pagination: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 },
+  pageBtn: { paddingVertical: 8, paddingHorizontal: 16, backgroundColor: '#019ee3', borderRadius: 8, marginHorizontal: 8 },
+  pageBtnDisabled: { backgroundColor: '#ccc', opacity: 0.8 },
+  pageBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  pageInfo: { fontSize: 14, color: '#333' },
 });
 
 export default RentalReportsScreen;

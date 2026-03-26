@@ -34,6 +34,14 @@ const OrderSuccess = () => {
                     {
                         sessionId: sessionId,
                         orderItems: cartItems,
+                        shippingInfo: (() => {
+                            try {
+                                return JSON.parse(localStorage.getItem("shippingInfo") || "null");
+                            } catch {
+                                return null;
+                            }
+                        })(),
+                        orderReferenceNo: (localStorage.getItem("orderReferenceNo") || "").trim(),
                     },
                     {
                         headers: {
@@ -49,6 +57,8 @@ const OrderSuccess = () => {
                     setCartItems([]);
                     localStorage.removeItem("cart");
                     localStorage.removeItem("sessionId");
+                    localStorage.removeItem("shippingInfo");
+                    localStorage.removeItem("orderReferenceNo");
                     setLoading(false);
                     setHasSavedPayment(true); // Mark the payment as saved to prevent further API calls
                 }
@@ -57,6 +67,20 @@ const OrderSuccess = () => {
                 console.log(error);
             }
         };
+
+        const skipOrderId = (localStorage.getItem("skipOrderId") || "").trim();
+        if (skipOrderId && cartItems.length > 0 && !hasSavedPayment) {
+            // Skip Stripe flow: order already created
+            setCartItems([]);
+            localStorage.removeItem("cart");
+            localStorage.removeItem("shippingInfo");
+            localStorage.removeItem("orderReferenceNo");
+            localStorage.removeItem("skipOrderId");
+            localStorage.removeItem("sessionId");
+            setLoading(false);
+            setHasSavedPayment(true);
+            return;
+        }
 
         if (sessionId && cartItems.length > 0 && !hasSavedPayment) {
             savePayment(); // Ensure the API call is only triggered once

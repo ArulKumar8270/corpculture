@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import { useAuth } from '../../context/auth';
@@ -21,8 +21,46 @@ const EmployeeActivityLogForm = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const preselectedCompany = location.state?.preselectedCompany;
+    const editLogId = location.state?.editLogId;
+    const isAdmin = Number(auth?.user?.role) === 1;
     const [companies, setCompanies] = useState([]);
     const [loading, setLoading] = useState(false);
+
+    /** Address rows for a single company (delivery addresses, else billing). */
+    const getAddressOptionsForCompany = useCallback((company) => {
+        if (!company) return [];
+        const opts = [];
+        const deliveries = Array.isArray(company.serviceDeliveryAddresses)
+            ? company.serviceDeliveryAddresses
+            : [];
+        if (deliveries.length > 0) {
+            deliveries.forEach((addr, idx) => {
+                const addrLine = (addr?.address || '').trim();
+                if (!addrLine) return;
+                opts.push({
+                    _id: `${company._id}_addr_${idx}`,
+                    companyId: company._id,
+                    companyName: company.companyName || '',
+                    addressLine: addrLine,
+                    pincode: addr?.pincode || '',
+                    label: `${addrLine}${addr?.pincode ? ` (${addr.pincode})` : ''}`,
+                });
+            });
+        } else {
+            const bill = (company.billingAddress || '').trim();
+            if (bill) {
+                opts.push({
+                    _id: `${company._id}_billing`,
+                    companyId: company._id,
+                    companyName: company.companyName || '',
+                    addressLine: bill,
+                    pincode: company.pincode || '',
+                    label: `${bill}${company.pincode ? ` (${company.pincode})` : ''}`,
+                });
+            }
+        }
+        return opts;
+    }, []);
 
     const [formData, setFormData] = useState({
         date: new Date().toISOString().split('T')[0],
@@ -35,10 +73,12 @@ const EmployeeActivityLogForm = () => {
         remarks: '',
     });
 
-    // Single From/To selection (no multi-add rows)
+    /** Step 1: company · Step 2: address for that company */
     const [routeDraft, setRouteDraft] = useState({
         fromCompany: null,
+        fromAddress: null,
         toCompany: null,
+        toAddress: null,
     });
 
     const callTypes = [
@@ -70,10 +110,18 @@ const EmployeeActivityLogForm = () => {
                 const list = data.companies || [];
                 setCompanies(list);
                 if (preselectedCompany) {
-                    const id = typeof preselectedCompany === 'object' ? preselectedCompany._id : preselectedCompany;
-                    const company = list.find((c) => c._id === id) || (typeof preselectedCompany === 'object' && preselectedCompany.companyName ? preselectedCompany : null);
+                    const id =
+                        typeof preselectedCompany === 'object'
+                            ? preselectedCompany._id
+                            : preselectedCompany;
+                    const company = list.find((c) => c._id === id);
                     if (company) {
-                        setRouteDraft((prev) => ({ ...prev, fromCompany: company }));
+                        const addrOpts = getAddressOptionsForCompany(company);
+                        setRouteDraft((prev) => ({
+                            ...prev,
+                            fromCompany: company,
+                            fromAddress: addrOpts[0] || null,
+                        }));
                     }
                 }
             }
@@ -83,6 +131,96 @@ const EmployeeActivityLogForm = () => {
         }
     };
 
+    const hydrateAddressForCompany = (company, addressLine, pincode, fallbackId) => {
+        if (!company) return null;
+        const opts = getAddressOptionsForCompany(company);
+        const found = opts.find(
+            (o) =>
+                String(o.addressLine || '').trim() === String(addressLine || '').trim() &&
+                String(o.pincode || '').trim() === String(pincode || '').trim()
+        );
+        if (found) return found;
+        if (!addressLine) return null;
+        return {
+            _id: fallbackId || `${company._id}_existing`,
+            companyId: company._id,
+            companyName: company.companyName || '',
+            addressLine: String(addressLine || ''),
+            pincode: String(pincode || ''),
+            label: `${String(addressLine || '')}${pincode ? ` (${pincode})` : ''}`,
+        };
+    };
+
+    const fetchLogForEdit = useCallback(
+        async (id) => {
+            if (!auth?.token || !id) return;
+            try {
+                setLoading(true);
+                const url = isAdmin
+                    ? `${import.meta.env.VITE_SERVER_URL}/api/v1/employee-activity-log/admin/${id}`
+                    : `${import.meta.env.VITE_SERVER_URL}/api/v1/employee-activity-log/${id}`;
+                const { data } = await axios.get(url, {
+                    headers: { Authorization: auth?.token },
+                });
+                if (!data?.success || !data?.activityLog) {
+                    toast.error(data?.message || 'Failed to load activity log');
+                    return;
+                }
+
+                const log = data.activityLog;
+                setFormData((prev) => ({
+                    ...prev,
+                    date: log?.date ? new Date(log.date).toISOString().split('T')[0] : prev.date,
+                    km: log?.km ?? '',
+                    inTime: log?.inTime ?? '',
+                    outTime: log?.outTime ?? '',
+                    callType: log?.callType ?? '',
+                    remarks: log?.remarks ?? '',
+                }));
+
+                // Build routeDraft from company list
+                const fromCompanyId = (log.fromCompany?._id || log.fromCompany)?.toString();
+                const toCompanyId = (log.toCompany?._id || log.toCompany)?.toString();
+                const fromCompanyObj = companies.find((c) => c._id === fromCompanyId) || null;
+                const toCompanyObj = companies.find((c) => c._id === toCompanyId) || null;
+
+                const fromAddr = hydrateAddressForCompany(
+                    fromCompanyObj,
+                    log.fromAddressLine,
+                    log.fromPincode,
+                    `${fromCompanyId || 'from'}_existing`
+                );
+                const toAddr = hydrateAddressForCompany(
+                    toCompanyObj,
+                    log.toAddressLine,
+                    log.toPincode,
+                    `${toCompanyId || 'to'}_existing`
+                );
+
+                setRouteDraft({
+                    fromCompany: fromCompanyObj,
+                    fromAddress: fromAddr,
+                    toCompany: toCompanyObj,
+                    toAddress: toAddr,
+                });
+            } catch (error) {
+                console.error('Error loading activity log:', error);
+                toast.error(error.response?.data?.message || 'Failed to load activity log');
+            } finally {
+                setLoading(false);
+            }
+        },
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [auth?.token, isAdmin, companies, getAddressOptionsForCompany]
+    );
+
+    useEffect(() => {
+        // Wait for companies list before hydrating routeDraft on edit
+        if (editLogId && companies.length > 0) {
+            fetchLogForEdit(editLogId);
+        }
+    }, [editLogId, companies.length, fetchLogForEdit]);
+
     const handleInputChange = (e) => {
         const { name, value } = e.target;
         setFormData((prev) => ({
@@ -91,12 +229,28 @@ const EmployeeActivityLogForm = () => {
         }));
     };
 
-    const handleDraftFromCompanyChange = (event, newValue) => {
-        setRouteDraft((prev) => ({ ...prev, fromCompany: newValue }));
+    const handleFromCompanyChange = (event, newCompany) => {
+        setRouteDraft((prev) => ({
+            ...prev,
+            fromCompany: newCompany,
+            fromAddress: null,
+        }));
     };
 
-    const handleDraftToCompanyChange = (event, newValue) => {
-        setRouteDraft((prev) => ({ ...prev, toCompany: newValue }));
+    const handleFromAddressChange = (event, newAddr) => {
+        setRouteDraft((prev) => ({ ...prev, fromAddress: newAddr }));
+    };
+
+    const handleToCompanyChange = (event, newCompany) => {
+        setRouteDraft((prev) => ({
+            ...prev,
+            toCompany: newCompany,
+            toAddress: null,
+        }));
+    };
+
+    const handleToAddressChange = (event, newAddr) => {
+        setRouteDraft((prev) => ({ ...prev, toAddress: newAddr }));
     };
 
     const handleSubmit = async (e) => {
@@ -107,27 +261,42 @@ const EmployeeActivityLogForm = () => {
             return;
         }
 
-        const from = routeDraft.fromCompany;
-        const to = routeDraft.toCompany;
-        if (!from || !to) {
-            toast.error('Please select both From Company and To Company');
+        const fromAddr = routeDraft.fromAddress;
+        const toAddr = routeDraft.toAddress;
+        if (!routeDraft.fromCompany || !fromAddr) {
+            toast.error('Please select From company and address');
             return;
         }
-        if (from._id === to._id) {
-            toast.error('From Company and To Company cannot be the same');
+        if (!routeDraft.toCompany || !toAddr) {
+            toast.error('Please select To company and address');
+            return;
+        }
+        if (fromAddr._id === toAddr._id) {
+            toast.error('From and To cannot be the same address');
             return;
         }
 
         try {
             setLoading(true);
-            const { data } = await axios.post(
-                `${import.meta.env.VITE_SERVER_URL}/api/v1/employee-activity-log/create`,
+            const endpoint = editLogId
+                ? isAdmin
+                    ? `${import.meta.env.VITE_SERVER_URL}/api/v1/employee-activity-log/admin/update/${editLogId}`
+                    : `${import.meta.env.VITE_SERVER_URL}/api/v1/employee-activity-log/update/${editLogId}`
+                : `${import.meta.env.VITE_SERVER_URL}/api/v1/employee-activity-log/create`;
+
+            const method = editLogId ? 'put' : 'post';
+            const { data } = await axios[method](
+                endpoint,
                 {
                     ...formData,
-                    fromCompany: from._id,
-                    fromCompanyName: from.companyName || '',
-                    toCompany: to._id,
-                    toCompanyName: to.companyName || '',
+                    fromCompany: fromAddr.companyId,
+                    fromCompanyName: fromAddr.companyName || '',
+                    fromAddressLine: fromAddr.addressLine || '',
+                    fromPincode: fromAddr.pincode || '',
+                    toCompany: toAddr.companyId,
+                    toCompanyName: toAddr.companyName || '',
+                    toAddressLine: toAddr.addressLine || '',
+                    toPincode: toAddr.pincode || '',
                 },
                 {
                     headers: {
@@ -137,18 +306,27 @@ const EmployeeActivityLogForm = () => {
             );
 
             if (data?.success) {
-                toast.success('Activity log created successfully');
-                setFormData({
-                    date: new Date().toISOString().split('T')[0],
-                    km: '',
-                    inTime: '',
-                    outTime: '',
-                    callType: '',
-                    leaveOrWork: '',
-                    assignedTo: '',
-                    remarks: '',
-                });
-                setRouteDraft({ fromCompany: null, toCompany: null });
+                toast.success(editLogId ? 'Activity log updated successfully' : 'Activity log created successfully');
+                if (editLogId) {
+                    navigate(-1);
+                } else {
+                    setFormData({
+                        date: new Date().toISOString().split('T')[0],
+                        km: '',
+                        inTime: '',
+                        outTime: '',
+                        callType: '',
+                        leaveOrWork: '',
+                        assignedTo: '',
+                        remarks: '',
+                    });
+                    setRouteDraft({
+                        fromCompany: null,
+                        fromAddress: null,
+                        toCompany: null,
+                        toAddress: null,
+                    });
+                }
             } else {
                 toast.error(data?.message || 'Failed to create activity log');
             }
@@ -165,7 +343,14 @@ const EmployeeActivityLogForm = () => {
     return (
         <div className="p-4">
             <div className="flex justify-between items-center mb-6">
-                <h1 className="text-2xl font-semibold">Employee Activity Log</h1>
+                <h1 className="text-2xl font-semibold">
+                    {editLogId ? 'Edit Activity Log' : 'Employee Activity Log'}
+                </h1>
+                {editLogId ? (
+                    <Button variant="outlined" onClick={() => navigate(-1)}>
+                        Back
+                    </Button>
+                ) : null}
             </div>
 
             <Paper className="p-6 shadow-md">
@@ -185,49 +370,119 @@ const EmployeeActivityLogForm = () => {
                             />
                         </Grid>
 
-                        {/* From Company */}
-                        <Grid item xs={12} md={4}>
+                        {/* From: company first, then address */}
+                        <Grid item xs={12} md={6}>
                             <Autocomplete
                                 fullWidth
                                 options={companies}
                                 getOptionLabel={(option) =>
-                                    option.companyName || ''
+                                    option?.companyName || ''
                                 }
                                 isOptionEqualToValue={(option, value) =>
-                                    option._id === value._id
+                                    option?._id === value?._id
                                 }
                                 value={routeDraft.fromCompany}
-                                onChange={handleDraftFromCompanyChange}
+                                onChange={handleFromCompanyChange}
                                 renderInput={(params) => (
                                     <TextField
                                         {...params}
-                                        label="From Company"
+                                        label="From — Company"
                                         variant="outlined"
-                                        placeholder="Select From"
+                                        placeholder="Select company first"
+                                    />
+                                )}
+                            />
+                        </Grid>
+                        <Grid item xs={12} md={6}>
+                            <Autocomplete
+                                fullWidth
+                                disabled={!routeDraft.fromCompany}
+                                options={getAddressOptionsForCompany(
+                                    routeDraft.fromCompany
+                                )}
+                                getOptionLabel={(option) => option?.label || ''}
+                                isOptionEqualToValue={(option, value) =>
+                                    option?._id === value?._id
+                                }
+                                value={routeDraft.fromAddress}
+                                onChange={handleFromAddressChange}
+                                renderInput={(params) => (
+                                    <TextField
+                                        {...params}
+                                        label="From — Address"
+                                        variant="outlined"
+                                        placeholder={
+                                            routeDraft.fromCompany
+                                                ? 'Select address'
+                                                : 'Select company first'
+                                        }
+                                        helperText={
+                                            routeDraft.fromCompany &&
+                                            getAddressOptionsForCompany(
+                                                routeDraft.fromCompany
+                                            ).length === 0
+                                                ? 'No addresses for this company (add in company profile)'
+                                                : undefined
+                                        }
                                     />
                                 )}
                             />
                         </Grid>
 
-                        {/* To Company */}
-                        <Grid item xs={12} md={4}>
+                        {/* To: company first, then address */}
+                        <Grid item xs={12} md={6}>
                             <Autocomplete
                                 fullWidth
                                 options={companies}
                                 getOptionLabel={(option) =>
-                                    option.companyName || ''
+                                    option?.companyName || ''
                                 }
                                 isOptionEqualToValue={(option, value) =>
-                                    option._id === value._id
+                                    option?._id === value?._id
                                 }
                                 value={routeDraft.toCompany}
-                                onChange={handleDraftToCompanyChange}
+                                onChange={handleToCompanyChange}
                                 renderInput={(params) => (
                                     <TextField
                                         {...params}
-                                        label="To Company"
+                                        label="To — Company"
                                         variant="outlined"
-                                        placeholder="Select To"
+                                        placeholder="Select company first"
+                                    />
+                                )}
+                            />
+                        </Grid>
+                        <Grid item xs={12} md={6}>
+                            <Autocomplete
+                                fullWidth
+                                disabled={!routeDraft.toCompany}
+                                options={getAddressOptionsForCompany(
+                                    routeDraft.toCompany
+                                )}
+                                getOptionLabel={(option) => option?.label || ''}
+                                isOptionEqualToValue={(option, value) =>
+                                    option?._id === value?._id
+                                }
+                                value={routeDraft.toAddress}
+                                onChange={handleToAddressChange}
+                                renderInput={(params) => (
+                                    <TextField
+                                        {...params}
+                                        label="To — Address"
+                                        variant="outlined"
+                                        placeholder={
+                                            routeDraft.toCompany
+                                                ? 'Select address'
+                                                : 'Select company first'
+                                        }
+                                        helperText={
+                                            routeDraft.toCompany &&
+                                            getAddressOptionsForCompany(
+                                                routeDraft.toCompany
+                                            ).length === 0
+                                                ? 'No addresses for this company (add in company profile)'
+                                                : undefined
+                                        }
                                     />
                                 )}
                             />

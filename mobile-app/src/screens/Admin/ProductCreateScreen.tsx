@@ -11,6 +11,8 @@ import {
   ActivityIndicator,
   Modal,
   FlatList,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
@@ -46,6 +48,8 @@ const ProductCreateScreen = () => {
   const [category, setCategory] = useState('');
   const [stock, setStock] = useState('');
   const [warranty, setWarranty] = useState('');
+  const [corpcultureWarranty, setCorpcultureWarranty] = useState('');
+  const [orderReferenceNo, setOrderReferenceNo] = useState('');
   const [brand, setBrand] = useState('');
   const [installationCost, setInstallationCost] = useState('');
   const [deliveryCharge, setDeliveryCharge] = useState('');
@@ -93,6 +97,8 @@ const ProductCreateScreen = () => {
     setCategory(product.category?.name || product.category || '');
     setStock(product.stock?.toString() || '');
     setWarranty(product.warranty?.toString() || '');
+    setCorpcultureWarranty(product.corpcultureWarranty || '');
+    setOrderReferenceNo(product.orderReferenceNo || '');
     setBrand(product.brandName || product.brand?.name || '');
     setInstallationCost(product.installationCost?.toString() || '');
     setDeliveryCharge(product.deliveryCharge?.toString() || '');
@@ -184,6 +190,8 @@ const ProductCreateScreen = () => {
     setCategory('');
     setStock('');
     setWarranty('');
+    setCorpcultureWarranty('');
+    setOrderReferenceNo('');
     setBrand('');
     setInstallationCost('');
     setDeliveryCharge('');
@@ -471,6 +479,8 @@ const ProductCreateScreen = () => {
         category,
         stock,
         warranty: warranty || '0',
+        corpcultureWarranty: corpcultureWarranty || '',
+        orderReferenceNo: orderReferenceNo || '',
         brandName: brand,
         installationCost: installationCost || '0',
         deliveryCharge: deliveryCharge || '0',
@@ -559,7 +569,8 @@ const ProductCreateScreen = () => {
   }
 
   return (
-    <ScrollView style={styles.container}>
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
+      <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
       <View style={styles.form}>
         <Text style={styles.label}>Name *</Text>
         <TextInput
@@ -657,16 +668,41 @@ const ProductCreateScreen = () => {
           </View>
         </View>
 
-        <View style={styles.halfInput}>
-          <Text style={styles.label}>Warranty</Text>
-          <TextInput
-            style={styles.input}
-            value={warranty}
-            onChangeText={setWarranty}
-            placeholder="Enter warranty"
-            placeholderTextColor="#999"
-            keyboardType="numeric"
-          />
+        <View style={styles.row}>
+          <View style={styles.halfInput}>
+            <Text style={styles.label}>Warranty</Text>
+            <TextInput
+              style={styles.input}
+              value={warranty}
+              onChangeText={setWarranty}
+              placeholder="Enter warranty"
+              placeholderTextColor="#999"
+              keyboardType="numeric"
+            />
+          </View>
+        </View>
+
+        <View style={styles.row}>
+          <View style={styles.halfInput}>
+            <Text style={styles.label}>Corpculture Warranty</Text>
+            <TextInput
+              style={styles.input}
+              value={corpcultureWarranty}
+              onChangeText={setCorpcultureWarranty}
+              placeholder="e.g. 2 Years Extended"
+              placeholderTextColor="#999"
+            />
+          </View>
+          <View style={styles.halfInput}>
+            <Text style={styles.label}>Order Reference No</Text>
+            <TextInput
+              style={styles.input}
+              value={orderReferenceNo}
+              onChangeText={setOrderReferenceNo}
+              placeholder="e.g. ORD-REF-001"
+              placeholderTextColor="#999"
+            />
+          </View>
         </View>
 
         {/* Highlights Section */}
@@ -924,7 +960,8 @@ const ProductCreateScreen = () => {
           </View>
         </TouchableOpacity>
       </Modal>
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
@@ -932,6 +969,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 40,
   },
   centerContainer: {
     flex: 1,

@@ -9,11 +9,14 @@ import Rating from "@mui/material/Rating";
 import Actions from "./Actions";
 import SeoData from "../../SEO/SeoData";
 import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField } from "@mui/material";
+import * as XLSX from "xlsx";
+import { saveAs } from "file-saver";
 
 const AllProducts = () => {
     const { auth, userPermissions } = useAuth();
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [exportingExcel, setExportingExcel] = useState(false);
 
     const hasPermission = (key) => {
         return userPermissions.some(p => p.key === key && p.actions.includes('edit')) || auth?.user?.role === 1;
@@ -33,7 +36,9 @@ const AllProducts = () => {
                 );
                 // console.log(res.data.products);
 
-                res.status === 201 && setProducts(res.data.products);
+                if (res.data?.products) {
+                    setProducts(res.data.products);
+                }
                 setLoading(false);
             } catch (error) {
                 console.error("Error fetching data:", error);
@@ -211,6 +216,43 @@ const AllProducts = () => {
         setCategoryErrors({ ...categoryErrors, [e.target.name]: undefined });
     };
 
+    /** OVERALL PRODUCTS — export full catalog to Excel (same data as grid) */
+    const handleDownloadOverallProductsExcel = () => {
+        if (!products?.length) {
+            toast.error("No products to export.");
+            return;
+        }
+        setExportingExcel(true);
+        try {
+            const rows = products.map((item) => ({
+                "Product ID": String(item._id ?? ""),
+                Name: item.name ?? "",
+                Category: item.category ?? "",
+                Stock: item.stock ?? "",
+                Price: item.price ?? "",
+                "Discount Price": item.discountPrice ?? "",
+                Rating: item.ratings ?? "",
+                "Image URL": item.images?.[0]?.url ?? "",
+                Description: item.description ?? "",
+            }));
+            const ws = XLSX.utils.json_to_sheet(rows);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Overall Products");
+            const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+            const blob = new Blob([excelBuffer], {
+                type: "application/octet-stream",
+            });
+            const stamp = new Date().toISOString().slice(0, 10);
+            saveAs(blob, `all_products_overall_${stamp}.xlsx`);
+            toast.success(`Exported ${rows.length} product(s) to Excel.`);
+        } catch (err) {
+            console.error("Excel export error:", err);
+            toast.error("Failed to export Excel.");
+        } finally {
+            setExportingExcel(false);
+        }
+    };
+
     const handleCategorySubmit = async (e) => {
         e.preventDefault();
         let errors = {};
@@ -262,6 +304,33 @@ const AllProducts = () => {
                             </button>
                         </div> : null}
                     </div>
+
+                    {hasPermission("salesAllProducts") ? (
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 mb-4 bg-gradient-to-r from-[#e6fbff] to-[#f0fff4] border border-[#019ee3] rounded-2xl shadow">
+                            <div>
+                                <h2 className="text-base font-bold text-gray-800">
+                                    OVERALL PRODUCTS
+                                </h2>
+                                <p className="text-xs text-gray-600 mt-1 max-w-xl">
+                                    Download the full seller product catalog shown on this page as an
+                                    Excel file (ID, name, category, stock, prices, rating, image).
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={handleDownloadOverallProductsExcel}
+                                disabled={exportingExcel || !products?.length}
+                                className={`shrink-0 px-5 py-2.5 rounded-lg font-semibold text-white text-sm transition whitespace-nowrap ${
+                                    exportingExcel || !products?.length
+                                        ? "bg-gray-400 cursor-not-allowed"
+                                        : "bg-gradient-to-r from-[#019ee3] to-[#afcb09] hover:from-[#afcb09] hover:to-[#019ee3]"
+                                }`}
+                            >
+                                {exportingExcel ? "Preparing Excel…" : "Download in Excel"}
+                            </button>
+                        </div>
+                    ) : null}
+
                     {/* Category Modal */}
                     <Dialog open={categoryModalOpen} onClose={handleCategoryClose}>
                         <DialogTitle>Add New Category</DialogTitle>

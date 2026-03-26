@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,9 @@ import {
   Modal,
   FlatList,
   Image,
+  KeyboardAvoidingView,
+  Platform,
+  Keyboard,
 } from 'react-native';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 // @ts-ignore - @expo/vector-icons is available via expo dependency
@@ -55,11 +58,20 @@ const RentalInvoiceFormScreen = () => {
   const employeeName = params?.employeeName;
   const employeeId = params?.employeeId;
   const rentalId = params?.rentalId;
-  const companyIdFromParams = params?.companyId;
+  // Normalize companyId: API may return populated object { _id, companyName } or string _id
+  const companyIdFromParams =
+    params?.companyId != null
+      ? typeof params.companyId === 'object'
+        ? params.companyId?._id
+        : params.companyId
+      : undefined;
+  const initialCompanyId =
+    companyIdFromParams && companyIdFromParams !== 'null' ? String(companyIdFromParams) : '';
 
   const [loading, setLoading] = useState(true);
   const [loadingCompanies, setLoadingCompanies] = useState(false);
   const [companies, setCompanies] = useState<any[]>([]);
+  const [companyData, setCompanyData] = useState<any>(null);
   const [availableProducts, setAvailableProducts] = useState<any[]>([]);
   const [contactOptions, setContactOptions] = useState<string[]>([]);
   const [invoices, setInvoices] = useState<string | number | null>(null);
@@ -67,13 +79,19 @@ const RentalInvoiceFormScreen = () => {
   const [companyPickerVisible, setCompanyPickerVisible] = useState(false);
   const [productPickerVisible, setProductPickerVisible] = useState<number | null>(null);
   const [sendToPickerVisible, setSendToPickerVisible] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  const scrollViewRef = useRef<ScrollView>(null);
+  const invoiceDateSectionY = useRef(0);
+  const remarksSectionY = useRef(0);
 
   const [formData, setFormData] = useState({
-    companyId: companyIdFromParams && companyIdFromParams !== 'null' ? companyIdFromParams : '',
+    companyId: initialCompanyId,
     machineId: '',
     sendDetailsTo: '',
     countImageFile: null as string | null,
     remarks: '',
+    invoiceDate: new Date().toISOString(), // Match web: default to today
     a3Config: { bwOldCount: '', bwNewCount: '' } as ProductConfig,
     a4Config: { bwOldCount: '', bwNewCount: '' } as ProductConfig,
     a5Config: { bwOldCount: '', bwNewCount: '' } as ProductConfig,
@@ -120,8 +138,8 @@ const RentalInvoiceFormScreen = () => {
   }, [rentalId]);
 
   useEffect(() => {
-    fetchCompanies();
-  }, []);
+    if (token) fetchCompanies();
+  }, [token]);
 
   useEffect(() => {
     if (entryId) {
@@ -131,25 +149,27 @@ const RentalInvoiceFormScreen = () => {
     }
   }, [entryId]);
 
-  // Auto-select company when companyIdFromParams is provided and companies are loaded
+  // Sync companyId from params when navigating from rental enquiries (e.g. screen reused in stack)
   useEffect(() => {
-    if (companyIdFromParams && companyIdFromParams !== 'null' && companies.length > 0 && !entryId) {
-      const companyExists = companies.find((c) => c._id === companyIdFromParams);
+    if (entryId || !initialCompanyId) return;
+    setFormData((prev) => {
+      if (prev.companyId === initialCompanyId) return prev;
+      return { ...prev, companyId: initialCompanyId, sendDetailsTo: '' };
+    });
+  }, [entryId, initialCompanyId]);
+
+  // Auto-select company when initialCompanyId is provided and companies are loaded
+  useEffect(() => {
+    if (initialCompanyId && companies.length > 0 && !entryId) {
+      const companyExists = companies.find((c) => String(c._id) === String(initialCompanyId));
       if (companyExists) {
-        // Ensure companyId is set (triggers product fetch and contact options)
         setFormData((prev) => {
-          // Only update if companyId is not already set to avoid unnecessary re-renders
-          if (prev.companyId !== companyIdFromParams) {
-            return {
-              ...prev,
-              companyId: companyIdFromParams,
-            };
-          }
-          return prev;
+          if (String(prev.companyId) === String(initialCompanyId)) return prev;
+          return { ...prev, companyId: initialCompanyId };
         });
       }
     }
-  }, [companyIdFromParams, companies, entryId]);
+  }, [initialCompanyId, companies, entryId]);
 
   useEffect(() => {
     if (formData.companyId && formData.companyId !== '') {
@@ -158,22 +178,59 @@ const RentalInvoiceFormScreen = () => {
     }
   }, [formData.companyId]);
 
+  // Populate contact options from companies list or from companyData (e.g. when coming from rental enquiries before companies load)
   useEffect(() => {
-    if (formData.companyId && companies.length > 0) {
-      const selectedCompany = companies.find((comp) => comp._id === formData.companyId);
-      if (selectedCompany && selectedCompany.contactPersons) {
-        const options = selectedCompany.contactPersons.map(
-          (person: any) => `${person.name} (Mobile: ${person.mobile}, Email: ${person.email})`
-        );
-        setContactOptions(options);
-      } else {
-        setContactOptions([]);
-      }
-      if (!entryId) {
-        setFormData((prev) => ({ ...prev, sendDetailsTo: '' }));
-      }
+    if (!formData.companyId) {
+      setContactOptions([]);
+      return;
     }
-  }, [formData.companyId, companies, entryId]);
+    const selectedCompany = companies.find((comp) => String(comp._id) === String(formData.companyId));
+    const persons = selectedCompany?.contactPersons ?? companyData?.contactPersons;
+    if (persons && Array.isArray(persons)) {
+      const options = persons.map(
+        (person: any) => `${person.name || ''} (Mobile: ${person.mobile || ''}, Email: ${person.email || ''})`
+      );
+      setContactOptions(options);
+    } else {
+      setContactOptions([]);
+    }
+    if (!entryId) {
+      setFormData((prev) => ({ ...prev, sendDetailsTo: '' }));
+    }
+  }, [formData.companyId, companies, companyData, entryId]);
+
+  // Keyboard show/hide: extra bottom padding so fields can scroll above keyboard
+  useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => setKeyboardHeight(e.endCoordinates.height)
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setKeyboardHeight(0)
+    );
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
+  const scrollToInvoiceDate = () => {
+    setTimeout(() => {
+      scrollViewRef.current?.scrollTo({
+        y: Math.max(0, invoiceDateSectionY.current - 120),
+        animated: true,
+      });
+    }, 100);
+  };
+  const scrollToRemarks = () => {
+    setTimeout(() => {
+      scrollViewRef.current?.scrollTo({
+        y: Math.max(0, remarksSectionY.current - 120),
+        animated: true,
+      });
+    }, 100);
+  };
 
   // Helper function to generate invoice number based on format
   const generateInvoiceNumber = (invoiceCount: number, format: string): string => {
@@ -297,18 +354,24 @@ const RentalInvoiceFormScreen = () => {
   };
 
   const fetchCompanyData = async () => {
+    if (!formData.companyId || !token) return;
     try {
       const { data } = await axios.get(
         `${getApiBaseUrl()}/company/get/${formData.companyId}`,
         {
           headers: {
-            Authorization: token || '',
+            Authorization: token,
           },
         }
       );
-      // Company data is used for contact options, already handled in useEffect
-    } catch (error) {
+      if (data?.success && data.company) {
+        setCompanyData(data.company);
+      } else {
+        setCompanyData(null);
+      }
+    } catch (error: any) {
       console.error('Error fetching company data:', error);
+      setCompanyData(null);
     }
   };
 
@@ -375,6 +438,7 @@ const RentalInvoiceFormScreen = () => {
           sendDetailsTo: entry?.sendDetailsTo || '',
           countImageFile: null,
           remarks: entry.remarks || '',
+          invoiceDate: entry.invoiceDate ? new Date(entry.invoiceDate).toISOString() : new Date().toISOString(),
           a3Config: {
             bwOldCount: entry.a3Config?.bwOldCount ?? 0,
             bwNewCount: entry.a3Config?.bwNewCount ?? 0,
@@ -501,11 +565,12 @@ const RentalInvoiceFormScreen = () => {
 
   const resetForm = useCallback(() => {
     setFormData({
-      companyId: companyIdFromParams && companyIdFromParams !== 'null' ? companyIdFromParams : '',
+      companyId: initialCompanyId,
       machineId: '',
       sendDetailsTo: '',
       countImageFile: null,
       remarks: '',
+      invoiceDate: new Date().toISOString(),
       a3Config: { bwOldCount: '', bwNewCount: '' },
       a4Config: { bwOldCount: '', bwNewCount: '' },
       a5Config: { bwOldCount: '', bwNewCount: '' },
@@ -545,28 +610,32 @@ const RentalInvoiceFormScreen = () => {
         },
       },
     ]);
-  }, [companyIdFromParams]);
+  }, [initialCompanyId]);
 
   useFocusEffect(
     useCallback(() => {
       const currentParams = route.params as any;
       const currentEntryId = currentParams?.id;
-      const currentCompanyId = currentParams?.companyId;
+      const rawCompanyId = currentParams?.companyId;
+      const currentCompanyId =
+        rawCompanyId != null
+          ? typeof rawCompanyId === 'object'
+            ? rawCompanyId?._id
+            : rawCompanyId
+          : undefined;
+      const normalizedId = currentCompanyId && currentCompanyId !== 'null' ? String(currentCompanyId) : '';
 
       // If companyId is provided in params and not in edit mode, set it
-      if (!currentEntryId && currentCompanyId && currentCompanyId !== 'null') {
-        if (formData.companyId !== currentCompanyId) {
-          setFormData((prev) => ({
-            ...prev,
-            companyId: currentCompanyId,
-          }));
-        }
+      if (!currentEntryId && normalizedId) {
+        setFormData((prev) => {
+          if (String(prev.companyId) === normalizedId) return prev;
+          return { ...prev, companyId: normalizedId, sendDetailsTo: '' };
+        });
       }
 
       if (!currentEntryId) {
         const timeoutId = setTimeout(() => {
-          // Only reset if we're not coming from a navigation with companyId
-          if (!currentCompanyId && (products.length > 0 || formData.companyId || formData.remarks)) {
+          if (!normalizedId && (products.length > 0 || formData.companyId || formData.remarks)) {
             resetForm();
           }
         }, 100);
@@ -781,11 +850,11 @@ const RentalInvoiceFormScreen = () => {
   // Invoice count is now incremented automatically by the backend
   // No need to call increment-invoice endpoint
 
-  const updateStatusToRental = async (rentalId: string, status: string) => {
+  const updateStatusToRental = async (rentalId: string, status: string, totalAmount?: string | number) => {
     try {
       await axios.put(
         `${getApiBaseUrl()}/rental/update/${rentalId}`,
-        { status },
+        { status, ...(totalAmount != null && { grandTotal: totalAmount }) },
         {
           headers: {
             Authorization: token || '',
@@ -886,8 +955,8 @@ const RentalInvoiceFormScreen = () => {
       let commissionRate = 0;
       
       try {
-        if (res.data?.entry) {
-          const totalData = getTotalRentalInvoicePayment(res.data.entry);
+        if (entry) {
+          const totalData = getTotalRentalInvoicePayment(entry);
           totalAmountIncludingGST = parseFloat(totalData.totalAmount) || 0;
           commissionAmount = parseFloat(totalData.commissionAmount) || 0;
           commissionRate = totalData.commissionRate || 0;
@@ -931,7 +1000,7 @@ const RentalInvoiceFormScreen = () => {
         // Only send invoiceNumber for quotations or when updating existing invoices
         // data.append('invoiceNumber', invoices?.toString() || '');
       }
-      const finalCompanyId = companyIdFromParams || formData.companyId;
+      const finalCompanyId = initialCompanyId || formData.companyId;
       if (!finalCompanyId) {
         Toast.show({
           type: 'error',
@@ -944,6 +1013,7 @@ const RentalInvoiceFormScreen = () => {
       data.append('companyId', finalCompanyId);
       data.append('sendDetailsTo', formData.sendDetailsTo);
       data.append('remarks', formData.remarks || '');
+      data.append('invoiceDate', formData.invoiceDate ? new Date(formData.invoiceDate).toISOString() : new Date().toISOString());
       // Use employeeId (User ID) for assignedTo, fallback to employeeName if employeeId not available
       const assignedToValue = employeeId || employeeName || '';
       if (!assignedToValue) {
@@ -1086,7 +1156,14 @@ const RentalInvoiceFormScreen = () => {
           // await handleUpdateInvoiceCount();
         }
         if (!entryId) {
-          await updateStatusToRental(rentalId || '', 'Completed');
+          let totalAmount: string | number | undefined;
+          try {
+            const calc = getTotalRentalInvoicePayment(res.data?.entry);
+            totalAmount = calc?.totalAmount ?? calc;
+          } catch (_) {
+            totalAmount = undefined;
+          }
+          await updateStatusToRental(rentalId || '', 'Completed', totalAmount);
         }
         await updateCommissionDetails(res.data?.entry);
 
@@ -1222,7 +1299,18 @@ const RentalInvoiceFormScreen = () => {
   }
 
   return (
-    <ScrollView style={styles.container}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
+    >
+      <ScrollView
+        ref={scrollViewRef}
+        style={styles.container}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 40 + keyboardHeight }]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
       <View style={styles.header}>
         <Text style={styles.title}>
           {entryId ? 'Edit Rental Payment Entry' : 'Add Rental Payment Entry'}
@@ -1235,10 +1323,12 @@ const RentalInvoiceFormScreen = () => {
         <TouchableOpacity
           style={styles.pickerButton}
           onPress={() => setCompanyPickerVisible(true)}
-          disabled={!!entryId || !!companyIdFromParams}
+          disabled={!!entryId || !!initialCompanyId}
         >
           <Text style={styles.pickerButtonText}>
-            {companies.find((c) => c._id === formData.companyId)?.companyName || '--select Company--'}
+            {companies.find((c) => String(c._id) === String(formData.companyId))?.companyName ??
+              companyData?.companyName ??
+              '--select Company--'}
           </Text>
           <Icon name="arrow-drop-down" size={24} color="#666" />
         </TouchableOpacity>
@@ -1326,8 +1416,41 @@ const RentalInvoiceFormScreen = () => {
         </TouchableOpacity>
       </View>
 
+      {/* Invoice Date - match web */}
+      <View
+        style={styles.section}
+        onLayout={(e) => {
+          invoiceDateSectionY.current = e.nativeEvent.layout.y;
+        }}
+      >
+        <Text style={styles.label}>Invoice Date</Text>
+        <TextInput
+          style={styles.configInput}
+          value={formData.invoiceDate ? formData.invoiceDate.slice(0, 10) : ''}
+          onChangeText={(text) => {
+            const trimmed = text.trim();
+            if (!trimmed) {
+              setFormData((prev) => ({ ...prev, invoiceDate: new Date().toISOString() }));
+              return;
+            }
+            const d = new Date(trimmed);
+            if (!isNaN(d.getTime())) {
+              setFormData((prev) => ({ ...prev, invoiceDate: d.toISOString() }));
+            }
+          }}
+          placeholder="YYYY-MM-DD"
+          placeholderTextColor="#999"
+          onFocus={scrollToInvoiceDate}
+        />
+      </View>
+
       {/* Remarks */}
-      <View style={styles.section}>
+      <View
+        style={styles.section}
+        onLayout={(e) => {
+          remarksSectionY.current = e.nativeEvent.layout.y;
+        }}
+      >
         <Text style={styles.label}>Remarks</Text>
         <TextInput
           style={styles.textArea}
@@ -1336,6 +1459,7 @@ const RentalInvoiceFormScreen = () => {
           multiline
           numberOfLines={4}
           placeholder="Enter remarks"
+          onFocus={scrollToRemarks}
         />
       </View>
 
@@ -1471,7 +1595,8 @@ const RentalInvoiceFormScreen = () => {
           </View>
         </TouchableOpacity>
       </Modal>
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
@@ -1479,6 +1604,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 40,
   },
   loaderContainer: {
     flex: 1,

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -40,6 +40,9 @@ const EmployeeListScreen = () => {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const ROWS_PER_PAGE_OPTIONS = [5, 10, 25, 50, 100];
 
   useFocusEffect(
     useCallback(() => {
@@ -121,6 +124,19 @@ const EmployeeListScreen = () => {
       (employee.designation && employee.designation.toLowerCase().includes(query))
     );
   });
+
+  const paginatedEmployees = useMemo(() => {
+    const start = page * rowsPerPage;
+    return filteredEmployees.slice(start, start + rowsPerPage);
+  }, [filteredEmployees, page, rowsPerPage]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [rowsPerPage]);
 
   const isAdmin = user?.role === 1 || Number(user?.role) === 1;
 
@@ -220,7 +236,7 @@ const EmployeeListScreen = () => {
       </View>
 
       <FlatList
-        data={filteredEmployees}
+        data={paginatedEmployees}
         renderItem={renderEmployee}
         keyExtractor={(item) => item._id}
         contentContainerStyle={styles.listContent}
@@ -232,6 +248,47 @@ const EmployeeListScreen = () => {
             <Text style={styles.emptyText}>
               {searchQuery ? 'No employees found matching your search' : 'No employees found'}
             </Text>
+          </View>
+        }
+        ListFooterComponent={
+          <View style={styles.paginationWrapper}>
+            {filteredEmployees.length > 0 && (
+              <View style={styles.rowsPerPageRow}>
+                <Text style={styles.rowsPerPageLabel}>Rows per page:</Text>
+                <View style={styles.rowsPerPageOptions}>
+                  {ROWS_PER_PAGE_OPTIONS.map((opt) => (
+                    <TouchableOpacity
+                      key={opt}
+                      style={[styles.rowsPerPageBtn, rowsPerPage === opt && styles.rowsPerPageBtnActive]}
+                      onPress={() => setRowsPerPage(opt)}
+                    >
+                      <Text style={[styles.rowsPerPageBtnText, rowsPerPage === opt && styles.rowsPerPageBtnTextActive]}>{opt}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
+            {filteredEmployees.length > rowsPerPage ? (
+              <View style={styles.pagination}>
+                <TouchableOpacity
+                  style={[styles.pageBtn, page === 0 && styles.pageBtnDisabled]}
+                  onPress={() => setPage((p) => Math.max(0, p - 1))}
+                  disabled={page === 0}
+                >
+                  <Text style={styles.pageBtnText}>Previous</Text>
+                </TouchableOpacity>
+                <Text style={styles.pageInfo}>
+                  Page {page + 1} of {Math.max(1, Math.ceil(filteredEmployees.length / rowsPerPage))}
+                </Text>
+                <TouchableOpacity
+                  style={[styles.pageBtn, page >= Math.ceil(filteredEmployees.length / rowsPerPage) - 1 && styles.pageBtnDisabled]}
+                  onPress={() => setPage((p) => p + 1)}
+                  disabled={page >= Math.ceil(filteredEmployees.length / rowsPerPage) - 1}
+                >
+                  <Text style={styles.pageBtnText}>Next</Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
           </View>
         }
       />
@@ -362,6 +419,24 @@ const styles = StyleSheet.create({
     marginTop: 10,
     textAlign: 'center',
   },
+  paginationWrapper: {
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#eee',
+  },
+  rowsPerPageRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+  rowsPerPageLabel: { fontSize: 14, color: '#666', marginRight: 8 },
+  rowsPerPageOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  rowsPerPageBtn: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 6, backgroundColor: '#e0e0e0' },
+  rowsPerPageBtnActive: { backgroundColor: '#019ee3' },
+  rowsPerPageBtnText: { fontSize: 14, color: '#333', fontWeight: '500' },
+  rowsPerPageBtnTextActive: { color: '#fff' },
+  pagination: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 },
+  pageBtn: { paddingVertical: 8, paddingHorizontal: 16, backgroundColor: '#019ee3', borderRadius: 8, marginHorizontal: 8 },
+  pageBtnDisabled: { backgroundColor: '#ccc', opacity: 0.8 },
+  pageBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  pageInfo: { fontSize: 14, color: '#333' },
 });
 
 export default EmployeeListScreen;

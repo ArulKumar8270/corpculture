@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -48,6 +48,9 @@ const RentalEnquiriesScreen = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [actionMenuVisible, setActionMenuVisible] = useState<string | null>(null);
   const [employeePickerVisible, setEmployeePickerVisible] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const ROWS_PER_PAGE_OPTIONS = [5, 10, 25, 50, 100];
 
   useEffect(() => {
     fetchEmployees();
@@ -268,14 +271,13 @@ const RentalEnquiriesScreen = () => {
     const employee = employees.find((emp) => emp.userId === enquiry.employeeId);
     const employeeName = employee?.name || enquiry.employeeId;
     const employeeUserId = employee?.userId || enquiry.employeeId;
-    // Ensure companyId is passed correctly - handle both string and object formats
     const companyId = typeof enquiry?.companyId === 'object' ? enquiry?.companyId?._id : enquiry?.companyId;
     (navigation as any).navigate('AddRentalInvoice', {
       employeeName,
       employeeId: employeeUserId,
       invoiceType: 'invoice',
       rentalId: enquiry._id,
-      companyId: companyId || enquiry?.companyId,
+      companyId: companyId ?? (typeof enquiry?.companyId === 'object' ? enquiry?.companyId?._id : enquiry?.companyId),
     });
     setActionMenuVisible(null);
   };
@@ -284,14 +286,13 @@ const RentalEnquiriesScreen = () => {
     const employee = employees.find((emp) => emp.userId === enquiry.employeeId);
     const employeeName = employee?.name || enquiry.employeeId;
     const employeeUserId = employee?.userId || enquiry.employeeId;
-    // Ensure companyId is passed correctly - handle both string and object formats
     const companyId = typeof enquiry?.companyId === 'object' ? enquiry?.companyId?._id : enquiry?.companyId;
     (navigation as any).navigate('AddRentalInvoice', {
       employeeName,
       employeeId: employeeUserId,
       invoiceType: 'quotation',
       rentalId: enquiry._id,
-      companyId: companyId || enquiry?.companyId,
+      companyId: companyId ?? (typeof enquiry?.companyId === 'object' ? enquiry?.companyId?._id : enquiry?.companyId),
     });
     setActionMenuVisible(null);
   };
@@ -327,6 +328,19 @@ const RentalEnquiriesScreen = () => {
       (enquiry.rentalTitle && enquiry.rentalTitle.toLowerCase().includes(term))
     );
   });
+
+  const paginatedEnquiries = useMemo(() => {
+    const start = page * rowsPerPage;
+    return filteredEnquiries.slice(start, start + rowsPerPage);
+  }, [filteredEnquiries, page, rowsPerPage]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [activeTab, searchTerm]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [rowsPerPage]);
 
   const renderEnquiry = ({ item }: { item: any }) => {
     const isUpdating = updatingRentalId === item._id;
@@ -526,7 +540,7 @@ const RentalEnquiriesScreen = () => {
 
       {/* Enquiries List */}
       <FlatList
-        data={filteredEnquiries}
+        data={paginatedEnquiries}
         renderItem={renderEnquiry}
         keyExtractor={(item) => item._id}
         ListEmptyComponent={
@@ -535,9 +549,50 @@ const RentalEnquiriesScreen = () => {
             <Text style={styles.emptyText}>No rental enquiries found</Text>
           </View>
         }
-        contentContainerStyle={filteredEnquiries.length === 0 ? styles.emptyListContent : undefined}
+        contentContainerStyle={paginatedEnquiries.length === 0 ? styles.emptyListContent : undefined}
         refreshing={loading}
         onRefresh={fetchAllRentals}
+        ListFooterComponent={
+          <View style={styles.paginationWrapper}>
+            {filteredEnquiries.length > 0 && (
+              <View style={styles.rowsPerPageRow}>
+                <Text style={styles.rowsPerPageLabel}>Rows per page:</Text>
+                <View style={styles.rowsPerPageOptions}>
+                  {ROWS_PER_PAGE_OPTIONS.map((opt) => (
+                    <TouchableOpacity
+                      key={opt}
+                      style={[styles.rowsPerPageBtn, rowsPerPage === opt && styles.rowsPerPageBtnActive]}
+                      onPress={() => setRowsPerPage(opt)}
+                    >
+                      <Text style={[styles.rowsPerPageBtnText, rowsPerPage === opt && styles.rowsPerPageBtnTextActive]}>{opt}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
+            {filteredEnquiries.length > rowsPerPage ? (
+              <View style={styles.pagination}>
+                <TouchableOpacity
+                  style={[styles.pageBtn, page === 0 && styles.pageBtnDisabled]}
+                  onPress={() => setPage((p) => Math.max(0, p - 1))}
+                  disabled={page === 0}
+                >
+                  <Text style={styles.pageBtnText}>Previous</Text>
+                </TouchableOpacity>
+                <Text style={styles.pageInfo}>
+                  Page {page + 1} of {Math.max(1, Math.ceil(filteredEnquiries.length / rowsPerPage))}
+                </Text>
+                <TouchableOpacity
+                  style={[styles.pageBtn, page >= Math.ceil(filteredEnquiries.length / rowsPerPage) - 1 && styles.pageBtnDisabled]}
+                  onPress={() => setPage((p) => p + 1)}
+                  disabled={page >= Math.ceil(filteredEnquiries.length / rowsPerPage) - 1}
+                >
+                  <Text style={styles.pageBtnText}>Next</Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
+          </View>
+        }
       />
 
       {/* Employee Picker Modal */}
@@ -826,6 +881,24 @@ const styles = StyleSheet.create({
   emptyListContent: {
     flexGrow: 1,
   },
+  paginationWrapper: {
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#eee',
+  },
+  rowsPerPageRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+  rowsPerPageLabel: { fontSize: 14, color: '#666', marginRight: 8 },
+  rowsPerPageOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  rowsPerPageBtn: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 6, backgroundColor: '#e0e0e0' },
+  rowsPerPageBtnActive: { backgroundColor: '#019ee3' },
+  rowsPerPageBtnText: { fontSize: 14, color: '#333', fontWeight: '500' },
+  rowsPerPageBtnTextActive: { color: '#fff' },
+  pagination: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 },
+  pageBtn: { paddingVertical: 8, paddingHorizontal: 16, backgroundColor: '#019ee3', borderRadius: 8, marginHorizontal: 8 },
+  pageBtnDisabled: { backgroundColor: '#ccc', opacity: 0.8 },
+  pageBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  pageInfo: { fontSize: 14, color: '#333' },
 });
 
 export default RentalEnquiriesScreen;

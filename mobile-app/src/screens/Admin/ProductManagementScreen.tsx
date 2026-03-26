@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -29,6 +29,9 @@ const ProductManagementScreen = () => {
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const ROWS_PER_PAGE_OPTIONS = [5, 10, 25, 50, 100];
 
   // Category modal state
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
@@ -192,6 +195,19 @@ const ProductManagementScreen = () => {
       product.category?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const paginatedProducts = useMemo(() => {
+    const start = page * rowsPerPage;
+    return filteredProducts.slice(start, start + rowsPerPage);
+  }, [filteredProducts, page, rowsPerPage]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [rowsPerPage]);
+
   const renderProduct = ({ item }: { item: any }) => {
     const imageUrl = item.images?.[0]?.url || item.images?.[0];
     const stock = item.stock || 0;
@@ -310,7 +326,7 @@ const ProductManagementScreen = () => {
         </View>
       ) : (
         <FlatList
-          data={filteredProducts}
+          data={paginatedProducts}
           renderItem={renderProduct}
           keyExtractor={(item) => item._id}
           refreshing={loading}
@@ -319,6 +335,47 @@ const ProductManagementScreen = () => {
             <View style={styles.emptyContainer}>
               <Icon name="inventory" size={50} color="#ccc" />
               <Text style={styles.emptyText}>No products found</Text>
+            </View>
+          }
+          ListFooterComponent={
+            <View style={styles.paginationWrapper}>
+              {filteredProducts.length > 0 && (
+                <View style={styles.rowsPerPageRow}>
+                  <Text style={styles.rowsPerPageLabel}>Rows per page:</Text>
+                  <View style={styles.rowsPerPageOptions}>
+                    {ROWS_PER_PAGE_OPTIONS.map((opt) => (
+                      <TouchableOpacity
+                        key={opt}
+                        style={[styles.rowsPerPageBtn, rowsPerPage === opt && styles.rowsPerPageBtnActive]}
+                        onPress={() => setRowsPerPage(opt)}
+                      >
+                        <Text style={[styles.rowsPerPageBtnText, rowsPerPage === opt && styles.rowsPerPageBtnTextActive]}>{opt}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
+              {filteredProducts.length > rowsPerPage ? (
+                <View style={styles.pagination}>
+                  <TouchableOpacity
+                    style={[styles.pageBtn, page === 0 && styles.pageBtnDisabled]}
+                    onPress={() => setPage((p) => Math.max(0, p - 1))}
+                    disabled={page === 0}
+                  >
+                    <Text style={styles.pageBtnText}>Previous</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.pageInfo}>
+                    Page {page + 1} of {Math.max(1, Math.ceil(filteredProducts.length / rowsPerPage))}
+                  </Text>
+                  <TouchableOpacity
+                    style={[styles.pageBtn, page >= Math.ceil(filteredProducts.length / rowsPerPage) - 1 && styles.pageBtnDisabled]}
+                    onPress={() => setPage((p) => p + 1)}
+                    disabled={page >= Math.ceil(filteredProducts.length / rowsPerPage) - 1}
+                  >
+                    <Text style={styles.pageBtnText}>Next</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : null}
             </View>
           }
         />
@@ -682,6 +739,24 @@ const styles = StyleSheet.create({
   buttonDisabled: {
     opacity: 0.6,
   },
+  paginationWrapper: {
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#eee',
+  },
+  rowsPerPageRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+  rowsPerPageLabel: { fontSize: 14, color: '#666', marginRight: 8 },
+  rowsPerPageOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  rowsPerPageBtn: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 6, backgroundColor: '#e0e0e0' },
+  rowsPerPageBtnActive: { backgroundColor: '#019ee3' },
+  rowsPerPageBtnText: { fontSize: 14, color: '#333', fontWeight: '500' },
+  rowsPerPageBtnTextActive: { color: '#fff' },
+  pagination: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 },
+  pageBtn: { paddingVertical: 8, paddingHorizontal: 16, backgroundColor: '#019ee3', borderRadius: 8, marginHorizontal: 8 },
+  pageBtnDisabled: { backgroundColor: '#ccc', opacity: 0.8 },
+  pageBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  pageInfo: { fontSize: 14, color: '#333' },
 });
 
 export default ProductManagementScreen;

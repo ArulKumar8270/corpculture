@@ -11,7 +11,7 @@ import {
   RefreshControl,
   Alert,
 } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 // @ts-ignore
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
@@ -24,6 +24,7 @@ const ROWS_PER_PAGE = 10;
 
 const ActivityLogReportScreen = () => {
   const { token } = useSelector((state: RootState) => state.auth);
+  const navigation = useNavigation();
   const [activityLogs, setActivityLogs] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -168,6 +169,12 @@ const ActivityLogReportScreen = () => {
     const empName = item.employeeId?.name || item.userId?.name || 'N/A';
     const fromName = item.fromCompany?.companyName || item.fromCompanyName || 'N/A';
     const toName = item.toCompany?.companyName || item.toCompanyName || 'N/A';
+    const fromAddrText = [item.fromAddressLine, item.fromPincode]
+      .filter(Boolean)
+      .join(' — ');
+    const toAddrText = [item.toAddressLine, item.toPincode]
+      .filter(Boolean)
+      .join(' — ');
     const isUpdating = updatingId === item._id;
 
     return (
@@ -184,10 +191,22 @@ const ActivityLogReportScreen = () => {
           <Text style={styles.cardLabel}>From</Text>
           <Text style={styles.cardValue}>{fromName}</Text>
         </View>
+        {fromAddrText ? (
+          <View style={styles.cardRow}>
+            <Text style={styles.cardLabel}>From address</Text>
+            <Text style={styles.cardValue}>{fromAddrText}</Text>
+          </View>
+        ) : null}
         <View style={styles.cardRow}>
           <Text style={styles.cardLabel}>To</Text>
           <Text style={styles.cardValue}>{toName}</Text>
         </View>
+        {toAddrText ? (
+          <View style={styles.cardRow}>
+            <Text style={styles.cardLabel}>To address</Text>
+            <Text style={styles.cardValue}>{toAddrText}</Text>
+          </View>
+        ) : null}
         <View style={styles.cardRow}>
           <Text style={styles.cardLabel}>KM</Text>
           <Text style={styles.cardValue}>{item.km ?? 'N/A'}</Text>
@@ -204,6 +223,19 @@ const ActivityLogReportScreen = () => {
             ) : (
               <Text style={styles.statusChipText}>{item.status || 'UNPAID'}</Text>
             )}
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.cardRow}>
+          <Text style={styles.cardLabel}>Actions</Text>
+          <TouchableOpacity
+            style={styles.editButton}
+            onPress={() => {
+              // Navigate to Activity Log form in edit mode
+              (navigation as any).navigate('ActivityLogForm', { editLogId: item._id });
+            }}
+          >
+            <Text style={styles.editButtonText}>Edit</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -429,6 +461,17 @@ const styles = StyleSheet.create({
   statusPaid: { backgroundColor: 'green' },
   statusUnpaid: { backgroundColor: '#f0ad4e' },
   statusChipText: { color: '#fff', fontSize: 12, fontWeight: '600' },
+  editButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: '#e3f2fd',
+  },
+  editButtonText: {
+    color: '#007AFF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
   empty: { padding: 40, alignItems: 'center' },
   emptyText: { fontSize: 14, color: '#666' },

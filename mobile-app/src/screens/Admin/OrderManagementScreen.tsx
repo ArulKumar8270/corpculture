@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -50,6 +50,8 @@ const OrderManagementScreen = () => {
   const [employeePickerVisible, setEmployeePickerVisible] = useState(false);
   const [statusPickerVisible, setStatusPickerVisible] = useState(false);
 
+  const isEmployee = Number(user?.role) === 3;
+
   useEffect(() => {
     if (token) {
       fetchEmployees();
@@ -62,6 +64,15 @@ const OrderManagementScreen = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, page, rowsPerPage, orderStatusFilter, employeeIdFilter, buyerNameFilter, fromDate, toDate, searchQuery]);
+
+  useEffect(() => {
+    // Employees should only see their assigned orders (backend enforces),
+    // but keep UI filters locked down to avoid confusion.
+    if (isEmployee && employeeIdFilter) {
+      setEmployeeIdFilter('');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEmployee]);
 
   const loadOrders = async () => {
     setLoading(true);
@@ -154,6 +165,10 @@ const OrderManagementScreen = () => {
   };
 
   const handleAssignOrders = async () => {
+    if (isEmployee) {
+      Alert.alert('Not allowed', 'Employees cannot assign orders.');
+      return;
+    }
     if (selectedOrderIds.length === 0) {
       Alert.alert('Error', 'Please select at least one order to assign.');
       return;
@@ -210,7 +225,13 @@ const OrderManagementScreen = () => {
     }
   };
 
-  const salesEmployees = employees.filter((emp) => emp.employeeType === 'Sales');
+  const salesEmployees = useMemo(() => {
+    const hasEmployeeType = (emp: any, type: string) => {
+      const et = emp?.employeeType;
+      return Array.isArray(et) ? et.includes(type) : et === type;
+    };
+    return (employees || []).filter((emp) => hasEmployeeType(emp, 'Sales'));
+  }, [employees]);
 
   const renderOrder = ({ item }: { item: any }) => {
     const handleOrderPress = () => {
@@ -320,7 +341,7 @@ const OrderManagementScreen = () => {
       </View>
 
       {/* Assignment Controls - Filter Style */}
-      {hasPermission('salesOrders') && selectedOrderIds.length > 0 && (
+      {!isEmployee && hasPermission('salesOrders') && selectedOrderIds.length > 0 && (
         <View style={styles.assignmentContainer}>
           <View style={styles.assignmentHeader}>
             <Text style={styles.assignmentLabel}>

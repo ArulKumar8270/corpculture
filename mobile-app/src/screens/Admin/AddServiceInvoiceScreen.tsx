@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,9 @@ import {
   Alert,
   Modal,
   FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  Keyboard,
 } from 'react-native';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 // @ts-ignore - @expo/vector-icons is available via expo dependency
@@ -45,10 +48,18 @@ const AddServiceInvoiceScreen = () => {
   const employeeName = params?.employeeName;
   const employeeId = params?.employeeId; // Employee ID if passed
   const serviceId = params?.serviceId;
-  const companyIdFromParams = params?.companyId;
+  // Normalize companyId: API may return populated object { _id, companyName } or string _id
+  const companyIdFromParams =
+    params?.companyId != null
+      ? typeof params.companyId === 'object'
+        ? params.companyId?._id
+        : params.companyId
+      : undefined;
+  const initialCompanyId =
+    companyIdFromParams && companyIdFromParams !== 'null' ? String(companyIdFromParams) : '';
 
   const [invoiceData, setInvoiceData] = useState({
-    companyId: companyIdFromParams && companyIdFromParams !== 'null' ? companyIdFromParams : '',
+    companyId: initialCompanyId,
     productId: '',
     quantity: '',
     modeOfPayment: 'Cash',
@@ -59,6 +70,7 @@ const AddServiceInvoiceScreen = () => {
     reInstall: false,
     otherProducts: '',
     benefitQuantity: '',
+    invoiceDate: new Date().toISOString(), // Match web: default to today
   });
 
   const [companyData, setCompanyData] = useState<any>(null);
@@ -73,13 +85,74 @@ const AddServiceInvoiceScreen = () => {
   const [deliveryAddressPickerVisible, setDeliveryAddressPickerVisible] = useState(false);
   const [sendToPickerVisible, setSendToPickerVisible] = useState(false);
   const [paymentModePickerVisible, setPaymentModePickerVisible] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  const scrollViewRef = useRef<ScrollView>(null);
+  const formSectionY = useRef(0); // Y of form container within scroll content
+  const referenceSectionY = useRef(0); // Y within form
+  const descriptionSectionY = useRef(0);
 
   const paymentModes = ['Cash', 'Card', 'Bank Transfer', 'UPI', 'CHEQUE', 'BANK TRANSFER', 'OTHERS'];
 
+  // When navigating from Service Enquiry (or similar) with companyId in params, sync to state so company shows
   useEffect(() => {
+    if (invoiceId || !initialCompanyId) return;
+    setInvoiceData((prev) => {
+      if (prev.companyId === initialCompanyId) return prev;
+      return { ...prev, companyId: initialCompanyId, productId: '', sendTo: [], deliveryAddress: '' };
+    });
+  }, [invoiceId, initialCompanyId]);
+
+  // Keyboard show/hide: extra bottom padding so fields can scroll above keyboard
+  useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => setKeyboardHeight(e.endCoordinates.height)
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setKeyboardHeight(0)
+    );
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
+  const scrollToReference = () => {
+    setTimeout(() => {
+      const y = formSectionY.current + referenceSectionY.current - 120;
+      scrollViewRef.current?.scrollTo({ y: Math.max(0, y), animated: true });
+    }, 100);
+  };
+  const scrollToDescription = () => {
+    setTimeout(() => {
+      const y = formSectionY.current + descriptionSectionY.current - 120;
+      scrollViewRef.current?.scrollTo({ y: Math.max(0, y), animated: true });
+    }, 100);
+  };
+
+  // Helper to get product display name (match web Autocomplete getOptionLabel - all nested structures)
+  const getProductDisplayName = (option: any): string => {
+    if (!option?.productName) return '';
+    const pn = option.productName;
+    if (typeof pn === 'string') return pn;
+    if (pn?.name) return pn.name;
+    if (pn?.productName?.name) return pn.productName.name;
+    if (pn?.productName?.productName?.name) return pn.productName.productName.name;
+    if (pn?.productName?.productName?.productName) return pn.productName.productName.productName;
+    return (pn?.productName as string) || (pn as unknown as string) || 'N/A';
+  };
+
+  // Fetch companies and invoice count when token is available (match web: company list needed to select company)
+  useEffect(() => {
+    if (!token) {
+      setLoading(false);
+      return;
+    }
     fetchInvoicesCount();
     fetchCompanies();
-  }, []);
+  }, [token]);
 
   useEffect(() => {
     if (invoiceData.companyId && invoiceData.companyId !== '') {
@@ -103,6 +176,7 @@ const AddServiceInvoiceScreen = () => {
       reInstall: false,
       otherProducts: '',
       benefitQuantity: '',
+      invoiceDate: new Date().toISOString(),
     });
     setCompanyData(null);
     setProductsInTable([]);
@@ -248,58 +322,86 @@ const AddServiceInvoiceScreen = () => {
   };
 
   const fetchCompanies = async () => {
+    if (!token) return;
     try {
       setLoading(true);
       const { data } = await axios.get(`${getApiBaseUrl()}/company/all`, {
         headers: {
-          Authorization: token || '',
+          Authorization: token,
         },
       });
       if (data?.success) {
-        setCompanies(data.companies || []);
+        // Handle both direct .companies and nested .data.companies (match backend response shape)
+        const list = data.companies ?? data.data?.companies ?? [];
+        setCompanies(Array.isArray(list) ? list : []);
+      } else {
+        setCompanies([]);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching companies:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: error.response?.data?.message || 'Failed to load companies',
+      });
+      setCompanies([]);
     } finally {
       setLoading(false);
     }
   };
 
   const fetchCompanyData = async () => {
+    if (!invoiceData.companyId || !token) return;
     try {
       const { data } = await axios.get(
         `${getApiBaseUrl()}/company/get/${invoiceData.companyId}`,
         {
           headers: {
-            Authorization: token || '',
+            Authorization: token,
           },
         }
       );
       if (data?.success && data.company) {
         setCompanyData(data.company);
+      } else {
+        setCompanyData(null);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching company data:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: error.response?.data?.message || 'Failed to load company details',
+      });
+      setCompanyData(null);
     }
   };
 
   const fetchProductsByCompany = async () => {
+    if (!invoiceData.companyId || !token) return;
     try {
       setLoading(true);
       const { data } = await axios.get(
         `${getApiBaseUrl()}/service-products/getServiceProductsByCompany/${invoiceData.companyId}`,
         {
           headers: {
-            Authorization: token || '',
+            Authorization: token,
           },
         }
       );
       if (data?.success) {
-        setAvailableProducts(data.serviceProducts || []);
+        const list = data.serviceProducts ?? data.data?.serviceProducts ?? [];
+        setAvailableProducts(Array.isArray(list) ? list : []);
       } else {
         setAvailableProducts([]);
       }
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Error fetching products by company:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: error.response?.data?.message || 'Failed to load products for this company',
+      });
       setAvailableProducts([]);
     } finally {
       setLoading(false);
@@ -335,6 +437,7 @@ const AddServiceInvoiceScreen = () => {
           reInstall: false,
           otherProducts: '',
           benefitQuantity: '',
+          invoiceDate: invoice.invoiceDate ? new Date(invoice.invoiceDate).toISOString() : new Date().toISOString(),
         });
         setProductsInTable(
           (invoice.products || []).map((p: any, idx: number) => {
@@ -390,7 +493,7 @@ const AddServiceInvoiceScreen = () => {
     const newProduct: ProductInTable = {
       id: Date.now().toString() + Math.random(),
       productId: selectedProduct._id,
-      productName: selectedProduct.productName?.productName?.productName || '', // String for display
+      productName: getProductDisplayName(selectedProduct) || (selectedProduct.productName as any), // String for display
       sku: selectedProduct.sku || '',
       hsn: selectedProduct.hsn || '',
       quantity: parseInt(invoiceData.quantity),
@@ -428,7 +531,7 @@ const AddServiceInvoiceScreen = () => {
   };
 
   const handleSubmit = async () => {
-    const { companyId, modeOfPayment, deliveryAddress, reference, description, sendTo } = invoiceData;
+    const { companyId, modeOfPayment, deliveryAddress, reference, description, sendTo, invoiceDate } = invoiceData;
 
     // Validation: For quotations, modeOfPayment is not required (based on client)
     if (!companyId || !deliveryAddress || productsInTable.length === 0 || sendTo.length === 0) {
@@ -491,6 +594,7 @@ const AddServiceInvoiceScreen = () => {
       tax,
       grandTotal,
       sendTo,
+      invoiceDate: invoiceDate ? new Date(invoiceDate).toISOString() : new Date().toISOString(),
       assignedTo: employeeId || employeeName, // Use employeeId if available, fallback to employeeName
       invoiceType: invoiceType || 'invoice', // Ensure invoiceType is always set
       serviceId: serviceId,
@@ -673,8 +777,10 @@ const AddServiceInvoiceScreen = () => {
     }
   };
 
-  const selectedCompany = companies.find((c) => c._id === invoiceData.companyId);
+  const selectedCompany = companies.find((c) => String(c._id) === String(invoiceData.companyId));
   const selectedProduct = availableProducts.find((p) => p._id === invoiceData.productId);
+  // Show company name from list, or from fetched companyData (when coming from service enquiry before companies load)
+  const companyDisplayName = selectedCompany?.companyName ?? companyData?.companyName ?? '';
 
   if (loading && !invoiceData.companyId) {
     return (
@@ -688,12 +794,28 @@ const AddServiceInvoiceScreen = () => {
   const screenTitle = invoiceType === 'quotation' ? 'Add Service Quotation' : 'Add Service Invoice';
 
   return (
-    <ScrollView style={styles.container}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
+    >
+      <ScrollView
+        ref={scrollViewRef}
+        style={styles.container}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 40 + keyboardHeight }]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
       <View style={styles.header}>
         <Text style={styles.title}>{screenTitle}</Text>
       </View>
 
-      <View style={styles.form}>
+      <View
+        style={styles.form}
+        onLayout={(e) => {
+          formSectionY.current = e.nativeEvent.layout.y;
+        }}
+      >
         {/* Company Selection */}
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Company *</Text>
@@ -702,8 +824,8 @@ const AddServiceInvoiceScreen = () => {
             onPress={() => setCompanyPickerVisible(true)}
             disabled={!!invoiceId || !!invoiceData.companyId}
           >
-            <Text style={[styles.pickerButtonText, !invoiceData.companyId && styles.placeholder]}>
-              {selectedCompany ? selectedCompany.companyName : 'Select a Company'}
+            <Text style={[styles.pickerButtonText, !invoiceData.companyId && !companyDisplayName && styles.placeholder]}>
+              {companyDisplayName || 'Select a Company'}
             </Text>
             {!invoiceId && !invoiceData.companyId && (
               <Icon name="arrow-drop-down" size={24} color="#666" />
@@ -720,9 +842,7 @@ const AddServiceInvoiceScreen = () => {
             disabled={!invoiceData.companyId || availableProducts.length === 0}
           >
             <Text style={[styles.pickerButtonText, !invoiceData.productId && styles.placeholder]}>
-              {selectedProduct
-                ? selectedProduct.productName?.productName?.productName || 'Selected'
-                : 'Select a Product'}
+              {selectedProduct ? getProductDisplayName(selectedProduct) : 'Select a Product'}
             </Text>
             {invoiceData.companyId && availableProducts.length > 0 && (
               <Icon name="arrow-drop-down" size={24} color="#666" />
@@ -820,13 +940,19 @@ const AddServiceInvoiceScreen = () => {
         </View>
 
         {/* Reference */}
-        <View style={styles.inputGroup}>
+        <View
+          style={styles.inputGroup}
+          onLayout={(e) => {
+            referenceSectionY.current = e.nativeEvent.layout.y;
+          }}
+        >
           <Text style={styles.label}>Reference</Text>
           <TextInput
             style={styles.input}
             value={invoiceData.reference}
             onChangeText={(text) => setInvoiceData({ ...invoiceData, reference: text })}
             placeholder="Reference"
+            onFocus={scrollToReference}
           />
         </View>
 
@@ -860,7 +986,12 @@ const AddServiceInvoiceScreen = () => {
         </View>
 
         {/* Description */}
-        <View style={styles.inputGroup}>
+        <View
+          style={styles.inputGroup}
+          onLayout={(e) => {
+            descriptionSectionY.current = e.nativeEvent.layout.y;
+          }}
+        >
           <Text style={styles.label}>Description</Text>
           <TextInput
             style={[styles.input, styles.textArea]}
@@ -869,6 +1000,7 @@ const AddServiceInvoiceScreen = () => {
             placeholder="Description"
             multiline
             numberOfLines={3}
+            onFocus={scrollToDescription}
           />
         </View>
 
@@ -893,7 +1025,7 @@ const AddServiceInvoiceScreen = () => {
             <View style={styles.tableHeader}>
               <Text style={styles.tableHeaderText}>S.No</Text>
               <Text style={styles.tableHeaderText}>Product Name</Text>
-              <Text style={styles.tableHeaderText}>SKU</Text>
+              {/* <Text style={styles.tableHeaderText}>SKU</Text> */}
               <Text style={styles.tableHeaderText}>HSN</Text>
               <Text style={styles.tableHeaderText}>Qty</Text>
               <Text style={styles.tableHeaderText}>Rate</Text>
@@ -904,9 +1036,9 @@ const AddServiceInvoiceScreen = () => {
               <View key={product.id} style={styles.tableRow}>
                 <Text style={styles.tableCell}>{index + 1}</Text>
                 <Text style={[styles.tableCell, styles.productNameCell]}>
-                  {product.productName}
+                  {typeof product.productName === 'string' ? product.productName : getProductDisplayName({ productName: product.productName })}
                 </Text>
-                <Text style={styles.tableCell}>{product.sku}</Text>
+                {/* <Text style={styles.tableCell}>{product.sku}</Text> */}
                 <Text style={styles.tableCell}>{product.hsn}</Text>
                 <Text style={styles.tableCell}>{product.quantity}</Text>
                 <Text style={styles.tableCell}>₹{product.rate.toFixed(2)}</Text>
@@ -974,6 +1106,7 @@ const AddServiceInvoiceScreen = () => {
             <FlatList
               data={companies}
               keyExtractor={(item) => item._id}
+              ListEmptyComponent={<Text style={styles.emptyListText}>No companies found</Text>}
               renderItem={({ item }) => (
                 <TouchableOpacity
                   style={styles.modalItem}
@@ -1014,6 +1147,7 @@ const AddServiceInvoiceScreen = () => {
             <FlatList
               data={availableProducts}
               keyExtractor={(item) => item._id}
+              ListEmptyComponent={<Text style={styles.emptyListText}>No products found for this company</Text>}
               renderItem={({ item }) => (
                 <TouchableOpacity
                   style={styles.modalItem}
@@ -1023,7 +1157,7 @@ const AddServiceInvoiceScreen = () => {
                   }}
                 >
                   <Text style={styles.modalItemText}>
-                    {item.productName?.productName?.productName || 'N/A'}
+                    {getProductDisplayName(item)}
                   </Text>
                 </TouchableOpacity>
               )}
@@ -1125,7 +1259,8 @@ const AddServiceInvoiceScreen = () => {
           </View>
         </TouchableOpacity>
       </Modal>
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
@@ -1133,6 +1268,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 40,
   },
   loadingContainer: {
     flex: 1,
@@ -1377,6 +1516,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#007AFF',
     fontWeight: '600',
+  },
+  emptyListText: {
+    fontSize: 15,
+    color: '#666',
+    textAlign: 'center',
+    paddingVertical: 24,
+    paddingHorizontal: 16,
   },
 });
 

@@ -34,6 +34,10 @@ const ServiceInvoiceListScreen = () => {
   const [invoiceCount, setInvoiceCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [serviceTitleFilter, setServiceTitleFilter] = useState('');
+  const [employeeFilter, setEmployeeFilter] = useState('');
+  const [companyFilter, setCompanyFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [expandedInvoices, setExpandedInvoices] = useState<Set<string>>(new Set());
@@ -62,6 +66,42 @@ const ServiceInvoiceListScreen = () => {
   const [modeOfPaymentPickerVisible, setModeOfPaymentPickerVisible] = useState(false);
   const [amountTypePickerVisible, setAmountTypePickerVisible] = useState(false);
   const [pendingInvoicePickerVisible, setPendingInvoicePickerVisible] = useState(false);
+  const [filterServiceTitleVisible, setFilterServiceTitleVisible] = useState(false);
+  const [filterEmployeeVisible, setFilterEmployeeVisible] = useState(false);
+  const [filterCompanyVisible, setFilterCompanyVisible] = useState(false);
+  const [filterStatusVisible, setFilterStatusVisible] = useState(false);
+
+  const serviceTitles = React.useMemo(() => {
+    const titles = (invoices || [])
+      .map((inv) =>
+        typeof inv.serviceId === 'object' && inv.serviceId?.serviceTitle
+          ? inv.serviceId.serviceTitle
+          : null
+      )
+      .filter(Boolean) as string[];
+    return [...new Set(titles)].sort();
+  }, [invoices]);
+
+  const employeeNames = React.useMemo(() => {
+    const names = (invoices || [])
+      .map((inv) => inv.assignedTo?.name)
+      .filter(Boolean) as string[];
+    return [...new Set(names)].sort();
+  }, [invoices]);
+
+  const companyNames = React.useMemo(() => {
+    const names = (invoices || [])
+      .map((inv) => inv.companyId?.companyName)
+      .filter(Boolean) as string[];
+    return [...new Set(names)].sort();
+  }, [invoices]);
+
+  const statuses = React.useMemo(() => {
+    const sts = (invoices || [])
+      .map((inv) => inv.status)
+      .filter(Boolean) as string[];
+    return [...new Set(sts)].sort();
+  }, [invoices]);
 
   useEffect(() => {
     fetchInvoices();
@@ -69,9 +109,8 @@ const ServiceInvoiceListScreen = () => {
   }, [invoiceType, token]);
 
   useEffect(() => {
-    filterInvoices();
-    setPage(0); // Reset to first page when search term changes
-  }, [searchTerm]);
+    setPage(0);
+  }, [searchTerm, serviceTitleFilter, employeeFilter, companyFilter, statusFilter]);
 
   const fetchInvoices = async () => {
     try {
@@ -134,10 +173,6 @@ const ServiceInvoiceListScreen = () => {
     } catch (error) {
       console.error('Error fetching invoice count:', error);
     }
-  };
-
-  const filterInvoices = () => {
-    // Filtering is handled in renderInvoice
   };
 
   const toggleExpand = (invoiceId: string) => {
@@ -231,15 +266,13 @@ const ServiceInvoiceListScreen = () => {
       );
 
       if (uploadRes.data?.fileUrl) {
-        // Get old invoice links
-        const oldInvoiceLink = invoice.invoiceLink || [];
-        
-        // Update invoice with new link and set status to InvoiceSent
+        const oldSignedLinks = invoice.signedInvoiceLink || [];
+
+        // Update invoice with new signed link (separate from invoiceLink)
         const serviceRes = await axios.put(
           `${getApiBaseUrl()}/service-invoice/update/${invoice._id}`,
           {
-            invoiceLink: [...oldInvoiceLink, uploadRes.data.fileUrl],
-            status: 'InvoiceSent',
+            signedInvoiceLink: [...oldSignedLinks, uploadRes.data.fileUrl],
           },
           {
             headers: {
@@ -252,7 +285,7 @@ const ServiceInvoiceListScreen = () => {
           Toast.show({
             type: 'success',
             text1: 'Success',
-            text2: 'Signed invoice uploaded successfully!',
+                text2: 'Signed copy uploaded successfully!',
           });
           // Refresh the invoice list
           fetchInvoices();
@@ -527,11 +560,21 @@ const ServiceInvoiceListScreen = () => {
       await axios.post('https://n8n.nicknameinfo.net/webhook/f8d3ad37-a38e-4a38-a06e-09c74fdc3b91', {
         invoiceId: invoice._id,
       });
+      try {
+        await axios.put(
+          `${getApiBaseUrl()}/service-invoice/update/${invoice._id}`,
+          { invoiceSendStatus: 'Sent', invoiceSentAt: new Date().toISOString() },
+          { headers: { Authorization: token || '' } }
+        );
+      } catch {
+        // ignore: webhook already triggered
+      }
       Toast.show({
         type: 'success',
         text1: 'Success',
         text2: 'Invoice sent successfully!',
       });
+      fetchInvoices();
     } catch (error: any) {
       Toast.show({
         type: 'error',
@@ -557,8 +600,33 @@ const ServiceInvoiceListScreen = () => {
     }
   };
 
+  const hasPaymentDetails = (inv: any) => {
+    return (
+      (Number(inv?.paymentAmount) || 0) > 0 ||
+      !!inv?.paymentAmountType ||
+      (Number(inv?.pendingAmount) || 0) > 0 ||
+      (Number(inv?.tdsAmount) || 0) > 0 ||
+      !!inv?.bankName ||
+      !!inv?.transactionDetails ||
+      !!inv?.chequeDate ||
+      !!inv?.transferDate ||
+      !!inv?.companyNamePayment ||
+      !!inv?.otherPaymentMode
+    );
+  };
+
   const filteredInvoices = invoices.filter((invoice) => {
+    const invServiceTitle =
+      typeof invoice.serviceId === 'object' && invoice.serviceId?.serviceTitle
+        ? invoice.serviceId.serviceTitle
+        : null;
+    if (serviceTitleFilter && invServiceTitle !== serviceTitleFilter) return false;
+    if (employeeFilter && invoice.assignedTo?.name !== employeeFilter) return false;
+    if (companyFilter && invoice.companyId?.companyName !== companyFilter) return false;
+    if (statusFilter && invoice.status !== statusFilter) return false;
+
     const lowerCaseSearchTerm = searchTerm.toLowerCase();
+    if (!lowerCaseSearchTerm) return true;
     return (
       invoice?.invoiceNumber?.toLowerCase()?.includes(lowerCaseSearchTerm) ||
       invoice.companyId?.companyName?.toLowerCase().includes(lowerCaseSearchTerm) ||
@@ -567,11 +635,6 @@ const ServiceInvoiceListScreen = () => {
       new Date(invoice.invoiceDate).toLocaleDateString().toLowerCase().includes(lowerCaseSearchTerm)
     );
   });
-
-  // Reset page to 0 when search term changes
-  useEffect(() => {
-    setPage(0);
-  }, [searchTerm]);
 
   // Pagination handlers
   const handleChangePage = (newPage: number) => {
@@ -647,12 +710,39 @@ const ServiceInvoiceListScreen = () => {
               </Text>
             </View>
           )}
-          {item.invoiceLink?.length === 0 && (
-            <View style={styles.warningBadge}>
-              <Icon name="warning" size={16} color="#FF3B30" />
-              <Text style={styles.warningText}>Invoice Upload Pending</Text>
+          {/* 3 flow statuses (Send / Payment Details / Signed Copy) */}
+          <View style={styles.statusRow}>
+            <View
+              style={[
+                styles.flowChip,
+                (item.invoiceSendStatus === 'Sent' || item.invoiceSentAt) ? styles.flowGreen : styles.flowRed,
+              ]}
+            >
+              <Text style={styles.flowChipText}>
+                {(item.invoiceSendStatus === 'Sent' || item.invoiceSentAt) ? 'Invoice Sent' : 'Invoice Not Sent'}
+              </Text>
             </View>
-          )}
+            <View
+              style={[
+                styles.flowChip,
+                hasPaymentDetails(item) ? styles.flowGreen : styles.flowRed,
+              ]}
+            >
+              <Text style={styles.flowChipText}>
+                {hasPaymentDetails(item) ? 'Payment Details Updated' : 'Payment Details Not Updated'}
+              </Text>
+            </View>
+            <View
+              style={[
+                styles.flowChip,
+                (item.signedInvoiceLink && item.signedInvoiceLink.length > 0) ? styles.flowGreen : styles.flowRed,
+              ]}
+            >
+              <Text style={styles.flowChipText}>
+                {(item.signedInvoiceLink && item.signedInvoiceLink.length > 0) ? 'Signed Copy Uploaded' : 'Signed Copy Not Uploaded'}
+              </Text>
+            </View>
+          </View>
         </View>
 
         {/* Action Buttons */}
@@ -763,13 +853,19 @@ const ServiceInvoiceListScreen = () => {
                   <View key={index} style={styles.productRow}>
                     <View style={styles.productInfo}>
                       <Text style={styles.productName}>
-                        {product.productId?.productName?.productName?.productName ||
-                          product.productName ||
-                          'N/A'}
+                        {(() => {
+                          const p = product.productId;
+                          const nameFromMaterial = p?.productName?.name;
+                          const nameAsString = typeof p?.productName === 'string' ? p.productName : null;
+                          const lineItemName = typeof product.productName === 'string'
+                            ? product.productName
+                            : product.productName?.name;
+                          return nameFromMaterial || nameAsString || lineItemName || 'N/A';
+                        })()}
                       </Text>
                       <Text style={styles.productDetails}>
-                        SKU: {product.productId?.sku || product.sku || 'N/A'} | HSN:{' '}
-                        {product.productId?.hsn || product.hsn || 'N/A'}
+                        {/* SKU: {product.productId?.sku || product.sku || 'N/A'} | HSN:{' '} */}
+                        HSN: {product.productId?.hsn || product.hsn || 'N/A'}
                       </Text>
                     </View>
                     <View style={styles.productAmounts}>
@@ -806,6 +902,61 @@ const ServiceInvoiceListScreen = () => {
           value={searchTerm}
           onChangeText={setSearchTerm}
         />
+      </View>
+
+      {/* Filters */}
+      <View style={styles.filterSection}>
+        <Text style={styles.filterSectionLabel}>Filters</Text>
+        <View style={styles.filterRow}>
+          <TouchableOpacity
+            style={[styles.filterChip, serviceTitleFilter ? styles.filterChipActive : null]}
+            onPress={() => setFilterServiceTitleVisible(true)}
+          >
+            <View style={styles.filterChipContent}>
+              <Text style={styles.filterChipLabel}>Service Title</Text>
+              <Text style={styles.filterChipValue} numberOfLines={1}>
+                {serviceTitleFilter || 'All'}
+              </Text>
+            </View>
+            <Icon name="arrow-drop-down" size={20} color="#666" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.filterChip, employeeFilter ? styles.filterChipActive : null]}
+            onPress={() => setFilterEmployeeVisible(true)}
+          >
+            <View style={styles.filterChipContent}>
+              <Text style={styles.filterChipLabel}>Employee</Text>
+              <Text style={styles.filterChipValue} numberOfLines={1}>
+                {employeeFilter || 'All'}
+              </Text>
+            </View>
+            <Icon name="arrow-drop-down" size={20} color="#666" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.filterChip, companyFilter ? styles.filterChipActive : null]}
+            onPress={() => setFilterCompanyVisible(true)}
+          >
+            <View style={styles.filterChipContent}>
+              <Text style={styles.filterChipLabel}>Company</Text>
+              <Text style={styles.filterChipValue} numberOfLines={1}>
+                {companyFilter || 'All'}
+              </Text>
+            </View>
+            <Icon name="arrow-drop-down" size={20} color="#666" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.filterChip, statusFilter ? styles.filterChipActive : null]}
+            onPress={() => setFilterStatusVisible(true)}
+          >
+            <View style={styles.filterChipContent}>
+              <Text style={styles.filterChipLabel}>Status</Text>
+              <Text style={styles.filterChipValue} numberOfLines={1}>
+                {statusFilter || 'All'}
+              </Text>
+            </View>
+            <Icon name="arrow-drop-down" size={20} color="#666" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {loading ? (
@@ -1240,6 +1391,162 @@ const ServiceInvoiceListScreen = () => {
           </View>
         </TouchableOpacity>
       </Modal>
+
+      {/* Filter: Service Title */}
+      <Modal
+        visible={filterServiceTitleVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setFilterServiceTitleVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setFilterServiceTitleVisible(false)}
+        >
+          <View style={styles.pickerModalContent}>
+            <Text style={styles.pickerModalTitle}>Service Title</Text>
+            <FlatList
+              data={[{ value: '', label: 'All' }, ...serviceTitles.map((t) => ({ value: t, label: t }))]}
+              keyExtractor={(item) => item.value || 'all'}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.pickerOption}
+                  onPress={() => {
+                    setServiceTitleFilter(item.value);
+                    setFilterServiceTitleVisible(false);
+                  }}
+                >
+                  <Text style={styles.pickerOptionText}>{item.label}</Text>
+                </TouchableOpacity>
+              )}
+            />
+            <TouchableOpacity
+              style={[styles.modalButton, styles.modalCancelButton]}
+              onPress={() => setFilterServiceTitleVisible(false)}
+            >
+              <Text style={styles.modalCancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Filter: Employee */}
+      <Modal
+        visible={filterEmployeeVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setFilterEmployeeVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setFilterEmployeeVisible(false)}
+        >
+          <View style={styles.pickerModalContent}>
+            <Text style={styles.pickerModalTitle}>Employee</Text>
+            <FlatList
+              data={[{ value: '', label: 'All' }, ...employeeNames.map((n) => ({ value: n, label: n }))]}
+              keyExtractor={(item) => item.value || 'all'}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.pickerOption}
+                  onPress={() => {
+                    setEmployeeFilter(item.value);
+                    setFilterEmployeeVisible(false);
+                  }}
+                >
+                  <Text style={styles.pickerOptionText}>{item.label}</Text>
+                </TouchableOpacity>
+              )}
+            />
+            <TouchableOpacity
+              style={[styles.modalButton, styles.modalCancelButton]}
+              onPress={() => setFilterEmployeeVisible(false)}
+            >
+              <Text style={styles.modalCancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Filter: Company */}
+      <Modal
+        visible={filterCompanyVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setFilterCompanyVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setFilterCompanyVisible(false)}
+        >
+          <View style={styles.pickerModalContent}>
+            <Text style={styles.pickerModalTitle}>Company</Text>
+            <FlatList
+              data={[{ value: '', label: 'All' }, ...companyNames.map((c) => ({ value: c, label: c }))]}
+              keyExtractor={(item) => item.value || 'all'}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.pickerOption}
+                  onPress={() => {
+                    setCompanyFilter(item.value);
+                    setFilterCompanyVisible(false);
+                  }}
+                >
+                  <Text style={styles.pickerOptionText}>{item.label}</Text>
+                </TouchableOpacity>
+              )}
+            />
+            <TouchableOpacity
+              style={[styles.modalButton, styles.modalCancelButton]}
+              onPress={() => setFilterCompanyVisible(false)}
+            >
+              <Text style={styles.modalCancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Filter: Status */}
+      <Modal
+        visible={filterStatusVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setFilterStatusVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setFilterStatusVisible(false)}
+        >
+          <View style={styles.pickerModalContent}>
+            <Text style={styles.pickerModalTitle}>Status</Text>
+            <FlatList
+              data={[{ value: '', label: 'All' }, ...statuses.map((s) => ({ value: s, label: s }))]}
+              keyExtractor={(item) => item.value || 'all'}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.pickerOption}
+                  onPress={() => {
+                    setStatusFilter(item.value);
+                    setFilterStatusVisible(false);
+                  }}
+                >
+                  <Text style={styles.pickerOptionText}>{item.label}</Text>
+                </TouchableOpacity>
+              )}
+            />
+            <TouchableOpacity
+              style={[styles.modalButton, styles.modalCancelButton]}
+              onPress={() => setFilterStatusVisible(false)}
+            >
+              <Text style={styles.modalCancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 };
@@ -1331,6 +1638,58 @@ const styles = StyleSheet.create({
     height: 40,
     fontSize: 16,
   },
+  filterSection: {
+    paddingHorizontal: 15,
+    marginBottom: 12,
+  },
+  filterSectionLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  filterRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  filterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    minWidth: '47%',
+    flex: 1,
+    maxWidth: '48%',
+  },
+  filterChipContent: {
+    flex: 1,
+    minWidth: 0,
+  },
+  filterChipLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#666',
+    marginBottom: 2,
+    textTransform: 'uppercase',
+  },
+  filterChipValue: {
+    fontSize: 14,
+    color: '#333',
+  },
+  filterChipActive: {
+    borderColor: '#019ee3',
+    backgroundColor: '#e6f7ff',
+  },
+  filterChipText: {
+    fontSize: 13,
+    color: '#333',
+    flex: 1,
+  },
   loader: {
     marginTop: 50,
   },
@@ -1399,6 +1758,27 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#FF3B30',
     marginLeft: 5,
+  },
+  statusRow: {
+    marginTop: 8,
+    gap: 8,
+  },
+  flowChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 18,
+    alignSelf: 'flex-start',
+  },
+  flowGreen: {
+    backgroundColor: '#2e7d32',
+  },
+  flowRed: {
+    backgroundColor: '#c62828',
+  },
+  flowChipText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
   },
   invoiceDetails: {
     padding: 15,

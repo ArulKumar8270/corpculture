@@ -9,6 +9,7 @@ import StarIcon from '@mui/icons-material/Star'; // Import an icon for Rewards
 const UserMenu = ({ toggleMenu }) => {
     const { auth, setAuth, LogOut } = useAuth();
     const navigate = useNavigate();
+    const isEmployee = Number(auth?.user?.role) === 3;
     const handleLogout = () => {
         navigate("/");
         LogOut();
@@ -71,7 +72,7 @@ const UserMenu = ({ toggleMenu }) => {
                                 Profile Information
                             </div>
                         </NavLink>
-
+                       
                         {/* <NavLink
                             to="./address"
                             onClick={scrollToTop}
@@ -140,20 +141,6 @@ const UserMenu = ({ toggleMenu }) => {
                         >
                             <div className="h-10 px-8 flex items-center">
                                 My Wishlist
-                            </div>
-                        </NavLink>
-                        <NavLink
-                            to="/user/dashboard/payslips"
-                            onClick={scrollToTop}
-                            className={({ isActive }) =>
-                                `rounded-lg mx-2 my-1 transition-all ${isActive
-                                    ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
-                                    : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
-                                }`
-                            }
-                        >
-                            <div className="h-10 px-8 flex items-center">
-                                My Payslips
                             </div>
                         </NavLink>
 

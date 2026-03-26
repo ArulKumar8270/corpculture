@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigation } from '@react-navigation/native';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import { createStackNavigator } from '@react-navigation/stack';
 import CustomDrawerContent from '../components/CustomDrawerContent';
@@ -99,7 +100,9 @@ import EmployeeLeaveFormScreen from '../screens/Admin/EmployeeLeaveFormScreen';
 import CreditManagementScreen from '../screens/Admin/CreditManagementScreen';
 
 // Placeholder screens for missing ones
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+// @ts-ignore - @expo/vector-icons is available via expo dependency
+import { MaterialIcons as Icon } from '@expo/vector-icons';
 
 const PlaceholderScreen = ({ title }: { title: string }) => (
   <View style={styles.placeholder}>
@@ -114,7 +117,7 @@ const Stack = createStackNavigator();
 // Product Stack
 const ProductStack = () => (
   <Stack.Navigator
-    screenOptions={{
+    screenOptions={({ navigation }) => ({
       headerShown: true,
       headerStyle: {
         backgroundColor: '#fff',
@@ -125,7 +128,8 @@ const ProductStack = () => (
       headerLeftContainerStyle: {
         paddingLeft: 10,
       },
-    }}
+      ...stackBackToDashboardOptions({ navigation }),
+    })}
   >
     <Stack.Screen name="ProductList" component={ProductManagementScreen} options={{ headerShown: false }} />
     <Stack.Screen name="ProductCreate" component={ProductCreateScreen} options={{ title: 'Create/Edit Product' }} />
@@ -136,7 +140,7 @@ const ProductStack = () => (
 // Order Stack
 const OrderStack = () => (
   <Stack.Navigator
-    screenOptions={{
+    screenOptions={({ navigation }) => ({
       headerShown: true,
       headerStyle: {
         backgroundColor: '#fff',
@@ -147,7 +151,8 @@ const OrderStack = () => (
       headerLeftContainerStyle: {
         paddingLeft: 10,
       },
-    }}
+      ...stackBackToDashboardOptions({ navigation }),
+    })}
   >
     <Stack.Screen name="OrderList" component={OrderManagementScreen} options={{ headerShown: false }} />
     <Stack.Screen name="OrderUpdate" component={OrderUpdateScreen} options={{ title: 'Update Order' }} />
@@ -158,7 +163,7 @@ const OrderStack = () => (
 const ServiceStack = () => (
   <Stack.Navigator
     initialRouteName="ServiceMain"
-    screenOptions={{
+    screenOptions={({ navigation }) => ({
       headerShown: true,
       headerStyle: {
         backgroundColor: '#fff',
@@ -169,7 +174,8 @@ const ServiceStack = () => (
       headerLeftContainerStyle: {
         paddingLeft: 10,
       },
-    }}
+      ...stackBackToDashboardOptions({ navigation }),
+    })}
   >
     <Stack.Screen name="ServiceMain" component={ServiceMonitoringScreen} options={{ headerShown: false }} />
     <Stack.Screen name="ServiceEnquiries" component={ServiceEnquiriesScreen} options={{ title: 'Service Enquiries', headerShown: true }} />
@@ -188,7 +194,7 @@ const ServiceStack = () => (
 // Rental Stack
 const RentalStack = () => (
   <Stack.Navigator
-    screenOptions={{
+    screenOptions={({ navigation }) => ({
       headerShown: true,
       headerStyle: {
         backgroundColor: '#fff',
@@ -199,7 +205,8 @@ const RentalStack = () => (
       headerLeftContainerStyle: {
         paddingLeft: 10,
       },
-    }}
+      ...stackBackToDashboardOptions({ navigation }),
+    })}
   >
     <Stack.Screen name="RentalMain" component={RentalManagementScreen} options={{ headerShown: false }} />
     <Stack.Screen name="RentalProductList" component={RentalProductListScreen} options={{ title: 'Rental Products' }} />
@@ -217,7 +224,7 @@ const RentalStack = () => (
 // Vendor Stack
 const VendorStack = () => (
   <Stack.Navigator
-    screenOptions={{
+    screenOptions={({ navigation }) => ({
       headerShown: true,
       headerStyle: {
         backgroundColor: '#fff',
@@ -228,7 +235,8 @@ const VendorStack = () => (
       headerLeftContainerStyle: {
         paddingLeft: 10,
       },
-    }}
+      ...stackBackToDashboardOptions({ navigation }),
+    })}
   >
     <Stack.Screen name="VendorList" component={VendorListScreen} options={{ headerShown: false }} />
     <Stack.Screen name="VendorCreate" component={VendorCreateScreen} options={{ title: 'Create/Edit Vendor' }} />
@@ -240,7 +248,7 @@ const VendorStack = () => (
 // Purchase Stack
 const PurchaseStack = () => (
   <Stack.Navigator
-    screenOptions={{
+    screenOptions={({ navigation }) => ({
       headerShown: true,
       headerStyle: {
         backgroundColor: '#fff',
@@ -251,7 +259,8 @@ const PurchaseStack = () => (
       headerLeftContainerStyle: {
         paddingLeft: 10,
       },
-    }}
+      ...stackBackToDashboardOptions({ navigation }),
+    })}
   >
     <Stack.Screen name="PurchaseList" component={PurchaseListScreen} options={{ headerShown: false }} />
     <Stack.Screen name="PurchaseRegister" component={PurchaseRegisterScreen} options={{ title: 'Register Purchase' }} />
@@ -261,7 +270,7 @@ const PurchaseStack = () => (
 // Settings Stack
 const SettingsStack = () => (
   <Stack.Navigator
-    screenOptions={{
+    screenOptions={({ navigation }) => ({
       headerShown: true,
       headerStyle: {
         backgroundColor: '#fff',
@@ -272,7 +281,8 @@ const SettingsStack = () => (
       headerLeftContainerStyle: {
         paddingLeft: 10,
       },
-    }}
+      ...stackBackToDashboardOptions({ navigation }),
+    })}
   >
     <Stack.Screen name="SettingsMain" component={SettingsScreen} options={{ headerShown: false }} />
     <Stack.Screen name="GlobalSettings" component={GlobalSettingsScreen} options={{ title: 'Global Settings' }} />
@@ -291,7 +301,7 @@ const SettingsStack = () => (
 // Profile Stack
 const ProfileStack = () => (
   <Stack.Navigator
-    screenOptions={{
+    screenOptions={({ navigation }) => ({
       headerShown: true,
       headerStyle: {
         backgroundColor: '#fff',
@@ -302,7 +312,8 @@ const ProfileStack = () => (
       headerLeftContainerStyle: {
         paddingLeft: 10,
       },
-    }}
+      ...stackBackToDashboardOptions({ navigation }),
+    })}
   >
     <Stack.Screen name="ProfileMain" component={ProfileScreen} options={{ headerShown: false }} />
     <Stack.Screen name="Address" component={AddressScreen} options={{ title: 'Address' }} />
@@ -316,7 +327,7 @@ const ProfileStack = () => (
 // Employee Stack
 const EmployeeStack = () => (
   <Stack.Navigator
-    screenOptions={{
+    screenOptions={({ navigation }) => ({
       headerShown: true,
       headerStyle: {
         backgroundColor: '#fff',
@@ -327,7 +338,8 @@ const EmployeeStack = () => (
       headerLeftContainerStyle: {
         paddingLeft: 10,
       },
-    }}
+      ...stackBackToDashboardOptions({ navigation }),
+    })}
   >
     <Stack.Screen name="EmployeeList" component={EmployeeListScreen} options={{ headerShown: false }} />
     <Stack.Screen name="AddEmployee" component={AddEmployeeScreen} options={{ title: 'Add/Edit Employee' }} />
@@ -340,7 +352,7 @@ const EmployeeStack = () => (
 // Reports Stack
 const ReportsStack = () => (
   <Stack.Navigator
-    screenOptions={{
+    screenOptions={({ navigation }) => ({
       headerShown: true,
       headerStyle: {
         backgroundColor: '#fff',
@@ -351,7 +363,8 @@ const ReportsStack = () => (
       headerLeftContainerStyle: {
         paddingLeft: 10,
       },
-    }}
+      ...stackBackToDashboardOptions({ navigation }),
+    })}
   >
     <Stack.Screen name="ReportsDashboard" component={ReportsDashboardScreen} options={{ title: 'Reports Dashboard' }} />
     <Stack.Screen name="CompanyReports" component={CompanyReportsScreen} options={{ title: 'Company Reports' }} />
@@ -367,12 +380,62 @@ const ReportsStack = () => (
   </Stack.Navigator>
 );
 
+// Go to Dashboard on drawer (jumpTo switches without adding to history)
+function goToDashboard(drawerNav: any) {
+  if (!drawerNav) return;
+  if (typeof (drawerNav as any).jumpTo === 'function') {
+    (drawerNav as any).jumpTo('Dashboard');
+  } else if (typeof drawerNav.navigate === 'function') {
+    drawerNav.navigate('Dashboard');
+  }
+}
+
+// Back from stack screens: get drawer by id then go to Dashboard
+function BackToDashboardButton() {
+  const navigation = useNavigation<any>();
+  return (
+    <TouchableOpacity
+      onPress={() => goToDashboard(navigation.getParent?.('AdminDrawer') ?? navigation.getParent?.())}
+      style={{ paddingLeft: 10, paddingRight: 10, paddingVertical: 8 }}
+      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+    >
+      <Icon name="arrow-back" size={24} color="#333" />
+    </TouchableOpacity>
+  );
+}
+
+// Back from drawer screens: current nav is the drawer
+function DrawerBackToDashboardButton() {
+  const navigation = useNavigation<any>();
+  return (
+    <TouchableOpacity
+      onPress={() => goToDashboard(navigation)}
+      style={{ paddingLeft: 10, paddingRight: 10, paddingVertical: 8 }}
+      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+    >
+      <Icon name="arrow-back" size={24} color="#333" />
+    </TouchableOpacity>
+  );
+}
+
+// Back to Dashboard for drawer screens (direct drawer items)
+const backToDashboardScreenOptions = ({ route }: { navigation: any; route: any }) => ({
+  headerLeft:
+    route.name === 'Dashboard' ? undefined : () => <DrawerBackToDashboardButton />,
+});
+
+// For stacks nested in drawer: back goes to Dashboard
+const stackBackToDashboardOptions = (_opts?: { navigation: any }) => ({
+  headerLeft: () => <BackToDashboardButton />,
+});
+
 const AdminNavigator = () => {
   return (
     <Drawer.Navigator
+      id="AdminDrawer"
       initialRouteName="Dashboard"
       drawerContent={(props) => <CustomDrawerContent {...props} />}
-      screenOptions={{
+      screenOptions={({ navigation, route }) => ({
         drawerType: 'slide',
         drawerStyle: {
           width: 280,
@@ -389,7 +452,8 @@ const AdminNavigator = () => {
         headerLeftContainerStyle: {
           paddingLeft: 10,
         },
-      }}
+        ...backToDashboardScreenOptions({ navigation, route }),
+      })}
     >
       {/* Main Dashboard - Always accessible */}
       <Drawer.Screen 
@@ -530,7 +594,7 @@ const AdminNavigator = () => {
       />
       <Drawer.Screen 
         name="ServicePartners" 
-        component={() => <PlaceholderScreen title="Service Partners" />}
+        component={CommissionScreen}
         options={{ headerShown: true }}
       />
       
@@ -567,12 +631,12 @@ const AdminNavigator = () => {
       />
       <Drawer.Screen 
         name="RentalReports" 
-        component={() => <PlaceholderScreen title="Rental Reports" />}
+        component={RentalReportsScreen}
         options={{ headerShown: true }}
       />
       <Drawer.Screen 
         name="RentalPartners" 
-        component={() => <PlaceholderScreen title="Rental Partners" />}
+        component={CommissionScreen}
         options={{ headerShown: true }}
       />
       {/* Settings Sub-screens */}
@@ -588,7 +652,7 @@ const AdminNavigator = () => {
       />
       <Drawer.Screen 
         name="CreditSettings" 
-        component={() => <PlaceholderScreen title="Credit Settings" />}
+        component={CreditManagementScreen}
         options={{ headerShown: true }}
       />
       <Drawer.Screen 

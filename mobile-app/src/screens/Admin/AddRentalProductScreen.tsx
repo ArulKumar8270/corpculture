@@ -10,6 +10,8 @@ import {
   Modal,
   FlatList,
   Switch,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 // @ts-ignore - @expo/vector-icons is available via expo dependency
@@ -56,6 +58,8 @@ const AddRentalProductScreen = () => {
   const [companyPickerVisible, setCompanyPickerVisible] = useState(false);
   const [gstPickerVisible, setGstPickerVisible] = useState(false);
   const [paymentDatePickerVisible, setPaymentDatePickerVisible] = useState(false);
+  const [openingDatePickerVisible, setOpeningDatePickerVisible] = useState(false);
+  const [closingDatePickerVisible, setClosingDatePickerVisible] = useState(false);
   const [companySearch, setCompanySearch] = useState('');
   const [companyPage, setCompanyPage] = useState(1);
   const [companyTotalCount, setCompanyTotalCount] = useState(0);
@@ -72,6 +76,8 @@ const AddRentalProductScreen = () => {
     basePrice: '',
     commission: '',
     paymentDate: '',
+    openingDate: '',
+    closingDate: '',
     gstTypeIds: [] as string[],
   });
 
@@ -179,6 +185,8 @@ const AddRentalProductScreen = () => {
       basePrice: '',
       commission: '',
       paymentDate: '',
+      openingDate: '',
+      closingDate: '',
       gstTypeIds: [],
     });
     setModelSpecs({
@@ -318,6 +326,12 @@ const AddRentalProductScreen = () => {
           paymentDate: product.paymentDate
             ? new Date(product.paymentDate).toISOString().split('T')[0]
             : '',
+          openingDate: product.openingDate
+            ? new Date(product.openingDate).toISOString().split('T')[0]
+            : '',
+          closingDate: product.closingDate
+            ? new Date(product.closingDate).toISOString().split('T')[0]
+            : '',
           gstTypeIds: Array.isArray(product.gstType)
             ? product.gstType.map((gst: any) => gst._id)
             : product.gstType?._id
@@ -374,8 +388,7 @@ const AddRentalProductScreen = () => {
       !formData.hsn ||
       !formData.basePrice ||
       formData.gstTypeIds.length === 0 ||
-      !formData.paymentDate ||
-      !formData.commission
+      !formData.paymentDate
     ) {
       Toast.show({
         type: 'error',
@@ -397,7 +410,9 @@ const AddRentalProductScreen = () => {
         basePrice: parseFloat(formData.basePrice),
         gstType: formData.gstTypeIds,
         paymentDate: formData.paymentDate ? new Date(formData.paymentDate).toISOString() : null,
-        commission: parseFloat(formData.commission),
+        openingDate: formData.openingDate ? new Date(formData.openingDate).toISOString() : null,
+        closingDate: formData.closingDate ? new Date(formData.closingDate).toISOString() : null,
+        commission: formData.commission ? parseFloat(formData.commission) : 0,
         modelSpecs,
         a3Config: modelSpecs.isA3Selected ? a3Config : {},
         a4Config: modelSpecs.isA4Selected ? a4Config : {},
@@ -605,7 +620,8 @@ const AddRentalProductScreen = () => {
   };
 
   return (
-    <ScrollView style={styles.container}>
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
+      <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
         <Text style={styles.title}>
           {isEditMode ? 'Edit Rental Product' : 'Add Rental Product'}
@@ -730,9 +746,37 @@ const AddRentalProductScreen = () => {
           </TouchableOpacity>
         </View>
 
+        {/* Opening Date */}
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Opening Date</Text>
+          <TouchableOpacity
+            style={styles.pickerButton}
+            onPress={() => setOpeningDatePickerVisible(true)}
+          >
+            <Text style={styles.pickerButtonText}>
+              {formData.openingDate || '--select Opening Date--'}
+            </Text>
+            <Icon name="calendar-today" size={24} color="#666" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Closing Date */}
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Closing Date</Text>
+          <TouchableOpacity
+            style={styles.pickerButton}
+            onPress={() => setClosingDatePickerVisible(true)}
+          >
+            <Text style={styles.pickerButtonText}>
+              {formData.closingDate || '--select Closing Date--'}
+            </Text>
+            <Icon name="calendar-today" size={24} color="#666" />
+          </TouchableOpacity>
+        </View>
+
         {/* Commission */}
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Commission *</Text>
+          <Text style={styles.label}>Commission</Text>
           <TextInput
             style={styles.input}
             value={formData.commission}
@@ -954,7 +998,76 @@ const AddRentalProductScreen = () => {
           </View>
         </TouchableOpacity>
       </Modal>
-    </ScrollView>
+
+      {/* Opening Date Picker Modal */}
+      <Modal
+        visible={openingDatePickerVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setOpeningDatePickerVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setOpeningDatePickerVisible(false)}
+        >
+          <View style={styles.pickerModalContent}>
+            <Text style={styles.pickerModalTitle}>Select Opening Date</Text>
+            <View style={styles.dateInputContainer}>
+              <TextInput
+                style={styles.dateInput}
+                value={formData.openingDate}
+                onChangeText={(text) => setFormData({ ...formData, openingDate: text })}
+                placeholder="YYYY-MM-DD"
+                keyboardType="numeric"
+              />
+              <Text style={styles.dateHint}>Format: YYYY-MM-DD</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.modalButton}
+              onPress={() => setOpeningDatePickerVisible(false)}
+            >
+              <Text style={styles.modalButtonText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Closing Date Picker Modal */}
+      <Modal
+        visible={closingDatePickerVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setClosingDatePickerVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setClosingDatePickerVisible(false)}
+        >
+          <View style={styles.pickerModalContent}>
+            <Text style={styles.pickerModalTitle}>Select Closing Date</Text>
+            <View style={styles.dateInputContainer}>
+              <TextInput
+                style={styles.dateInput}
+                value={formData.closingDate}
+                onChangeText={(text) => setFormData({ ...formData, closingDate: text })}
+                placeholder="YYYY-MM-DD"
+                keyboardType="numeric"
+              />
+              <Text style={styles.dateHint}>Format: YYYY-MM-DD</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.modalButton}
+              onPress={() => setClosingDatePickerVisible(false)}
+            >
+              <Text style={styles.modalButtonText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
@@ -962,6 +1075,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 40,
   },
   header: {
     padding: 15,

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,9 @@ import {
   Alert,
   Modal,
   FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  Keyboard,
 } from 'react-native';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 // @ts-ignore - @expo/vector-icons is available via expo dependency
@@ -48,6 +51,12 @@ const PurchaseRegisterScreen = () => {
   const [productPickerVisible, setProductPickerVisible] = useState(false);
   const [voucherTypePickerVisible, setVoucherTypePickerVisible] = useState(false);
   const [datePickerVisible, setDatePickerVisible] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  const scrollViewRef = useRef<ScrollView>(null);
+  const formSectionY = useRef(0);
+  const quantitySectionY = useRef(0);
+  const rateSectionY = useRef(0);
 
   useFocusEffect(
     useCallback(() => {
@@ -307,6 +316,34 @@ const PurchaseRegisterScreen = () => {
     }
   };
 
+  useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => setKeyboardHeight(e.endCoordinates.height)
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setKeyboardHeight(0)
+    );
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
+  const scrollToQuantity = () => {
+    setTimeout(() => {
+      const y = formSectionY.current + quantitySectionY.current - 120;
+      scrollViewRef.current?.scrollTo({ y: Math.max(0, y), animated: true });
+    }, 100);
+  };
+  const scrollToRate = () => {
+    setTimeout(() => {
+      const y = formSectionY.current + rateSectionY.current - 120;
+      scrollViewRef.current?.scrollTo({ y: Math.max(0, y), animated: true });
+    }, 100);
+  };
+
   const selectedVendor = vendorCompanies.find((v) => v._id === formData.vendorCompanyName);
   const selectedProduct = products.find((p) => p._id === formData.selectedProductId);
 
@@ -319,7 +356,14 @@ const PurchaseRegisterScreen = () => {
   }
 
   return (
-    <ScrollView style={styles.container}>
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}>
+      <ScrollView
+        ref={scrollViewRef}
+        style={styles.container}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 40 + keyboardHeight }]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
       <View style={styles.header}>
         <Text style={styles.headerTitle}>
           {purchaseId ? 'Edit Purchase Entry' : 'Purchase Register'}
@@ -332,7 +376,7 @@ const PurchaseRegisterScreen = () => {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.form}>
+      <View style={styles.form} onLayout={(e) => { formSectionY.current = e.nativeEvent.layout.y; }}>
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Vendor Company Name *</Text>
           <TouchableOpacity
@@ -398,7 +442,7 @@ const PurchaseRegisterScreen = () => {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.inputGroup}>
+        <View style={styles.inputGroup} onLayout={(e) => { quantitySectionY.current = e.nativeEvent.layout.y; }}>
           <Text style={styles.label}>Quantity</Text>
           <View style={styles.inputContainer}>
             <TextInput
@@ -408,12 +452,13 @@ const PurchaseRegisterScreen = () => {
               placeholder="Enter quantity"
               placeholderTextColor="#999"
               keyboardType="numeric"
+              onFocus={scrollToQuantity}
             />
             <Icon name="shopping-cart" size={20} color="#666" style={styles.inputIcon} />
           </View>
         </View>
 
-        <View style={styles.inputGroup}>
+        <View style={styles.inputGroup} onLayout={(e) => { rateSectionY.current = e.nativeEvent.layout.y; }}>
           <Text style={styles.label}>Rate *</Text>
           <View style={styles.inputContainer}>
             <Text style={styles.currencySymbol}>₹</Text>
@@ -424,6 +469,7 @@ const PurchaseRegisterScreen = () => {
               placeholder="Enter rate"
               placeholderTextColor="#999"
               keyboardType="decimal-pad"
+              onFocus={scrollToRate}
             />
           </View>
         </View>
@@ -622,7 +668,8 @@ const PurchaseRegisterScreen = () => {
           </View>
         </TouchableOpacity>
       </Modal>
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
@@ -630,6 +677,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 40,
   },
   centerContainer: {
     flex: 1,

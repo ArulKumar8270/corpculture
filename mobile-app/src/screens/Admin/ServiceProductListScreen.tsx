@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -26,6 +26,9 @@ const ServiceProductListScreen = () => {
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const ROWS_PER_PAGE_OPTIONS = [5, 10, 25, 50, 100];
 
   useEffect(() => {
     loadProducts();
@@ -122,17 +125,30 @@ const ServiceProductListScreen = () => {
     return companyName.includes(lowerCaseSearchTerm) || productName.includes(lowerCaseSearchTerm);
   });
 
+  const paginatedProducts = useMemo(() => {
+    const start = page * rowsPerPage;
+    return filteredProducts.slice(start, start + rowsPerPage);
+  }, [filteredProducts, page, rowsPerPage]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [rowsPerPage]);
+
   const renderProduct = ({ item, index }: { item: any; index: number }) => (
     <View style={styles.productCard}>
       <View style={styles.productInfo}>
-        <Text style={styles.serialNumber}>{index + 1}</Text>
+        <Text style={styles.serialNumber}>{page * rowsPerPage + index + 1}</Text>
         <View style={styles.productDetails}>
           <Text style={styles.companyName}>{item.company?.companyName || 'N/A'}</Text>
           <Text style={styles.productName}>
             {item.productName?.productName?.productName || 'N/A'}
           </Text>
           <View style={styles.productSpecs}>
-            <Text style={styles.specText}>SKU: {item.sku || 'N/A'}</Text>
+            {/* <Text style={styles.specText}>SKU: {item.sku || 'N/A'}</Text> */}
             <Text style={styles.specText}>HSN: {item.hsn || 'N/A'}</Text>
           </View>
           <View style={styles.productSpecs}>
@@ -203,7 +219,7 @@ const ServiceProductListScreen = () => {
         <ActivityIndicator size="large" color="#007AFF" style={styles.loader} />
       ) : (
         <FlatList
-          data={filteredProducts}
+          data={paginatedProducts}
           renderItem={renderProduct}
           keyExtractor={(item) => item._id}
           refreshing={loading}
@@ -212,6 +228,47 @@ const ServiceProductListScreen = () => {
             <View style={styles.emptyContainer}>
               <Icon name="inventory" size={64} color="#ccc" />
               <Text style={styles.emptyText}>No service products found</Text>
+            </View>
+          }
+          ListFooterComponent={
+            <View style={styles.paginationWrapper}>
+              {filteredProducts.length > 0 && (
+                <View style={styles.rowsPerPageRow}>
+                  <Text style={styles.rowsPerPageLabel}>Rows per page:</Text>
+                  <View style={styles.rowsPerPageOptions}>
+                    {ROWS_PER_PAGE_OPTIONS.map((opt) => (
+                      <TouchableOpacity
+                        key={opt}
+                        style={[styles.rowsPerPageBtn, rowsPerPage === opt && styles.rowsPerPageBtnActive]}
+                        onPress={() => setRowsPerPage(opt)}
+                      >
+                        <Text style={[styles.rowsPerPageBtnText, rowsPerPage === opt && styles.rowsPerPageBtnTextActive]}>{opt}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
+              {filteredProducts.length > rowsPerPage ? (
+                <View style={styles.pagination}>
+                  <TouchableOpacity
+                    style={[styles.pageBtn, page === 0 && styles.pageBtnDisabled]}
+                    onPress={() => setPage((p) => Math.max(0, p - 1))}
+                    disabled={page === 0}
+                  >
+                    <Text style={styles.pageBtnText}>Previous</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.pageInfo}>
+                    Page {page + 1} of {Math.max(1, Math.ceil(filteredProducts.length / rowsPerPage))}
+                  </Text>
+                  <TouchableOpacity
+                    style={[styles.pageBtn, page >= Math.ceil(filteredProducts.length / rowsPerPage) - 1 && styles.pageBtnDisabled]}
+                    onPress={() => setPage((p) => p + 1)}
+                    disabled={page >= Math.ceil(filteredProducts.length / rowsPerPage) - 1}
+                  >
+                    <Text style={styles.pageBtnText}>Next</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : null}
             </View>
           }
         />
@@ -369,6 +426,70 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#999',
     marginTop: 10,
+  },
+  paginationWrapper: {
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#eee',
+  },
+  rowsPerPageRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  rowsPerPageLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginRight: 8,
+  },
+  rowsPerPageOptions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  rowsPerPageBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    backgroundColor: '#e0e0e0',
+  },
+  rowsPerPageBtnActive: {
+    backgroundColor: '#019ee3',
+  },
+  rowsPerPageBtnText: {
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '500',
+  },
+  rowsPerPageBtnTextActive: {
+    color: '#fff',
+  },
+  pagination: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+  },
+  pageBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    backgroundColor: '#019ee3',
+    borderRadius: 8,
+    marginHorizontal: 8,
+  },
+  pageBtnDisabled: {
+    backgroundColor: '#ccc',
+    opacity: 0.8,
+  },
+  pageBtnText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  pageInfo: {
+    fontSize: 14,
+    color: '#333',
   },
 });
 

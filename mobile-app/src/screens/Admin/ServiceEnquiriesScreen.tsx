@@ -40,7 +40,8 @@ const ServiceEnquiriesScreen = () => {
   const [serviceTitleFilter, setServiceTitleFilter] = useState('');
   const [serviceTitlePickerVisible, setServiceTitlePickerVisible] = useState(false);
   const [page, setPage] = useState(0);
-  const rowsPerPage = 10;
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const ROWS_PER_PAGE_OPTIONS = [5, 10, 25, 50, 100];
 
   // Base filtered data by service title (for counts and list)
   const baseFiltered = React.useMemo(() => {
@@ -121,18 +122,20 @@ const ServiceEnquiriesScreen = () => {
     setPage(0);
   }, [activeTab, serviceTitleFilter, searchTerm]);
 
+  useEffect(() => {
+    setPage(0);
+  }, [rowsPerPage]);
+
   const fetchAllServices = async () => {
     try {
       setLoading(true);
-      const { data } = await axios.get(
-        `${getApiBaseUrl()}/service/${user?.role === 3 ? `assignedTo/${user?._id}` : 'all'}`,
-        {
-          headers: {
-            Authorization: token || '',
-          },
-        }
-      );
-      console.log('data23452345', data);
+      const baseUrl = `${getApiBaseUrl()}/service/${user?.role === 3 ? `assignedTo/${user?._id}` : 'all'}`;
+      const url = user?.role === 3 ? baseUrl : `${baseUrl}?limit=0`;
+      const { data } = await axios.get(url, {
+        headers: {
+          Authorization: token || '',
+        },
+      });
       if (data?.success) {
         setAllServicesData(data.services || []);
       } else {
@@ -245,24 +248,28 @@ const ServiceEnquiriesScreen = () => {
     const employeeId = service.employeeId; // Get the employee ID from service
 
     switch (action) {
-      case 'invoice':
+      case 'invoice': {
+        const companyId = typeof service?.companyId === 'object' ? service?.companyId?._id : service?.companyId;
         (navigation as any).navigate('AddServiceInvoice', {
           employeeName,
           employeeId, // Pass employee ID for the payload
           invoiceType: 'invoice',
           serviceId: service._id,
-          companyId: service.companyId,
+          companyId: companyId || service?.companyId,
         });
         break;
-      case 'quotation':
+      }
+      case 'quotation': {
+        const companyId = typeof service?.companyId === 'object' ? service?.companyId?._id : service?.companyId;
         (navigation as any).navigate('AddServiceInvoice', {
           employeeName,
           employeeId, // Pass employee ID for the payload
           invoiceType: 'quotation',
           serviceId: service._id,
-          companyId: service.companyId,
+          companyId: companyId || service?.companyId,
         });
         break;
+      }
       case 'report':
         // Ensure companyId is passed correctly - handle both string and object formats
         const companyId = typeof service?.companyId === 'object' ? service?.companyId?._id : service?.companyId;
@@ -310,6 +317,12 @@ const ServiceEnquiriesScreen = () => {
         )}
       </View>
 
+      {/* Service title right below header, above contact details */}
+      <View style={styles.serviceTitleRow}>
+        <Icon name="build" size={16} color="#019ee3" />
+        <Text style={styles.serviceTitleText}>{item.serviceTitle || item.serviceType || 'N/A'}</Text>
+      </View>
+
       <View style={styles.enquiryDetails}>
         <View style={styles.detailRow}>
           <Icon name="phone" size={16} color="#666" />
@@ -322,10 +335,6 @@ const ServiceEnquiriesScreen = () => {
         <View style={styles.detailRow}>
           <Icon name="location-on" size={16} color="#666" />
           <Text style={styles.detailText}>{item.location || 'N/A'}</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Icon name="build" size={16} color="#666" />
-          <Text style={styles.detailText}>{item.serviceTitle || item.serviceType || 'N/A'}</Text>
         </View>
         {item.serviceImage && (
           <TouchableOpacity
@@ -532,30 +541,50 @@ const ServiceEnquiriesScreen = () => {
             </View>
           }
           ListFooterComponent={
-            enquiries.length > rowsPerPage ? (
-              <View style={styles.pagination}>
-                <TouchableOpacity
-                  style={[styles.pageBtn, page === 0 && styles.pageBtnDisabled]}
-                  onPress={() => setPage((p) => Math.max(0, p - 1))}
-                  disabled={page === 0}
-                >
-                  <Text style={styles.pageBtnText}>Previous</Text>
-                </TouchableOpacity>
-                <Text style={styles.pageInfo}>
-                  Page {page + 1} of {Math.ceil(enquiries.length / rowsPerPage)}
-                </Text>
-                <TouchableOpacity
-                  style={[
-                    styles.pageBtn,
-                    page >= Math.ceil(enquiries.length / rowsPerPage) - 1 && styles.pageBtnDisabled,
-                  ]}
-                  onPress={() => setPage((p) => p + 1)}
-                  disabled={page >= Math.ceil(enquiries.length / rowsPerPage) - 1}
-                >
-                  <Text style={styles.pageBtnText}>Next</Text>
-                </TouchableOpacity>
-              </View>
-            ) : null
+            <View style={styles.paginationWrapper}>
+              {enquiries.length > 0 && (
+                <View style={styles.rowsPerPageRow}>
+                  <Text style={styles.rowsPerPageLabel}>Rows per page:</Text>
+                  <View style={styles.rowsPerPageOptions}>
+                    {ROWS_PER_PAGE_OPTIONS.map((opt) => (
+                      <TouchableOpacity
+                        key={opt}
+                        style={[styles.rowsPerPageBtn, rowsPerPage === opt && styles.rowsPerPageBtnActive]}
+                        onPress={() => setRowsPerPage(opt)}
+                      >
+                        <Text style={[styles.rowsPerPageBtnText, rowsPerPage === opt && styles.rowsPerPageBtnTextActive]}>
+                          {opt}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
+              {enquiries.length > rowsPerPage ? (
+                <View style={styles.pagination}>
+                  <TouchableOpacity
+                    style={[styles.pageBtn, page === 0 && styles.pageBtnDisabled]}
+                    onPress={() => setPage((p) => Math.max(0, p - 1))}
+                    disabled={page === 0}
+                  >
+                    <Text style={styles.pageBtnText}>Previous</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.pageInfo}>
+                    Page {page + 1} of {Math.max(1, Math.ceil(enquiries.length / rowsPerPage))}
+                  </Text>
+                  <TouchableOpacity
+                    style={[
+                      styles.pageBtn,
+                      page >= Math.ceil(enquiries.length / rowsPerPage) - 1 && styles.pageBtnDisabled,
+                    ]}
+                    onPress={() => setPage((p) => p + 1)}
+                    disabled={page >= Math.ceil(enquiries.length / rowsPerPage) - 1}
+                  >
+                    <Text style={styles.pageBtnText}>Next</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : null}
+            </View>
           }
         />
       )}
@@ -721,7 +750,47 @@ const styles = StyleSheet.create({
     marginRight: 8,
     backgroundColor: '#e0e0e0',
     borderRadius: 8,
+    minHeight: 50,
     alignItems: 'center',
+    marginBottom: 10,
+  },
+  paginationWrapper: {
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#eee',
+  },
+  rowsPerPageRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  rowsPerPageLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginRight: 8,
+  },
+  rowsPerPageOptions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  rowsPerPageBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    backgroundColor: '#e0e0e0',
+  },
+  rowsPerPageBtnActive: {
+    backgroundColor: '#019ee3',
+  },
+  rowsPerPageBtnText: {
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '500',
+  },
+  rowsPerPageBtnTextActive: {
+    color: '#fff',
   },
   pageBtn: {
     paddingVertical: 8,
@@ -747,8 +816,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 12,
-    paddingHorizontal: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 0,
   },
   activeTab: {
     backgroundColor: '#019ee3',
@@ -794,6 +863,19 @@ const styles = StyleSheet.create({
   contactPerson: {
     fontSize: 14,
     color: '#666',
+  },
+  serviceTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 0,
+  },
+  serviceTitleText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#019ee3',
+    marginLeft: 8,
   },
   enquiryDetails: {
     marginBottom: 15,

@@ -75,7 +75,7 @@ function InvoiceRow(props) {
         navigate(`../addServiceInvoice/${invoice._id}?invoiceType=${invoiceType}`);
     };
 
-    const handleUploadSignedInvoice = async (invoiceId, oldInvoicLink) => {
+    const handleUploadSignedInvoice = async (invoiceId, oldSignedLinks) => {
         const input = document.createElement('input');
         input.type = 'file';
         input.accept = '.pdf,.jpg,.jpeg,.png';
@@ -100,8 +100,7 @@ function InvoiceRow(props) {
                     const serviceRes = await axios.put(
                         `${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/update/${invoiceId}`,
                         {
-                            invoiceLink: [...oldInvoicLink, res.data?.fileUrl],
-                            status: "InvoiceSent"
+                            signedInvoiceLink: [...(oldSignedLinks || []), res.data?.fileUrl],
                         },
                         {
                             headers: {
@@ -440,7 +439,17 @@ function InvoiceRow(props) {
         try {
             const res = await axios.post('https://n8n.nicknameinfo.net/webhook/f8d3ad37-a38e-4a38-a06e-09c74fdc3b91', { invoiceId: invoice?._id });
             if (res) {
+                try {
+                    await axios.put(
+                        `${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/update/${invoice?._id}`,
+                        { invoiceSendStatus: "Sent", invoiceSentAt: new Date().toISOString() },
+                        { headers: { Authorization: auth?.token } }
+                    );
+                } catch (e) {
+                    // even if status update fails, webhook already triggered
+                }
                 setInvoiceSend(false)
+                props.onInvoiceUpdate();
             }
         } catch (webhookError) {
             setInvoiceSend(false)
@@ -557,22 +566,55 @@ function InvoiceRow(props) {
                 <TableCell>{invoice.deliveryAddress}</TableCell>
                 <TableCell align="right">{invoice.grandTotal.toFixed(2)}</TableCell>
                 <TableCell>
-                    <Chip
-                        label={invoice.status}
-                        size="small"
-                        color={
-                            invoice.status === 'Paid' ? 'success' :
-                                invoice.status === 'Unpaid' ? 'error' :
-                                    invoice.status === 'Pending' || invoice.status === 'Progress' ? 'warning' :
-                                        'default'
-                        }
-                    />
-                    {invoice?.invoiceLink?.length <= 0 ? <Chip
-                        label={"Invoice Upload Pending"}
-                        size="small"
-                        color={"error"}
-                        className='mt-2'
-                    /> : null}
+                    {(() => {
+                        const isInvoiceSent =
+                            invoice?.invoiceSendStatus === "Sent" ||
+                            !!invoice?.invoiceSentAt;
+
+                        const hasPaymentDetails =
+                            (Number(invoice?.paymentAmount) || 0) > 0 ||
+                            !!invoice?.paymentAmountType ||
+                            (Number(invoice?.pendingAmount) || 0) > 0 ||
+                            (Number(invoice?.tdsAmount) || 0) > 0 ||
+                            !!invoice?.bankName ||
+                            !!invoice?.transactionDetails ||
+                            !!invoice?.chequeDate ||
+                            !!invoice?.transferDate ||
+                            !!invoice?.companyNamePayment ||
+                            !!invoice?.otherPaymentMode;
+
+                        const hasSignedCopy =
+                            Array.isArray(invoice?.signedInvoiceLink) &&
+                            invoice.signedInvoiceLink.length > 0;
+
+                        return (
+                            <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75 }}>
+                                <Chip
+                                    label={isInvoiceSent ? "Invoice Sent" : "Invoice Not Sent"}
+                                    size="small"
+                                    color={isInvoiceSent ? "success" : "error"}
+                                />
+                                <Chip
+                                    label={
+                                        hasPaymentDetails
+                                            ? "Payment Details Updated"
+                                            : "Payment Details Not Updated"
+                                    }
+                                    size="small"
+                                    color={hasPaymentDetails ? "success" : "error"}
+                                />
+                                <Chip
+                                    label={
+                                        hasSignedCopy
+                                            ? "Signed Copy Uploaded"
+                                            : "Signed Copy Not Uploaded"
+                                    }
+                                    size="small"
+                                    color={hasSignedCopy ? "success" : "error"}
+                                />
+                            </Box>
+                        );
+                    })()}
                 </TableCell>
                 {/* <TableCell>{invoice.status}</TableCell> */}
                 <TableCell>{new Date(invoice.invoiceDate).toLocaleDateString()}</TableCell>
@@ -605,7 +647,7 @@ function InvoiceRow(props) {
                         variant="contained"
                         sx={{ bgcolor: '#28a745', '&:hover': { bgcolor: '#218838' } }}
                         startIcon={<UploadFileIcon />}
-                        onClick={() => handleUploadSignedInvoice(invoice?._id, invoice?.invoiceLink)}
+                        onClick={() => handleUploadSignedInvoice(invoice?._id, invoice?.signedInvoiceLink)}
                         disabled={loading}
                     >
                         {loading ? <CircularProgress size={24} /> : 'Upload Signed Copy'}
@@ -657,6 +699,60 @@ function InvoiceRow(props) {
                                         </Box>
                                     ))
                                 }
+                            </Stack>
+
+                            <Typography variant="h6" gutterBottom component="div" sx={{ mt: 2 }}>
+                                Signed Copy Links
+                            </Typography>
+                            <Stack direction="row" spacing={1} flexWrap="wrap">
+                                {(invoice.signedInvoiceLink || []).map((link, index) => (
+                                    <Box key={index} sx={{ display: 'flex', alignItems: 'center', my: 0.5 }}>
+                                        <Button
+                                            variant="outlined"
+                                            size="small"
+                                            startIcon={<LinkIcon />}
+                                            href={link}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                        >
+                                            Signed {index + 1}
+                                        </Button>
+                                        {hasPermission("serviceInvoice") && (
+                                            <IconButton
+                                                aria-label={`delete signed link ${index + 1}`}
+                                                size="small"
+                                                onClick={async () => {
+                                                    if (!window.confirm("Are you sure you want to delete this signed copy link?")) return;
+                                                    try {
+                                                        setDeletingLink(true);
+                                                        const fileName = link.split("/").pop();
+                                                        await axios.post(
+                                                            `${import.meta.env.VITE_SERVER_URL}/api/v1/auth/delete-file/${fileName}`,
+                                                            {
+                                                                headers: { Authorization: auth?.token },
+                                                            }
+                                                        );
+                                                        const updated = (invoice.signedInvoiceLink || []).filter((l) => l !== link);
+                                                        await axios.put(
+                                                            `${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/update/${invoice._id}`,
+                                                            { signedInvoiceLink: updated },
+                                                            { headers: { Authorization: auth.token } }
+                                                        );
+                                                        props.onInvoiceUpdate();
+                                                    } catch (e) {
+                                                        toast.error("Failed to delete signed copy link.");
+                                                    } finally {
+                                                        setDeletingLink(false);
+                                                    }
+                                                }}
+                                                disabled={deletingLink}
+                                                sx={{ ml: 0.5 }}
+                                            >
+                                                {deletingLink ? <CircularProgress size={16} /> : <DeleteIcon fontSize="small" />}
+                                            </IconButton>
+                                        )}
+                                    </Box>
+                                ))}
                             </Stack>
                         </Box>
                     </Collapse>

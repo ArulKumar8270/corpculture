@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useRoute } from '@react-navigation/native';
 // @ts-ignore
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
@@ -31,6 +31,9 @@ const CALL_TYPES = [
 
 const EmployeeActivityLogFormScreen = () => {
   const { token } = useSelector((state: RootState) => state.auth);
+  const route = useRoute();
+  const editLogId = (route.params as any)?.editLogId as string | undefined;
+  const isEdit = !!editLogId;
   const [companies, setCompanies] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingCompanies, setLoadingCompanies] = useState(true);
@@ -47,11 +50,61 @@ const EmployeeActivityLogFormScreen = () => {
     remarks: '',
   });
 
+  const companiesById = useMemo(() => {
+    const map: Record<string, any> = {};
+    (companies || []).forEach((c) => {
+      if (c?._id) map[String(c._id)] = c;
+    });
+    return map;
+  }, [companies]);
+
   useFocusEffect(
     useCallback(() => {
       if (token) fetchCompanies();
     }, [token])
   );
+
+  const fetchLogForEdit = useCallback(async () => {
+    if (!token || !editLogId) return;
+    try {
+      setLoading(true);
+      const { data } = await axios.get(`${getApiBaseUrl()}/employee-activity-log/admin/${editLogId}`, {
+        headers: { Authorization: token || '' },
+      });
+      if (!data?.success || !data?.activityLog) {
+        Toast.show({ type: 'error', text1: data?.message || 'Failed to load activity log' });
+        return;
+      }
+      const log = data.activityLog;
+      const fromId = (log.fromCompany?._id || log.fromCompany)?.toString();
+      const toId = (log.toCompany?._id || log.toCompany)?.toString();
+      setFromCompany(fromId ? companiesById[fromId] || null : null);
+      setToCompany(toId ? companiesById[toId] || null : null);
+      setForm((prev) => ({
+        ...prev,
+        date: log?.date ? new Date(log.date).toISOString().split('T')[0] : prev.date,
+        km: log?.km != null ? String(log.km) : '',
+        inTime: log?.inTime || '',
+        outTime: log?.outTime || '',
+        callType: log?.callType || '',
+        status: log?.status === 'PAID' ? 'PAID' : 'UNPAID',
+        remarks: log?.remarks || '',
+      }));
+    } catch (err: any) {
+      Toast.show({
+        type: 'error',
+        text1: err.response?.data?.message || 'Failed to load activity log',
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [token, editLogId, companiesById]);
+
+  useEffect(() => {
+    if (isEdit && companies.length > 0) {
+      fetchLogForEdit();
+    }
+  }, [isEdit, companies.length, fetchLogForEdit]);
 
   const fetchCompanies = async () => {
     try {
@@ -82,43 +135,48 @@ const EmployeeActivityLogFormScreen = () => {
       Toast.show({ type: 'error', text1: 'Please select both From Company and To Company' });
       return;
     }
-    if (fromCompany._id === toCompany._id) {
-      Toast.show({ type: 'error', text1: 'From and To company cannot be the same' });
-      return;
-    }
-
     try {
       setLoading(true);
-      const { data } = await axios.post(
-        `${getApiBaseUrl()}/employee-activity-log/create`,
-        {
-          date: form.date,
-          fromCompany: fromCompany._id,
-          fromCompanyName: fromCompany.companyName || '',
-          toCompany: toCompany._id,
-          toCompanyName: toCompany.companyName || '',
-          km: form.km ? Number(form.km) : 0,
-          inTime: form.inTime || undefined,
-          outTime: form.outTime || undefined,
-          callType: form.callType || undefined,
-          status: form.status,
-          remarks: form.remarks || undefined,
-        },
-        { headers: { Authorization: token || '' } }
-      );
+      const payload = {
+        date: form.date,
+        fromCompany: fromCompany._id,
+        fromCompanyName: fromCompany.companyName || '',
+        fromAddressLine: (fromCompany.billingAddress || '').trim() || undefined,
+        fromPincode: fromCompany.pincode ? String(fromCompany.pincode) : undefined,
+        toCompany: toCompany._id,
+        toCompanyName: toCompany.companyName || '',
+        toAddressLine: (toCompany.billingAddress || '').trim() || undefined,
+        toPincode: toCompany.pincode ? String(toCompany.pincode) : undefined,
+        km: form.km ? Number(form.km) : 0,
+        inTime: form.inTime || undefined,
+        outTime: form.outTime || undefined,
+        callType: form.callType || undefined,
+        status: form.status,
+        remarks: form.remarks || undefined,
+      };
+
+      const url = isEdit
+        ? `${getApiBaseUrl()}/employee-activity-log/admin/update/${editLogId}`
+        : `${getApiBaseUrl()}/employee-activity-log/create`;
+
+      const { data } = isEdit
+        ? await axios.put(url, payload, { headers: { Authorization: token || '' } })
+        : await axios.post(url, payload, { headers: { Authorization: token || '' } });
       if (data?.success) {
-        Toast.show({ type: 'success', text1: 'Activity log created successfully' });
-        setForm({
-          date: new Date().toISOString().split('T')[0],
-          km: '',
-          inTime: '',
-          outTime: '',
-          callType: '',
-          status: 'UNPAID',
-          remarks: '',
-        });
-        setFromCompany(null);
-        setToCompany(null);
+        Toast.show({ type: 'success', text1: isEdit ? 'Activity log updated' : 'Activity log created successfully' });
+        if (!isEdit) {
+          setForm({
+            date: new Date().toISOString().split('T')[0],
+            km: '',
+            inTime: '',
+            outTime: '',
+            callType: '',
+            status: 'UNPAID',
+            remarks: '',
+          });
+          setFromCompany(null);
+          setToCompany(null);
+        }
       } else {
         Toast.show({ type: 'error', text1: data?.message || 'Failed to create activity log' });
       }

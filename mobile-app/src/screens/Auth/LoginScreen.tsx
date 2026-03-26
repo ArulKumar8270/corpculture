@@ -7,6 +7,8 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useDispatch } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
@@ -182,6 +184,7 @@ const LoginScreen = () => {
   };
 
   return (
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}>
     <View style={styles.container}>
       <Text style={styles.title}>Corpculture</Text>
       <Text style={styles.subtitle}>Login to your account</Text>
@@ -229,6 +232,7 @@ const LoginScreen = () => {
         <Text style={styles.linkText}>Forgot Password?</Text>
       </TouchableOpacity>
     </View>
+    </KeyboardAvoidingView>
   );
 };
 

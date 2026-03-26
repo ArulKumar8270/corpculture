@@ -40,6 +40,7 @@ const EmployeeDashboardScreen = () => {
       'AddCompany': 'Settings',
       'OldInvoicesList': 'Settings',
       'MenuSettings': 'Settings',
+      'GlobalSettings': 'Settings',
       'CreditSettings': 'Settings',
       'GiftSettings': 'Settings',
       'ProductCreate': 'Products',
@@ -79,8 +80,16 @@ const EmployeeDashboardScreen = () => {
       'VendorList': { stack: 'VendorList', initialScreen: 'VendorList' },
       'PurchaseList': { stack: 'PurchaseList', initialScreen: 'PurchaseList' },
     };
-    
-    const parentStack = nestedScreens[screen];
+
+    const reportStackScreens = [
+      'ReportsDashboard', 'CompanyReports', 'ServiceReportsSummary', 'RentalReportsSummary',
+      'SalesReportsSummary', 'RentalInvoiceReport', 'ServiceEnquiriesReport', 'ServiceInvoicesReport',
+      'ServiceReportsReport', 'ActivityLogReport', 'LeaveReport', 'EmployeeList',
+    ];
+    let parentStack = nestedScreens[screen];
+    if (!parentStack && reportStackScreens.includes(screen)) {
+      parentStack = 'Reports';
+    }
     if (parentStack) {
       // Navigate to parent stack first, then to nested screen
       (navigation as any).navigate(parentStack, {
@@ -328,7 +337,7 @@ const EmployeeDashboardScreen = () => {
     },
   ];
 
-  // Other Settings Section
+  // Other Settings Section (order matches web: Company, GST, Menu setting, Settings, Category, Credit, Gift)
   const otherSettingsItems: MenuItem[] = [
     {
       id: 'companyList',
@@ -353,6 +362,14 @@ const EmployeeDashboardScreen = () => {
       screen: 'MenuSettings',
       permissionKey: 'otherSettingsMenuSetting',
       color: '#9C27B0',
+    },
+    {
+      id: 'globalSettings',
+      title: 'Settings',
+      icon: 'tune',
+      screen: 'GlobalSettings',
+      permissionKey: 'otherSettingsSettings',
+      color: '#607D8B',
     },
     {
       id: 'category',

@@ -52,8 +52,22 @@ const AdminDashboardScreen = () => {
     }
   };
 
-  const navigateToScreen = (screen: string) => {
-    // Map of nested screens to their parent stack
+  const navigateToScreen = (screen: string, params?: object) => {
+    // Open as direct Drawer.Screen so back button always goes to Dashboard (no stack history)
+    const directDrawerScreens = [
+      'ServiceEnquiries', 'ServiceProductList', 'ServiceInvoiceList', 'ServiceQuotationList', 'ServiceReports',
+      'AddServiceProduct', 'AddServiceInvoice', 'AddServiceQuotation',
+      'RentalEnquiries', 'RentalProductList', 'RentalInvoiceList', 'RentalQuotationList', 'RentalReports',
+      'AddRentalProduct', 'AddRentalInvoice',
+      'Commission', 'ServicePartners', 'RentalPartners',
+      'AddCompany', 'MenuSettings', 'CreditSettings', 'GiftSettings',
+    ];
+    if (directDrawerScreens.includes(screen)) {
+      (navigation as any).navigate(screen, params || {});
+      return;
+    }
+
+    // Map of nested screens to their parent stack (for screens not in direct list)
     const nestedScreens: { [key: string]: string } = {
       'CategoryManagement': 'Settings',
       'UserManagement': 'Settings',
@@ -62,6 +76,7 @@ const AdminDashboardScreen = () => {
       'AddCompany': 'Settings',
       'OldInvoicesList': 'Settings',
       'MenuSettings': 'Settings',
+      'GlobalSettings': 'Settings',
       'CreditSettings': 'Settings',
       'GiftSettings': 'Settings',
       'ProductCreate': 'Products',
@@ -81,18 +96,31 @@ const AdminDashboardScreen = () => {
       'Deactivate': 'Profile',
       'ActivityLogForm': 'Employees',
       'LeaveForm': 'Employees',
+      'EmployeeList': 'Employees',
+      'ReportsDashboard': 'Reports',
+      'CompanyReports': 'Reports',
+      'ServiceReportsSummary': 'Reports',
+      'RentalReportsSummary': 'Reports',
+      'SalesReportsSummary': 'Reports',
+      'RentalInvoiceReport': 'Reports',
+      'ServiceEnquiriesReport': 'Reports',
+      'ServiceInvoicesReport': 'Reports',
+      'ServiceReportsReport': 'Reports',
       'ActivityLogReport': 'Reports',
       'LeaveReport': 'Reports',
     };
-    
-    const parentStack = nestedScreens[screen];
+    const reportStackScreens = [
+      'ReportsDashboard', 'CompanyReports', 'ServiceReportsSummary', 'RentalReportsSummary',
+      'SalesReportsSummary', 'RentalInvoiceReport', 'ServiceEnquiriesReport', 'ServiceInvoicesReport',
+      'ServiceReportsReport', 'ActivityLogReport', 'LeaveReport',
+    ];
+    let parentStack = nestedScreens[screen];
+    if (!parentStack && reportStackScreens.includes(screen)) {
+      parentStack = 'Reports';
+    }
     if (parentStack) {
-      // Navigate to parent stack first, then to nested screen
-      (navigation as any).navigate(parentStack, {
-        screen: screen,
-      });
+      (navigation as any).navigate(parentStack, { screen });
     } else {
-      // Navigate directly
       (navigation as any).navigate(screen);
     }
   };
@@ -141,7 +169,7 @@ const AdminDashboardScreen = () => {
     },
     {
       id: 'commission',
-      title: 'Commission',
+      title: 'Partners',
       icon: 'account-balance-wallet',
       screen: 'Commission',
       permissionKey: 'salesCommission',
@@ -405,7 +433,7 @@ const AdminDashboardScreen = () => {
     },
   ];
 
-  // Other Settings Section
+  // Other Settings Section (order matches web: Company, GST, Menu setting, Settings, Category, Credit, Gift)
   const otherSettingsItems: MenuItem[] = [
     {
       id: 'companyList',
@@ -432,6 +460,14 @@ const AdminDashboardScreen = () => {
       color: '#9C27B0',
     },
     {
+      id: 'globalSettings',
+      title: 'Settings',
+      icon: 'tune',
+      screen: 'GlobalSettings',
+      permissionKey: 'otherSettingsSettings',
+      color: '#607D8B',
+    },
+    {
       id: 'category',
       title: 'Category',
       icon: 'category',
@@ -447,14 +483,14 @@ const AdminDashboardScreen = () => {
       permissionKey: 'otherSettingsCredit',
       color: '#F44336',
     },
-    {
-      id: 'gift',
-      title: 'Gift',
-      icon: 'card-giftcard',
-      screen: 'GiftSettings',
-      permissionKey: 'otherSettingsGift',
-      color: '#E91E63',
-    },
+    // {
+    //   id: 'gift',
+    //   title: 'Gift',
+    //   icon: 'card-giftcard',
+    //   screen: 'GiftSettings',
+    //   permissionKey: 'otherSettingsGift',
+    //   color: '#E91E63',
+    // },
   ];
 
   const renderMenuItem = (item: MenuItem) => {
@@ -466,7 +502,17 @@ const AdminDashboardScreen = () => {
       <TouchableOpacity
         key={item.id}
         style={[styles.menuCard, { borderLeftColor: item.color || '#019ee3' }]}
-        onPress={() => navigateToScreen(item.screen)}
+        onPress={() => {
+          const params =
+            item.screen === 'ServicePartners'
+              ? { commissionFrom: 'Service' }
+              : item.screen === 'RentalPartners'
+                ? { commissionFrom: 'Rental' }
+                : item.screen === 'Commission'
+                  ? { commissionFrom: 'Sales' }
+                  : undefined;
+          navigateToScreen(item.screen, params);
+        }}
       >
         <View style={[styles.iconContainer, { backgroundColor: `${item.color || '#019ee3'}20` }]}>
           <Icon name={item.icon as any} size={24} color={item.color || '#019ee3'} />

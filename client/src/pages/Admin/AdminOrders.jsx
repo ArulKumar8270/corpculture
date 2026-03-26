@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 // import OrderItem from "./OrderItem"; // We will refactor to use a table directly
 import SearchIcon from "@mui/icons-material/Search";
 import Spinner from "../../components/Spinner";
@@ -7,6 +7,80 @@ import { useAuth } from "../../context/auth";
 import SeoData from "../../SEO/SeoData";
 import { Link } from "react-router-dom"; // Import Link for navigation
 import { TablePagination } from "@mui/material";
+import toast from "react-hot-toast";
+import * as XLSX from "xlsx";
+import { saveAs } from "file-saver";
+
+const INVOICE_WEBHOOK_URL =
+    "https://n8n.nicknameinfo.net/webhook/cbb63555-0bcc-4a74-bdde-36a995ac303a";
+
+/** Public R2 URL for order PDF: {base}/{orderId}.pdf — set VITE_ORDER_INVOICE_R2_BASE in .env */
+const getOrderInvoicePdfUrl = (orderId) => {
+    const base = (
+        import.meta.env.VITE_ORDER_INVOICE_R2_BASE ||
+        "https://pub-d7041e72c8d44c0b8c69743a057d0b36.r2.dev"
+    ).replace(/\/$/, "");
+    const id = String(orderId || "").trim();
+    return `${base}/${encodeURIComponent(id)}.pdf`;
+};
+
+/** HEAD: PDF already on R2 (some buckets may not support HEAD — returns false → webhook runs) */
+const invoicePdfExistsOnR2 = async (pdfUrl) => {
+    try {
+        const r = await axios.head(pdfUrl, {
+            timeout: 20000,
+            validateStatus: (s) => s === 200,
+        });
+        return r.status === 200;
+    } catch {
+        return false;
+    }
+};
+
+/**
+ * Download PDF via GET blob. If CORS blocks the admin site, opens the URL in a new tab instead.
+ * @returns {Promise<boolean>} true if file was saved via blob download
+ */
+const downloadPdfFromPublicUrl = async (pdfUrl, filename) => {
+    try {
+        const response = await axios.get(pdfUrl, {
+            responseType: "blob",
+            timeout: 120000,
+        });
+        const blob = new Blob([response.data], {
+            type: response.headers["content-type"] || "application/pdf",
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename || "invoice.pdf";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        return true;
+    } catch {
+        window.open(pdfUrl, "_blank", "noopener,noreferrer");
+        return false;
+    }
+};
+
+/** After webhook uploads, wait until R2 serves the PDF then download */
+const waitForR2InvoiceAndDownload = async (orderId, maxAttempts = 12, delayMs = 1500) => {
+    const pdfUrl = getOrderInvoicePdfUrl(orderId);
+    const filename = `invoice-${orderId}.pdf`;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        if (attempt > 0) {
+            await new Promise((r) => setTimeout(r, delayMs));
+        }
+        const exists = await invoicePdfExistsOnR2(pdfUrl);
+        if (exists) {
+            await downloadPdfFromPublicUrl(pdfUrl, filename);
+            return true;
+        }
+    }
+    return false;
+};
 
 const AdminOrders = () => {
     const { auth, userPermissions } = useAuth();
@@ -27,10 +101,42 @@ const AdminOrders = () => {
     const [buyerNameFilter, setBuyerNameFilter] = useState("");
     const [employeeIdFilter, setEmployeeIdFilter] = useState("");
     const [orderStatusFilter, setOrderStatusFilter] = useState("");
+    /** `${orderId}-send` | `${orderId}-download` while webhook is in progress */
+    const [invoiceLoadingKey, setInvoiceLoadingKey] = useState(null);
+    const [exportingProductsExcel, setExportingProductsExcel] = useState(false);
 
     const hasPermission = (key) => {
         return userPermissions.some(p => p.key === key && p.actions.includes('edit')) || auth?.user?.role === 1;
     };
+
+    /** Backend stores employeeType as string[] e.g. ['Sales']; strict === 'Sales' never matches */
+    const hasEmployeeType = (employee, type) => {
+        if (!employee?.employeeType) return false;
+        const et = employee.employeeType;
+        return Array.isArray(et) ? et.includes(type) : et === type;
+    };
+
+    const salesEmployees = (employees || []).filter((e) => hasEmployeeType(e, "Sales"));
+
+    const isEmployee = Number(auth?.user?.role) === 3;
+    const myEmployeeId = useMemo(() => {
+        if (!isEmployee) return "";
+        const myUserId = String(auth?.user?._id || "");
+        const match = (employees || []).find((e) => {
+            const eid = e?.userId?._id || e?.userId;
+            return String(eid || "") === myUserId;
+        });
+        return match?._id || "";
+    }, [isEmployee, auth?.user?._id, employees]);
+
+    useEffect(() => {
+        // Force filter to logged-in employee for role 3
+        if (isEmployee && myEmployeeId && employeeIdFilter !== myEmployeeId) {
+            setEmployeeIdFilter(myEmployeeId);
+            setPage(0);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isEmployee, myEmployeeId]);
 
     useEffect(() => {
         if (auth?.token) {
@@ -40,7 +146,7 @@ const AdminOrders = () => {
             setLoading(false);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [auth?.token, refetchOrders, page, rowsPerPage]); // Re-run effect when pagination changes or refetch is triggered
+    }, [auth?.token, refetchOrders, page, rowsPerPage, employees?.length]); // ensure employee mapping is available
 
     // Fetch employees
     useEffect(() => {
@@ -70,7 +176,8 @@ const AdminOrders = () => {
                 fromDate: currentFromDate || "",
                 toDate: currentToDate || "",
                 buyerName: currentBuyerName || "",
-                employeeId: currentEmployeeId || "",
+                // Employees should only see orders assigned to them
+                employeeId: isEmployee ? myEmployeeId : (currentEmployeeId || ""),
                 orderStatus: currentOrderStatus || "",
                 page: currentPage + 1, // Backend expects 1-indexed page
                 limit: currentRowsPerPage,
@@ -102,19 +209,19 @@ const AdminOrders = () => {
 
     const fetchEmployees = async () => {
         try {
-            // Assuming you have an endpoint to get all employees
             const response = await axios.get(
-                `${import.meta.env.VITE_SERVER_URL}/api/v1/employee/all`, // *** Verify this endpoint ***
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/employee/all`,
                 {
                     headers: {
                         Authorization: auth?.token,
                     },
                 }
             );
-            setEmployees(response.data.employees || []);
+            const list = response.data?.employees ?? response.data?.data ?? [];
+            setEmployees(Array.isArray(list) ? list : []);
         } catch (error) {
             console.error("Error fetching employees:", error);
-            // Handle error display if needed
+            setEmployees([]);
         }
     };
 
@@ -128,6 +235,106 @@ const AdminOrders = () => {
     };
 
     // Handle assignment button click (Placeholder)
+    const buildInvoiceWebhookPayload = (order, action) => ({
+        action,
+        orderId: order._id,
+        /** Where n8n should upload the generated PDF (same pattern as UI download) */
+        invoicePdfUrl: getOrderInvoicePdfUrl(order._id),
+        order: {
+            _id: order._id,
+            orderStatus: order.orderStatus,
+            amount: order.amount,
+            createdAt: order.createdAt,
+            products: order.products,
+            employeeId: order.employeeId?._id,
+            employeeName: order.employeeId?.name,
+            buyer: order.buyer || order.userId || null,
+        },
+    });
+
+    const handleSendInvoice = async (order) => {
+        const key = `${order._id}-send`;
+        setInvoiceLoadingKey(key);
+        try {
+            await axios.post(
+                INVOICE_WEBHOOK_URL,
+                buildInvoiceWebhookPayload(order, "send_invoice"),
+                {
+                    headers: { "Content-Type": "application/json" },
+                    timeout: 120000,
+                }
+            );
+            toast.success("Invoice send requested successfully.");
+        } catch (error) {
+            console.error("Send invoice webhook error:", error);
+            toast.error(
+                error.response?.data?.message ||
+                    error.message ||
+                    "Failed to send invoice."
+            );
+        } finally {
+            setInvoiceLoadingKey(null);
+        }
+    };
+
+    /**
+     * 1) If PDF already on R2 → download directly.
+     * 2) Else → POST webhook to generate + upload to R2, then poll R2 and download when ready.
+     */
+    const handleDownloadInvoice = async (order) => {
+        const key = `${order._id}-download`;
+        const pdfUrl = getOrderInvoicePdfUrl(order._id);
+        const filename = `invoice-${order._id}.pdf`;
+
+        setInvoiceLoadingKey(key);
+        try {
+            const alreadyThere = await invoicePdfExistsOnR2(pdfUrl);
+            if (alreadyThere) {
+                const saved = await downloadPdfFromPublicUrl(pdfUrl, filename);
+                toast.success(
+                    saved ? "Invoice downloaded from cloud." : "Opened invoice in a new tab (CORS)."
+                );
+                return;
+            }
+
+            toast.loading("Generating invoice and uploading to cloud…", { id: "inv-dl" });
+            await axios.post(
+                INVOICE_WEBHOOK_URL,
+                buildInvoiceWebhookPayload(order, "download_invoice"),
+                {
+                    headers: { "Content-Type": "application/json" },
+                    timeout: 120000,
+                }
+            );
+            toast.dismiss("inv-dl");
+            toast.loading("Waiting for file on cloud…", { id: "inv-wait" });
+
+            const ok = await waitForR2InvoiceAndDownload(order._id);
+            toast.dismiss("inv-wait");
+
+            if (ok) {
+                toast.success("Invoice downloaded.");
+                return;
+            }
+
+            toast.error(
+                "Invoice not detected on cloud yet. Open the link to check, or try again shortly."
+            );
+            window.open(pdfUrl, "_blank", "noopener,noreferrer");
+        } catch (error) {
+            toast.dismiss("inv-dl");
+            toast.dismiss("inv-wait");
+            console.error("Download invoice error:", error);
+            toast.error(
+                error.response?.data?.message ||
+                    error.message ||
+                    "Failed to download invoice."
+            );
+        } finally {
+            setInvoiceLoadingKey(null);
+        }
+    };
+
     const handleAssignOrders = async () => {
         if (selectedOrderIds.length === 0) {
             alert("Please select at least one order to assign.");
@@ -201,6 +408,134 @@ const AdminOrders = () => {
         });
     };
 
+    /** Query string for admin-orders (1-based page) — same filters as the table */
+    const buildAdminOrdersQueryString = (pageNum, limitNum) =>
+        new URLSearchParams({
+            search: search || "",
+            fromDate: fromDate || "",
+            toDate: toDate || "",
+            buyerName: buyerNameFilter || "",
+            employeeId: employeeIdFilter || "",
+            orderStatus: orderStatusFilter || "",
+            page: String(pageNum),
+            limit: String(limitNum),
+        }).toString();
+
+    /** Fetch all orders matching current filters (batched), flatten products → Excel rows */
+    const handleDownloadOverallProductsExcel = async () => {
+        if (!auth?.token) {
+            toast.error("Please sign in again.");
+            return;
+        }
+        setExportingProductsExcel(true);
+        const batchSize = 500;
+        const allOrders = [];
+        try {
+            let pageNum = 1;
+            let totalCount = 0;
+            // eslint-disable-next-line no-constant-condition
+            while (true) {
+                const qs = buildAdminOrdersQueryString(pageNum, batchSize);
+                const response = await axios.get(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/user/admin-orders?${qs}`,
+                    { headers: { Authorization: auth.token }, timeout: 120000 }
+                );
+                const batch = response.data?.orders || [];
+                totalCount = response.data?.totalCount ?? 0;
+                allOrders.push(...batch);
+                if (batch.length < batchSize || allOrders.length >= totalCount) break;
+                pageNum += 1;
+            }
+
+            if (allOrders.length === 0) {
+                toast.error("No orders to export for the current filters.");
+                return;
+            }
+
+            const rows = [];
+            for (const order of allOrders) {
+                const buyerName = order.buyer?.name ?? "";
+                const empName = order.employeeId?.name ?? "";
+                const ship = order.shippingInfo;
+                const shippingAddress = ship
+                    ? [ship.address, ship.city, ship.state, ship.pincode, ship.country]
+                          .filter(Boolean)
+                          .join(", ")
+                    : "";
+                const orderDate = order.createdAt
+                    ? new Date(order.createdAt).toLocaleString()
+                    : "";
+                const products = order.products || [];
+
+                if (products.length === 0) {
+                    rows.push({
+                        "Order ID": String(order._id),
+                        "Order Date": orderDate,
+                        "Order Status": order.orderStatus ?? "",
+                        "Order Amount": order.amount ?? "",
+                        "Buyer Name": buyerName,
+                        "Assigned Employee": empName,
+                        "Shipping Address": shippingAddress,
+                        "Product Name": "",
+                        Brand: "",
+                        "Product ID": "",
+                        Qty: "",
+                        "Unit Price": "",
+                        "Line Total": "",
+                    });
+                    continue;
+                }
+
+                for (const p of products) {
+                    const qty = Number(p.quantity) || 1;
+                    const hasDiscount =
+                        p.discountPrice != null && p.discountPrice !== "";
+                    const unit = Number(
+                        hasDiscount ? p.discountPrice : p.price ?? 0
+                    );
+                    const lineTotal = qty * unit;
+                    rows.push({
+                        "Order ID": String(order._id),
+                        "Order Date": orderDate,
+                        "Order Status": order.orderStatus ?? "",
+                        "Order Amount": order.amount ?? "",
+                        "Buyer Name": buyerName,
+                        "Assigned Employee": empName,
+                        "Shipping Address": shippingAddress,
+                        "Product Name": p.name ?? "",
+                        Brand: p.brandName ?? "",
+                        "Product ID": p.productId ?? "",
+                        Qty: qty,
+                        "Unit Price": unit,
+                        "Line Total": lineTotal,
+                    });
+                }
+            }
+
+            const ws = XLSX.utils.json_to_sheet(rows);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Overall Products");
+            const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+            const blob = new Blob([excelBuffer], {
+                type: "application/octet-stream",
+            });
+            const stamp = new Date().toISOString().slice(0, 10);
+            saveAs(blob, `admin_orders_overall_products_${stamp}.xlsx`);
+            toast.success(
+                `Downloaded ${rows.length} product line(s) from ${allOrders.length} order(s).`
+            );
+        } catch (error) {
+            console.error("Excel export error:", error);
+            toast.error(
+                error.response?.data?.message ||
+                    error.message ||
+                    "Failed to export Excel."
+            );
+        } finally {
+            setExportingProductsExcel(false);
+        }
+    };
+
     return (
         <>
             <SeoData title="Admin Orders | Flipkart" />
@@ -237,7 +572,7 @@ const AdminOrders = () => {
                                         <SearchIcon sx={{ fontSize: "20px" }} />
                                         <span className="text-xs sm:text-sm">Search</span>
                                     </button>
-                                </form>
+                                </form> 
                                 
                                 {/* Advanced Filters */}
                                 <div className="bg-white border border-[#019ee3] rounded-2xl shadow p-4">
@@ -276,15 +611,14 @@ const AdminOrders = () => {
                                                 value={employeeIdFilter}
                                                 onChange={(e) => setEmployeeIdFilter(e.target.value)}
                                                 className="w-full p-2 border rounded-md text-sm"
+                                                disabled={isEmployee}
                                             >
-                                                <option value="">All Employees</option>
-                                                {employees
-                                                    ?.filter(employee => employee.employeeType === 'Sales')
-                                                    .map(employee => (
-                                                        <option key={employee._id} value={employee._id}>
-                                                            {employee.name}
-                                                        </option>
-                                                    ))}
+                                                {!isEmployee && <option value="">All Employees</option>}
+                                                {salesEmployees.map((employee) => (
+                                                    <option key={employee._id} value={employee._id}>
+                                                        {employee.name}
+                                                    </option>
+                                                ))}
                                             </select>
                                         </div>
                                         <div>
@@ -320,6 +654,36 @@ const AdminOrders = () => {
                             </div>
                             {/* <!-- search bar and filters --> */}
 
+                            {/* OVERALL PRODUCTS — Excel export (respects current filters) */}
+                            {hasPermission("salesOrders") ? (
+                                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 bg-gradient-to-r from-[#e6fbff] to-[#f0fff4] border border-[#019ee3] rounded-2xl shadow">
+                                    <div>
+                                        <h3 className="text-base font-bold text-gray-800">
+                                            OVERALL PRODUCTS
+                                        </h3>
+                                        <p className="text-xs text-gray-600 mt-1 max-w-xl">
+                                            Download every product line from all orders that match your
+                                            current search and filters (dates, buyer, employee, status)
+                                            as an Excel file.
+                                        </p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={handleDownloadOverallProductsExcel}
+                                        disabled={exportingProductsExcel}
+                                        className={`shrink-0 px-5 py-2.5 rounded-lg font-semibold text-white text-sm transition whitespace-nowrap ${
+                                            exportingProductsExcel
+                                                ? "bg-gray-400 cursor-not-allowed"
+                                                : "bg-gradient-to-r from-[#019ee3] to-[#afcb09] hover:from-[#afcb09] hover:to-[#019ee3]"
+                                        }`}
+                                    >
+                                        {exportingProductsExcel
+                                            ? "Preparing Excel…"
+                                            : "Download in Excel"}
+                                    </button>
+                                </div>
+                            ) : null}
+
                             {/* Assignment Controls */}
                             {hasPermission("salesOrders") ? <div className="flex flex-col sm:flex-row items-center gap-4 mb-4 p-4 bg-white rounded-xl shadow justify-between">
                                 <span className="font-semibold text-gray-700">Assign Selected Orders:</span>
@@ -330,13 +694,11 @@ const AdminOrders = () => {
                                         className="p-2 border rounded-md text-sm w-full sm:w-auto"
                                     >
                                         <option value="">-- Select Employee --</option>
-                                        {employees
-                                            ?.filter(employee => employee.employeeType === 'Sales') // {{ edit_1 }} Filter employees by type 'Service'
-                                            .map(employee => (
-                                                <option key={employee._id} value={employee._id}>
-                                                    {employee.name} ({employee.employeeType})
-                                                </option>
-                                            ))}
+                                        {salesEmployees.map((employee) => (
+                                            <option key={employee._id} value={employee._id}>
+                                                {employee.name} ({Array.isArray(employee.employeeType) ? employee.employeeType.join(", ") : employee.employeeType})
+                                            </option>
+                                        ))}
                                     </select>
                                     <button
                                         onClick={handleAssignOrders}
@@ -394,7 +756,9 @@ const AdminOrders = () => {
                                                 <th className="py-2 px-3 text-left">Amount</th>
                                                 <th className="py-2 px-3 text-left">Products</th>
                                                 <th className="py-2 px-3 text-left">Order Date</th>
-                                                {/* Add more headers as needed */}
+                                                {hasPermission("salesOrders") ? (
+                                                    <th className="py-2 px-3 text-left whitespace-nowrap">Actions</th>
+                                                ) : null}
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -440,7 +804,28 @@ const AdminOrders = () => {
                                                         )}
                                                     </td>
                                                     <td className="py-2 px-3">{order.createdAt ? new Date(order.createdAt).toLocaleDateString() : '-'}</td>
-                                                    {/* Add more cells as needed */}
+                                                    {hasPermission("salesOrders") ? (
+                                                        <td className="py-2 px-3 align-top">
+                                                            <div className="flex flex-col sm:flex-row gap-1.5">
+                                                                {/* <button
+                                                                    type="button"
+                                                                    disabled={invoiceLoadingKey === `${order._id}-send` || invoiceLoadingKey === `${order._id}-download`}
+                                                                    onClick={() => handleSendInvoice(order)}
+                                                                    className="px-2 py-1 text-xs font-semibold rounded-md bg-[#019ee3] text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                                                                >
+                                                                    {invoiceLoadingKey === `${order._id}-send` ? "Sending…" : "Send invoice"}
+                                                                </button> */}
+                                                                <button
+                                                                    type="button"
+                                                                    disabled={invoiceLoadingKey === `${order._id}-send` || invoiceLoadingKey === `${order._id}-download`}
+                                                                    onClick={() => handleDownloadInvoice(order)}
+                                                                    className="px-2 py-1 text-xs font-semibold rounded-md border border-[#afcb09] text-gray-800 bg-[#f7fafd] hover:bg-[#e6fbff] disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                                                                >
+                                                                    {invoiceLoadingKey === `${order._id}-download` ? "Downloading…" : "Download invoice"}
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    ) : null}
                                                 </tr>
                                             ))}
                                         </tbody>

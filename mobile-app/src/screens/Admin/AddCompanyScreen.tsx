@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,9 @@ import {
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Keyboard,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 // @ts-ignore
@@ -40,12 +43,46 @@ const AddCompanyScreen = () => {
   const [serviceDeliveryAddresses, setServiceDeliveryAddresses] = useState([{ address: '', pincode: '' }]);
   const [contactPersons, setContactPersons] = useState([{ name: '', mobile: '', email: '' }]);
   const [loading, setLoading] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  const scrollViewRef = useRef<ScrollView>(null);
+  const formSectionY = useRef(0);
+  const billingAddressSectionY = useRef(0);
+  const phoneSectionY = useRef(0);
 
   useEffect(() => {
     if (isEditMode && companyId) {
       fetchCompanyData();
     }
   }, []);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => setKeyboardHeight(e.endCoordinates.height)
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setKeyboardHeight(0)
+    );
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
+  const scrollToBillingAddress = () => {
+    setTimeout(() => {
+      const y = formSectionY.current + billingAddressSectionY.current - 120;
+      scrollViewRef.current?.scrollTo({ y: Math.max(0, y), animated: true });
+    }, 100);
+  };
+  const scrollToPhone = () => {
+    setTimeout(() => {
+      const y = formSectionY.current + phoneSectionY.current - 120;
+      scrollViewRef.current?.scrollTo({ y: Math.max(0, y), animated: true });
+    }, 100);
+  };
 
   const fetchCompanyData = async () => {
     try {
@@ -155,8 +192,15 @@ const AddCompanyScreen = () => {
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.form}>
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}>
+      <ScrollView
+        ref={scrollViewRef}
+        style={styles.container}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 40 + keyboardHeight }]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+      <View style={styles.form} onLayout={(e) => { formSectionY.current = e.nativeEvent.layout.y; }}>
         <Text style={styles.label}>Company Name *</Text>
         <TextInput
           style={styles.input}
@@ -165,15 +209,18 @@ const AddCompanyScreen = () => {
           placeholder="Enter company name"
         />
 
-        <Text style={styles.label}>Billing Address *</Text>
-        <TextInput
-          style={[styles.input, styles.textArea]}
-          value={formData.billingAddress}
-          onChangeText={(text) => setFormData({ ...formData, billingAddress: text })}
-          placeholder="Enter billing address"
-          multiline
-          numberOfLines={3}
-        />
+        <View onLayout={(e) => { billingAddressSectionY.current = e.nativeEvent.layout.y; }}>
+          <Text style={styles.label}>Billing Address *</Text>
+          <TextInput
+            style={[styles.input, styles.textArea]}
+            value={formData.billingAddress}
+            onChangeText={(text) => setFormData({ ...formData, billingAddress: text })}
+            placeholder="Enter billing address"
+            multiline
+            numberOfLines={3}
+            onFocus={scrollToBillingAddress}
+          />
+        </View>
 
         <Text style={styles.label}>City</Text>
         <TextInput
@@ -208,14 +255,17 @@ const AddCompanyScreen = () => {
           placeholder="Enter GST number"
         />
 
-        <Text style={styles.label}>Phone</Text>
-        <TextInput
-          style={styles.input}
-          value={formData.phone}
-          onChangeText={(text) => setFormData({ ...formData, phone: text })}
-          placeholder="Enter phone number"
-          keyboardType="phone-pad"
-        />
+        <View onLayout={(e) => { phoneSectionY.current = e.nativeEvent.layout.y; }}>
+          <Text style={styles.label}>Phone</Text>
+          <TextInput
+            style={styles.input}
+            value={formData.phone}
+            onChangeText={(text) => setFormData({ ...formData, phone: text })}
+            placeholder="Enter phone number"
+            keyboardType="phone-pad"
+            onFocus={scrollToPhone}
+          />
+        </View>
 
         <Text style={styles.label}>Invoice Type</Text>
         <TextInput
@@ -327,7 +377,8 @@ const AddCompanyScreen = () => {
           )}
         </TouchableOpacity>
       </View>
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
@@ -335,6 +386,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 40,
   },
   form: {
     padding: 20,

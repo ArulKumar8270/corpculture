@@ -23,6 +23,7 @@ const PurchaseList = () => {
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [searchTerm, setSearchTerm] = useState('');
     const [materials, setMaterials] = useState([]); // New state for materials
+    const [stockTab, setStockTab] = useState('inStock'); // inStock | lowStock | noStock
 
     const hasPermission = (key) => {
         return userPermissions.some(p => p.key === key && p.actions.includes('edit')) || auth?.user?.role === 1;
@@ -125,6 +126,24 @@ const PurchaseList = () => {
         })).sort((a, b) => b.totalQuantity - a.totalQuantity);
     }, [materials]);
 
+    const LOW_STOCK_THRESHOLD = 10;
+    const stockGroups = useMemo(() => {
+        const base = {
+            inStock: [],
+            lowStock: [],
+            noStock: [],
+        };
+        sortedProductGroups.forEach((g) => {
+            const qty = Number(g.totalQuantity) || 0;
+            if (qty <= 0) base.noStock.push(g);
+            else if (qty <= LOW_STOCK_THRESHOLD) base.lowStock.push(g);
+            else base.inStock.push(g);
+        });
+        return base;
+    }, [sortedProductGroups]);
+
+    const activeStockList = stockGroups[stockTab] || [];
+
     console.log(sortedProductGroups, "asdf7908as");
 
     if (loading) {
@@ -145,7 +164,7 @@ const PurchaseList = () => {
 
     return (
         <div className="p-6 bg-gray-100 min-h-screen">
-            <div className="flex justify-between items-center mb-6 w-[95%]">
+            <div className="flex justify-between items-center mb-6 w-[95%] max-h-[300px] overflow-y-auto">
                 <Typography variant="h5" className="font-semibold text-blue-600">
                     Material List
                 </Typography>
@@ -159,32 +178,65 @@ const PurchaseList = () => {
             </div>
 
             {/* Product Summary Section */}
-            <Paper className="p-4 mb-4 shadow-md w-[95%]" elevation={3}>
+            <Paper className="p-4 mb-4 shadow-md w-[95%] max-h-[300px] overflow-y-auto" elevation={3}>
                 <Typography variant="h6" className="font-semibold mb-3">
                     Material Summary
                 </Typography>
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 2 }}>
-                    {sortedProductGroups.map((group) => {
-                        const isNegative = group.totalQuantity < 0;
-                        return (
-                            <Chip
-                                key={group.name}
-                                label={`${group.name}: ${group.totalQuantity}`}
-                                color={isNegative ? "error" : "primary"}
-                                variant="outlined"
-                                sx={{ 
-                                    fontWeight: 'medium',
-                                    ...(isNegative && {
-                                        color: 'red',
-                                        borderColor: 'red',
-                                        '& .MuiChip-label': {
-                                            color: 'red'
-                                        }
-                                    })
-                                }}
-                            />
-                        );
-                    })}
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mb: 2 }}>
+                    <Chip
+                        clickable
+                        onClick={() => setStockTab('inStock')}
+                        label={`In Stock (${stockGroups.inStock.length})`}
+                        color="success"
+                        variant={stockTab === 'inStock' ? 'filled' : 'outlined'}
+                        sx={{ fontWeight: 600 }}
+                    />
+                    <Chip
+                        clickable
+                        onClick={() => setStockTab('lowStock')}
+                        label={`Low Stock (${stockGroups.lowStock.length})`}
+                        sx={{
+                            fontWeight: 600,
+                            ...(stockTab === 'lowStock'
+                                ? { bgcolor: '#f59e0b', color: '#fff', borderColor: '#f59e0b' }
+                                : { borderColor: '#f59e0b', color: '#b45309' }),
+                            '&:hover': { opacity: 0.9 },
+                        }}
+                        variant={stockTab === 'lowStock' ? 'filled' : 'outlined'}
+                    />
+                    <Chip
+                        clickable
+                        onClick={() => setStockTab('noStock')}
+                        label={`No / Negative Stock (${stockGroups.noStock.length})`}
+                        color="error"
+                        variant={stockTab === 'noStock' ? 'filled' : 'outlined'}
+                        sx={{ fontWeight: 600 }}
+                    />
+                </Box>
+
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+                    {activeStockList.map((group) => (
+                        <Chip
+                            key={group.name}
+                            label={`${group.name}: ${group.totalQuantity}`}
+                            variant="outlined"
+                            color={
+                                stockTab === 'inStock'
+                                    ? 'success'
+                                    : stockTab === 'noStock'
+                                        ? 'error'
+                                        : 'default'
+                            }
+                            sx={{
+                                fontWeight: 'medium',
+                                ...(stockTab === 'lowStock' && {
+                                    borderColor: '#f59e0b',
+                                    color: '#b45309',
+                                    '& .MuiChip-label': { color: '#b45309' },
+                                }),
+                            }}
+                        />
+                    ))}
                 </Box>
                 {/* <Divider sx={{ my: 2 }} />
                 <TableContainer sx={{ maxHeight: 250 }}>

@@ -51,15 +51,17 @@ const PayslipList = () => {
             <div className="p-4">
                 <div className="flex justify-between items-center mb-6">
                     <h1 className="text-2xl font-bold text-gray-800">Payslips</h1>
-                    <Link to="../addPayslip">
-                        <Button
-                            variant="contained"
-                            startIcon={<AddIcon />}
-                            className="bg-gradient-to-r from-[#019ee3] to-[#afcb09] hover:opacity-90"
-                        >
-                            Add Payslip
-                        </Button>
-                    </Link>
+                    {Number(auth?.user?.role) === 1 && (
+                        <Link to="../addPayslip">
+                            <Button
+                                variant="contained"
+                                startIcon={<AddIcon />}
+                                className="bg-gradient-to-r from-[#019ee3] to-[#afcb09] hover:opacity-90"
+                            >
+                                Add Payslip
+                            </Button>
+                        </Link>
+                    )}
                 </div>
 
                 {loading ? (

@@ -29,6 +29,7 @@ const AddEmployee = () => {
         idCradNo: '',
         department: [],
         salary: '',
+        bikeAllowance: '',
         image: '',
         parentName: '',
         parentPhone: '',
@@ -100,6 +101,7 @@ const AddEmployee = () => {
                             ? employeeData.department.map(d => d._id || d)
                             : (employeeData.department?._id || employeeData.department ? [employeeData.department?._id || employeeData.department] : []),
                         salary: employeeData.salary || '',
+                        bikeAllowance: employeeData.bikeAllowance ?? '',
                         image: employeeData.image || '',
                         parentName: employeeData.parentName || '',
                         parentPhone: employeeData.parentPhone || '',
@@ -123,7 +125,7 @@ const AddEmployee = () => {
             // Clear form data if switching from edit to add mode
             setFormData({
                 name: '', email: '', phone: '', address: '', pincode: [], employeeType: [],
-                designation: [], idCradNo: '', department: [], salary: '', image: '',
+                designation: [], idCradNo: '', department: [], salary: '', bikeAllowance: '', image: '',
                 parentName: '', parentPhone: '', parentAddress: '', parentRelation: '', idProof: '',
             });
         }
@@ -318,6 +320,7 @@ const AddEmployee = () => {
                     {
                         ...formData,
                         salary: formData.salary ? Number(formData.salary) : undefined,
+                        bikeAllowance: formData.bikeAllowance ? Number(formData.bikeAllowance) : 0,
                         image: formData.image || undefined
                     },
                     {
@@ -348,6 +351,7 @@ const AddEmployee = () => {
                             password: formData?.phone,
                             userId: registerUser?._id,
                             salary: formData.salary ? Number(formData.salary) : undefined,
+                            bikeAllowance: formData.bikeAllowance ? Number(formData.bikeAllowance) : 0,
                             image: formData.image || undefined
                         },
                         {
@@ -703,6 +707,17 @@ const AddEmployee = () => {
                             fullWidth
                             inputProps={{ min: 0 }}
                         />
+                        <TextField
+                            label="Bike Allowance"
+                            name="bikeAllowance"
+                            type="number"
+                            value={formData.bikeAllowance}
+                            onChange={handleInputChange}
+                            variant="outlined"
+                            size="small"
+                            fullWidth
+                            inputProps={{ min: 0 }}
+                        />
 
                         <Button
                             type="submit"
@@ -853,6 +868,14 @@ const AddEmployee = () => {
                                 <span className="text-sm font-semibold text-gray-600">Salary:</span>
                                 <span className="text-sm font-bold text-[#019ee3]">
                                     ₹{formData.salary}
+                                </span>
+                            </div>
+                        )}
+                        {formData.bikeAllowance && Number(formData.bikeAllowance) > 0 && (
+                            <div className="flex justify-between">
+                                <span className="text-sm font-semibold text-gray-600">Bike Allowance:</span>
+                                <span className="text-sm font-bold text-[#019ee3]">
+                                    ₹{formData.bikeAllowance}
                                 </span>
                             </div>
                         )}

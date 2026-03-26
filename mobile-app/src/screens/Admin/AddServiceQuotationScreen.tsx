@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,9 @@ import {
   Alert,
   Modal,
   FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  Keyboard,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 // @ts-ignore - @expo/vector-icons is available via expo dependency
@@ -61,6 +64,12 @@ const AddServiceQuotationScreen = () => {
   const [productPickerVisible, setProductPickerVisible] = useState(false);
   const [deliveryAddressPickerVisible, setDeliveryAddressPickerVisible] = useState(false);
   const [sendToPickerVisible, setSendToPickerVisible] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  const scrollViewRef = useRef<ScrollView>(null);
+  const formSectionY = useRef(0);
+  const referenceSectionY = useRef(0);
+  const descriptionSectionY = useRef(0);
 
   useEffect(() => {
     fetchQuotationsCount();
@@ -338,6 +347,34 @@ const AddServiceQuotationScreen = () => {
     }
   };
 
+  useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => setKeyboardHeight(e.endCoordinates.height)
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setKeyboardHeight(0)
+    );
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
+  const scrollToReference = () => {
+    setTimeout(() => {
+      const y = formSectionY.current + referenceSectionY.current - 120;
+      scrollViewRef.current?.scrollTo({ y: Math.max(0, y), animated: true });
+    }, 100);
+  };
+  const scrollToDescription = () => {
+    setTimeout(() => {
+      const y = formSectionY.current + descriptionSectionY.current - 120;
+      scrollViewRef.current?.scrollTo({ y: Math.max(0, y), animated: true });
+    }, 100);
+  };
+
   const selectedCompany = companies.find((c) => c._id === quotationData.companyId);
   const selectedProduct = availableProducts.find((p) => p._id === quotationData.productId);
 
@@ -350,12 +387,19 @@ const AddServiceQuotationScreen = () => {
   }
 
   return (
-    <ScrollView style={styles.container}>
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}>
+      <ScrollView
+        ref={scrollViewRef}
+        style={styles.container}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 40 + keyboardHeight }]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
       <View style={styles.header}>
         <Text style={styles.title}>Add Service Quotation</Text>
       </View>
 
-      <View style={styles.form}>
+      <View style={styles.form} onLayout={(e) => { formSectionY.current = e.nativeEvent.layout.y; }}>
         {/* Company Selection */}
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Company *</Text>
@@ -426,13 +470,14 @@ const AddServiceQuotationScreen = () => {
         </View>
 
         {/* Reference */}
-        <View style={styles.inputGroup}>
+        <View style={styles.inputGroup} onLayout={(e) => { referenceSectionY.current = e.nativeEvent.layout.y; }}>
           <Text style={styles.label}>Reference</Text>
           <TextInput
             style={styles.input}
             value={quotationData.reference}
             onChangeText={(text) => setQuotationData({ ...quotationData, reference: text })}
             placeholder="Reference"
+            onFocus={scrollToReference}
           />
         </View>
 
@@ -466,7 +511,7 @@ const AddServiceQuotationScreen = () => {
         </View>
 
         {/* Description */}
-        <View style={styles.inputGroup}>
+        <View style={styles.inputGroup} onLayout={(e) => { descriptionSectionY.current = e.nativeEvent.layout.y; }}>
           <Text style={styles.label}>Description</Text>
           <TextInput
             style={[styles.input, styles.textArea]}
@@ -475,6 +520,7 @@ const AddServiceQuotationScreen = () => {
             placeholder="Description"
             multiline
             numberOfLines={3}
+            onFocus={scrollToDescription}
           />
         </View>
 
@@ -733,7 +779,8 @@ const AddServiceQuotationScreen = () => {
           </View>
         </TouchableOpacity>
       </Modal>
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
@@ -741,6 +788,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 40,
   },
   loadingContainer: {
     flex: 1,

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -31,6 +31,9 @@ const RentalProductListScreen = () => {
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [employeePickerVisible, setEmployeePickerVisible] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const ROWS_PER_PAGE_OPTIONS = [5, 10, 25, 50, 100];
 
   useEffect(() => {
     fetchRentalProducts();
@@ -201,6 +204,19 @@ const RentalProductListScreen = () => {
     );
   });
 
+  const paginatedProducts = useMemo(() => {
+    const start = page * rowsPerPage;
+    return filteredProducts.slice(start, start + rowsPerPage);
+  }, [filteredProducts, page, rowsPerPage]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [rowsPerPage]);
+
   const renderProduct = ({ item, index }: { item: any; index: number }) => {
     const gstTypes = Array.isArray(item.gstType) && item.gstType.length > 0
       ? item.gstType.map((gst: any) => `${gst.gstType} (${gst.gstPercentage}%)`).join(', ')
@@ -209,7 +225,7 @@ const RentalProductListScreen = () => {
     return (
       <View style={styles.productCard}>
         <View style={styles.productHeader}>
-          <Text style={styles.productSNo}>{index + 1}</Text>
+          <Text style={styles.productSNo}>{page * rowsPerPage + index + 1}</Text>
           <View style={styles.productMainInfo}>
             <Text style={styles.productCompany}>{item.company?.companyName || 'N/A'}</Text>
             <Text style={styles.productModel}>{item.modelName || 'N/A'}</Text>
@@ -311,7 +327,7 @@ const RentalProductListScreen = () => {
         <ActivityIndicator size="large" color="#007AFF" style={styles.loader} />
       ) : (
         <FlatList
-          data={filteredProducts}
+          data={paginatedProducts}
           renderItem={renderProduct}
           keyExtractor={(item) => item._id}
           refreshing={loading}
@@ -320,6 +336,47 @@ const RentalProductListScreen = () => {
             <View style={styles.emptyContainer}>
               <Icon name="inventory" size={64} color="#ccc" />
               <Text style={styles.emptyText}>No rental products found</Text>
+            </View>
+          }
+          ListFooterComponent={
+            <View style={styles.paginationWrapper}>
+              {filteredProducts.length > 0 && (
+                <View style={styles.rowsPerPageRow}>
+                  <Text style={styles.rowsPerPageLabel}>Rows per page:</Text>
+                  <View style={styles.rowsPerPageOptions}>
+                    {ROWS_PER_PAGE_OPTIONS.map((opt) => (
+                      <TouchableOpacity
+                        key={opt}
+                        style={[styles.rowsPerPageBtn, rowsPerPage === opt && styles.rowsPerPageBtnActive]}
+                        onPress={() => setRowsPerPage(opt)}
+                      >
+                        <Text style={[styles.rowsPerPageBtnText, rowsPerPage === opt && styles.rowsPerPageBtnTextActive]}>{opt}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
+              {filteredProducts.length > rowsPerPage ? (
+                <View style={styles.pagination}>
+                  <TouchableOpacity
+                    style={[styles.pageBtn, page === 0 && styles.pageBtnDisabled]}
+                    onPress={() => setPage((p) => Math.max(0, p - 1))}
+                    disabled={page === 0}
+                  >
+                    <Text style={styles.pageBtnText}>Previous</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.pageInfo}>
+                    Page {page + 1} of {Math.max(1, Math.ceil(filteredProducts.length / rowsPerPage))}
+                  </Text>
+                  <TouchableOpacity
+                    style={[styles.pageBtn, page >= Math.ceil(filteredProducts.length / rowsPerPage) - 1 && styles.pageBtnDisabled]}
+                    onPress={() => setPage((p) => p + 1)}
+                    disabled={page >= Math.ceil(filteredProducts.length / rowsPerPage) - 1}
+                  >
+                    <Text style={styles.pageBtnText}>Next</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : null}
             </View>
           }
         />
@@ -569,6 +626,24 @@ const styles = StyleSheet.create({
     color: '#333',
     fontWeight: '600',
   },
+  paginationWrapper: {
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#eee',
+  },
+  rowsPerPageRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+  rowsPerPageLabel: { fontSize: 14, color: '#666', marginRight: 8 },
+  rowsPerPageOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  rowsPerPageBtn: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 6, backgroundColor: '#e0e0e0' },
+  rowsPerPageBtnActive: { backgroundColor: '#019ee3' },
+  rowsPerPageBtnText: { fontSize: 14, color: '#333', fontWeight: '500' },
+  rowsPerPageBtnTextActive: { color: '#fff' },
+  pagination: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 },
+  pageBtn: { paddingVertical: 8, paddingHorizontal: 16, backgroundColor: '#019ee3', borderRadius: 8, marginHorizontal: 8 },
+  pageBtnDisabled: { backgroundColor: '#ccc', opacity: 0.8 },
+  pageBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  pageInfo: { fontSize: 14, color: '#333' },
 });
 
 export default RentalProductListScreen;

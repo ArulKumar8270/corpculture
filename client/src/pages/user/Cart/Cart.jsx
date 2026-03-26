@@ -112,8 +112,7 @@ const Cart = () => {
             navigate("/login"); // Redirect to login if not authenticated
             return;
         }
-        localStorage.setItem("sessionId", "sdfas09df8as7");
-        navigate("/shipping/confirm")
+        navigate("/shipping");
     };
 
     // Function to close the modal

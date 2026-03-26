@@ -35,6 +35,11 @@ const RentalInvoiceListScreen = () => {
   const [invoiceCount, setInvoiceCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [rentalTypeFilter, setRentalTypeFilter] = useState('');
+  const [rentalTitleFilter, setRentalTitleFilter] = useState('');
+  const [employeeFilter, setEmployeeFilter] = useState('');
+  const [companyFilter, setCompanyFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [expandedEntries, setExpandedEntries] = useState<Set<string>>(new Set());
@@ -63,6 +68,54 @@ const RentalInvoiceListScreen = () => {
   const [modeOfPaymentPickerVisible, setModeOfPaymentPickerVisible] = useState(false);
   const [amountTypePickerVisible, setAmountTypePickerVisible] = useState(false);
   const [pendingInvoicePickerVisible, setPendingInvoicePickerVisible] = useState(false);
+  const [filterRentalTypeVisible, setFilterRentalTypeVisible] = useState(false);
+  const [filterRentalTitleVisible, setFilterRentalTitleVisible] = useState(false);
+  const [filterEmployeeVisible, setFilterEmployeeVisible] = useState(false);
+  const [filterCompanyVisible, setFilterCompanyVisible] = useState(false);
+  const [filterStatusVisible, setFilterStatusVisible] = useState(false);
+
+  const rentalTypes = React.useMemo(() => {
+    const types = (rentalEntries || [])
+      .map((entry) =>
+        typeof entry.rentalId === 'object' && entry.rentalId?.rentalType
+          ? entry.rentalId.rentalType
+          : null
+      )
+      .filter(Boolean) as string[];
+    return [...new Set(types)].sort();
+  }, [rentalEntries]);
+
+  const rentalTitles = React.useMemo(() => {
+    const titles = (rentalEntries || [])
+      .map((entry) =>
+        typeof entry.rentalId === 'object' && entry.rentalId?.rentalTitle
+          ? entry.rentalId.rentalTitle
+          : null
+      )
+      .filter(Boolean) as string[];
+    return [...new Set(titles)].sort();
+  }, [rentalEntries]);
+
+  const employeeNames = React.useMemo(() => {
+    const names = (rentalEntries || [])
+      .map((entry) => entry.assignedTo?.name)
+      .filter(Boolean) as string[];
+    return [...new Set(names)].sort();
+  }, [rentalEntries]);
+
+  const companyNames = React.useMemo(() => {
+    const names = (rentalEntries || [])
+      .map((entry) => entry.companyId?.companyName)
+      .filter(Boolean) as string[];
+    return [...new Set(names)].sort();
+  }, [rentalEntries]);
+
+  const statuses = React.useMemo(() => {
+    const sts = (rentalEntries || [])
+      .map((entry) => entry.status)
+      .filter(Boolean) as string[];
+    return [...new Set(sts)].sort();
+  }, [rentalEntries]);
 
   useEffect(() => {
     fetchRentalEntries();
@@ -77,9 +130,8 @@ const RentalInvoiceListScreen = () => {
   );
 
   useEffect(() => {
-    filterEntries();
-    setPage(0); // Reset to first page when search term changes
-  }, [searchTerm]);
+    setPage(0);
+  }, [searchTerm, rentalTypeFilter, rentalTitleFilter, employeeFilter, companyFilter, statusFilter]);
 
   const fetchRentalEntries = async () => {
     try {
@@ -146,10 +198,6 @@ const RentalInvoiceListScreen = () => {
     } catch (error) {
       console.error('Error fetching invoice count:', error);
     }
-  };
-
-  const filterEntries = () => {
-    // Filtering is handled in renderEntry
   };
 
   const toggleExpand = (entryId: string) => {
@@ -598,23 +646,34 @@ const RentalInvoiceListScreen = () => {
   };
 
   const filteredEntries = rentalEntries.filter((entry) => {
+    const entryType =
+      typeof entry.rentalId === 'object' && entry.rentalId?.rentalType
+        ? entry.rentalId.rentalType
+        : null;
+    const entryTitle =
+      typeof entry.rentalId === 'object' && entry.rentalId?.rentalTitle
+        ? entry.rentalId.rentalTitle
+        : null;
+    if (rentalTypeFilter && entryType !== rentalTypeFilter) return false;
+    if (rentalTitleFilter && entryTitle !== rentalTitleFilter) return false;
+    if (employeeFilter && entry.assignedTo?.name !== employeeFilter) return false;
+    if (companyFilter && entry.companyId?.companyName !== companyFilter) return false;
+    if (statusFilter && entry.status !== statusFilter) return false;
+
     const lowerCaseSearchTerm = searchTerm.toLowerCase();
+    if (!lowerCaseSearchTerm) return true;
     const invoiceNumberMatch =
       invoiceType === 'invoice' &&
       entry?.invoiceNumber?.toString().toLowerCase().includes(lowerCaseSearchTerm);
     const companyNameMatch = entry.companyId?.companyName?.toLowerCase().includes(lowerCaseSearchTerm);
     const statusMatch = entry.paymentAmountType?.toLowerCase().includes(lowerCaseSearchTerm);
-    const dateMatch = entry.createdAt
-      ? new Date(entry.createdAt).toISOString().split('T')[0].includes(lowerCaseSearchTerm)
-      : false;
-
+    const invoiceDateValue = entry.invoiceDate || entry.entryDate || entry.createdAt;
+    const invoiceDateStr = invoiceDateValue
+      ? new Date(invoiceDateValue).toISOString().split('T')[0]
+      : '';
+    const dateMatch = invoiceDateStr.includes(lowerCaseSearchTerm);
     return invoiceNumberMatch || companyNameMatch || statusMatch || dateMatch;
   });
-
-  // Reset page to 0 when search term changes
-  useEffect(() => {
-    setPage(0);
-  }, [searchTerm]);
 
   // Pagination handlers
   const handleChangePage = (newPage: number) => {
@@ -918,6 +977,73 @@ const RentalInvoiceListScreen = () => {
           value={searchTerm}
           onChangeText={setSearchTerm}
         />
+      </View>
+
+      {/* Filters */}
+      <View style={styles.filterSection}>
+        <Text style={styles.filterSectionLabel}>Filters</Text>
+        <View style={styles.filterRow}>
+          <TouchableOpacity
+            style={[styles.filterChip, rentalTypeFilter ? styles.filterChipActive : null]}
+            onPress={() => setFilterRentalTypeVisible(true)}
+          >
+            <View style={styles.filterChipContent}>
+              <Text style={styles.filterChipLabel}>Rental Type</Text>
+              <Text style={styles.filterChipValue} numberOfLines={1}>
+                {rentalTypeFilter || 'All'}
+              </Text>
+            </View>
+            <Icon name="arrow-drop-down" size={20} color="#666" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.filterChip, rentalTitleFilter ? styles.filterChipActive : null]}
+            onPress={() => setFilterRentalTitleVisible(true)}
+          >
+            <View style={styles.filterChipContent}>
+              <Text style={styles.filterChipLabel}>Rental Title</Text>
+              <Text style={styles.filterChipValue} numberOfLines={1}>
+                {rentalTitleFilter || 'All'}
+              </Text>
+            </View>
+            <Icon name="arrow-drop-down" size={20} color="#666" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.filterChip, employeeFilter ? styles.filterChipActive : null]}
+            onPress={() => setFilterEmployeeVisible(true)}
+          >
+            <View style={styles.filterChipContent}>
+              <Text style={styles.filterChipLabel}>Employee</Text>
+              <Text style={styles.filterChipValue} numberOfLines={1}>
+                {employeeFilter || 'All'}
+              </Text>
+            </View>
+            <Icon name="arrow-drop-down" size={20} color="#666" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.filterChip, companyFilter ? styles.filterChipActive : null]}
+            onPress={() => setFilterCompanyVisible(true)}
+          >
+            <View style={styles.filterChipContent}>
+              <Text style={styles.filterChipLabel}>Company</Text>
+              <Text style={styles.filterChipValue} numberOfLines={1}>
+                {companyFilter || 'All'}
+              </Text>
+            </View>
+            <Icon name="arrow-drop-down" size={20} color="#666" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.filterChip, statusFilter ? styles.filterChipActive : null]}
+            onPress={() => setFilterStatusVisible(true)}
+          >
+            <View style={styles.filterChipContent}>
+              <Text style={styles.filterChipLabel}>Status</Text>
+              <Text style={styles.filterChipValue} numberOfLines={1}>
+                {statusFilter || 'All'}
+              </Text>
+            </View>
+            <Icon name="arrow-drop-down" size={20} color="#666" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {loading ? (
@@ -1402,6 +1528,141 @@ const RentalInvoiceListScreen = () => {
           </View>
         </TouchableOpacity>
       </Modal>
+
+      {/* Filter: Rental Type */}
+      <Modal visible={filterRentalTypeVisible} transparent animationType="slide" onRequestClose={() => setFilterRentalTypeVisible(false)}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setFilterRentalTypeVisible(false)}>
+          <View style={styles.pickerModalContent}>
+            <Text style={styles.pickerModalTitle}>Rental Type</Text>
+            <FlatList
+              data={[{ value: '', label: 'All' }, ...rentalTypes.map((t) => ({ value: t, label: t }))]}
+              keyExtractor={(item) => item.value || 'all'}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.pickerOption}
+                  onPress={() => {
+                    setRentalTypeFilter(item.value);
+                    setFilterRentalTypeVisible(false);
+                  }}
+                >
+                  <Text style={styles.pickerOptionText}>{item.label}</Text>
+                </TouchableOpacity>
+              )}
+            />
+            <TouchableOpacity style={[styles.modalButton, styles.modalCancelButton]} onPress={() => setFilterRentalTypeVisible(false)}>
+              <Text style={styles.modalCancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Filter: Rental Title */}
+      <Modal visible={filterRentalTitleVisible} transparent animationType="slide" onRequestClose={() => setFilterRentalTitleVisible(false)}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setFilterRentalTitleVisible(false)}>
+          <View style={styles.pickerModalContent}>
+            <Text style={styles.pickerModalTitle}>Rental Title</Text>
+            <FlatList
+              data={[{ value: '', label: 'All' }, ...rentalTitles.map((t) => ({ value: t, label: t }))]}
+              keyExtractor={(item) => item.value || 'all'}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.pickerOption}
+                  onPress={() => {
+                    setRentalTitleFilter(item.value);
+                    setFilterRentalTitleVisible(false);
+                  }}
+                >
+                  <Text style={styles.pickerOptionText}>{item.label}</Text>
+                </TouchableOpacity>
+              )}
+            />
+            <TouchableOpacity style={[styles.modalButton, styles.modalCancelButton]} onPress={() => setFilterRentalTitleVisible(false)}>
+              <Text style={styles.modalCancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Filter: Employee */}
+      <Modal visible={filterEmployeeVisible} transparent animationType="slide" onRequestClose={() => setFilterEmployeeVisible(false)}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setFilterEmployeeVisible(false)}>
+          <View style={styles.pickerModalContent}>
+            <Text style={styles.pickerModalTitle}>Employee</Text>
+            <FlatList
+              data={[{ value: '', label: 'All' }, ...employeeNames.map((n) => ({ value: n, label: n }))]}
+              keyExtractor={(item) => item.value || 'all'}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.pickerOption}
+                  onPress={() => {
+                    setEmployeeFilter(item.value);
+                    setFilterEmployeeVisible(false);
+                  }}
+                >
+                  <Text style={styles.pickerOptionText}>{item.label}</Text>
+                </TouchableOpacity>
+              )}
+            />
+            <TouchableOpacity style={[styles.modalButton, styles.modalCancelButton]} onPress={() => setFilterEmployeeVisible(false)}>
+              <Text style={styles.modalCancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Filter: Company */}
+      <Modal visible={filterCompanyVisible} transparent animationType="slide" onRequestClose={() => setFilterCompanyVisible(false)}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setFilterCompanyVisible(false)}>
+          <View style={styles.pickerModalContent}>
+            <Text style={styles.pickerModalTitle}>Company</Text>
+            <FlatList
+              data={[{ value: '', label: 'All' }, ...companyNames.map((c) => ({ value: c, label: c }))]}
+              keyExtractor={(item) => item.value || 'all'}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.pickerOption}
+                  onPress={() => {
+                    setCompanyFilter(item.value);
+                    setFilterCompanyVisible(false);
+                  }}
+                >
+                  <Text style={styles.pickerOptionText}>{item.label}</Text>
+                </TouchableOpacity>
+              )}
+            />
+            <TouchableOpacity style={[styles.modalButton, styles.modalCancelButton]} onPress={() => setFilterCompanyVisible(false)}>
+              <Text style={styles.modalCancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Filter: Status */}
+      <Modal visible={filterStatusVisible} transparent animationType="slide" onRequestClose={() => setFilterStatusVisible(false)}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setFilterStatusVisible(false)}>
+          <View style={styles.pickerModalContent}>
+            <Text style={styles.pickerModalTitle}>Status</Text>
+            <FlatList
+              data={[{ value: '', label: 'All' }, ...statuses.map((s) => ({ value: s, label: s }))]}
+              keyExtractor={(item) => item.value || 'all'}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.pickerOption}
+                  onPress={() => {
+                    setStatusFilter(item.value);
+                    setFilterStatusVisible(false);
+                  }}
+                >
+                  <Text style={styles.pickerOptionText}>{item.label}</Text>
+                </TouchableOpacity>
+              )}
+            />
+            <TouchableOpacity style={[styles.modalButton, styles.modalCancelButton]} onPress={() => setFilterStatusVisible(false)}>
+              <Text style={styles.modalCancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 };
@@ -1492,6 +1753,53 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 40,
     fontSize: 16,
+  },
+  filterSection: {
+    paddingHorizontal: 15,
+    marginBottom: 12,
+  },
+  filterSectionLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  filterRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  filterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    minWidth: '47%',
+    flex: 1,
+    maxWidth: '48%',
+  },
+  filterChipContent: {
+    flex: 1,
+    minWidth: 0,
+  },
+  filterChipLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#666',
+    marginBottom: 2,
+    textTransform: 'uppercase',
+  },
+  filterChipValue: {
+    fontSize: 14,
+    color: '#333',
+  },
+  filterChipActive: {
+    borderColor: '#019ee3',
+    backgroundColor: '#e6f7ff',
   },
   loader: {
     marginTop: 50,
