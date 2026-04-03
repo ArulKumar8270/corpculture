@@ -74,10 +74,18 @@ export const getAllCompanies = async (req, res) => {
                 rentalQuotationCount,
                 rentalReportCount
             ] = await Promise.all([
-                ServiceInvoice.countDocuments({ companyId: company._id, invoiceType: "invoice" }),
+                ServiceInvoice.countDocuments({
+                    companyId: company._id,
+                    invoiceType: "invoice",
+                    status: "Unpaid",
+                }),
                 ServiceInvoice.countDocuments({ companyId: company._id, invoiceType: "quotation" }),
                 Report.countDocuments({ company: company._id, reportType: "service" }),
-                RentalPaymentEntry.countDocuments({ companyId: company._id, invoiceType: "invoice" }),
+                RentalPaymentEntry.countDocuments({
+                    companyId: company._id,
+                    invoiceType: "invoice",
+                    status: "Unpaid",
+                }),
                 RentalPaymentEntry.countDocuments({ companyId: company._id, invoiceType: "quotation" }),
                 Report.countDocuments({ company: company._id, reportType: "rental" })
             ]);

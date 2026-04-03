@@ -228,7 +228,7 @@ export const deleteRentalProduct = async (req, res) => {
     }
 };
 
-// Get Today's Rental Products
+// Get Today's Rental Products (one row per company; all serial numbers combined)
 export const getTodaysRentalProducts = async (req, res) => {
     try {
         const today = new Date();
@@ -244,11 +244,34 @@ export const getTodaysRentalProducts = async (req, res) => {
         })
             .populate('company')
             .populate('gstType')
-            .sort({ createdAt: -1 });
+            .sort({ createdAt: -1 })
+            .lean();
 
-        res.status(200).json({products : rentalProducts});
+        const byCompany = new Map();
+        for (const p of rentalProducts) {
+            const companyId = p.company?._id ? String(p.company._id) : String(p.company || '');
+            const key = companyId || `unknown-${p._id}`;
+            if (!byCompany.has(key)) {
+                byCompany.set(key, []);
+            }
+            byCompany.get(key).push(p);
+        }
+
+        const products = [];
+        for (const group of byCompany.values()) {
+            const serialNos = group.map((x) => x.serialNo).filter(Boolean);
+            const first = { ...group[0] };
+            products.push({
+                ...first,
+                serialNo: serialNos.join(', '),
+                serialNos,
+                rentalProductIds: group.map((x) => x._id),
+            });
+        }
+
+        res.status(200).json({ success: true, products });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Server Error' });
+        res.status(500).json({ success: false, message: 'Server Error' });
     }
 };

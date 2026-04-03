@@ -54,6 +54,10 @@ const rentalSchema = new mongoose.Schema({
         type: String,
         required: false 
     },
+    serialNo : {
+        type: String,
+        required: false
+    },
     status: {
         type: String,
         enum: ["Pending", "In Progress", "Completed", "Cancelled"],
