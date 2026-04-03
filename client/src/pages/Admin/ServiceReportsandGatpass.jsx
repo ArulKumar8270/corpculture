@@ -33,10 +33,13 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown'; // Import down arrow icon
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';   // Import up arrow icon
 import SendIcon from '@mui/icons-material/Send'; // Import SendIcon
+import DownloadIcon from '@mui/icons-material/Download';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import axios from 'axios';
 import { useAuth } from '../../context/auth';
+
+const REPORT_DOWNLOAD_BASE_URL = 'https://pub-109709bff58d46faa2a7782c9bf60324.r2.dev';
 
 const ServiceReportsandGatpass = (props) => {
     const navigate = useNavigate();
@@ -210,6 +213,27 @@ const ServiceReportsandGatpass = (props) => {
         } catch (webhookError) {
             setOnSendn8n(false)
             console.error('Error triggering webhook:', webhookError);
+        }
+    };
+
+    const handleDownloadReport = async (reportId) => {
+        if (!reportId) {
+            toast.error('Report id missing');
+            return;
+        }
+
+        const candidateUrl = `${REPORT_DOWNLOAD_BASE_URL}/${reportId}`;
+        try {
+            const res = await fetch(candidateUrl, { method: 'HEAD' });
+            if (!res.ok) {
+                const msg = 'Report not uploaded';
+                toast.error(msg);
+                window.alert(msg);
+                return;
+            }
+            window.open(candidateUrl, '_blank', 'noopener,noreferrer');
+        } catch (e) {
+            window.open(candidateUrl, '_blank', 'noopener,noreferrer');
         }
     };
 
@@ -476,6 +500,11 @@ const ServiceReportsandGatpass = (props) => {
                                                         color="success" // You can choose a different color
                                                     >
                                                         {onSendn8n ? <CircularProgress size={24} /> : <SendIcon />}
+                                                    </IconButton>
+                                                </Tooltip>
+                                                <Tooltip title="Download Report">
+                                                    <IconButton onClick={() => handleDownloadReport(report._id)} color="primary">
+                                                        <DownloadIcon />
                                                     </IconButton>
                                                 </Tooltip>
                                                 <Tooltip title="Edit Report">

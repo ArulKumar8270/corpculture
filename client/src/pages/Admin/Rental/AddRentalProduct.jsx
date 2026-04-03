@@ -291,7 +291,11 @@ const AddRentalProduct = () => {
         e.preventDefault();
 
         // Basic validation
-        if (!company || !branch || !department || !modelName || !serialNo || !hsn || !basePrice || gstTypeIds.length === 0 || !paymentDate) { // Check gstTypeIds length and commission
+        const cleanedGstTypeIds = (Array.isArray(gstTypeIds) ? gstTypeIds : [])
+            .map((v) => (typeof v === 'string' ? v.trim() : v))
+            .filter(Boolean);
+
+        if (!company || !branch || !department || !modelName || !serialNo || !hsn || !basePrice || cleanedGstTypeIds.length === 0 || !paymentDate) { // Check gstTypeIds length and commission
         alert('Please fill in all required fields.');
             return;
         }
@@ -304,11 +308,11 @@ const AddRentalProduct = () => {
             serialNo,
             hsn,
             basePrice: parseFloat(basePrice),
-            gstType: gstTypeIds,
+            gstType: cleanedGstTypeIds,
             paymentDate: paymentDate ? dayjs(paymentDate).utc().startOf('day').toISOString() : null,
             openingDate: openingDate ? dayjs(openingDate).utc().startOf('day').toISOString() : null,
             closingDate: closingDate ? dayjs(closingDate).utc().startOf('day').toISOString() : null,
-            commission: parseFloat(commission),
+            commission: commission === '' || commission == null ? undefined : parseFloat(commission),
             modelSpecs,
             a3Config: modelSpecs.isA3Selected ? a3Config : {},
             a4Config: modelSpecs.isA4Selected ? a4Config : {},
@@ -498,13 +502,14 @@ const AddRentalProduct = () => {
                                 labelId="gst-type-label"
                                 multiple // Added for multiple selection
                                 value={gstTypeIds} // Now an array
-                                onChange={(e) => setGstTypeIds(e.target.value)} // Handles array of values
+                                onChange={(e) => {
+                                    const next = (Array.isArray(e.target.value) ? e.target.value : [])
+                                        .map((v) => (typeof v === 'string' ? v.trim() : v))
+                                        .filter(Boolean);
+                                    setGstTypeIds(next);
+                                }} // Filter out empty selections
                                 label="Select GST *"
-                                displayEmpty
                             >
-                                <MenuItem value="">
-                                    <em>Select a GST Type</em>
-                                </MenuItem>
                                 {gstOptions.map((gst) => (
                                     <MenuItem key={gst._id} value={gst._id}>
                                         {gst.gstType} ({gst.gstPercentage}%)

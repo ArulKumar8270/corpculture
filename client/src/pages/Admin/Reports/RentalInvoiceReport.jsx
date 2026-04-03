@@ -45,7 +45,20 @@ const RentalInvoiceReport = (props) => {
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [totalCount, setTotalCount] = useState(0);
+    const [exporting, setExporting] = useState(false);
     const { companyId: filterCompanyId } = useParams(); // If filtering by company from another page
+
+    const buildListRequestBody = (currentPage, currentLimit) => ({
+        invoiceType: props?.type,
+        fromDate: fromDate,
+        toDate: toDate,
+        ...(filterCompanyId ? { companyId: filterCompanyId } : {}),
+        companyName: companyNameFilter,
+        invoiceNumber: invoiceNumberFilter,
+        paymentStatus: paymentStatusFilter,
+        page: currentPage + 1,
+        limit: currentLimit,
+    });
 
     const fetchRentalInvoices = async (
         from = '',
@@ -60,13 +73,13 @@ const RentalInvoiceReport = (props) => {
         setError(null);
         try {
             const requestBody = {
-                invoiceType: props?.type, // Fixed for Rental Invoice Report
+                invoiceType: props?.type,
                 fromDate: from,
                 toDate: to,
                 ...(filterCompanyId ? { companyId: filterCompanyId } : {}),
-                companyName: companyName, // Assumes backend can filter by companyName
+                companyName: companyName,
                 invoiceNumber: invoiceNumber,
-                paymentStatus: paymentStatus, // Assumes backend can filter by paymentStatus
+                paymentStatus: paymentStatus,
                 page: currentPage + 1,
                 limit: currentRowsPerPage,
             };
@@ -146,35 +159,76 @@ const RentalInvoiceReport = (props) => {
         fetchRentalInvoices('', '', '', '', '', 0, 10);
     };
 
-    const handleExportExcel = () => {
-        if (rentalInvoices.length === 0) {
-            toast.error("No data to export.");
+    const rentalInvoiceDateStr = (invoice) => {
+        if (invoice.invoiceDate) return new Date(invoice.invoiceDate).toLocaleDateString();
+        if (invoice.entryDate) return new Date(invoice.entryDate).toLocaleDateString();
+        if (invoice.createdAt) return new Date(invoice.createdAt).toLocaleDateString();
+        return 'N/A';
+    };
+
+    const handleExportExcel = async () => {
+        if (!auth?.token) {
+            toast.error('You must be signed in to export.');
             return;
         }
+        if (totalCount === 0) {
+            toast.error('No data to export for the current filters.');
+            return;
+        }
+        setExporting(true);
+        try {
+            const exportLimit = Math.min(Math.max(totalCount, 1), 100000);
+            const requestBody = buildListRequestBody(0, exportLimit);
 
-        const dataToExport = rentalInvoices.map(invoice => ({
-            'Invoice No.': invoice.invoiceNumber,
-            'Company': invoice.companyId?.companyName || 'N/A',
-            'Machine Model': invoice.machineId?.modelName || 'N/A',
-            'Machine Serial No.': invoice.machineId?.serialNo || 'N/A',
-            'Invoice Date': invoice.invoiceDate ? new Date(invoice.invoiceDate).toLocaleDateString() : (invoice.entryDate ? new Date(invoice.entryDate).toLocaleDateString() : (invoice.createdAt ? new Date(invoice.createdAt).toLocaleDateString() : 'N/A')), // Use invoiceDate, fallback to entryDate, then createdAt
-            'Grand Total': 'N/A', // Placeholder: Grand Total not in sample response
-            'Mode of Payment': invoice.modeOfPayment || 'N/A',
-            'Bank Name': invoice.bankName || 'N/A',
-            'Cheque Date': invoice.chequeDate ? new Date(invoice.chequeDate).toLocaleDateString() : 'N/A',
-            'Other Payment Mode': invoice.otherPaymentMode || 'N/A',
-            'Transaction Details': invoice.transactionDetails || 'N/A',
-            'Transfer Date': invoice.transferDate ? new Date(invoice.transferDate).toLocaleDateString() : 'N/A',
-            'Status': 'N/A', // Placeholder: Payment Status not in sample response
-        }));
+            const response = await axios.post(
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/all/`,
+                requestBody,
+                { headers: { Authorization: auth?.token } }
+            );
 
-        const ws = XLSX.utils.json_to_sheet(dataToExport);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Rental Invoices");
-        const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-        const data = new Blob([excelBuffer], { type: 'application/octet-stream' });
-        saveAs(data, 'rental_invoices_report.xlsx');
-        toast.success("Exported to Excel successfully!");
+            if (!response.data?.success) {
+                toast.error(response.data?.message || 'Failed to fetch data for export.');
+                return;
+            }
+
+            const rows = response.data.entries || [];
+            if (rows.length === 0) {
+                toast.error('No data to export.');
+                return;
+            }
+
+            const dataToExport = rows.map((invoice) => ({
+                'Invoice No.': invoice.invoiceNumber ?? 'N/A',
+                'Company': invoice.companyId?.companyName || 'N/A',
+                'Machine Model': invoice.machineId?.modelName || 'N/A',
+                'Machine Serial No.': invoice.machineId?.serialNo || 'N/A',
+                'Invoice Date': rentalInvoiceDateStr(invoice),
+                'Grand Total': Number(invoice.grandTotal ?? 0).toFixed(2),
+                'Status': invoice.status ?? 'N/A',
+                'Assigned To': invoice.assignedTo?.name || 'N/A',
+                'Mode of Payment': invoice.modeOfPayment || 'N/A',
+                'Bank Name': invoice.bankName || 'N/A',
+                'Cheque Date': invoice.chequeDate ? new Date(invoice.chequeDate).toLocaleDateString() : 'N/A',
+                'Other Payment Mode': invoice.otherPaymentMode || 'N/A',
+                'Transaction Details': invoice.transactionDetails || 'N/A',
+                'Transfer Date': invoice.transferDate ? new Date(invoice.transferDate).toLocaleDateString() : 'N/A',
+            }));
+
+            const ws = XLSX.utils.json_to_sheet(dataToExport);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Rental Invoices');
+            const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+            const blob = new Blob([excelBuffer], {
+                type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            });
+            saveAs(blob, `rental_invoices_report_${new Date().toISOString().slice(0, 10)}.xlsx`);
+            toast.success(`Exported ${rows.length} row(s) to Excel.`);
+        } catch (err) {
+            console.error('Export error:', err);
+            toast.error(err.response?.data?.message || err.message || 'Export failed.');
+        } finally {
+            setExporting(false);
+        }
     };
 
     const handleChangePage = (event, newPage) => {
@@ -263,8 +317,14 @@ const RentalInvoiceReport = (props) => {
                         <Button variant="outlined" onClick={handleClearFilter} sx={{ height: '56px' }}>
                             Clear Filter
                         </Button>
-                        <Button variant="contained" color="success" onClick={handleExportExcel} sx={{ height: '56px' }}>
-                            Export to Excel
+                        <Button
+                            variant="contained"
+                            color="success"
+                            onClick={handleExportExcel}
+                            disabled={exporting || totalCount === 0}
+                            sx={{ height: '56px' }}
+                        >
+                            {exporting ? 'Exporting…' : 'Export to Excel'}
                         </Button>
                     </Box>
                 </Box>

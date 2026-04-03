@@ -37,6 +37,10 @@ import Stack from '@mui/material/Stack'; // Import Stack for layout
 import Chip from '@mui/material/Chip'; // Import Chip for assignedTo UI
 import DeleteIcon from '@mui/icons-material/Delete'; // Import DeleteIcon
 import EditIcon from '@mui/icons-material/Edit'; // Import EditIcon for reassign
+import DownloadIcon from '@mui/icons-material/Download';
+
+const INVOICE_DOWNLOAD_BASE_URL = 'https://pub-ef65b8bdb5974dd191a466c3120cd6b3.r2.dev';
+const PAYMENT_COPY_DOWNLOAD_BASE_URL = 'https://pub-982db31d50054adebd29fa1792b12fb8.r2.dev';
 
 // Row component for each invoice, allowing expansion to show products
 function InvoiceRow(props) {
@@ -73,6 +77,56 @@ function InvoiceRow(props) {
 
     const handleEdit = () => {
         navigate(`../addServiceInvoice/${invoice._id}?invoiceType=${invoiceType}`);
+    };
+
+    const handleDownloadInvoice = async () => {
+        const candidateUrl =
+            Array.isArray(invoice?.invoiceLink) && invoice.invoiceLink.length > 0
+                ? invoice.invoiceLink[0]
+                : invoice?._id
+                    ? `${INVOICE_DOWNLOAD_BASE_URL}/${invoice._id}`
+                    : null;
+
+        if (!candidateUrl) {
+            toast.error('Invoice id missing');
+            return;
+        }
+
+        try {
+            const res = await fetch(candidateUrl, { method: 'HEAD' });
+            if (!res.ok) {
+                const msg = 'Already invoice not send please send invoice and download';
+                toast.error(msg);
+                window.alert(msg);
+                return;
+            }
+            window.open(candidateUrl, '_blank', 'noopener,noreferrer');
+        } catch (e) {
+            // If HEAD fails (network/CORS), fall back to opening the URL.
+            window.open(candidateUrl, '_blank', 'noopener,noreferrer');
+        }
+    };
+
+    const handleDownloadPaymentCopy = async () => {
+        if (!invoice?._id) {
+            toast.error('Invoice id missing');
+            return;
+        }
+
+        const candidateUrl = `${PAYMENT_COPY_DOWNLOAD_BASE_URL}/${invoice._id}`;
+
+        try {
+            const res = await fetch(candidateUrl, { method: 'HEAD' });
+            if (!res.ok) {
+                const msg = 'Payment copy not uploaded';
+                toast.error(msg);
+                window.alert(msg);
+                return;
+            }
+            window.open(candidateUrl, '_blank', 'noopener,noreferrer');
+        } catch (e) {
+            window.open(candidateUrl, '_blank', 'noopener,noreferrer');
+        }
     };
 
     const handleUploadSignedInvoice = async (invoiceId, oldSignedLinks) => {
@@ -235,8 +289,6 @@ function InvoiceRow(props) {
         return payload;
     };
 
-    console.log(selectedInvoiceIds, "selectedInvoiceIds23254", invoice._id);
-
     const handleSavePaymentDetails = async (targetInvoiceIdArg, amountArg) => {
         const isMultiSave = typeof targetInvoiceIdArg === 'string' && amountArg != null;
         try {
@@ -303,15 +355,12 @@ function InvoiceRow(props) {
                 allocatedToInvoices: allocatedInvoices,
             };
 
-            console.log(n8nPayload, "n8nPayload23254");
-
             try {
-                const res = await axios.post('https://n8n.nicknameinfo.net/webhook/fb83e945-2e49-4a73-acce-fd08632ef1a8', n8nPayload);
-                if (res) {
-                    alert('Payment acknowledgement sent successfully!');
-                }
+                await axios.post('https://n8n.nicknameinfo.net/webhook/fb83e945-2e49-4a73-acce-fd08632ef1a8', n8nPayload);
+                toast.success('Payment updated (ack sent).');
             } catch (webhookError) {
-                alert(webhookError.message || 'Failed to trigger webhook for payment acknowledgement.');
+                console.error('n8n webhook error:', webhookError);
+                toast.error(webhookError?.message || 'Payment updated, but ack failed.');
             }
         } catch (error) {
             console.error('Error updating payment details:', error);
@@ -587,10 +636,14 @@ function InvoiceRow(props) {
                             Array.isArray(invoice?.signedInvoiceLink) &&
                             invoice.signedInvoiceLink.length > 0;
 
+                        const sentLabel = invoiceType === "quotation"
+                            ? (isInvoiceSent ? "Quotation Sent" : "Quotation Not Sent")
+                            : (isInvoiceSent ? "Invoice Sent" : "Invoice Not Sent");
+
                         return (
                             <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75 }}>
                                 <Chip
-                                    label={isInvoiceSent ? "Invoice Sent" : "Invoice Not Sent"}
+                                    label={sentLabel}
                                     size="small"
                                     color={isInvoiceSent ? "success" : "error"}
                                 />
@@ -639,10 +692,33 @@ function InvoiceRow(props) {
                 </TableCell>
                 <TableCell>
                     {hasPermission("serviceInvoice") ? <Button variant="outlined" size="small" sx={{ mr: 1 }} onClick={handleEdit}>Edit</Button> : null}
-                    <Button variant="outlined" size="small" sx={{ my: 1 }} onClick={() => onSendInvoice(invoice)} > {isInvoiceSend ? <CircularProgress size={24} /> : `Send ${invoiceType === "quotation" ? "Quotaion" : "Invoice"}`}</Button>
+                    <Button
+                        variant="outlined"
+                        size="small"
+                        sx={{ my: 1, mr: 1 }}
+                        startIcon={<DownloadIcon />}
+                        onClick={handleDownloadInvoice}
+                    >
+                        Download {invoiceType === "quotation" ? "Quotation" : "Invoice"}
+                    </Button>
+                    <Button variant="outlined" size="small" sx={{ my: 1 }} onClick={() => onSendInvoice(invoice)} > {isInvoiceSend ? <CircularProgress size={24} /> : `Send ${invoiceType === "quotation" ? "Quotation" : "Invoice"}`}</Button>
                     {invoiceType === "quotation" ? <Button variant="outlined" size="small" sx={{ my: 1 }} onClick={() => onMoveToInvoice("invoice")}>Move to invoice</Button>
                         : null}
-                    {!invoice?.tdsAmount && invoiceType !== "quotation" ? <Button variant="outlined" size="small" sx={{ my: 1 }} onClick={handleOpenPaymentDetailsModal}>Update Payment Details</Button> : null}
+                    {!invoice?.tdsAmount && invoiceType !== "quotation" ? (
+                        <>
+                            <Button variant="outlined" size="small" sx={{ my: 1 }} onClick={handleOpenPaymentDetailsModal}>
+                                Update Payment Details
+                            </Button>
+                            <IconButton
+                                size="small"
+                                sx={{ ml: 0.5 }}
+                                title="Download Payment Copy"
+                                onClick={handleDownloadPaymentCopy}
+                            >
+                                <DownloadIcon fontSize="small" />
+                            </IconButton>
+                        </>
+                    ) : null}
                     <Button
                         variant="contained"
                         sx={{ bgcolor: '#28a745', '&:hover': { bgcolor: '#218838' } }}

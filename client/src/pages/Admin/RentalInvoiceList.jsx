@@ -36,6 +36,10 @@ import Chip from '@mui/material/Chip';
 import SearchIcon from '@mui/icons-material/Search'; // Import SearchIcon
 import InputAdornment from '@mui/material/InputAdornment'; // Import InputAdornment
 import DeleteIcon from '@mui/icons-material/Delete';
+import DownloadIcon from '@mui/icons-material/Download';
+
+const RENTAL_INVOICE_DOWNLOAD_BASE_URL = 'https://pub-bcab85dac0c64221ba6b6a756f991c46.r2.dev';
+const PAYMENT_COPY_DOWNLOAD_BASE_URL = 'https://pub-982db31d50054adebd29fa1792b12fb8.r2.dev';
 
 function RentalInvoiceList(props) {
     const [loading, setLoading] = useState(true);
@@ -78,6 +82,56 @@ function RentalInvoiceList(props) {
     const [selectedUserId, setSelectedUserId] = useState(''); // State for selected user in reassign modal
     const [reassigning, setReassigning] = useState(false); // State for reassign loading
     const [page, setPage] = useState(0); // Pagination state
+
+    const handleDownloadInvoice = async (entry) => {
+        const candidateUrl =
+            Array.isArray(entry?.invoiceLink) && entry.invoiceLink.length > 0
+                ? entry.invoiceLink[0]
+                : entry?._id
+                    ? `${RENTAL_INVOICE_DOWNLOAD_BASE_URL}/${entry._id}`
+                    : null;
+
+        if (!candidateUrl) {
+            toast.error('Invoice id missing');
+            return;
+        }
+
+        try {
+            const res = await fetch(candidateUrl, { method: 'HEAD' });
+            if (!res.ok) {
+                const msg = 'Already invoice not send please send invoice and download';
+                toast.error(msg);
+                window.alert(msg);
+                return;
+            }
+            window.open(candidateUrl, '_blank', 'noopener,noreferrer');
+        } catch (e) {
+            // If HEAD fails (network/CORS), fall back to opening the URL.
+            window.open(candidateUrl, '_blank', 'noopener,noreferrer');
+        }
+    };
+
+    const handleDownloadPaymentCopy = async (entry) => {
+        if (!entry?._id) {
+            toast.error('Invoice id missing');
+            return;
+        }
+
+        const candidateUrl = `${PAYMENT_COPY_DOWNLOAD_BASE_URL}/${entry._id}`;
+
+        try {
+            const res = await fetch(candidateUrl, { method: 'HEAD' });
+            if (!res.ok) {
+                const msg = 'Payment copy not uploaded';
+                toast.error(msg);
+                window.alert(msg);
+                return;
+            }
+            window.open(candidateUrl, '_blank', 'noopener,noreferrer');
+        } catch (e) {
+            window.open(candidateUrl, '_blank', 'noopener,noreferrer');
+        }
+    };
     const [rowsPerPage, setRowsPerPage] = useState(10); // Pagination state
     useEffect(() => {
         fetchRentalEntries();
@@ -529,8 +583,10 @@ function RentalInvoiceList(props) {
 
             try {
                 await axios.post('https://n8n.nicknameinfo.net/webhook/fb83e945-2e49-4a73-acce-fd08632ef1a8', n8nPayload);
+                toast.success('Payment updated (ack sent).');
             } catch (webhookError) {
                 console.error('n8n webhook error:', webhookError);
+                toast.error(webhookError?.message || 'Payment updated, but ack failed.');
             }
 
             toast.success('Payment details updated successfully!');
@@ -985,28 +1041,101 @@ function RentalInvoiceList(props) {
                                                     </Typography>
                                                 </TableCell>
                                                 <TableCell>
-                                                    <Chip
-                                                        label={entry.status}
-                                                        size="small"
-                                                        color={
-                                                            entry.status === 'Paid' ? 'success' :
-                                                                entry.status === 'Unpaid' ? 'error' :
-                                                                    entry.status === 'Pending' || entry.status === 'Progress' ? 'warning' :
-                                                                        'default'
-                                                        }
-                                                    />
-                                                    {entry?.invoiceLink?.length <= 0 ? <Chip
-                                                        label={"Invoice Upload Pending"}
-                                                        size="small"
-                                                        color={"error"}
-                                                        className='mt-2'
-                                                    /> : null}
+                                                    {(() => {
+                                                        const isQuotation = props?.invoice === "quotation";
+                                                        const isInvoiceSent =
+                                                            entry?.invoiceSendStatus === "Sent" ||
+                                                            !!entry?.invoiceSentAt ||
+                                                            entry?.status === "InvoiceSent";
+
+                                                        const hasPaymentDetails =
+                                                            (Number(entry?.paymentAmount) || 0) > 0 ||
+                                                            !!entry?.paymentAmountType ||
+                                                            (Number(entry?.pendingAmount) || 0) > 0 ||
+                                                            (Number(entry?.tdsAmount) || 0) > 0 ||
+                                                            !!entry?.bankName ||
+                                                            !!entry?.transactionDetails ||
+                                                            !!entry?.chequeDate ||
+                                                            !!entry?.transferDate ||
+                                                            !!entry?.companyNamePayment ||
+                                                            !!entry?.otherPaymentMode;
+
+                                                        const hasSignedCopy =
+                                                            Array.isArray(entry?.signedInvoiceLink) &&
+                                                            entry.signedInvoiceLink.length > 0;
+                                                        const showSignedChip = Object.prototype.hasOwnProperty.call(entry || {}, "signedInvoiceLink");
+
+                                                        const sentLabel = isQuotation
+                                                            ? (isInvoiceSent ? "Quotation Sent" : "Quotation Not Sent")
+                                                            : (isInvoiceSent ? "Invoice Sent" : "Invoice Not Sent");
+
+                                                        return (
+                                                            <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75 }}>
+                                                                <Chip
+                                                                    label={sentLabel}
+                                                                    size="small"
+                                                                    color={isInvoiceSent ? "success" : "error"}
+                                                                />
+                                                                <Chip
+                                                                    label={
+                                                                        hasPaymentDetails
+                                                                            ? "Payment Details Updated"
+                                                                            : "Payment Details Not Updated"
+                                                                    }
+                                                                    size="small"
+                                                                    color={hasPaymentDetails ? "success" : "error"}
+                                                                />
+                                                                {showSignedChip ? (
+                                                                    <Chip
+                                                                        label={
+                                                                            hasSignedCopy
+                                                                                ? "Signed Copy Uploaded"
+                                                                                : "Signed Copy Not Uploaded"
+                                                                        }
+                                                                        size="small"
+                                                                        color={hasSignedCopy ? "success" : "error"}
+                                                                    />
+                                                                ) : null}
+                                                                {(!entry?.invoiceLink || entry.invoiceLink.length <= 0) ? (
+                                                                    <Chip
+                                                                        label={isQuotation ? "Quotation Upload Pending" : "Invoice Upload Pending"}
+                                                                        size="small"
+                                                                        color="error"
+                                                                        className="mt-2"
+                                                                    />
+                                                                ) : null}
+                                                                {entry?.status && entry.status !== "InvoiceSent" ? (
+                                                                    <Chip
+                                                                        label={entry.status}
+                                                                        size="small"
+                                                                        color={
+                                                                            entry.status === "Paid"
+                                                                                ? "success"
+                                                                                : entry.status === "Unpaid"
+                                                                                    ? "error"
+                                                                                    : entry.status === "Pending" || entry.status === "Progress"
+                                                                                        ? "warning"
+                                                                                        : "default"
+                                                                        }
+                                                                    />
+                                                                ) : null}
+                                                            </Box>
+                                                        );
+                                                    })()}
                                                 </TableCell>
                                                 <TableCell>
                                                     <Stack spacing={1}>
                                                         {hasPermission("rentalInvoice") ? <Button variant="outlined" size="small" onClick={() => handleEdit(entry._id)}>
                                                             Edit
                                                         </Button> : null}
+                                                        <Button
+                                                            variant="outlined"
+                                                            size="small"
+                                                            startIcon={<DownloadIcon />}
+                                                            onClick={() => handleDownloadInvoice(entry)}
+                                                        >
+                                                            Download {props?.invoice === "quotation" ? "Quotation" : "Invoice"}
+                                                        </Button>
                                                         <Button variant="outlined" size="small" onClick={() => onSendInvoice(entry._id)}>
                                                             {isInvoiceSend ? <CircularProgress size={24} /> : `Send ${props?.invoice === "quotation" ? "Quotation" : "Invoice"}`}
                                                         </Button>
@@ -1017,6 +1146,15 @@ function RentalInvoiceList(props) {
                                                         }}>
                                                             Update Payment Details
                                                         </Button> : null}
+                                                        {!entry?.tdsAmount && props?.invoice !== "quotation" ? (
+                                                            <IconButton
+                                                                size="small"
+                                                                title="Download Payment Copy"
+                                                                onClick={() => handleDownloadPaymentCopy(entry)}
+                                                            >
+                                                                <DownloadIcon fontSize="small" />
+                                                            </IconButton>
+                                                        ) : null}
                                                         <Button
                                                             variant="contained"
                                                             color="success"
@@ -1114,7 +1252,7 @@ function RentalInvoiceList(props) {
                                                                             target="_blank"
                                                                             rel="noopener noreferrer"
                                                                         >
-                                                                            Invoice {index + 1}
+                                                                            {props?.invoice === "quotation" ? "Quotation" : "Invoice"} {index + 1}
                                                                         </Button>
                                                                         {hasPermission("serviceInvoice") && (
                                                                             <IconButton

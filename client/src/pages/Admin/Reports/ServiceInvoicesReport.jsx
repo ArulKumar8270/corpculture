@@ -45,6 +45,7 @@ const ServiceInvoicesReport = (props) => {
     const [page, setPage] = useState(0); // New state for current page (0-indexed)
     const [rowsPerPage, setRowsPerPage] = useState(10); // New state for rows per page
     const [totalCount, setTotalCount] = useState(0); // New state for total number of invoices
+    const [exporting, setExporting] = useState(false);
     const { companyId: filterCompanyId } = useParams();
     // Modified to accept all filter parameters and pagination parameters
     const fetchServiceInvoices = async (
@@ -60,14 +61,14 @@ const ServiceInvoicesReport = (props) => {
         setError(null);
         try {
             const requestBody = {
-                invoiceType: props?.type, // Explicitly set invoiceType for this report
+                invoiceType: props?.type,
                 fromDate: from,
                 toDate: to,
-                ...(filterCompanyId ? {companyId : filterCompanyId} : {}),
+                ...(filterCompanyId ? { companyId: filterCompanyId } : {}),
                 companyName: companyName,
                 invoiceNumber: invoiceNumber,
                 paymentStatus: paymentStatus,
-                page: currentPage + 1, // Backend usually expects 1-indexed page
+                page: currentPage + 1,
                 limit: currentRowsPerPage,
             };
 
@@ -146,33 +147,79 @@ const ServiceInvoicesReport = (props) => {
         fetchServiceInvoices('', '', '', '', '', 0, 10); // Fetch all invoices with default pagination
     };
 
-    const handleExportExcel = () => {
-        if (invoices.length === 0) {
-            toast.error("No data to export.");
+    const buildListRequestBody = (currentPage, currentLimit) => ({
+        invoiceType: props?.type,
+        fromDate: fromDate,
+        toDate: toDate,
+        ...(filterCompanyId ? { companyId: filterCompanyId } : {}),
+        companyName: companyNameFilter,
+        invoiceNumber: invoiceNumberFilter,
+        paymentStatus: paymentStatusFilter,
+        page: currentPage + 1,
+        limit: currentLimit,
+    });
+
+    const handleExportExcel = async () => {
+        if (!auth?.token) {
+            toast.error('You must be signed in to export.');
             return;
         }
+        if (totalCount === 0) {
+            toast.error('No data to export for the current filters.');
+            return;
+        }
+        setExporting(true);
+        try {
+            const exportLimit = Math.min(Math.max(totalCount, 1), 100000);
+            const requestBody = buildListRequestBody(0, exportLimit);
 
-        const dataToExport = invoices.map(invoice => ({
-            'Invoice No.': invoice.invoiceNumber,
-            'Company': invoice.companyId?.companyName || 'N/A',
-            'Invoice Date': new Date(invoice.invoiceDate).toLocaleDateString(),
-            'Grand Total': invoice.grandTotal?.toFixed(2) || '0.00',
-            'Assigned To': invoice.assignedTo?.name || 'N/A',
-            'Bank Name': invoice.bankName || 'N/A',
-            'Mode of Payment': invoice.modeOfPayment || 'N/A',
-            'Cheque Date': invoice.chequeDate ? new Date(invoice.chequeDate).toLocaleDateString() : 'N/A',
-            'Other Payment Mode': invoice.otherPaymentMode || 'N/A',
-            'Transaction Details': invoice.transactionDetails || 'N/A',
-            'Transfer Date': invoice.transferDate ? new Date(invoice.transferDate).toLocaleDateString() : 'N/A',
-        }));
+            const response = await axios.post(
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/all`,
+                requestBody,
+                { headers: { Authorization: auth?.token } }
+            );
 
-        const ws = XLSX.utils.json_to_sheet(dataToExport);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Service Invoices");
-        const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-        const data = new Blob([excelBuffer], { type: 'application/octet-stream' });
-        saveAs(data, 'service_invoices_report.xlsx');
-        toast.success("Exported to Excel successfully!");
+            if (!response.data?.success) {
+                toast.error(response.data?.message || 'Failed to fetch data for export.');
+                return;
+            }
+
+            const rows = response.data.serviceInvoices || [];
+            if (rows.length === 0) {
+                toast.error('No data to export.');
+                return;
+            }
+
+            const dataToExport = rows.map((invoice) => ({
+                'Invoice No.': invoice.invoiceNumber ?? 'N/A',
+                'Company': invoice.companyId?.companyName || 'N/A',
+                'Invoice Date': invoice.invoiceDate ? new Date(invoice.invoiceDate).toLocaleDateString() : 'N/A',
+                'Grand Total': Number(invoice.grandTotal ?? 0).toFixed(2),
+                'Status': invoice.status ?? 'N/A',
+                'Assigned To': invoice.assignedTo?.name || 'N/A',
+                'Bank Name': invoice.bankName || 'N/A',
+                'Mode of Payment': invoice.modeOfPayment || 'N/A',
+                'Cheque Date': invoice.chequeDate ? new Date(invoice.chequeDate).toLocaleDateString() : 'N/A',
+                'Other Payment Mode': invoice.otherPaymentMode || 'N/A',
+                'Transaction Details': invoice.transactionDetails || 'N/A',
+                'Transfer Date': invoice.transferDate ? new Date(invoice.transferDate).toLocaleDateString() : 'N/A',
+            }));
+
+            const ws = XLSX.utils.json_to_sheet(dataToExport);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Service Invoices');
+            const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+            const blob = new Blob([excelBuffer], {
+                type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            });
+            saveAs(blob, `service_invoices_report_${new Date().toISOString().slice(0, 10)}.xlsx`);
+            toast.success(`Exported ${rows.length} row(s) to Excel.`);
+        } catch (err) {
+            console.error('Export error:', err);
+            toast.error(err.response?.data?.message || err.message || 'Export failed.');
+        } finally {
+            setExporting(false);
+        }
     };
 
     // Pagination handlers
@@ -266,8 +313,14 @@ const ServiceInvoicesReport = (props) => {
                         <Button variant="outlined" onClick={handleClearFilter} sx={{ height: '56px' }}>
                             Clear Filter
                         </Button>
-                        <Button variant="contained" color="success" onClick={handleExportExcel} sx={{ height: '56px' }}>
-                            Export to Excel
+                        <Button
+                            variant="contained"
+                            color="success"
+                            onClick={handleExportExcel}
+                            disabled={exporting || totalCount === 0}
+                            sx={{ height: '56px' }}
+                        >
+                            {exporting ? 'Exporting…' : 'Export to Excel'}
                         </Button>
                     </Box>
                 </Box>

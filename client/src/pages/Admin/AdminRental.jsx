@@ -12,10 +12,17 @@ import DescriptionIcon from '@mui/icons-material/Description'; // For Quotation
 import BarChartIcon from '@mui/icons-material/BarChart'; // For Report
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward'; // For Move To Unwanted Tab
 import TextField from '@mui/material/TextField';
+import PhoneIcon from '@mui/icons-material/Phone';
+
+const telHref = (phone) => {
+    if (!phone) return '#';
+    return `tel:${String(phone).replace(/[\s-]/g, '')}`;
+};
 
 const AdminRental
   = () => {
     const { auth, userPermissions } = useAuth();
+    const isAdmin = Number(auth?.user?.role) === 1;
     const [enquiries, setEnquiries] = useState([]);
     const [allRentalsData, setAllRentalsData] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -430,7 +437,7 @@ const AdminRental
                 {/* <th className="py-2 px-3 text-left">Assigned To</th> */}
                 <th className="py-2 px-3 text-left">Assigned Employee</th>
                 <th className="py-2 px-3 text-left">Customer Type</th>
-                <th className="py-2 px-3 text-left">Phone</th>
+                <th className="py-2 px-3 text-left">{isAdmin ? 'Phone' : 'Call'}</th>
                 <th className="py-2 px-3 text-left">Company Name</th>
                 <th className="py-2 px-3 text-left">Contact Person</th>
                 <th className="py-2 px-3 text-left">Email</th>
@@ -537,7 +544,24 @@ const AdminRental
                       )}
                     </td>
                     <td className="py-2 px-3">{enquiry.customerType}</td>
-                    <td className="py-2 px-3">{enquiry.phone}</td>
+                    <td className="py-2 px-3">
+                      {isAdmin ? (
+                        enquiry.phone || '—'
+                      ) : enquiry.phone ? (
+                        <IconButton
+                          component="a"
+                          href={telHref(enquiry.phone)}
+                          size="small"
+                          color="primary"
+                          aria-label="Call customer"
+                          title="Call"
+                        >
+                          <PhoneIcon fontSize="small" />
+                        </IconButton>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
                     <td className="py-2 px-3">{enquiry.companyName}</td>
                     <td className="py-2 px-3">{enquiry.contactPerson}</td>
                     <td className="py-2 px-3">{enquiry.email}</td>

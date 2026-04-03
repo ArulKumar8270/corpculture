@@ -31,8 +31,10 @@ const RentalProductList = () => {
     }, [searchTerm]);
 
 
-    const hasPermission = (key) => {
-        return userPermissions.some(p => p.key === key && p.actions.includes('edit')) || auth?.user?.role === 1;
+    const isAdmin = Number(auth?.user?.role) === 1;
+
+    const hasPermission = (key, action = 'edit') => {
+        return userPermissions.some(p => p.key === key && p.actions.includes(action)) || isAdmin;
     };
 
     const fetchRentalProducts = async () => {
@@ -77,7 +79,14 @@ const RentalProductList = () => {
     const handleDelete = async (productId) => {
         if (window.confirm('Are you sure you want to delete this rental product?')) {
             try {
-                const { data } = await axios.delete(`${import.meta.env.VITE_SERVER_URL}/api/v1/rental-products/${productId}`);
+                const { data } = await axios.delete(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-products/${productId}`,
+                    {
+                        headers: {
+                            Authorization: auth?.token,
+                        },
+                    }
+                );
                 if (data?.success) {
                     toast.success(data.message || 'Rental product deleted successfully!');
                     fetchRentalProducts(); // Refresh the list
@@ -145,11 +154,15 @@ const RentalProductList = () => {
         setCurrentPage(value);
     };
 
+    const canEditRentalProducts = hasPermission("rentalAllProducts", "edit");
+    const canDeleteRentalProducts = isAdmin || hasPermission("rentalAllProducts", "delete");
+    const showActions = canEditRentalProducts || canDeleteRentalProducts;
+
     return (
         <div className="p-4" style={{ width: '91%' }}>
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-semibold">Rental Product List</h1>
-                {hasPermission("rentalAllProducts") ? <Button
+                {canEditRentalProducts ? <Button
                     variant="contained"
                     color="primary"
                     onClick={() => navigate('../addRentalProduct')}
@@ -184,7 +197,7 @@ const RentalProductList = () => {
                                 <TableCell className="font-semibold">Payment Date</TableCell>
                                 <TableCell className="font-semibold">Commission</TableCell> {/* New Table Header */}
                                 <TableCell className="font-semibold">Assigned Employee</TableCell>
-                                {hasPermission("rentalAllProducts") ? <TableCell className="font-semibold">Action</TableCell> : null}
+                                {showActions ? <TableCell className="font-semibold">Action</TableCell> : null}
                             </TableRow>
                         </TableHead>
                         <TableBody>
@@ -231,33 +244,40 @@ const RentalProductList = () => {
                                                 </Select>
                                             </FormControl>
                                         </TableCell>
-                                        {hasPermission("rentalAllProducts") ? <TableCell>
-                                            <Button
-                                                variant="contained"
-                                                color="primary"
-                                                size="small"
-                                                startIcon={<EditIcon />}
-                                                onClick={() => handleEdit(product._id)}
-                                                className="mr-2 bg-blue-500 hover:bg-blue-600"
-                                            >
-                                                Edit
-                                            </Button>
-                                            {/* <Button
-                                                variant="contained"
-                                                color="error"
-                                                size="small"
-                                                startIcon={<DeleteIcon />}
-                                                onClick={() => handleDelete(product._id)}
-                                                className="bg-red-500 hover:bg-red-600"
-                                            >
-                                                Delete
-                                            </Button> */}
-                                        </TableCell> : null}
+                                        {showActions ? (
+                                            <TableCell>
+                                                {canEditRentalProducts ? (
+                                                    <Button
+                                                        variant="contained"
+                                                        color="primary"
+                                                        size="small"
+                                                        startIcon={<EditIcon />}
+                                                        onClick={() => handleEdit(product._id)}
+                                                        className="mr-2 bg-blue-500 hover:bg-blue-600"
+                                                    >
+                                                        Edit
+                                                    </Button>
+                                                ) : null}
+
+                                                {canDeleteRentalProducts ? (
+                                                    <Button
+                                                        variant="contained"
+                                                        color="error"
+                                                        size="small"
+                                                        startIcon={<DeleteIcon />}
+                                                        onClick={() => handleDelete(product._id)}
+                                                        className="bg-red-500 hover:bg-red-600"
+                                                    >
+                                                        Delete
+                                                    </Button>
+                                                ) : null}
+                                            </TableCell>
+                                        ) : null}
                                     </TableRow>
                                 ))
                             ) : (
                                 <TableRow>
-                                    <TableCell colSpan={11} className="text-center text-gray-500 py-4"> {/* Adjusted colspan to 11 */}
+                                    <TableCell colSpan={showActions ? 12 : 11} className="text-center text-gray-500 py-4">
                                         No rental products found.
                                     </TableCell>
                                 </TableRow>

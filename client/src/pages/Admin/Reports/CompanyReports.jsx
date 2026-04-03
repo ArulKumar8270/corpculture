@@ -70,10 +70,12 @@ const CompanyReports = () => {
                         companyAddress: c.billingAddress || c.addressDetail || '',
                         mobileNumber: c.mobileNumber || c.phone || 'N/A',
                         // Assuming these counts are now returned by the backend for each company
-                        serviceInvoiceCount: c.serviceInvoiceCount || 0,
+                        // Backend returns unpaid service invoices only for this count
+                        serviceInvoiceCount: c.serviceInvoiceCount ?? 0,
                         serviceQuotationCount: c.serviceQuotationCount || 0,
                         serviceReportCount: c.serviceReportCount || 0,
-                        rentalInvoiceCount: c.rentalInvoiceCount || 0,
+                        // Backend returns unpaid rental invoices only for this count
+                        rentalInvoiceCount: c.rentalInvoiceCount ?? 0,
                         rentalQuotationCount: c.rentalQuotationCount || 0,
                         rentalReportCount: c.rentalReportCount || 0,
                     }));
@@ -268,10 +270,10 @@ const CompanyReports = () => {
                                 <TableCell>Company Name</TableCell>
                                 <TableCell>Company Address</TableCell>
                                 <TableCell>Mobile Number</TableCell>
-                                <TableCell align="center">Service Invoice</TableCell>
+                                <TableCell align="center">Service Invoice (Unpaid)</TableCell>
                                 <TableCell align="center">Service Quotation</TableCell>
                                 <TableCell align="center">Service Report</TableCell>
-                                <TableCell align="center">Rental Invoice</TableCell>
+                                <TableCell align="center">Rental Invoice (Unpaid)</TableCell>
                                 <TableCell align="center">Rental Quotation</TableCell>
                                 <TableCell align="center">Rental Report</TableCell>
                                 {/* <TableCell align="center">Action</TableCell> */}
@@ -300,7 +302,7 @@ const CompanyReports = () => {
                                             >
                                                 {company.serviceInvoiceCount}
                                             </Button>
-                                            <Tooltip title="Set Reminder">
+                                            <Tooltip title="Set reminder (unpaid service invoices)">
                                                 <IconButton onClick={() => handleSetReminder(company._id, 'ServiceInvoice')} color="warning">
                                                     <NotificationsActiveIcon />
                                                 </IconButton>
@@ -338,7 +340,7 @@ const CompanyReports = () => {
                                             >
                                                 {company.rentalInvoiceCount}
                                             </Button>
-                                            <Tooltip title="Set Reminder">
+                                            <Tooltip title="Set reminder (unpaid rental invoices)">
                                                 <IconButton onClick={() => handleSetReminder(company._id, 'RentalInvoice')} color="warning">
                                                     <NotificationsActiveIcon />
                                                 </IconButton>

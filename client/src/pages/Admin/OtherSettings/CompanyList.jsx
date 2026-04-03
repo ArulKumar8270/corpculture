@@ -21,45 +21,68 @@ const CompanyList = () => {
     const [totalCount, setTotalCount] = useState(0);
 
 
-    useEffect(() => {
-        const fetchCompanies = async () => {
-            try {
-                setLoading(true);
-                const queryParams = new URLSearchParams({
-                    page: page + 1, // Backend expects 1-indexed page
-                    limit: rowsPerPage,
-                    search: appliedSearch || ''
-                }).toString();
+    const fetchCompanies = async () => {
+        try {
+            setLoading(true);
+            const queryParams = new URLSearchParams({
+                page: page + 1, // Backend expects 1-indexed page
+                limit: rowsPerPage,
+                search: appliedSearch || ''
+            }).toString();
 
-                const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/company/all?${queryParams}`, {
-                    headers: {
-                        Authorization: auth.token,
-                    },
-                });
-                if (data?.success) {
-                    setCompanies(data.companies);
-                    setTotalCount(data.totalCount || 0);
-                } else {
-                    setError(data?.message || 'Failed to fetch companies.');
-                    toast.error(data?.message || 'Failed to fetch companies.');
-                }
-            } catch (err) {
-                console.error('Error fetching companies:', err);
-                setError('Something went wrong while fetching companies.');
-                toast.error('Something went wrong while fetching companies.');
-            } finally {
-                setLoading(false);
+            const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/company/all?${queryParams}`, {
+                headers: {
+                    Authorization: auth.token,
+                },
+            });
+            if (data?.success) {
+                setCompanies(data.companies);
+                setTotalCount(data.totalCount || 0);
+                setError(null);
+            } else {
+                setError(data?.message || 'Failed to fetch companies.');
+                toast.error(data?.message || 'Failed to fetch companies.');
             }
-        };
+        } catch (err) {
+            console.error('Error fetching companies:', err);
+            setError('Something went wrong while fetching companies.');
+            toast.error('Something went wrong while fetching companies.');
+        } finally {
+            setLoading(false);
+        }
+    };
 
+    useEffect(() => {
         if (auth?.token) {
             fetchCompanies();
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [auth?.token, page, rowsPerPage, appliedSearch]);
 
 
+    const isAdmin = Number(auth?.user?.role) === 1;
+
     const hasPermission = (key) => {
         return userPermissions.some(p => p.key === key && p.actions.includes('edit')) || auth?.user?.role === 1;
+    };
+
+    const handleDeleteCompany = async (companyId) => {
+        if (!window.confirm('Are you sure you want to delete this company?')) return;
+        try {
+            const { data } = await axios.delete(
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/company/delete/${companyId}`,
+                { headers: { Authorization: auth?.token } }
+            );
+            if (data?.success) {
+                toast.success(data.message || 'Company deleted successfully.');
+                await fetchCompanies();
+            } else {
+                toast.error(data?.message || 'Failed to delete company.');
+            }
+        } catch (err) {
+            console.error('Error deleting company:', err);
+            toast.error(err.response?.data?.message || 'Something went wrong while deleting the company.');
+        }
     };
 
     const handleChangePage = (event, newPage) => {
@@ -201,10 +224,21 @@ const CompanyList = () => {
                                                 variant="contained"
                                                 size="small"
                                                 onClick={() => navigate(`../addCompany/${company._id}`)}
-                                                className="bg-[#019ee3] hover:bg-[#017bb3] text-white px-3 py-1 rounded"
+                                                className="bg-[#019ee3] hover:bg-[#017bb3] text-white px-3 py-1 rounded mr-2"
                                             >
                                                 Edit
                                             </Button>
+                                            {isAdmin ? (
+                                                <Button
+                                                    variant="contained"
+                                                    size="small"
+                                                    color="error"
+                                                    onClick={() => handleDeleteCompany(company._id)}
+                                                    className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded"
+                                                >
+                                                    Delete
+                                                </Button>
+                                            ) : null}
                                         </TableCell> 
                                         {/* : null} */}
                                     </TableRow>

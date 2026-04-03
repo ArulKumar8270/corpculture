@@ -24,9 +24,15 @@ const ServiceProductList = () => {
         setCurrentPage(1);
     }, [searchTerm]);
 
-    const hasPermission = (key) => {
-        return userPermissions.some(p => p.key === key && p.actions.includes('edit')) || auth?.user?.role === 1;
+    const isAdmin = Number(auth?.user?.role) === 1;
+
+    const hasPermission = (key, action = 'edit') => {
+        return userPermissions.some(p => p.key === key && p.actions.includes(action)) || auth?.user?.role === 1;
     };
+
+    const canEditServiceProducts = hasPermission('serviceProductList', 'edit');
+    const canDeleteServiceProducts = isAdmin || hasPermission('serviceProductList', 'delete');
+    const showActions = canEditServiceProducts || canDeleteServiceProducts;
 
     const fetchServiceProducts = async () => {
         try {
@@ -53,7 +59,10 @@ const ServiceProductList = () => {
     const handleDelete = async (productId) => {
         if (window.confirm('Are you sure you want to delete this product?')) {
             try {
-                const { data } = await axios.delete(`${import.meta.env.VITE_SERVER_URL}/api/v1/service-products/${productId}`);
+                const { data } = await axios.delete(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/service-products/${productId}`,
+                    { headers: { Authorization: auth?.token } }
+                );
                 if (data?.success) {
                     toast.success(data.message || 'Product deleted successfully!');
                     fetchServiceProducts(); // Refresh the list
@@ -90,7 +99,7 @@ const ServiceProductList = () => {
         <div className="p-4">
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-semibold">Service Product List</h1>
-                {hasPermission("serviceProductList") ? <Button
+                {canEditServiceProducts ? <Button
                     variant="contained"
                     color="primary"
                     onClick={() => navigate('../addServiceProduct')}
@@ -124,7 +133,7 @@ const ServiceProductList = () => {
                                 <TableCell className="font-semibold">Rate</TableCell>
                                 <TableCell className="font-semibold">GST Type</TableCell>
                                 <TableCell className="font-semibold">Total Amount</TableCell>
-                                {hasPermission("serviceProductList") ? <TableCell className="font-semibold">Action</TableCell> : null}
+                                {showActions ? <TableCell className="font-semibold">Action</TableCell> : null}
                             </TableRow>
                         </TableHead>
                         <TableBody>
@@ -152,33 +161,39 @@ const ServiceProductList = () => {
                                             )}
                                         </TableCell>
                                         <TableCell>{product.totalAmount}</TableCell>
-                                        {hasPermission("serviceProductList") ? <TableCell>
-                                            <Button
-                                                variant="contained"
-                                                color="primary"
-                                                size="small"
-                                                startIcon={<EditIcon />}
-                                                onClick={() => handleEdit(product._id)}
-                                                className="mr-2 bg-blue-500 hover:bg-blue-600"
-                                            >
-                                                Edit
-                                            </Button>
-                                            {/* <Button
-                                                variant="contained"
-                                                color="error"
-                                                size="small"
-                                                startIcon={<DeleteIcon />}
-                                                onClick={() => handleDelete(product._id)}
-                                                className="bg-red-500 hover:bg-red-600"
-                                            >
-                                                Delete
-                                            </Button> */}
-                                        </TableCell> : null}
+                                        {showActions ? (
+                                            <TableCell>
+                                                {canEditServiceProducts ? (
+                                                    <Button
+                                                        variant="contained"
+                                                        color="primary"
+                                                        size="small"
+                                                        startIcon={<EditIcon />}
+                                                        onClick={() => handleEdit(product._id)}
+                                                        className="mr-2 bg-blue-500 hover:bg-blue-600"
+                                                    >
+                                                        Edit
+                                                    </Button>
+                                                ) : null}
+                                                {canDeleteServiceProducts ? (
+                                                    <Button
+                                                        variant="contained"
+                                                        color="error"
+                                                        size="small"
+                                                        startIcon={<DeleteIcon />}
+                                                        onClick={() => handleDelete(product._id)}
+                                                        className="bg-red-500 hover:bg-red-600"
+                                                    >
+                                                        Delete
+                                                    </Button>
+                                                ) : null}
+                                            </TableCell>
+                                        ) : null}
                                     </TableRow>
                                 ))
                             ) : (
                                 <TableRow>
-                                    <TableCell colSpan={10} className="text-center text-gray-500 py-4">
+                                    <TableCell colSpan={showActions ? 9 : 8} className="text-center text-gray-500 py-4">
                                         No service products found.
                                     </TableCell>
                                 </TableRow>
