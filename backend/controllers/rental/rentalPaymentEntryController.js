@@ -755,6 +755,7 @@ export const updateRentalPaymentEntry = async (req, res) => {
             paymentAmountType,
             transferDate,
             companyNamePayment,
+            paymentContactEmail,
             otherPaymentMode,
             paymentAmount,
             invoiceLink,
@@ -1035,6 +1036,7 @@ export const updateRentalPaymentEntry = async (req, res) => {
         if (chequeDate !== undefined) entry.chequeDate = chequeDate;
         if (transferDate !== undefined) entry.transferDate = transferDate;
         if (companyNamePayment !== undefined) entry.companyNamePayment = companyNamePayment;
+        if (paymentContactEmail !== undefined) entry.paymentContactEmail = paymentContactEmail;
         if (otherPaymentMode !== undefined) entry.otherPaymentMode = otherPaymentMode;
         if (assignedTo) entry.assignedTo = assignedTo;
 

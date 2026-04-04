@@ -151,6 +151,10 @@ const rentalPaymentEntrySchema = new mongoose.Schema({
         type: String,
         trim: true,
     },
+    paymentContactEmail: {
+        type: String,
+        trim: true,
+    },
     assignedTo: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',

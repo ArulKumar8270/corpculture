@@ -58,6 +58,7 @@ export const createServiceInvoice = async (req, res) => {
             chequeDate, // New field
             transferDate, // New field
             companyNamePayment, // New field
+            paymentContactEmail,
             otherPaymentMode, // New field
             deliveryAddress,
             reference,
@@ -185,6 +186,7 @@ export const createServiceInvoice = async (req, res) => {
             chequeDate, // Save new field
             transferDate, // Save new field
             companyNamePayment, // Save new field
+            paymentContactEmail,
             otherPaymentMode, // Save new field
             deliveryAddress,
             reference,
@@ -500,6 +502,7 @@ export const updateServiceInvoice = async (req, res) => {
             paymentAmountType,
             transferDate, // New field
             companyNamePayment, // New field
+            paymentContactEmail,
             otherPaymentMode, // New field
             deliveryAddress,
             reference,
@@ -618,6 +621,7 @@ export const updateServiceInvoice = async (req, res) => {
         if (chequeDate !== undefined) serviceInvoice.chequeDate = chequeDate; // Update new field
         if (transferDate !== undefined) serviceInvoice.transferDate = transferDate; // Update new field
         if (companyNamePayment !== undefined) serviceInvoice.companyNamePayment = companyNamePayment; // Update new field
+        if (paymentContactEmail !== undefined) serviceInvoice.paymentContactEmail = paymentContactEmail;
         if (otherPaymentMode !== undefined) serviceInvoice.otherPaymentMode = otherPaymentMode; // Update new field
         if (deliveryAddress) serviceInvoice.deliveryAddress = deliveryAddress;
         if (reference) serviceInvoice.reference = reference;
