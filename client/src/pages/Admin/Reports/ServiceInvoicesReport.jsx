@@ -24,12 +24,16 @@ import {
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import DownloadIcon from '@mui/icons-material/Download';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import axios from 'axios';
 import { useAuth } from '../../../context/auth';
 import * as XLSX from 'xlsx'; // Import xlsx library
 import { saveAs } from 'file-saver'; // Import saveAs from file-saver
+
+const INVOICE_DOWNLOAD_BASE_URL = 'https://pub-ef65b8bdb5974dd191a466c3120cd6b3.r2.dev';
+const PAYMENT_COPY_DOWNLOAD_BASE_URL = 'https://pub-982db31d50054adebd29fa1792b12fb8.r2.dev';
 
 const ServiceInvoicesReport = (props) => {
     const navigate = useNavigate();
@@ -109,6 +113,57 @@ const ServiceInvoicesReport = (props) => {
 
     const handleEdit = (invoiceId) => {
         navigate(`/admin/edit-service-invoice/${invoiceId}`);
+    };
+
+    const isQuotationReport = props?.type === 'quotation';
+
+    const handleDownloadInvoicePdf = async (invoice) => {
+        const candidateUrl =
+            Array.isArray(invoice?.invoiceLink) && invoice.invoiceLink.length > 0
+                ? invoice.invoiceLink[0]
+                : invoice?._id
+                    ? `${INVOICE_DOWNLOAD_BASE_URL}/${invoice._id}`
+                    : null;
+
+        if (!candidateUrl) {
+            toast.error('Invoice id missing');
+            return;
+        }
+
+        try {
+            const res = await fetch(candidateUrl, { method: 'HEAD' });
+            if (!res.ok) {
+                const msg = 'Already invoice not send please send invoice and download';
+                toast.error(msg);
+                window.alert(msg);
+                return;
+            }
+            window.open(candidateUrl, '_blank', 'noopener,noreferrer');
+        } catch (e) {
+            window.open(candidateUrl, '_blank', 'noopener,noreferrer');
+        }
+    };
+
+    const handleDownloadPaymentPdf = async (invoice) => {
+        if (!invoice?._id) {
+            toast.error('Invoice id missing');
+            return;
+        }
+
+        const candidateUrl = `${PAYMENT_COPY_DOWNLOAD_BASE_URL}/${invoice._id}`;
+
+        try {
+            const res = await fetch(candidateUrl, { method: 'HEAD' });
+            if (!res.ok) {
+                const msg = 'Payment copy not uploaded';
+                toast.error(msg);
+                window.alert(msg);
+                return;
+            }
+            window.open(candidateUrl, '_blank', 'noopener,noreferrer');
+        } catch (e) {
+            window.open(candidateUrl, '_blank', 'noopener,noreferrer');
+        }
     };
 
     const handleDelete = async (invoiceId) => {
@@ -337,12 +392,13 @@ const ServiceInvoicesReport = (props) => {
                                 <TableCell>Assigned To</TableCell>
                                 <TableCell>Payment Details</TableCell>
                                 <TableCell>Status</TableCell>
+                                <TableCell align="center">PDF</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
                             {invoices.length === 0 && !loading ? ( // Check loading state to avoid "No data" during initial fetch
                                 <TableRow>
-                                    <TableCell colSpan={7} align="center" sx={{ py: 3, color: 'text.secondary' }}>
+                                    <TableCell colSpan={8} align="center" sx={{ py: 3, color: 'text.secondary' }}>
                                         No service invoices found.
                                     </TableCell>
                                 </TableRow>
@@ -380,6 +436,31 @@ const ServiceInvoicesReport = (props) => {
                                                     'default'
                                                 }
                                             />
+                                        </TableCell>
+                                        <TableCell align="center">
+                                            <Tooltip title={isQuotationReport ? 'Download quotation PDF' : 'Download invoice PDF'}>
+                                                <IconButton
+                                                    size="small"
+                                                    color="primary"
+                                                    onClick={() => handleDownloadInvoicePdf(invoice)}
+                                                    aria-label="Download invoice PDF"
+                                                >
+                                                    <DownloadIcon fontSize="small" />
+                                                </IconButton>
+                                            </Tooltip>
+                                            {!isQuotationReport ? (
+                                                <Tooltip title="Download payment copy PDF">
+                                                    <IconButton
+                                                        size="small"
+                                                        color="secondary"
+                                                        onClick={() => handleDownloadPaymentPdf(invoice)}
+                                                        aria-label="Download payment PDF"
+                                                        sx={{ ml: 0.5 }}
+                                                    >
+                                                        <DownloadIcon fontSize="small" />
+                                                    </IconButton>
+                                                </Tooltip>
+                                            ) : null}
                                         </TableCell>
                                     </TableRow>
                                 ))

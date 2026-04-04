@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     Box,
     Typography,
@@ -47,6 +47,7 @@ function RentalInvoiceList(props) {
     const { auth, userPermissions } = useAuth();
     const navigate = useNavigate();
     const [openPaymentModal, setOpenPaymentModal] = useState(false); // State for payment modal
+    const [companyContactPersons, setCompanyContactPersons] = useState([]);
     const [paymentForm, setPaymentForm] = useState({ // State for payment form data
         modeOfPayment: 'CASH',
         bankName: '',
@@ -54,6 +55,7 @@ function RentalInvoiceList(props) {
         chequeDate: '', // New field for Cheque
         transferDate: '', // New field for Bank Transfer/UPI
         companyNamePayment: '', // New field for Cheque/Bank Transfer/UPI
+        paymentContactEmail: '',
         otherPaymentMode: '', // New field for OTHERS,
         invoiceId: '',
         paymentAmount: 0, // Single field for amount
@@ -82,6 +84,24 @@ function RentalInvoiceList(props) {
     const [selectedUserId, setSelectedUserId] = useState(''); // State for selected user in reassign modal
     const [reassigning, setReassigning] = useState(false); // State for reassign loading
     const [page, setPage] = useState(0); // Pagination state
+
+    const contactsWithEmail = useMemo(() => {
+        const seen = new Set();
+        const list = [];
+        for (const cp of companyContactPersons) {
+            const email = (cp?.email || '').trim();
+            if (email && !seen.has(email)) {
+                seen.add(email);
+                list.push(cp);
+            }
+        }
+        return list;
+    }, [companyContactPersons]);
+
+    const savedEmailTrimmed = (paymentForm.paymentContactEmail || '').trim();
+    const savedEmailNotInContacts =
+        Boolean(savedEmailTrimmed) &&
+        !contactsWithEmail.some((cp) => (cp?.email || '').trim() === savedEmailTrimmed);
 
     const handleDownloadInvoice = async (entry) => {
         const candidateUrl =
@@ -427,7 +447,7 @@ function RentalInvoiceList(props) {
     };
 
 
-    const handleOpenPaymentDetailsModal = (invoice) => {
+    const handleOpenPaymentDetailsModal = async (invoice) => {
         let initialPaymentAmount = 0;
         let initialPaymentAmountType = '';
 
@@ -439,6 +459,25 @@ function RentalInvoiceList(props) {
             initialPaymentAmount = invoice.pendingAmount;
             initialPaymentAmountType = 'Pending';
         }
+
+        const companyId = invoice?.companyId?._id || invoice?.companyId;
+        let persons = [];
+        if (companyId && auth?.token) {
+            try {
+                const { data } = await axios.get(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/company/get/${companyId}`,
+                    { headers: { Authorization: auth.token } }
+                );
+                if (data?.success && Array.isArray(data.company?.contactPersons)) {
+                    persons = data.company.contactPersons;
+                }
+            } catch (e) {
+                console.error(e);
+                toast.error('Could not load company contacts.');
+            }
+        }
+        setCompanyContactPersons(persons);
+
         setCurrentInvoice(invoice); // Store current invoice for filtering
         setPaymentForm({
             modeOfPayment: invoice?.modeOfPayment || 'CASH',
@@ -447,6 +486,7 @@ function RentalInvoiceList(props) {
             chequeDate: invoice?.chequeDate ? new Date(invoice?.chequeDate).toISOString().split('T')[0] : '',
             transferDate: invoice?.transferDate ? new Date(invoice?.transferDate).toISOString().split('T')[0] : '',
             companyNamePayment: invoice?.companyNamePayment || '',
+            paymentContactEmail: invoice?.paymentContactEmail || '',
             otherPaymentMode: invoice?.otherPaymentMode || '',
             invoiceId: invoice?._id,
             paymentAmount: invoice?.paymentAmount ? invoice?.paymentAmount : initialPaymentAmount,
@@ -461,6 +501,7 @@ function RentalInvoiceList(props) {
         setOpenPaymentModal(false);
         setCurrentInvoice(null);
         setSelectedInvoiceIds([]);
+        setCompanyContactPersons([]);
     };
 
     const selectedAllocatedTotal = companyPendingInvoice
@@ -517,6 +558,7 @@ function RentalInvoiceList(props) {
             chequeDate: paymentForm.chequeDate,
             transferDate: paymentForm.transferDate,
             companyNamePayment: paymentForm.companyNamePayment,
+            paymentContactEmail: paymentForm.paymentContactEmail || '',
             otherPaymentMode: paymentForm.otherPaymentMode,
             paymentAmountType: paymentForm.paymentAmountType,
             paymentAmount: Number(paymentAmount),
@@ -591,6 +633,7 @@ function RentalInvoiceList(props) {
                     chequeDate: paymentForm.chequeDate,
                     transferDate: paymentForm.transferDate,
                     companyNamePayment: paymentForm.companyNamePayment,
+                    paymentContactEmail: paymentForm.paymentContactEmail || '',
                     otherPaymentMode: paymentForm.otherPaymentMode,
                     paymentAmountType: paymentForm.paymentAmountType,
                     currentInvoicePayment,
@@ -1315,6 +1358,57 @@ function RentalInvoiceList(props) {
             <Dialog open={openPaymentModal} onClose={handleClosePaymentDetailsModal}>
                 <DialogTitle>Payment Details (RS: {paymentForm?.grandTotal})</DialogTitle>
                 <DialogContent>
+                    <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                        Invoice company: {currentInvoice?.companyId?.companyName || 'N/A'}
+                    </Typography>
+                    {contactsWithEmail.length > 0 ? (
+                        <FormControl fullWidth margin="normal" size="small">
+                            <InputLabel id="rental-payment-contact-email-label">Contact person (email)</InputLabel>
+                            <Select
+                                labelId="rental-payment-contact-email-label"
+                                id="paymentContactEmail"
+                                name="paymentContactEmail"
+                                value={paymentForm.paymentContactEmail || ''}
+                                onChange={handlePaymentFormChange}
+                                label="Contact person (email)"
+                                displayEmpty
+                            >
+                                <MenuItem value="">
+                                    <em>-- Select contact email --</em>
+                                </MenuItem>
+                                {savedEmailNotInContacts ? (
+                                    <MenuItem value={savedEmailTrimmed}>
+                                        Saved on invoice — {savedEmailTrimmed}
+                                    </MenuItem>
+                                ) : null}
+                                {contactsWithEmail.map((cp, idx) => {
+                                    const email = (cp?.email || '').trim();
+                                    return (
+                                        <MenuItem key={`${email}-${idx}`} value={email}>
+                                            {cp.name || 'Contact'} — {email}
+                                            {cp.mobile ? ` (${cp.mobile})` : ''}
+                                        </MenuItem>
+                                    );
+                                })}
+                            </Select>
+                        </FormControl>
+                    ) : (
+                        <>
+                            <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>
+                                No company contacts with email. Add them under Company master, or enter an email to store on this invoice.
+                            </Typography>
+                            <TextField
+                                fullWidth
+                                margin="normal"
+                                size="small"
+                                label="Contact email"
+                                name="paymentContactEmail"
+                                type="email"
+                                value={paymentForm.paymentContactEmail || ''}
+                                onChange={handlePaymentFormChange}
+                            />
+                        </>
+                    )}
                     <FormControl fullWidth margin="normal" size="small">
                         <InputLabel id="mode-of-payment-label">Mode Of Payment</InputLabel>
                         <Select

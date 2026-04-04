@@ -24,12 +24,16 @@ import {
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import DownloadIcon from '@mui/icons-material/Download';
 import { useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import axios from 'axios';
 import { useAuth } from '../../../context/auth';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
+
+const RENTAL_INVOICE_DOWNLOAD_BASE_URL = 'https://pub-bcab85dac0c64221ba6b6a756f991c46.r2.dev';
+const PAYMENT_COPY_DOWNLOAD_BASE_URL = 'https://pub-982db31d50054adebd29fa1792b12fb8.r2.dev';
 
 const RentalInvoiceReport = (props) => {
     const navigate = useNavigate();
@@ -157,6 +161,57 @@ const RentalInvoiceReport = (props) => {
         setPage(0);
         setRowsPerPage(10);
         fetchRentalInvoices('', '', '', '', '', 0, 10);
+    };
+
+    const isQuotationReport = props?.type === 'quotation';
+
+    const handleDownloadInvoicePdf = async (entry) => {
+        const candidateUrl =
+            Array.isArray(entry?.invoiceLink) && entry.invoiceLink.length > 0
+                ? entry.invoiceLink[0]
+                : entry?._id
+                    ? `${RENTAL_INVOICE_DOWNLOAD_BASE_URL}/${entry._id}`
+                    : null;
+
+        if (!candidateUrl) {
+            toast.error('Invoice id missing');
+            return;
+        }
+
+        try {
+            const res = await fetch(candidateUrl, { method: 'HEAD' });
+            if (!res.ok) {
+                const msg = 'Already invoice not send please send invoice and download';
+                toast.error(msg);
+                window.alert(msg);
+                return;
+            }
+            window.open(candidateUrl, '_blank', 'noopener,noreferrer');
+        } catch (e) {
+            window.open(candidateUrl, '_blank', 'noopener,noreferrer');
+        }
+    };
+
+    const handleDownloadPaymentPdf = async (entry) => {
+        if (!entry?._id) {
+            toast.error('Invoice id missing');
+            return;
+        }
+
+        const candidateUrl = `${PAYMENT_COPY_DOWNLOAD_BASE_URL}/${entry._id}`;
+
+        try {
+            const res = await fetch(candidateUrl, { method: 'HEAD' });
+            if (!res.ok) {
+                const msg = 'Payment copy not uploaded';
+                toast.error(msg);
+                window.alert(msg);
+                return;
+            }
+            window.open(candidateUrl, '_blank', 'noopener,noreferrer');
+        } catch (e) {
+            window.open(candidateUrl, '_blank', 'noopener,noreferrer');
+        }
     };
 
     const rentalInvoiceDateStr = (invoice) => {
@@ -340,14 +395,14 @@ const RentalInvoiceReport = (props) => {
                                 <TableCell>Invoice Date</TableCell>
                                 <TableCell>Grand Total</TableCell> {/* Placeholder */}
                                 <TableCell>Payment Details</TableCell>
-                                <TableCell>Status</TableCell> {/* Placeholder */}
-                                {/* <TableCell>Actions</TableCell> */}
+                                <TableCell>Status</TableCell>
+                                <TableCell align="center">PDF</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
                             {rentalInvoices.length === 0 && !loading ? (
                                 <TableRow>
-                                    <TableCell colSpan={9} align="center" sx={{ py: 3, color: 'text.secondary' }}>
+                                    <TableCell colSpan={10} align="center" sx={{ py: 3, color: 'text.secondary' }}>
                                         No rental invoices found.
                                     </TableCell>
                                 </TableRow>
@@ -379,6 +434,31 @@ const RentalInvoiceReport = (props) => {
                                                     'default'
                                                 }
                                             />
+                                        </TableCell>
+                                        <TableCell align="center">
+                                            <Tooltip title={isQuotationReport ? 'Download quotation PDF' : 'Download invoice PDF'}>
+                                                <IconButton
+                                                    size="small"
+                                                    color="primary"
+                                                    onClick={() => handleDownloadInvoicePdf(invoice)}
+                                                    aria-label="Download invoice PDF"
+                                                >
+                                                    <DownloadIcon fontSize="small" />
+                                                </IconButton>
+                                            </Tooltip>
+                                            {!isQuotationReport ? (
+                                                <Tooltip title="Download payment copy PDF">
+                                                    <IconButton
+                                                        size="small"
+                                                        color="secondary"
+                                                        onClick={() => handleDownloadPaymentPdf(invoice)}
+                                                        aria-label="Download payment PDF"
+                                                        sx={{ ml: 0.5 }}
+                                                    >
+                                                        <DownloadIcon fontSize="small" />
+                                                    </IconButton>
+                                                </Tooltip>
+                                            ) : null}
                                         </TableCell>
                                         {/* <TableCell>
                                             <Tooltip title="View Details">
