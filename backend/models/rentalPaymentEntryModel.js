@@ -164,6 +164,14 @@ const rentalPaymentEntrySchema = new mongoose.Schema({
         type: [String],
         trim: true,
     },
+    invoiceSendStatus: {
+        type: String,
+        enum: ["NotSent", "Sent"],
+        default: "NotSent",
+    },
+    invoiceSentAt: {
+        type: Date,
+    },
     status: {
         type: String,
         enum: ['draft', 'Cancelled', "Pending", "Progress", "Completed", "InvoiceSent", "Paid", "Unpaid"],

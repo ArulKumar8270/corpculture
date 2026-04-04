@@ -761,6 +761,8 @@ export const updateRentalPaymentEntry = async (req, res) => {
             invoiceType,
             invoiceDate, // Add invoiceDate
             status,
+            invoiceSendStatus,
+            invoiceSentAt,
             assignedTo,
             products: productsRaw, // New: array of products (may be JSON string from FormData)
         } = req.body;
@@ -1019,6 +1021,10 @@ export const updateRentalPaymentEntry = async (req, res) => {
         if (companyId) entry.companyId = companyId;
         if (invoiceLink) entry.invoiceLink = invoiceLink;
         if (invoiceType) entry.invoiceType = invoiceType;
+        if (invoiceSendStatus !== undefined) entry.invoiceSendStatus = invoiceSendStatus;
+        if (invoiceSentAt !== undefined) {
+            entry.invoiceSentAt = invoiceSentAt ? new Date(invoiceSentAt) : null;
+        }
         // Use finalInvoiceNumber (generated from global count if moving to invoice) or provided invoiceNumber
         if (finalInvoiceNumber) entry.invoiceNumber = finalInvoiceNumber;
         entry.countImageUpload = countImageUploadUrl;

@@ -347,19 +347,36 @@ function RentalInvoiceList(props) {
         console.log('Edit:', id);
     };
 
-    const onSendInvoice = async (invoice) => {
-        setInvoiceSend(true)
+    const onSendInvoice = async (invoiceOrId) => {
+        const invoiceId = typeof invoiceOrId === 'string' ? invoiceOrId : invoiceOrId?._id;
+        if (!invoiceId) {
+            toast.error('Invoice id missing.');
+            return;
+        }
+        setInvoiceSend(true);
         try {
-            const res = await axios.post('https://n8n.nicknameinfo.net/webhook/60f841c0-76d9-47c3-8a4c-7129ceca00df', { invoiceId: invoice});
-            if (res) {
-                setInvoiceSend(false)
+            await axios.post(
+                'https://n8n.nicknameinfo.net/webhook/60f841c0-76d9-47c3-8a4c-7129ceca00df',
+                { invoiceId }
+            );
+            try {
+                await axios.put(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/${invoiceId}`,
+                    { invoiceSendStatus: 'Sent', invoiceSentAt: new Date().toISOString() },
+                    { headers: { Authorization: auth?.token } }
+                );
+            } catch (e) {
+                console.error('Failed to update rental invoice send status:', e);
             }
+            toast.success('Send triggered; status updated.');
+            fetchRentalEntries();
         } catch (webhookError) {
-            setInvoiceSend(false)
             console.error('Error triggering webhook:', webhookError);
             toast.error('Failed to trigger webhook for external notification.');
+        } finally {
+            setInvoiceSend(false);
         }
-    }
+    };
 
     const handleUploadSignedInvoice = async (invoiceId, oldInvoicLink) => {
         const input = document.createElement('input');
@@ -1046,7 +1063,9 @@ function RentalInvoiceList(props) {
                                                         const isInvoiceSent =
                                                             entry?.invoiceSendStatus === "Sent" ||
                                                             !!entry?.invoiceSentAt ||
-                                                            entry?.status === "InvoiceSent";
+                                                            entry?.status === "InvoiceSent" ||
+                                                            (Array.isArray(entry?.invoiceLink) &&
+                                                                entry.invoiceLink.length > 0);
 
                                                         const hasPaymentDetails =
                                                             (Number(entry?.paymentAmount) || 0) > 0 ||
@@ -1136,7 +1155,7 @@ function RentalInvoiceList(props) {
                                                         >
                                                             Download {props?.invoice === "quotation" ? "Quotation" : "Invoice"}
                                                         </Button>
-                                                        <Button variant="outlined" size="small" onClick={() => onSendInvoice(entry._id)}>
+                                                        <Button variant="outlined" size="small" onClick={() => onSendInvoice(entry)}>
                                                             {isInvoiceSend ? <CircularProgress size={24} /> : `Send ${props?.invoice === "quotation" ? "Quotation" : "Invoice"}`}
                                                         </Button>
                                                         {props?.invoice === "quotation" ? <Button variant="outlined" size="small" sx={{ my: 1 }} onClick={() => onMoveToInvoice("invoice", entry)}>Move to invoice</Button>
