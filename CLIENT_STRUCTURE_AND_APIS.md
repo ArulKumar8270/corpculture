@@ -544,7 +544,7 @@ client/
 
 ### Base URL
 - Environment variable: `VITE_SERVER_URL`
-- Default: `https://nicknameinfo.net/corpculture`
+- Default: `https://app.corpculture.tech`
 - API prefix: `/api/v1`
 
 ### Authentication

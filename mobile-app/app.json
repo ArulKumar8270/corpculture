@@ -60,7 +60,7 @@
       "eas": {
         "projectId": "4f70c950-2b15-46e5-b88b-b2c4a69477fd"
       },
-      "apiUrl": "https://nicknameinfo.net/corpculture/api/v1"
+      "apiUrl": "https://app.corpculture.tech/api/v1"
     }
   }
 }

@@ -16,7 +16,7 @@ const getApiBaseUrl = () => {
     return process.env.EXPO_PUBLIC_API_URL;
   }
   // Fallback to hardcoded URL (for production builds)
-  return 'https://nicknameinfo.net/corpculture/api/v1';
+  return 'https://app.corpculture.tech/api/v1';
 };
 
 const API_BASE_URL = getApiBaseUrl();

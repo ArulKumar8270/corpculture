@@ -72,7 +72,7 @@ const ProductsScreen = () => {
     setLoading(true);
     try {
       const response = await axios.get(
-        `${getApiBaseUrl() || 'https://nicknameinfo.net/corpculture/api/v1'}/product/filtered-products`,
+        `${getApiBaseUrl() || 'https://app.corpculture.tech/api/v1'}/product/filtered-products`,
         {
           params: {
             category: category,

@@ -120,7 +120,7 @@
     },
     {
       "parameters": {
-        "url": "=https://nicknameinfo.net/corpculture/api/v1/rental-payment/{{ $json.body.invoiceId}}",
+        "url": "=https://app.corpculture.tech/api/v1/rental-payment/{{ $json.body.invoiceId}}",
         "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",

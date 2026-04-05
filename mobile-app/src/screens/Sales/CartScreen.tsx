@@ -180,13 +180,13 @@ const CartScreen = () => {
     setIsLoading(true);
     try {
       const response = await axios.post(
-        `${getApiBaseUrl() || 'https://nicknameinfo.net/corpculture/api/v1'}/auth/register`,
+        `${getApiBaseUrl() || 'https://app.corpculture.tech/api/v1'}/auth/register`,
         newUserParams
       );
 
       if (isCompanyEnabled && selectedCompany && selectedCompany !== 'new') {
         await axios.put(
-          `${getApiBaseUrl() || 'https://nicknameinfo.net/corpculture/api/v1'}/company/update/${selectedCompany}`,
+          `${getApiBaseUrl() || 'https://app.corpculture.tech/api/v1'}/company/update/${selectedCompany}`,
           companyPayload,
           {
             headers: {

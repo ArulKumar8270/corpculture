@@ -3,7 +3,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://nicknameinfo.net/corpculture/api/v1/service-invoice/all",
+        "url": "https://app.corpculture.tech/api/v1/service-invoice/all",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n    \"invoiceType\": \"invoice\",\n    \"tdsAmount\": {\n        \"$eq\": null\n    },\n    \"status\": {\n        \"$ne\": \"Paid\"\n    },\n   \"companyId\" : {\n       \"$eq\" : \"{{ $json.companyId._id }}\"\n   }\n}",
@@ -110,7 +110,7 @@
     },
     {
       "parameters": {
-        "url": "https://nicknameinfo.net/corpculture/api/v1/remainders/getByToday/remainder",
+        "url": "https://app.corpculture.tech/api/v1/remainders/getByToday/remainder",
         "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",

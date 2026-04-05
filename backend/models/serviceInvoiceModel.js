@@ -87,6 +87,10 @@ const serviceInvoiceSchema = new mongoose.Schema({
         type: String,
         trim: true,
     },
+    paymentContactEmails: {
+        type: [String],
+        default: [],
+    },
     otherPaymentMode: { // New field for 'OTHERS' payment mode
         type: String,
         trim: true,

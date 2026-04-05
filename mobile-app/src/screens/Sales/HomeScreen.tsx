@@ -332,7 +332,7 @@ const HomeScreen = () => {
       // For customers (role 0), use user-company endpoint
       if (user.role === 0 && user.phone) {
         response = await axios.get(
-          `${getApiBaseUrl() || 'https://nicknameinfo.net/corpculture/api/v1'}/company/user-company/${user.phone}`,
+          `${getApiBaseUrl() || 'https://app.corpculture.tech/api/v1'}/company/user-company/${user.phone}`,
           { headers: { Authorization: token || '' } }
         );
         // Handle response structure: { success: true, company: [...] }
@@ -343,7 +343,7 @@ const HomeScreen = () => {
       } else {
         // For admin/employee, use all companies endpoint
         response = await axios.get(
-          `${getApiBaseUrl() || 'https://nicknameinfo.net/corpculture/api/v1'}/company/all?limit=1000`,
+          `${getApiBaseUrl() || 'https://app.corpculture.tech/api/v1'}/company/all?limit=1000`,
           { headers: { Authorization: token || '' } }
         );
         // Handle response structure: { success: true, companies: [...] }
@@ -405,7 +405,7 @@ const HomeScreen = () => {
     
     setIsFetchingServices(true);
     try {
-      const API_BASE_URL = getApiBaseUrl() || 'https://nicknameinfo.net/corpculture/api/v1';
+      const API_BASE_URL = getApiBaseUrl() || 'https://app.corpculture.tech/api/v1';
       
       // Fetch services based on which modal is open
       if (selectedService) {
@@ -444,7 +444,7 @@ const HomeScreen = () => {
     }
     
     try {
-      const API_BASE_URL = getApiBaseUrl() || 'https://nicknameinfo.net/corpculture/api/v1';
+      const API_BASE_URL = getApiBaseUrl() || 'https://app.corpculture.tech/api/v1';
       const response = await axios.get(`${API_BASE_URL}/company/getByPhone/${phoneNumber}`);
       
       if (response.data?.success && response.data?.company) {
@@ -485,7 +485,7 @@ const HomeScreen = () => {
 
     setLoading(true);
     try {
-      const API_BASE_URL = getApiBaseUrl() || 'https://nicknameinfo.net/corpculture/api/v1';
+      const API_BASE_URL = getApiBaseUrl() || 'https://app.corpculture.tech/api/v1';
       const payload: any = {
         customerType: formData.customerType,
         phone: formData.phone,
@@ -692,7 +692,7 @@ const HomeScreen = () => {
       };
 
       const { data } = await axios.post(
-        `${getApiBaseUrl() || 'https://nicknameinfo.net/corpculture/api/v1'}/company/create`,
+        `${getApiBaseUrl() || 'https://app.corpculture.tech/api/v1'}/company/create`,
         payload,
         {
           headers: { Authorization: token || '' },

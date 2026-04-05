@@ -45,6 +45,18 @@ const generateInvoiceNumber = (invoiceCount, format) => {
     return format + invoiceCount.toString().padStart(5, '0');
 };
 
+/** Deduped trimmed emails; prefers array from body, else legacy single string. */
+const normalizePaymentContactEmails = (paymentContactEmails, paymentContactEmail) => {
+    if (Array.isArray(paymentContactEmails)) {
+        return [...new Set(paymentContactEmails.map((e) => String(e ?? "").trim()).filter(Boolean))];
+    }
+    if (paymentContactEmail !== undefined && paymentContactEmail !== null) {
+        const one = String(paymentContactEmail).trim();
+        return one ? [one] : [];
+    }
+    return [];
+};
+
 // Create Service Invoice
 export const createServiceInvoice = async (req, res) => {
     try {
@@ -59,6 +71,7 @@ export const createServiceInvoice = async (req, res) => {
             transferDate, // New field
             companyNamePayment, // New field
             paymentContactEmail,
+            paymentContactEmails,
             otherPaymentMode, // New field
             deliveryAddress,
             reference,
@@ -174,6 +187,8 @@ export const createServiceInvoice = async (req, res) => {
 
         const { subtotal, grandTotal } = calculateInvoiceTotals(processedProducts);
 
+        const paymentEmailsNorm = normalizePaymentContactEmails(paymentContactEmails, paymentContactEmail);
+
         // Build invoice object, only include assignedTo if it's a valid value
         // CRITICAL: invoiceNumber is generated ONLY from global count, never from existing invoices
         const invoiceData = {
@@ -186,7 +201,8 @@ export const createServiceInvoice = async (req, res) => {
             chequeDate, // Save new field
             transferDate, // Save new field
             companyNamePayment, // Save new field
-            paymentContactEmail,
+            paymentContactEmails: paymentEmailsNorm,
+            paymentContactEmail: paymentEmailsNorm[0] || "",
             otherPaymentMode, // Save new field
             deliveryAddress,
             reference,
@@ -503,6 +519,7 @@ export const updateServiceInvoice = async (req, res) => {
             transferDate, // New field
             companyNamePayment, // New field
             paymentContactEmail,
+            paymentContactEmails,
             otherPaymentMode, // New field
             deliveryAddress,
             reference,
@@ -621,7 +638,14 @@ export const updateServiceInvoice = async (req, res) => {
         if (chequeDate !== undefined) serviceInvoice.chequeDate = chequeDate; // Update new field
         if (transferDate !== undefined) serviceInvoice.transferDate = transferDate; // Update new field
         if (companyNamePayment !== undefined) serviceInvoice.companyNamePayment = companyNamePayment; // Update new field
-        if (paymentContactEmail !== undefined) serviceInvoice.paymentContactEmail = paymentContactEmail;
+        if (paymentContactEmails !== undefined || paymentContactEmail !== undefined) {
+            const arr = normalizePaymentContactEmails(
+                paymentContactEmails,
+                paymentContactEmails === undefined ? paymentContactEmail : undefined
+            );
+            serviceInvoice.paymentContactEmails = arr;
+            serviceInvoice.paymentContactEmail = arr[0] || "";
+        }
         if (otherPaymentMode !== undefined) serviceInvoice.otherPaymentMode = otherPaymentMode; // Update new field
         if (deliveryAddress) serviceInvoice.deliveryAddress = deliveryAddress;
         if (reference) serviceInvoice.reference = reference;

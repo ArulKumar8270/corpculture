@@ -118,7 +118,7 @@
     },
     {
       "parameters": {
-        "url": "=https://nicknameinfo.net/corpculture/api/v1/report/{{ $json.body.reportId }}",
+        "url": "=https://app.corpculture.tech/api/v1/report/{{ $json.body.reportId }}",
         "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",

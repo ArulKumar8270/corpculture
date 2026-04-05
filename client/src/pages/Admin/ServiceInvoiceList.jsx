@@ -42,6 +42,14 @@ import DownloadIcon from '@mui/icons-material/Download';
 const INVOICE_DOWNLOAD_BASE_URL = 'https://pub-ef65b8bdb5974dd191a466c3120cd6b3.r2.dev';
 const PAYMENT_COPY_DOWNLOAD_BASE_URL = 'https://pub-982db31d50054adebd29fa1792b12fb8.r2.dev';
 
+function invoicePaymentEmailsFromRecord(inv) {
+    if (Array.isArray(inv?.paymentContactEmails) && inv.paymentContactEmails.length) {
+        return [...new Set(inv.paymentContactEmails.map((e) => String(e || '').trim()).filter(Boolean))];
+    }
+    const one = String(inv?.paymentContactEmail || '').trim();
+    return one ? [one] : [];
+}
+
 // Row component for each invoice, allowing expansion to show products
 function InvoiceRow(props) {
     const { invoice, navigate, invoiceType, invoiceCount } = props;
@@ -66,7 +74,7 @@ function InvoiceRow(props) {
         chequeDate: invoice.chequeDate || '', // New field for Cheque
         transferDate: invoice.transferDate || '', // New field for Bank Transfer/UPI
         companyNamePayment: invoice.companyNamePayment || '', // New field for Cheque/Bank Transfer/UPI
-        paymentContactEmail: invoice.paymentContactEmail || '',
+        paymentContactEmails: invoicePaymentEmailsFromRecord(invoice),
         otherPaymentMode: invoice.otherPaymentMode || '', // New field for OTHERS
         paymentAmount: 0, // Single field for amount
         paymentAmountType: '', // Type of amount (TDS or Pending)
@@ -86,10 +94,11 @@ function InvoiceRow(props) {
         return list;
     }, [companyContactPersons]);
 
-    const savedEmailTrimmed = (paymentForm.paymentContactEmail || '').trim();
-    const savedEmailNotInContacts =
-        Boolean(savedEmailTrimmed) &&
-        !contactsWithEmail.some((cp) => (cp?.email || '').trim() === savedEmailTrimmed);
+    const paymentEmailAutocompleteOptions = useMemo(() => {
+        const fromContacts = contactsWithEmail.map((cp) => (cp?.email || '').trim()).filter(Boolean);
+        const selected = (paymentForm.paymentContactEmails || []).map((e) => String(e || '').trim()).filter(Boolean);
+        return [...new Set([...selected, ...fromContacts])];
+    }, [contactsWithEmail, paymentForm.paymentContactEmails]);
 
     const hasPermission = (key) => {
         return userPermissions.some(p => p.key === key && p.actions.includes('edit')) || auth?.user?.role === 1;
@@ -222,7 +231,7 @@ function InvoiceRow(props) {
             chequeDate: invoice.chequeDate ? new Date(invoice.chequeDate).toISOString().split('T')[0] : '',
             transferDate: invoice.transferDate ? new Date(invoice.transferDate).toISOString().split('T')[0] : '',
             companyNamePayment: invoice.companyNamePayment || '',
-            paymentContactEmail: invoice.paymentContactEmail || '',
+            paymentContactEmails: invoicePaymentEmailsFromRecord(invoice),
             otherPaymentMode: invoice.otherPaymentMode || '',
             paymentAmount: invoice.paymentAmount || 0,
             paymentAmountType: invoice.paymentAmountType || '',
@@ -301,7 +310,8 @@ function InvoiceRow(props) {
             chequeDate: paymentForm.chequeDate,
             transferDate: paymentForm.transferDate,
             companyNamePayment: paymentForm.companyNamePayment,
-            paymentContactEmail: paymentForm.paymentContactEmail || '',
+            paymentContactEmails: [...new Set((paymentForm.paymentContactEmails || []).map((e) => String(e || '').trim()).filter(Boolean))],
+            paymentContactEmail: (paymentForm.paymentContactEmails || []).map((e) => String(e || '').trim()).filter(Boolean)[0] || '',
             otherPaymentMode: paymentForm.otherPaymentMode,
             paymentAmountType: paymentForm.paymentAmountType,
             paymentAmount: Number(paymentAmount),
@@ -376,6 +386,7 @@ function InvoiceRow(props) {
                     chequeDate: paymentForm.chequeDate,
                     transferDate: paymentForm.transferDate,
                     companyNamePayment: paymentForm.companyNamePayment,
+                    paymentContactEmails: [...new Set((paymentForm.paymentContactEmails || []).map((e) => String(e || '').trim()).filter(Boolean))],
                     otherPaymentMode: paymentForm.otherPaymentMode,
                     paymentAmountType: paymentForm.paymentAmountType,
                     currentInvoicePayment: currentInvoicePayment,
@@ -934,54 +945,44 @@ function InvoiceRow(props) {
                     <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
                         Invoice company: {invoice.companyId?.companyName || 'N/A'}
                     </Typography>
-                    {contactsWithEmail.length > 0 ? (
-                        <FormControl fullWidth margin="normal" size="small">
-                            <InputLabel id="payment-contact-email-label">Contact person (email)</InputLabel>
-                            <Select
-                                labelId="payment-contact-email-label"
-                                id="paymentContactEmail"
-                                name="paymentContactEmail"
-                                value={paymentForm.paymentContactEmail || ''}
-                                onChange={handlePaymentFormChange}
-                                label="Contact person (email)"
-                                displayEmpty
-                            >
-                                <MenuItem value="">
-                                    <em>-- Select contact email --</em>
-                                </MenuItem>
-                                {savedEmailNotInContacts ? (
-                                    <MenuItem value={savedEmailTrimmed}>
-                                        Saved on invoice — {savedEmailTrimmed}
-                                    </MenuItem>
-                                ) : null}
-                                {contactsWithEmail.map((cp, idx) => {
-                                    const email = (cp?.email || '').trim();
-                                    return (
-                                        <MenuItem key={`${email}-${idx}`} value={email}>
-                                            {cp.name || 'Contact'} — {email}
-                                            {cp.mobile ? ` (${cp.mobile})` : ''}
-                                        </MenuItem>
-                                    );
-                                })}
-                            </Select>
-                        </FormControl>
-                    ) : (
-                        <>
-                            <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>
-                                No company contacts with email. Add them under Company master, or enter an email to store on this invoice.
-                            </Typography>
+                    <Autocomplete
+                        multiple
+                        freeSolo
+                        options={paymentEmailAutocompleteOptions}
+                        value={paymentForm.paymentContactEmails || []}
+                        onChange={(event, newValue) => {
+                            const cleaned = [...new Set(newValue.map((v) => String(v || '').trim()).filter(Boolean))];
+                            setPaymentForm((prev) => ({ ...prev, paymentContactEmails: cleaned }));
+                        }}
+                        getOptionLabel={(option) => option}
+                        filterSelectedOptions
+                        renderOption={(props, option) => {
+                            const cp = contactsWithEmail.find((c) => (c?.email || '').trim() === option);
+                            const label = cp
+                                ? `${cp.name || 'Contact'} — ${option}${cp.mobile ? ` (${cp.mobile})` : ''}`
+                                : option;
+                            return (
+                                <li {...props} key={option}>
+                                    {label}
+                                </li>
+                            );
+                        }}
+                        renderTags={(value, getTagProps) =>
+                            value.map((option, index) => (
+                                <Chip variant="outlined" label={option} {...getTagProps({ index })} key={`${option}-${index}`} />
+                            ))
+                        }
+                        renderInput={(params) => (
                             <TextField
-                                fullWidth
+                                {...params}
                                 margin="normal"
                                 size="small"
-                                label="Contact email"
-                                name="paymentContactEmail"
-                                type="email"
-                                value={paymentForm.paymentContactEmail || ''}
-                                onChange={handlePaymentFormChange}
+                                label="Contact persons (email)"
+                                placeholder={contactsWithEmail.length ? 'Pick contacts or type email, Enter to add' : 'Type email, Enter to add'}
+                                helperText="Multi-select company contacts and/or add any email; all are saved on this invoice."
                             />
-                        </>
-                    )}
+                        )}
+                    />
                     <FormControl fullWidth margin="normal" size="small">
                         <InputLabel id="mode-of-payment-label">Mode Of Payment</InputLabel>
                         <Select

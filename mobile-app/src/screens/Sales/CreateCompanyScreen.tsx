@@ -85,7 +85,7 @@ const CreateCompanyScreen = () => {
       };
 
       const { data } = await axios.post(
-        `${getApiBaseUrl() || 'https://nicknameinfo.net/corpculture/api/v1'}/company/create`,
+        `${getApiBaseUrl() || 'https://app.corpculture.tech/api/v1'}/company/create`,
         payload,
         {
           headers: { Authorization: token || '' },
@@ -99,7 +99,7 @@ const CreateCompanyScreen = () => {
             let response;
             if (user?.role === 0 && user?.phone) {
               response = await axios.get(
-                `${getApiBaseUrl() || 'https://nicknameinfo.net/corpculture/api/v1'}/company/user-company/${user.phone}`,
+                `${getApiBaseUrl() || 'https://app.corpculture.tech/api/v1'}/company/user-company/${user.phone}`,
                 { headers: { Authorization: token || '' } }
               );
               if (response.data?.success && response.data.company) {
@@ -110,7 +110,7 @@ const CreateCompanyScreen = () => {
               }
             } else {
               response = await axios.get(
-                `${getApiBaseUrl() || 'https://nicknameinfo.net/corpculture/api/v1'}/company/all?limit=1000`,
+                `${getApiBaseUrl() || 'https://app.corpculture.tech/api/v1'}/company/all?limit=1000`,
                 { headers: { Authorization: token || '' } }
               );
               if (response.data?.success && response.data.companies) {

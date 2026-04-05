@@ -3,7 +3,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://nicknameinfo.net/corpculture/api/v1/rental/create",
+        "url": "https://app.corpculture.tech/api/v1/rental/create",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n    \"customerType\": \"New\",\n    \"phone\": \"{{ $json.company.contactPersons[0].name }}\",\n    \"companyName\": \"{{ $json.company.companyName }}\",\n    \"companyId\": \"{{ $json.company._id }}\",\n    \"complaint\": \"\",\n    \"contactPerson\": \"{{ $json.company.contactPersons[0].name }}\",\n    \"email\": \"{{ $json.company.contactPersons[0].email }}\",\n    \"address\": \"{{ $json.company.billingAddress }}\",\n    \"location\": \"{{ $json.company.city }}\",\n    \"oldServiceId\": \"{{ $json._id }}\",\n    \"serviceImage\": \"\",\n    \"rentalType\": 1\n}",
@@ -67,7 +67,7 @@
     },
     {
       "parameters": {
-        "url": "https://nicknameinfo.net/corpculture/api/v1/rental-products/payment/today",
+        "url": "https://app.corpculture.tech/api/v1/rental-products/payment/today",
         "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",

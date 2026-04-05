@@ -90,6 +90,17 @@ const generateInvoiceNumber = (invoiceCount, format) => {
     return format + invoiceCount.toString().padStart(5, '0');
 };
 
+const normalizePaymentContactEmails = (paymentContactEmails, paymentContactEmail) => {
+    if (Array.isArray(paymentContactEmails)) {
+        return [...new Set(paymentContactEmails.map((e) => String(e ?? "").trim()).filter(Boolean))];
+    }
+    if (paymentContactEmail !== undefined && paymentContactEmail !== null) {
+        const one = String(paymentContactEmail).trim();
+        return one ? [one] : [];
+    }
+    return [];
+};
+
 // Create a new rental payment entry
 export const createRentalPaymentEntry = async (req, res) => {
     try {
@@ -756,6 +767,7 @@ export const updateRentalPaymentEntry = async (req, res) => {
             transferDate,
             companyNamePayment,
             paymentContactEmail,
+            paymentContactEmails,
             otherPaymentMode,
             paymentAmount,
             invoiceLink,
@@ -1036,7 +1048,14 @@ export const updateRentalPaymentEntry = async (req, res) => {
         if (chequeDate !== undefined) entry.chequeDate = chequeDate;
         if (transferDate !== undefined) entry.transferDate = transferDate;
         if (companyNamePayment !== undefined) entry.companyNamePayment = companyNamePayment;
-        if (paymentContactEmail !== undefined) entry.paymentContactEmail = paymentContactEmail;
+        if (paymentContactEmails !== undefined || paymentContactEmail !== undefined) {
+            const arr = normalizePaymentContactEmails(
+                paymentContactEmails,
+                paymentContactEmails === undefined ? paymentContactEmail : undefined
+            );
+            entry.paymentContactEmails = arr;
+            entry.paymentContactEmail = arr[0] || "";
+        }
         if (otherPaymentMode !== undefined) entry.otherPaymentMode = otherPaymentMode;
         if (assignedTo) entry.assignedTo = assignedTo;
 
