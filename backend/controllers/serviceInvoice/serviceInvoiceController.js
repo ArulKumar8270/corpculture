@@ -449,17 +449,9 @@ export const getServiceInvoicesAssignedTo = async (req, res) => {
             .populate('serviceId', 'serviceTitle') // include service title for invoice list
             .sort({ createdAt: -1 }); // Find services by phone number
 
-        if (!serviceInvoices || serviceInvoices.length === 0) {
-            return res.status(404).send({
-                success: false,
-                message: "No ServiceInvoice found for this phone number",
-                errorType: "servicesNotFound"
-            });
-        }
-
         res.status(200).send({
             success: true,
-            serviceInvoices
+            serviceInvoices: serviceInvoices || [],
         });
     } catch (error) {
         console.error("Error in getting ServiceInvoice by phone:", error); // Log the error
