@@ -1,5 +1,5 @@
 import express from "express";
-import { isAdmin, requireSignIn } from "../middleware/authMiddleware.js";
+import { isAdminOrEmployee, requireSignIn } from "../middleware/authMiddleware.js";
 import {
     createrRental,
     getAllRental,
@@ -17,7 +17,7 @@ const router = express.Router();
 router.post("/create", createrRental);
 
 // Get all services
-router.get("/all", isAdmin, getAllRental);
+router.get("/all", isAdminOrEmployee, getAllRental);
 
 // Get single service
 router.get("/get/:id", requireSignIn, getRentalById);
@@ -29,10 +29,10 @@ router.get("/serviceType/:serviceType", getRentalByType);
 router.get("/assignedTo/:assignedTo", getRentalAssignedTo);
 
 // Update service
-router.put("/update/:id", isAdmin, updateRental);
+router.put("/update/:id", isAdminOrEmployee, updateRental);
 
 // Delete service
-router.delete("/delete/:id", isAdmin, updateRental);
+router.delete("/delete/:id", isAdminOrEmployee, updateRental);
 
 // GET Service by Phone (example: maybe protected)
 router.get('/phone/:phone', getRentalByType); // Add appropriate middleware

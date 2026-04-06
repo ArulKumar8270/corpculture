@@ -1,5 +1,5 @@
 import express from "express";
-import { requireSignIn, isAdmin } from "../middleware/authMiddleware.js";
+import { requireSignIn, isAdmin, isAdminOrEmployee } from "../middleware/authMiddleware.js";
 import {
     createActivityLogController,
     getActivityLogsController,
@@ -30,16 +30,16 @@ router.put("/update/:id", requireSignIn, updateActivityLogController);
 router.delete("/delete/:id", requireSignIn, deleteActivityLogController);
 
 // Get All Activity Logs || GET (Admin only)
-router.get("/admin/all", isAdmin, getAllActivityLogsController);
+router.get("/admin/all", isAdminOrEmployee, getAllActivityLogsController);
 
 // Update Activity Log Status || PUT (Admin only)
-router.put("/admin/status/:id", isAdmin, updateActivityLogStatusAdminController);
+router.put("/admin/status/:id", isAdminOrEmployee, updateActivityLogStatusAdminController);
 
 // Get Activity Log by ID || GET (Admin only)
-router.get("/admin/:id", isAdmin, getActivityLogByIdAdminController);
+router.get("/admin/:id", isAdminOrEmployee, getActivityLogByIdAdminController);
 
 // Update Activity Log || PUT (Admin only)
-router.put("/admin/update/:id", isAdmin, updateActivityLogAdminController);
+router.put("/admin/update/:id", isAdminOrEmployee, updateActivityLogAdminController);
 
 export default router;
 

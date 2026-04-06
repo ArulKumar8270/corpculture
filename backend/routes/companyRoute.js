@@ -1,5 +1,5 @@
 import express from "express";
-import { isAdmin, requireSignIn } from "../middleware/authMiddleware.js";
+import { isAdmin, isAdminOrEmployee, requireSignIn } from "../middleware/authMiddleware.js";
 import { requirePermission } from "../middleware/permissionMiddleware.js";
 import {
     createCompany,
@@ -31,6 +31,6 @@ router.get('/user-company/:id', getCompanyByUser);
 router.put("/update/:id", updateCompany);
 
 // Delete company
-router.delete("/delete/:id", isAdmin, deleteCompany);
+router.delete("/delete/:id", isAdminOrEmployee, deleteCompany);
 
 export default router;

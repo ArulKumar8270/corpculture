@@ -1,5 +1,5 @@
 import express from "express";
-import { isAdmin } from "../middleware/authMiddleware.js";
+import { isAdmin, isAdminOrEmployee } from "../middleware/authMiddleware.js";
 import {
     createServiceInvoice,
     getAllServiceInvoices,
@@ -11,8 +11,8 @@ import {
 
 const router = express.Router();
 
-// Create service invoice
-router.post("/create", isAdmin, createServiceInvoice);
+// Create service invoice (employees assigned to service work can create)
+router.post("/create", isAdminOrEmployee, createServiceInvoice);
 
 // Get all service invoices
 router.post("/all", getAllServiceInvoices);
@@ -24,9 +24,9 @@ router.get("/get/:id", getServiceInvoiceById);
 router.post("/assignedTo/:assignedTo?/:invoiceType", getServiceInvoicesAssignedTo);
 
 // Update service invoice
-router.put("/update/:id", isAdmin, updateServiceInvoice);
+router.put("/update/:id", isAdminOrEmployee, updateServiceInvoice);
 
 // Delete service invoice
-router.delete("/delete/:id", isAdmin, deleteServiceInvoice);
+router.delete("/delete/:id", isAdminOrEmployee, deleteServiceInvoice);
 
 export default router;

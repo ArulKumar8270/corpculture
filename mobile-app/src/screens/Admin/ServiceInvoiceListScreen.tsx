@@ -22,6 +22,8 @@ import axios from 'axios';
 import { getApiBaseUrl } from '../../services/api';
 import Toast from 'react-native-toast-message';
 import * as ImagePicker from 'expo-image-picker';
+import { PaymentContactEmailsField } from '../../components/PaymentContactEmailsField';
+import { invoicePaymentEmailsFromRecord, normalizePaymentContactPayload } from '../../utils/invoicePaymentEmails';
 
 const ServiceInvoiceListScreen = () => {
   const navigation = useNavigation();
@@ -58,6 +60,7 @@ const ServiceInvoiceListScreen = () => {
     paymentAmount: '',
     paymentAmountType: '',
     grandTotal: 0,
+    paymentContactEmails: [] as string[],
   });
   const [balanceAmount, setBalanceAmount] = useState(0);
   const [pendingAmount, setPendingAmount] = useState(0);
@@ -404,6 +407,7 @@ const ServiceInvoiceListScreen = () => {
       paymentAmount: initialPaymentAmount.toString(),
       paymentAmountType: initialPaymentAmountType,
       grandTotal: invoice.grandTotal || 0,
+      paymentContactEmails: invoicePaymentEmailsFromRecord(invoice),
     });
     setBalanceAmount(0);
     setPendingAmount(0);
@@ -461,6 +465,7 @@ const ServiceInvoiceListScreen = () => {
       const paymentAmount = parseFloat(paymentForm.paymentAmount) || 0;
       const balance = balanceAmountParam !== undefined ? balanceAmountParam : balanceAmount;
       
+      const payEmails = normalizePaymentContactPayload(paymentForm.paymentContactEmails);
       const payload: any = {
         modeOfPayment: paymentForm.modeOfPayment,
         bankName: paymentForm.bankName,
@@ -471,6 +476,8 @@ const ServiceInvoiceListScreen = () => {
         otherPaymentMode: paymentForm.otherPaymentMode,
         paymentAmountType: paymentForm.paymentAmountType,
         paymentAmount: paymentForm?.paymentAmount ? parseFloat(paymentForm.paymentAmount) : 0,
+        paymentContactEmails: payEmails.paymentContactEmails,
+        paymentContactEmail: payEmails.paymentContactEmail,
         tdsAmount: 0, // Default to 0, will be updated if type is TDS
         pendingAmount: 0, // Default to 0, will be updated if type is Pending
         status:
@@ -1048,6 +1055,18 @@ const ServiceInvoiceListScreen = () => {
             onStartShouldSetResponder={() => true}
           >
             <Text style={styles.modalTitle}>Payment Details</Text>
+
+            {selectedInvoice ? (
+              <PaymentContactEmailsField
+                token={token || ''}
+                companyId={selectedInvoice?.companyId?._id || selectedInvoice?.companyId}
+                companyName={selectedInvoice?.companyId?.companyName}
+                selectedEmails={paymentForm.paymentContactEmails}
+                onChange={(emails) =>
+                  setPaymentForm((prev) => ({ ...prev, paymentContactEmails: emails }))
+                }
+              />
+            ) : null}
 
             {/* Mode of Payment */}
             <View style={styles.modalInputGroup}>

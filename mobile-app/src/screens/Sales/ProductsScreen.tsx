@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -39,14 +39,29 @@ const ProductsScreen = () => {
   const [price, setPrice] = useState([0, 200000]);
   const [category, setCategory] = useState('');
   const [ratings, setRatings] = useState(0);
-  
-  // Pagination
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredProducts = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return products;
+    return products.filter((p) => {
+      const name = p.name != null ? String(p.name).toLowerCase() : '';
+      const cat = p.category != null ? String(p.category).toLowerCase() : '';
+      return name.includes(q) || cat.includes(q);
+    });
+  }, [products, searchQuery]);
+
+  // Pagination (after client-side search)
   const [currentPage, setCurrentPage] = useState(1);
   const productsPerPage = 8;
-  const totalPages = Math.ceil(products.length / productsPerPage);
+  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / productsPerPage));
   const startIndex = (currentPage - 1) * productsPerPage;
   const endIndex = startIndex + productsPerPage;
-  const currentProducts = products.slice(startIndex, endIndex);
+  const currentProducts = filteredProducts.slice(startIndex, endIndex);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
 
   const debounceTimeout = useRef<NodeJS.Timeout | null>(null);
 
@@ -286,17 +301,40 @@ const ProductsScreen = () => {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.headerContainer}>
-        <View style={styles.headerLeft}>
-          <TouchableOpacity
-            style={styles.filterButton}
-            onPress={() => setFilterModalVisible(true)}
-          >
-            <Icon name="filter-list" size={24} color="#007AFF" />
-            <Text style={styles.filterButtonText}>Filters</Text>
-          </TouchableOpacity>
+        <View style={styles.headerTopRow}>
+          <View style={styles.headerLeft}>
+            <TouchableOpacity
+              style={styles.filterButton}
+              onPress={() => setFilterModalVisible(true)}
+            >
+              <Icon name="filter-list" size={24} color="#007AFF" />
+              <Text style={styles.filterButtonText}>Filters</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.headerRight}>
+            <CompanyToggleHeader />
+          </View>
         </View>
-        <View style={styles.headerRight}>
-          <CompanyToggleHeader />
+        <View style={styles.searchRow}>
+          <Icon name="search" size={22} color="#888" style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search by name or category"
+            placeholderTextColor="#999"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            returnKeyType="search"
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          {searchQuery.length > 0 ? (
+            <TouchableOpacity
+              onPress={() => setSearchQuery('')}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            >
+              <Icon name="close" size={22} color="#888" />
+            </TouchableOpacity>
+          ) : null}
         </View>
       </View>
 
@@ -309,6 +347,11 @@ const ProductsScreen = () => {
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>No products found</Text>
           <Text style={styles.emptySubtext}>Try adjusting your filters</Text>
+        </View>
+      ) : filteredProducts.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>No matching products</Text>
+          <Text style={styles.emptySubtext}>Try a different search or clear the search box</Text>
         </View>
       ) : (
         <>
@@ -356,13 +399,32 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
   },
   headerContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     padding: 15,
+    paddingBottom: 12,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
+  },
+  headerTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0f0f0',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginTop: 12,
+  },
+  searchIcon: { marginRight: 8 },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#333',
+    paddingVertical: 4,
   },
   headerLeft: {
     flexDirection: 'row',

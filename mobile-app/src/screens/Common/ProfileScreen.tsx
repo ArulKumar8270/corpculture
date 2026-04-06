@@ -467,6 +467,52 @@ const ProfileScreen = () => {
         </View>
       )}
 
+      {user?.role === 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Account</Text>
+          <TouchableOpacity
+            style={styles.accountRow}
+            onPress={() => (navigation as any).navigate('Address')}
+          >
+            <Icon name="location-on" size={22} color="#019ee3" />
+            <Text style={styles.accountRowText}>Address</Text>
+            <Icon name="chevron-right" size={22} color="#999" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.accountRow}
+            onPress={() => (navigation as any).navigate('PanCard')}
+          >
+            <Icon name="badge" size={22} color="#019ee3" />
+            <Text style={styles.accountRowText}>PAN card</Text>
+            <Icon name="chevron-right" size={22} color="#999" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.accountRow}
+            onPress={() => (navigation as any).navigate('Wishlist')}
+          >
+            <Icon name="favorite-border" size={22} color="#019ee3" />
+            <Text style={styles.accountRowText}>Wishlist</Text>
+            <Icon name="chevron-right" size={22} color="#999" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.accountRow}
+            onPress={() => (navigation as any).navigate('PaymentCards')}
+          >
+            <Icon name="credit-card" size={22} color="#019ee3" />
+            <Text style={styles.accountRowText}>Payment cards</Text>
+            <Icon name="chevron-right" size={22} color="#999" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.accountRow, styles.accountRowLast]}
+            onPress={() => (navigation as any).navigate('Reviews')}
+          >
+            <Icon name="rate-review" size={22} color="#019ee3" />
+            <Text style={styles.accountRowText}>My reviews</Text>
+            <Icon name="chevron-right" size={22} color="#999" />
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Additional Details Section */}
       {user?.role === 3 && employee && !loadingEmployee && (
         <View style={styles.section}>
@@ -1209,6 +1255,23 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     marginLeft: 15,
+    color: '#333',
+  },
+  accountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  accountRowLast: {
+    borderBottomWidth: 0,
+  },
+  accountRowText: {
+    flex: 1,
+    fontSize: 16,
+    marginLeft: 12,
     color: '#333',
   },
   logoutButton: {

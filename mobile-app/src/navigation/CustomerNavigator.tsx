@@ -24,6 +24,8 @@ import OrderSuccessScreen from '../screens/Sales/OrderSuccessScreen';
 import OrderFailedScreen from '../screens/Sales/OrderFailedScreen';
 import PaymentCardsScreen from '../screens/Common/PaymentCardsScreen';
 import ReviewsScreen from '../screens/Common/ReviewsScreen';
+import AddressScreen from '../screens/Common/AddressScreen';
+import PanCardScreen from '../screens/Common/PanCardScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -151,6 +153,8 @@ const ProfileStack = () => (
       component={ReviewsScreen}
       options={{ title: 'My Reviews' }}
     />
+    <Stack.Screen name="Address" component={AddressScreen} options={{ title: 'Address' }} />
+    <Stack.Screen name="PanCard" component={PanCardScreen} options={{ title: 'PAN Card' }} />
   </Stack.Navigator>
 );
 

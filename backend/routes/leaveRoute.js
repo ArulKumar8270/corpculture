@@ -1,5 +1,5 @@
 import express from "express";
-import { requireSignIn, isAdmin } from "../middleware/authMiddleware.js";
+import { requireSignIn, isAdmin, isAdminOrEmployee } from "../middleware/authMiddleware.js";
 import {
     createLeaveController,
     getMyLeavesController,
@@ -13,8 +13,8 @@ import {
 const router = express.Router();
 
 // Admin routes (must be before /:id)
-router.get("/admin/all", isAdmin, getAllLeavesController);
-router.put("/admin/status/:id", isAdmin, updateLeaveStatusAdminController);
+router.get("/admin/all", isAdminOrEmployee, getAllLeavesController);
+router.put("/admin/status/:id", isAdminOrEmployee, updateLeaveStatusAdminController);
 
 // Employee routes
 router.post("/create", requireSignIn, createLeaveController);

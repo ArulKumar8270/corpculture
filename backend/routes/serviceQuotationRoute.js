@@ -1,5 +1,5 @@
 import express from "express";
-import { isAdmin } from "../middleware/authMiddleware.js";
+import { isAdmin, isAdminOrEmployee } from "../middleware/authMiddleware.js";
 import {
     createServiceQuotation,
     getAllServiceQuotations,
@@ -12,21 +12,21 @@ import {
 const router = express.Router();
 
 // Create service Quotation
-router.post("/create", isAdmin, createServiceQuotation);
+router.post("/create", isAdminOrEmployee, createServiceQuotation);
 
 // Get all service Quotations
-router.get("/all/:status?", isAdmin, getAllServiceQuotations);
+router.get("/all/:status?", isAdminOrEmployee, getAllServiceQuotations);
 
 // Get single service Quotation
 router.get("/get/:id", getServiceQuotationById);
 
 // Update service Quotation
-router.put("/update/:id", isAdmin, updateServiceQuotation);
+router.put("/update/:id", isAdminOrEmployee, updateServiceQuotation);
 
 // Get single service Quotation
 router.get("/assignedTo/:assignedTo", getServiceQuotationAssignedTo);
 
 // Delete service Quotation
-router.delete("/delete/:id", isAdmin, deleteServiceQuotation);
+router.delete("/delete/:id", isAdminOrEmployee, deleteServiceQuotation);
 
 export default router;

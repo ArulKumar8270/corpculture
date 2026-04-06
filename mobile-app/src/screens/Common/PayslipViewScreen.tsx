@@ -5,6 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   ActivityIndicator,
+  TouchableOpacity,
 } from 'react-native';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
@@ -13,6 +14,9 @@ import { RootState } from '../../store';
 import axios from 'axios';
 import { getApiBaseUrl } from '../../services/api';
 import Toast from 'react-native-toast-message';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
+import { buildPayslipHtml } from '../../utils/payslipPdfHtml';
 
 const formatDate = (d: any) => {
   if (d == null || d === '') return '-';
@@ -40,6 +44,7 @@ const PayslipViewScreen = () => {
   const id = (route.params as any)?.id;
   const [payslip, setPayslip] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [pdfLoading, setPdfLoading] = useState(false);
 
   const fetchPayslip = useCallback(async () => {
     if (!id || !token) return;
@@ -62,6 +67,31 @@ const PayslipViewScreen = () => {
       fetchPayslip();
     }, [fetchPayslip])
   );
+
+  const sharePdf = async () => {
+    if (!payslip) return;
+    try {
+      setPdfLoading(true);
+      const html = buildPayslipHtml(payslip);
+      const { uri } = await Print.printToFileAsync({ html });
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, {
+          mimeType: 'application/pdf',
+          dialogTitle: 'Share payslip',
+        });
+      } else {
+        Toast.show({
+          type: 'info',
+          text1: 'Sharing unavailable',
+          text2: 'PDF was generated but this device cannot open the share sheet.',
+        });
+      }
+    } catch {
+      Toast.show({ type: 'error', text1: 'Could not create or share PDF' });
+    } finally {
+      setPdfLoading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -104,6 +134,21 @@ const PayslipViewScreen = () => {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <TouchableOpacity
+        style={styles.pdfButton}
+        onPress={sharePdf}
+        disabled={pdfLoading}
+        activeOpacity={0.85}
+      >
+        {pdfLoading ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <>
+            <Icon name="picture-as-pdf" size={22} color="#fff" />
+            <Text style={styles.pdfButtonText}>Share PDF</Text>
+          </>
+        )}
+      </TouchableOpacity>
       <View style={styles.header}>
         <Text style={styles.logo}>corp culture</Text>
         <Text style={styles.title}>PAYSLIP</Text>
@@ -185,6 +230,21 @@ const PayslipViewScreen = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f5f5' },
   content: { padding: 16, paddingBottom: 32 },
+  pdfButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#019ee3',
+    paddingVertical: 12,
+    borderRadius: 10,
+    marginBottom: 14,
+  },
+  pdfButtonText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 15,
+    marginLeft: 8,
+  },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   errorText: { fontSize: 16, color: '#666' },
   header: {

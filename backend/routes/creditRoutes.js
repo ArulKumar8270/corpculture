@@ -1,5 +1,5 @@
 import express from "express";
-import { isAdmin, requireSignIn } from "../middleware/authMiddleware.js";
+import { isAdmin, isAdminOrEmployee, requireSignIn } from "../middleware/authMiddleware.js";
 import {
     createCredit,
     getAllCredits,
@@ -12,21 +12,21 @@ import {
 const router = express.Router();
 
 // Create Credit || POST
-router.post("/create", requireSignIn, isAdmin, createCredit);
+router.post("/create", requireSignIn, isAdminOrEmployee, createCredit);
 
 // Get All Credits || GET
-router.get("/all", requireSignIn, isAdmin, getAllCredits);
+router.get("/all", requireSignIn, isAdminOrEmployee, getAllCredits);
 
 // Get Credit by ID || GET
-router.get("/get/:id", requireSignIn, isAdmin, getCreditById);
+router.get("/get/:id", requireSignIn, isAdminOrEmployee, getCreditById);
 
 // Get Credits by Company ID || GET
-router.get("/company/:companyId", requireSignIn, isAdmin, getCreditsByCompany);
+router.get("/company/:companyId", requireSignIn, isAdminOrEmployee, getCreditsByCompany);
 
 // Update Credit || PUT
-router.put("/update/:id", requireSignIn, isAdmin, updateCredit);
+router.put("/update/:id", requireSignIn, isAdminOrEmployee, updateCredit);
 
 // Delete Credit || DELETE
-router.delete("/delete/:id", requireSignIn, isAdmin, deleteCredit);
+router.delete("/delete/:id", requireSignIn, isAdminOrEmployee, deleteCredit);
 
 export default router;

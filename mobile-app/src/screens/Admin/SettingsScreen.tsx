@@ -54,12 +54,40 @@ const SettingsScreen = () => {
       screen: 'OldInvoicesList' as never,
       permissionKey: 'otherSettings', // Using parent permission
     },
+    {
+      id: 'payslipAdmin',
+      title: 'Payslips (HR)',
+      icon: 'payments',
+      screen: 'AdminPayslipList' as never,
+      permissionKey: '__adminOnlyPayslip__',
+    },
+    {
+      id: 'gift',
+      title: 'Gift settings',
+      icon: 'card-giftcard',
+      screen: 'GiftSettings' as never,
+      permissionKey: 'otherSettingsGift',
+    },
+    {
+      id: 'allOrders',
+      title: 'All orders (admin)',
+      icon: 'inventory',
+      screen: 'AllOrdersAdmin' as never,
+      permissionKey: '__adminOnlyAllOrders__',
+    },
   ];
 
   // Filter menu items based on permissions (admins see all)
-  const settingsMenu = user?.role === 1
-    ? allSettingsMenu
-    : allSettingsMenu.filter(item => hasPermission(item.permissionKey, 'view'));
+  const settingsMenu = allSettingsMenu.filter((item) => {
+    if (item.permissionKey === '__adminOnlyAllOrders__') {
+      return user?.role === 1 || Number(user?.role) === 1;
+    }
+    if (item.permissionKey === '__adminOnlyPayslip__') {
+      return user?.role === 1 || Number(user?.role) === 1;
+    }
+    if (user?.role === 1 || Number(user?.role) === 1) return true;
+    return hasPermission(item.permissionKey, 'view');
+  });
 
   return (
     <ScrollView style={styles.container}>

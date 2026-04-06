@@ -1,5 +1,5 @@
 import express from "express";
-import { requireSignIn, isAdmin } from "../middleware/authMiddleware.js";
+import { requireSignIn, isAdmin, isAdminOrEmployee } from "../middleware/authMiddleware.js";
 import newProduct from "../controllers/product/newProduct.js";
 import getSellerProducts from "../controllers/product/getSellerProducts.js";
 import deleteProduct from "../controllers/product/deleteProduct.js";
@@ -12,13 +12,13 @@ import searchProductController from "../controllers/product/searchProductControl
 const router = express.Router();
 
 //Add new product POST
-router.post("/new-product", isAdmin, newProduct);
+router.post("/new-product", isAdminOrEmployee, newProduct);
 
 //Get Seller Product
-router.get("/seller-product", isAdmin, getSellerProducts);
+router.get("/seller-product", isAdminOrEmployee, getSellerProducts);
 
 //Delete Product
-router.post("/delete-product", isAdmin, deleteProduct);
+router.post("/delete-product", isAdminOrEmployee, deleteProduct);
 
 //find filtered product
 router.get("/filtered-products", getFilteredProducts);
@@ -27,7 +27,7 @@ router.get("/filtered-products", getFilteredProducts);
 router.get("/:id", findProduct);
 
 //update product details from product id
-router.patch("/update/:id", isAdmin, updateProduct);
+router.patch("/update/:id", isAdminOrEmployee, updateProduct);
 
 // search products using keyword
 router.get("/search/:keyword", searchProductController);

@@ -113,6 +113,10 @@ const CustomDrawerContent = (props: CustomDrawerContentProps) => {
       'MenuSettings': 'Settings',
       'CreditSettings': 'Settings',
       'GiftSettings': 'Settings',
+      'AdminPayslipList': 'Settings',
+      'AddPayslip': 'Settings',
+      'AdminPayslipView': 'Settings',
+      'ActivityLogList': 'Profile',
       'ProductCreate': 'Products',
       'ProductList': 'Products',
       'OrderUpdate': 'Orders',
@@ -233,6 +237,12 @@ const CustomDrawerContent = (props: CustomDrawerContentProps) => {
               onPress={() => navigateToScreen('Payslips')}
             >
               <Text style={styles.menuItemText}>My Payslips</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => navigateToScreen('ActivityLogList')}
+            >
+              <Text style={styles.menuItemText}>My Activity Logs</Text>
             </TouchableOpacity>
           </View>
         )}

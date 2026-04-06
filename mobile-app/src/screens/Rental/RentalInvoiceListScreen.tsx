@@ -23,6 +23,8 @@ import axios from 'axios';
 import { getApiBaseUrl } from '../../services/api';
 import Toast from 'react-native-toast-message';
 import * as ImagePicker from 'expo-image-picker';
+import { PaymentContactEmailsField } from '../../components/PaymentContactEmailsField';
+import { invoicePaymentEmailsFromRecord, normalizePaymentContactPayload } from '../../utils/invoicePaymentEmails';
 
 const RentalInvoiceListScreen = () => {
   const navigation = useNavigation();
@@ -60,6 +62,7 @@ const RentalInvoiceListScreen = () => {
     paymentAmount: '',
     paymentAmountType: '',
     grandTotal: 0,
+    paymentContactEmails: [] as string[],
   });
   const [balanceAmount, setBalanceAmount] = useState(0);
   const [pendingAmount, setPendingAmount] = useState(0);
@@ -414,6 +417,7 @@ const RentalInvoiceListScreen = () => {
       paymentAmount: initialPaymentAmount.toString(),
       paymentAmountType: initialPaymentAmountType,
       grandTotal: entry.grandTotal || 0,
+      paymentContactEmails: invoicePaymentEmailsFromRecord(entry),
     });
     setBalanceAmount(0);
     setPendingAmount(0);
@@ -477,6 +481,7 @@ const RentalInvoiceListScreen = () => {
       paymentAmount: '',
       paymentAmountType: '',
       grandTotal: 0,
+      paymentContactEmails: [],
     });
     setBalanceAmount(0);
     setPendingAmount(0);
@@ -501,6 +506,7 @@ const RentalInvoiceListScreen = () => {
         status = 'Unpaid';
       }
       
+      const payEmails = normalizePaymentContactPayload(paymentForm.paymentContactEmails);
       const payload: any = {
         modeOfPayment: paymentForm.modeOfPayment,
         bankName: paymentForm.bankName,
@@ -513,6 +519,8 @@ const RentalInvoiceListScreen = () => {
         paymentAmount: balanceAmountParam 
           ? balanceAmountParam 
           : (paymentAmount >= grandTotal ? grandTotal : paymentAmount),
+        paymentContactEmails: payEmails.paymentContactEmails,
+        paymentContactEmail: payEmails.paymentContactEmail,
         tdsAmount: 0,
         pendingAmount: 0,
         status: status,
@@ -1137,6 +1145,18 @@ const RentalInvoiceListScreen = () => {
             <Text style={styles.modalTitle}>
               Payment Details (RS: {paymentForm?.grandTotal || selectedEntry?.grandTotal || '0.00'})
             </Text>
+
+            {selectedEntry ? (
+              <PaymentContactEmailsField
+                token={token || ''}
+                companyId={selectedEntry?.companyId?._id || selectedEntry?.companyId}
+                companyName={selectedEntry?.companyId?.companyName}
+                selectedEmails={paymentForm.paymentContactEmails}
+                onChange={(emails) =>
+                  setPaymentForm((prev) => ({ ...prev, paymentContactEmails: emails }))
+                }
+              />
+            ) : null}
 
             {/* Mode of Payment */}
             <View style={styles.modalInputGroup}>

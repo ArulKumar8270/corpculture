@@ -14,6 +14,7 @@ import PanCardScreen from '../screens/Common/PanCardScreen';
 import DeactivateScreen from '../screens/Common/DeactivateScreen';
 import PayslipListScreen from '../screens/Common/PayslipListScreen';
 import PayslipViewScreen from '../screens/Common/PayslipViewScreen';
+import EmployeeActivityLogListScreen from '../screens/Common/EmployeeActivityLogListScreen';
 
 // Product Management
 import ProductManagementScreen from '../screens/Admin/ProductManagementScreen';
@@ -67,6 +68,10 @@ import CompanyListScreen from '../screens/Admin/CompanyListScreen';
 import AddCompanyScreen from '../screens/Admin/AddCompanyScreen';
 import OldInvoicesListScreen from '../screens/Admin/OldInvoicesListScreen';
 import MenuSettingScreen from '../screens/Admin/MenuSettingScreen';
+import CreditManagementScreen from '../screens/Admin/CreditManagementScreen';
+import GiftSettingsScreen from '../screens/Admin/GiftSettingsScreen';
+import AdminPayslipListScreen from '../screens/Admin/AdminPayslipListScreen';
+import AddPayslipScreen from '../screens/Admin/AddPayslipScreen';
 
 // Commission
 import CommissionScreen from '../screens/Admin/CommissionScreen';
@@ -82,35 +87,6 @@ import ServiceEnquiriesReportScreen from '../screens/Admin/Reports/ServiceEnquir
 import ServiceInvoicesReportScreen from '../screens/Admin/Reports/ServiceInvoicesReportScreen';
 import ServiceReportsReportScreen from '../screens/Admin/Reports/ServiceReportsReportScreen';
 import EmployeeListScreen from '../screens/Admin/EmployeeListScreen';
-
-import { View, Text, StyleSheet } from 'react-native';
-
-
-const PlaceholderScreen = ({ title }: { title: string }) => (
-  <View style={styles.placeholder}>
-    <Text style={styles.placeholderText}>{title}</Text>
-    <Text style={styles.placeholderSubtext}>Coming Soon</Text>
-  </View>
-);
-
-const styles = StyleSheet.create({
-  placeholder: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-  },
-  placeholderText: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 10,
-  },
-  placeholderSubtext: {
-    fontSize: 16,
-    color: '#666',
-  },
-});
 
 const Drawer = createDrawerNavigator();
 const Stack = createStackNavigator();
@@ -184,7 +160,7 @@ const ServiceStack = () => (
     <Stack.Screen name="AddServiceQuotation" component={AddServiceInvoiceScreen} options={{ title: 'Add/Edit Quotation', headerShown: true }} />
     <Stack.Screen name="ServiceReports" component={ServiceReportsScreen} options={{ title: 'Service Reports', headerShown: true }} />
     <Stack.Screen name="AddServiceReport" component={AddServiceReportScreen} options={{ title: 'Add Service Report', headerShown: true }} />
-    <Stack.Screen name="ServicePartners" component={() => <PlaceholderScreen title="Service Partners" />} options={{ title: 'Service Partners', headerShown: true }} />
+    <Stack.Screen name="ServicePartners" component={CommissionScreen} options={{ title: 'Partners (Service)', headerShown: true }} />
   </Stack.Navigator>
 );
 
@@ -213,7 +189,7 @@ const RentalStack = () => (
     <Stack.Screen name="RentalQuotationList" component={RentalQuotationListScreen} options={{ title: 'Rental Quotations' }} />
     <Stack.Screen name="RentalReports" component={RentalReportsScreen} options={{ title: 'Rental Reports' }} />
     <Stack.Screen name="AddRentalReport" component={AddRentalReportScreen} options={{ title: 'Add/Edit Rental Report' }} />
-    <Stack.Screen name="RentalPartners" component={() => <PlaceholderScreen title="Rental Partners" />} options={{ title: 'Rental Partners' }} />
+    <Stack.Screen name="RentalPartners" component={CommissionScreen} options={{ title: 'Partners (Rental)' }} />
   </Stack.Navigator>
 );
 
@@ -286,8 +262,11 @@ const SettingsStack = () => (
     <Stack.Screen name="AddCompany" component={AddCompanyScreen} options={{ title: 'Add/Edit Company' }} />
     <Stack.Screen name="OldInvoicesList" component={OldInvoicesListScreen} options={{ title: 'Old Invoices' }} />
     <Stack.Screen name="MenuSettings" component={MenuSettingScreen} options={{ title: 'Menu Settings' }} />
-    <Stack.Screen name="CreditSettings" component={() => <PlaceholderScreen title="Credit Settings" />} options={{ title: 'Credit Settings' }} />
-    <Stack.Screen name="GiftSettings" component={() => <PlaceholderScreen title="Gift Settings" />} options={{ title: 'Gift Settings' }} />
+    <Stack.Screen name="CreditSettings" component={CreditManagementScreen} options={{ title: 'Credit Management' }} />
+    <Stack.Screen name="GiftSettings" component={GiftSettingsScreen} options={{ title: 'Gift Settings' }} />
+    <Stack.Screen name="AdminPayslipList" component={AdminPayslipListScreen} options={{ title: 'Payslips (Admin)' }} />
+    <Stack.Screen name="AddPayslip" component={AddPayslipScreen} options={{ title: 'Add Payslip' }} />
+    <Stack.Screen name="AdminPayslipView" component={PayslipViewScreen} options={{ title: 'Payslip' }} />
   </Stack.Navigator>
 );
 
@@ -313,6 +292,7 @@ const ProfileStack = () => (
     <Stack.Screen name="Deactivate" component={DeactivateScreen} options={{ title: 'Deactivate Account' }} />
     <Stack.Screen name="Payslips" component={PayslipListScreen} options={{ title: 'My Payslips' }} />
     <Stack.Screen name="PayslipView" component={PayslipViewScreen} options={{ title: 'Payslip' }} />
+    <Stack.Screen name="ActivityLogList" component={EmployeeActivityLogListScreen} options={{ title: 'My Activity Logs' }} />
   </Stack.Navigator>
 );
 

@@ -1,5 +1,5 @@
 import express from "express";
-import { requireSignIn, isAdmin } from "../middleware/authMiddleware.js";
+import { requireSignIn, isAdmin, isAdminOrEmployee } from "../middleware/authMiddleware.js";
 import {
     createInvoice,
     getAllInvoices,
@@ -11,18 +11,18 @@ import {
 const router = express.Router();
 
 // Create invoice
-router.post("/create", requireSignIn, isAdmin, createInvoice);
+router.post("/create", requireSignIn, isAdminOrEmployee, createInvoice);
 
 // Get all invoices
-router.get("/all", requireSignIn, isAdmin, getAllInvoices);
+router.get("/all", requireSignIn, isAdminOrEmployee, getAllInvoices);
 
 // Get single invoice
 router.get("/get/:id", requireSignIn, getInvoiceById);
 
 // Update invoice
-router.put("/update/:id", requireSignIn, isAdmin, updateInvoice);
+router.put("/update/:id", requireSignIn, isAdminOrEmployee, updateInvoice);
 
 // Delete invoice
-router.delete("/delete/:id", requireSignIn, isAdmin, deleteInvoice);
+router.delete("/delete/:id", requireSignIn, isAdminOrEmployee, deleteInvoice);
 
 export default router;

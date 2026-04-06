@@ -973,8 +973,18 @@ const HomeScreen = () => {
           scrollEnabled={false}
           contentContainerStyle={styles.productsList}
         />
-        <TouchableOpacity style={styles.getUpdatesButton}>
-          <Text style={styles.getUpdatesText}>Get Updates</Text>
+        <TouchableOpacity
+          style={styles.getUpdatesButton}
+          activeOpacity={0.85}
+          onPress={() => {
+            const parent = navigation.getParent?.();
+            if (parent && typeof (parent as any).navigate === 'function') {
+              (parent as any).navigate('Products', { screen: 'ProductsMain' });
+            }
+          }}
+        >
+          <Icon name="shopping-bag" size={22} color="#fff" style={styles.shopCatalogIcon} />
+          <Text style={styles.getUpdatesText}>Browse shop catalog</Text>
         </TouchableOpacity>
       </View>
 
@@ -2037,8 +2047,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#00BCD4',
     padding: 15,
     borderRadius: 8,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     marginTop: 20,
+  },
+  shopCatalogIcon: {
+    marginRight: 10,
   },
   getUpdatesText: {
     color: '#fff',

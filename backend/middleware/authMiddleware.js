@@ -53,7 +53,37 @@ const isAdmin = asyncHandler(async (req, res, next) => {
     }
 });
 
-export { requireSignIn, isAdmin };
+/** Admin (role 1) or assigned employee (role 3) — for service/rental workflows employees can run from the admin UI. */
+const isAdminOrEmployee = asyncHandler(async (req, res, next) => {
+    try {
+        const token = req.headers.authorization;
+
+        if (!token) {
+            return res.status(401).json({ message: "JWT must be provided" });
+        }
+
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        req.user = await UserModel.findById(decoded._id);
+
+        if (!req.user) {
+            return res.status(401).json({ message: "Unauthorised User" });
+        }
+
+        const role = Number(req.user.role);
+        if (role !== 1 && role !== 3) {
+            return res.status(403).json({
+                message: "Access denied. Admin or employee privileges required.",
+            });
+        }
+
+        next();
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ message: "Server error" });
+    }
+});
+
+export { requireSignIn, isAdmin, isAdminOrEmployee };
 // import JWT from "jsonwebtoken";
 // import userModel from "../models/userModel.js";
 // import asyncHandler from "express-async-handler";
