@@ -125,3 +125,81 @@ export const getTotalRentalInvoicePayment = (entry) => {
         totalWithCommission: (totalAmountIncludingGST + commissionAmount).toFixed(2)
     };
 };
+
+/** Display names only for rental invoice "Send details to" (legacy strings or {name,email}[]). */
+export const formatSendDetailsToDisplay = (value) => {
+    if (value == null || value === '') return 'N/A';
+    if (Array.isArray(value)) {
+        if (value.length === 0) return 'N/A';
+        if (typeof value[0] === 'object' && value[0] !== null && 'name' in value[0]) {
+            return value.map((x) => x.name).filter(Boolean).join(', ');
+        }
+        return value
+            .map((s) => {
+                const t = String(s).trim();
+                if (!t) return '';
+                const p = t.indexOf('(');
+                return p !== -1 ? t.slice(0, p).trim() : t;
+            })
+            .filter(Boolean)
+            .join(', ');
+    }
+    const t = String(value).trim();
+    if (!t) return 'N/A';
+    const p = t.indexOf('(');
+    return p !== -1 ? t.slice(0, p).trim() : t;
+};
+
+const EMAIL_IN_LABEL = /Email:\s*([^\s,)]+)/i;
+
+const legacyRecipientFromLabel = (line) => {
+    const s = String(line).trim();
+    if (!s) return null;
+    const m = s.match(EMAIL_IN_LABEL);
+    const email = m ? m[1].trim() : '';
+    if (!email) {
+        return { name: s, email: '' };
+    }
+    const paren = s.indexOf('(');
+    let name =
+        paren !== -1
+            ? s.slice(0, paren).trim()
+            : s
+                  .replace(EMAIL_IN_LABEL, '')
+                  .replace(/Mobile:\s*[^,)]*,?\s*/i, '')
+                  .replace(/,\s*$/, '')
+                  .trim();
+    if (!name) name = s.replace(EMAIL_IN_LABEL, '').trim();
+    return { name, email };
+};
+
+/** Form state for rental send-details: { name, email }[] */
+export const parseSendDetailsToForForm = (value) => {
+    if (!value) return [];
+    if (Array.isArray(value)) {
+        if (
+            value.length > 0 &&
+            typeof value[0] === 'object' &&
+            value[0] !== null &&
+            ('name' in value[0] || 'email' in value[0])
+        ) {
+            return value
+                .map((x) => ({
+                    name: String(x.name ?? '').trim(),
+                    email: String(x.email ?? '').trim(),
+                }))
+                .filter((x) => x.name && x.name !== '[object Object]');
+        }
+        return value
+            .map((s) => legacyRecipientFromLabel(String(s)))
+            .filter((x) => x && x.name && x.name !== '[object Object]');
+    }
+    const raw = String(value).trim();
+    if (!raw) return [];
+    const lines = raw.includes('\n')
+        ? raw.split('\n').map((t) => t.trim()).filter(Boolean)
+        : [raw];
+    return lines
+        .map((line) => legacyRecipientFromLabel(line))
+        .filter((x) => x && x.name && x.name !== '[object Object]');
+};

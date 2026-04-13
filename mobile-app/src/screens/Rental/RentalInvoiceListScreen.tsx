@@ -25,6 +25,7 @@ import Toast from 'react-native-toast-message';
 import * as ImagePicker from 'expo-image-picker';
 import { PaymentContactEmailsField } from '../../components/PaymentContactEmailsField';
 import { invoicePaymentEmailsFromRecord, normalizePaymentContactPayload } from '../../utils/invoicePaymentEmails';
+import { formatSendDetailsToDisplay } from '../../utils/functions';
 
 const RENTAL_INVOICE_DOWNLOAD_BASE_URL = 'https://pub-bcab85dac0c64221ba6b6a756f991c46.r2.dev';
 
@@ -815,9 +816,7 @@ const RentalInvoiceListScreen = () => {
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Send Details To:</Text>
             <Text style={styles.detailValue}>
-              {Array.isArray(item.sendDetailsTo)
-                ? item.sendDetailsTo.filter(Boolean).join(', ')
-                : item.sendDetailsTo || 'N/A'}
+              {formatSendDetailsToDisplay(item.sendDetailsTo)}
             </Text>
           </View>
           {item.assignedTo && (

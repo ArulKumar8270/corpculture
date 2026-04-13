@@ -48,6 +48,91 @@ interface Product {
   a5Config: ProductConfig;
 }
 
+type SendDetailsRecipient = { name: string; email: string };
+
+const EMAIL_IN_LABEL_MOBILE = /Email:\s*([^\s,)]+)/i;
+
+function legacyRecipientFromLabel(line: string): SendDetailsRecipient | null {
+  const s = String(line).trim();
+  if (!s) return null;
+  const m = s.match(EMAIL_IN_LABEL_MOBILE);
+  const email = m ? m[1].trim() : '';
+  if (!email) {
+    return { name: s, email: '' };
+  }
+  const paren = s.indexOf('(');
+  let name =
+    paren !== -1
+      ? s.slice(0, paren).trim()
+      : s
+          .replace(EMAIL_IN_LABEL_MOBILE, '')
+          .replace(/Mobile:\s*[^,)]*,?\s*/i, '')
+          .replace(/,\s*$/, '')
+          .trim();
+  if (!name) name = s.replace(EMAIL_IN_LABEL_MOBILE, '').trim();
+  return { name, email };
+}
+
+function parseSendDetailsToForForm(value: unknown): SendDetailsRecipient[] {
+  if (!value) return [];
+  if (Array.isArray(value)) {
+    if (
+      value.length > 0 &&
+      typeof value[0] === 'object' &&
+      value[0] !== null &&
+      ('name' in (value[0] as object) || 'email' in (value[0] as object))
+    ) {
+      return (value as any[])
+        .map((x) => ({
+          name: String(x.name ?? '').trim(),
+          email: String(x.email ?? '').trim(),
+        }))
+        .filter((x) => x.name && x.name !== '[object Object]');
+    }
+    return value
+      .map((s) => legacyRecipientFromLabel(String(s)))
+      .filter(
+        (x): x is SendDetailsRecipient =>
+          x != null && !!x.name && x.name !== '[object Object]'
+      );
+  }
+  const raw = String(value).trim();
+  if (!raw) return [];
+  const lines = raw.includes('\n')
+    ? raw.split('\n').map((t) => t.trim()).filter(Boolean)
+    : [raw];
+  return lines
+    .map((line) => legacyRecipientFromLabel(line))
+    .filter(
+      (x): x is SendDetailsRecipient =>
+        x != null && !!x.name && x.name !== '[object Object]'
+    );
+}
+
+function sameSendRecipient(a: SendDetailsRecipient, b: SendDetailsRecipient): boolean {
+  const ae = (a.email || '').trim().toLowerCase();
+  const be = (b.email || '').trim().toLowerCase();
+  if (ae && be && ae === be) return true;
+  if (!ae && !be) return (a.name || '').trim() === (b.name || '').trim();
+  return false;
+}
+
+function serializeSendDetailsPayload(recipients: SendDetailsRecipient[]): string {
+  const cleaned = (recipients || [])
+    .map((r) => ({
+      name:
+        typeof r?.name === 'string' || typeof r?.name === 'number'
+          ? String(r.name).trim()
+          : '',
+      email:
+        typeof r?.email === 'string' || typeof r?.email === 'number'
+          ? String(r.email).trim()
+          : '',
+    }))
+    .filter((r) => r.name);
+  return JSON.stringify(cleaned);
+}
+
 const RentalInvoiceFormScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
@@ -73,7 +158,7 @@ const RentalInvoiceFormScreen = () => {
   const [companies, setCompanies] = useState<any[]>([]);
   const [companyData, setCompanyData] = useState<any>(null);
   const [availableProducts, setAvailableProducts] = useState<any[]>([]);
-  const [contactOptions, setContactOptions] = useState<string[]>([]);
+  const [contactPersons, setContactPersons] = useState<SendDetailsRecipient[]>([]);
   const [invoices, setInvoices] = useState<string | number | null>(null);
   const [globalInvoiceFormat, setGlobalInvoiceFormat] = useState('');
   const [companyPickerVisible, setCompanyPickerVisible] = useState(false);
@@ -88,7 +173,7 @@ const RentalInvoiceFormScreen = () => {
   const [formData, setFormData] = useState({
     companyId: initialCompanyId,
     machineId: '',
-    sendDetailsTo: [] as string[],
+    sendDetailsTo: [] as SendDetailsRecipient[],
     countImageFile: null as string | null,
     remarks: '',
     invoiceDate: new Date().toISOString(), // Match web: default to today
@@ -97,29 +182,8 @@ const RentalInvoiceFormScreen = () => {
     a5Config: { bwOldCount: '', bwNewCount: '' } as ProductConfig,
   });
 
-  const parseSendDetailsTo = (value: any): string[] => {
-    if (!value) return [];
-    if (Array.isArray(value)) return value.map((v) => String(v)).filter(Boolean);
-    const s = String(value).trim();
-    if (!s) return [];
-    // Use newline as our multi-select delimiter (safe because option string contains commas).
-    if (s.includes('\n')) return s.split('\n').map((x) => x.trim()).filter(Boolean);
-    return [s];
-  };
-
-  const serializeSendDetailsTo = (values: string[]) => {
-    const cleaned = (values || []).map((v) => String(v).trim()).filter(Boolean);
-    return cleaned.join('\n');
-  };
-
-  const sendToDisplayLabel = (option: string) => {
-    const s = String(option || '').trim();
-    if (!s) return '';
-    return s;
-  };
-
-  const sendToSummary = (values: string[]) => {
-    const labels = (values || []).map(sendToDisplayLabel).filter(Boolean);
+  const sendToSummary = (values: SendDetailsRecipient[]) => {
+    const labels = (values || []).map((r) => r.name).filter(Boolean);
     if (!labels.length) return '--select Option--';
     return labels.join(', ');
   };
@@ -205,21 +269,24 @@ const RentalInvoiceFormScreen = () => {
     }
   }, [formData.companyId]);
 
-  // Populate contact options from companies list or from companyData (e.g. when coming from rental enquiries before companies load)
+  // Populate contacts from companies list or from companyData (e.g. when coming from rental enquiries before companies load)
   useEffect(() => {
     if (!formData.companyId) {
-      setContactOptions([]);
+      setContactPersons([]);
       return;
     }
     const selectedCompany = companies.find((comp) => String(comp._id) === String(formData.companyId));
     const persons = selectedCompany?.contactPersons ?? companyData?.contactPersons;
     if (persons && Array.isArray(persons)) {
       const options = persons
-        .map((person: any) => String(person?.name || '').trim())
-        .filter(Boolean);
-      setContactOptions(options);
+        .map((person: any) => ({
+          name: String(person?.name || '').trim(),
+          email: String(person?.email || '').trim(),
+        }))
+        .filter((p: SendDetailsRecipient) => p.name);
+      setContactPersons(options);
     } else {
-      setContactOptions([]);
+      setContactPersons([]);
     }
     if (!entryId) {
       setFormData((prev) => ({ ...prev, sendDetailsTo: [] }));
@@ -462,7 +529,7 @@ const RentalInvoiceFormScreen = () => {
         setFormData({
           companyId: entry.companyId?._id || entry.companyId || '',
           machineId: entry.machineId?._id || entry.machineId || '',
-          sendDetailsTo: parseSendDetailsTo(entry?.sendDetailsTo),
+          sendDetailsTo: parseSendDetailsToForForm(entry?.sendDetailsTo),
           countImageFile: null,
           remarks: entry.remarks || '',
           invoiceDate: entry.invoiceDate ? new Date(entry.invoiceDate).toISOString() : new Date().toISOString(),
@@ -824,7 +891,8 @@ const RentalInvoiceFormScreen = () => {
       });
       return false;
     }
-    if (!formData.sendDetailsTo || formData.sendDetailsTo.length === 0) {
+    const recipients = formData.sendDetailsTo || [];
+    if (!recipients.length || !recipients.some((r) => r && String(r.name || '').trim())) {
       Toast.show({
         type: 'error',
         text1: 'Validation Error',
@@ -1038,7 +1106,7 @@ const RentalInvoiceFormScreen = () => {
         return;
       }
       data.append('companyId', finalCompanyId);
-      data.append('sendDetailsTo', serializeSendDetailsTo(formData.sendDetailsTo));
+      data.append('sendDetailsTo', serializeSendDetailsPayload(formData.sendDetailsTo));
       data.append('remarks', formData.remarks || '');
       data.append('invoiceDate', formData.invoiceDate ? new Date(formData.invoiceDate).toISOString() : new Date().toISOString());
       // Use employeeId (User ID) for assignedTo, fallback to employeeName if employeeId not available
@@ -1434,7 +1502,7 @@ const RentalInvoiceFormScreen = () => {
         <TouchableOpacity
           style={styles.pickerButton}
           onPress={() => setSendToPickerVisible(true)}
-          disabled={!formData.companyId || contactOptions.length === 0}
+          disabled={!formData.companyId || contactPersons.length === 0}
         >
           <Text style={styles.pickerButtonText}>
             {sendToSummary(formData.sendDetailsTo)}
@@ -1599,26 +1667,32 @@ const RentalInvoiceFormScreen = () => {
           <View style={styles.pickerModalContent}>
             <Text style={styles.pickerModalTitle}>Select Contact</Text>
             <FlatList
-              data={contactOptions}
-              keyExtractor={(item, index) => index.toString()}
-              renderItem={({ item }) => (
+              data={contactPersons}
+              keyExtractor={(item, index) =>
+                `${(item.email || '').toLowerCase()}-${(item.name || '').toLowerCase()}-${index}`
+              }
+              renderItem={({ item: person }) => (
                 <TouchableOpacity
                   style={styles.pickerOption}
                   onPress={() => {
-                    const exists = formData.sendDetailsTo?.includes(item);
+                    const exists = (formData.sendDetailsTo || []).some((x) => sameSendRecipient(x, person));
                     const next = exists
-                      ? (formData.sendDetailsTo || []).filter((x) => x !== item)
-                      : [...(formData.sendDetailsTo || []), item];
+                      ? (formData.sendDetailsTo || []).filter((x) => !sameSendRecipient(x, person))
+                      : [...(formData.sendDetailsTo || []), { ...person }];
                     setFormData({ ...formData, sendDetailsTo: next });
                   }}
                 >
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
                     <Icon
-                      name={formData.sendDetailsTo?.includes(item) ? 'check-box' : 'check-box-outline-blank'}
+                      name={
+                        (formData.sendDetailsTo || []).some((x) => sameSendRecipient(x, person))
+                          ? 'check-box'
+                          : 'check-box-outline-blank'
+                      }
                       size={20}
                       color="#019ee3"
                     />
-                    <Text style={[styles.pickerOptionText, { flex: 1 }]}>{item}</Text>
+                    <Text style={[styles.pickerOptionText, { flex: 1 }]}>{person.name}</Text>
                   </View>
                 </TouchableOpacity>
               )}

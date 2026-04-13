@@ -152,3 +152,31 @@ export const getTotalRentalInvoicePayment = (entry: any) => {
         totalWithCommission: (totalAmountIncludingGST + commissionAmount).toFixed(2)
     };
 };
+
+/** Rental invoice send-details: show names; supports legacy string[] or { name, email }[]. */
+export const formatSendDetailsToDisplay = (value: unknown): string => {
+    if (value == null || value === '') return 'N/A';
+    if (Array.isArray(value)) {
+        if (value.length === 0) return 'N/A';
+        const first = value[0] as any;
+        if (typeof first === 'object' && first !== null && 'name' in first) {
+            return value
+                .map((x: any) => String(x?.name || '').trim())
+                .filter(Boolean)
+                .join(', ');
+        }
+        return value
+            .map((s) => {
+                const t = String(s).trim();
+                if (!t) return '';
+                const p = t.indexOf('(');
+                return p !== -1 ? t.slice(0, p).trim() : t;
+            })
+            .filter(Boolean)
+            .join(', ');
+    }
+    const t = String(value).trim();
+    if (!t) return 'N/A';
+    const p = t.indexOf('(');
+    return p !== -1 ? t.slice(0, p).trim() : t;
+};

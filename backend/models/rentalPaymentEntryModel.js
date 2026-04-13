@@ -76,7 +76,7 @@ const rentalPaymentEntrySchema = new mongoose.Schema({
         ref: 'Company',
         required: true,
     },
-    // Stored as BSON array of strings; Mixed accepts legacy single string until re-saved
+    // Array of { name, email }; Mixed keeps legacy string / string[] documents readable until re-saved
     sendDetailsTo: {
         type: mongoose.Schema.Types.Mixed,
         required: true,

@@ -1,13 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     Box,
     Typography,
     TextField,
     Button,
     FormControl,
-    InputLabel,
-    Select,
-    MenuItem,
     Paper,
     CircularProgress,
     FormHelperText,
@@ -22,7 +19,7 @@ import toast from 'react-hot-toast';
 import { useAuth } from '../../context/auth';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import ImageIcon from "@mui/icons-material/Image";
-import { getTotalRentalInvoicePayment } from '../../utils/functions';
+import { getTotalRentalInvoicePayment, parseSendDetailsToForForm } from '../../utils/functions';
 const MAX_IMAGE_SIZE = 500 * 1024;
 
 const RentalInvoiceForm = () => {
@@ -36,7 +33,6 @@ const RentalInvoiceForm = () => {
     const [companies, setCompanies] = useState([]);
     const [availableProducts, setAvailableProducts] = useState([]);
     const [logoPreview, setLogoPreview] = useState("");
-    const [contactOptions, setContactOptions] = useState([]);
     const [selectedProduct, setSelectedProduct] = useState(null);
     const [invoices, setInvoices] = useState(null);
     const [invoiceCount, setInvoiceCount] = useState(0);
@@ -45,7 +41,7 @@ const RentalInvoiceForm = () => {
     const [formData, setFormData] = useState({
         companyId: companyId ? companyId : '',
         machineId: '',
-        sendDetailsTo: [],
+        sendDetailsTo: [], // { name, email }[]
         countImageFile: null,
         remarks: '',
         invoiceDate: dayjs(), // Invoice date with default to today
@@ -74,6 +70,34 @@ const RentalInvoiceForm = () => {
     const navigate = useNavigate();
     const { id } = useParams();
 
+    const selectedCompanyForSend = useMemo(() => {
+        if (!formData.companyId) return null;
+        return companies.find((c) => String(c._id) === String(formData.companyId)) || null;
+    }, [companies, formData.companyId]);
+
+    const baseSendToContacts = useMemo(() => {
+        if (!selectedCompanyForSend?.contactPersons?.length) return [];
+        return selectedCompanyForSend.contactPersons
+            .map((person) => ({
+                name: String(person?.name || '').trim(),
+                email: String(person?.email || '').trim(),
+            }))
+            .filter((p) => p.name);
+    }, [selectedCompanyForSend]);
+
+    const sendToAutocompleteOptions = useMemo(() => {
+        const map = new Map();
+        const keyOf = (p) => (p.email ? p.email.toLowerCase() : `n:${(p.name || '').toLowerCase()}`);
+        for (const p of baseSendToContacts) {
+            map.set(keyOf(p), p);
+        }
+        for (const r of formData.sendDetailsTo || []) {
+            if (!r || !String(r.name || '').trim()) continue;
+            const k = keyOf(r);
+            if (!map.has(k)) map.set(k, { name: r.name, email: r.email || '' });
+        }
+        return Array.from(map.values());
+    }, [baseSendToContacts, formData.sendDetailsTo]);
 
     useEffect(() => {
         fetchInvoicesCounts();
@@ -227,21 +251,11 @@ const RentalInvoiceForm = () => {
                     if (data?.success) {
                         const entry = data.entry;
 
-                        const parseSendDetailsTo = (v) => {
-                            if (!v) return [];
-                            if (Array.isArray(v)) return v.filter(Boolean);
-                            const s = String(v).trim();
-                            if (!s) return [];
-                            return s.includes('\n')
-                                ? s.split('\n').map(x => x.trim()).filter(Boolean)
-                                : [s];
-                        };
-
                         // Set basic form data
                         setFormData({
                             companyId: entry.companyId?._id || '',
                             machineId: entry.machineId?._id || '',
-                            sendDetailsTo: parseSendDetailsTo(entry?.sendDetailsTo),
+                            sendDetailsTo: parseSendDetailsToForForm(entry?.sendDetailsTo),
                             countImageFile: null,
                             remarks: entry.remarks || '',
                             invoiceDate: entry.invoiceDate ? dayjs(entry.invoiceDate) : dayjs(), // Set invoice date if exists, otherwise default to today
@@ -448,26 +462,10 @@ const RentalInvoiceForm = () => {
         }
     }, [formData.companyId, auth.token, id]);
 
-    // Populate "Send Details To" options based on selected company
     useEffect(() => {
-        if (formData.companyId && companies.length > 0) {
-            const selectedCompany = companies[0];
-            if (selectedCompany && selectedCompany.contactPersons) {
-                const options = selectedCompany.contactPersons
-                    .map(person => String(person?.name || '').trim())
-                    .filter(Boolean);
-                setContactOptions(options);
-            } else {
-                setContactOptions([]);
-            }
-        } else {
-            setContactOptions([]);
-        }
-        // Reset sendDetailsTo when company changes, unless in edit mode and it's already set
-        if (!id) { // {{ edit_4 }}
-            setFormData(prev => ({ ...prev, sendDetailsTo: [] })); // {{ edit_4 }}
-        } // {{ edit_4 }}
-    }, [formData.companyId, companies, id]); // Added id to dependencies // {{ edit_4 }}
+        if (id) return;
+        setFormData((prev) => ({ ...prev, sendDetailsTo: [] }));
+    }, [formData.companyId, id]);
 
     const handleImagehange = (e) => {
         const file = e.target.files[0];
@@ -497,13 +495,7 @@ const RentalInvoiceForm = () => {
             }));
             setErrors(prev => ({ ...prev, [name]: '' })); // Clear error for nested field
         } else {
-            if (name === 'sendDetailsTo') {
-                // MUI Select multiple returns string[]; autofill may return a string.
-                const next = typeof value === 'string' ? value.split('\n').filter(Boolean) : value;
-                setFormData(prev => ({ ...prev, [name]: next }));
-            } else {
-                setFormData(prev => ({ ...prev, [name]: value }));
-            }
+            setFormData(prev => ({ ...prev, [name]: value }));
             setErrors(prev => ({ ...prev, [name]: '' })); // Clear error on change
         }
     };
@@ -605,7 +597,8 @@ const RentalInvoiceForm = () => {
     const validateForm = () => {
         let tempErrors = {};
         if (!formData.companyId) tempErrors.companyId = "Company is required.";
-        if (!formData.sendDetailsTo || (Array.isArray(formData.sendDetailsTo) && formData.sendDetailsTo.length === 0)) {
+        const recipients = Array.isArray(formData.sendDetailsTo) ? formData.sendDetailsTo : [];
+        if (!recipients.length || !recipients.some((r) => r && String(r.name || '').trim())) {
             tempErrors.sendDetailsTo = "Send Details To is required.";
         }
 
@@ -729,15 +722,24 @@ const RentalInvoiceForm = () => {
             }
             data.append('companyId', finalCompanyId);
 
-            if (!formData.sendDetailsTo || (Array.isArray(formData.sendDetailsTo) && formData.sendDetailsTo.length === 0)) {
+            const recipientsPayload = (Array.isArray(formData.sendDetailsTo) ? formData.sendDetailsTo : [])
+                .map((r) => ({
+                    name:
+                        typeof r?.name === 'string' || typeof r?.name === 'number'
+                            ? String(r.name).trim()
+                            : '',
+                    email:
+                        typeof r?.email === 'string' || typeof r?.email === 'number'
+                            ? String(r.email).trim()
+                            : '',
+                }))
+                .filter((r) => r.name);
+            if (!recipientsPayload.length) {
                 toast.error("Send Details To is required.");
                 setLoading(false);
                 return;
             }
-            const sendDetailsToValue = Array.isArray(formData.sendDetailsTo)
-                ? formData.sendDetailsTo.map(v => String(v).trim()).filter(Boolean).join('\n')
-                : (formData.sendDetailsTo || '');
-            data.append('sendDetailsTo', sendDetailsToValue);
+            data.append('sendDetailsTo', JSON.stringify(recipientsPayload));
             data.append('remarks', formData.remarks || '');
             data.append('invoiceDate', formData.invoiceDate ? formData.invoiceDate.toISOString() : new Date().toISOString()); // Add invoice date
             if (employeeName) {
@@ -860,7 +862,7 @@ const RentalInvoiceForm = () => {
                 setFormData({
                     companyId: '',
                     machineId: '',
-                    sendDetailsTo: [],
+                    sendDetailsTo: [], // { name, email }[]
                     countImageFile: null,
                     remarks: '',
                     invoiceDate: dayjs(), // Reset to today
@@ -947,7 +949,7 @@ const RentalInvoiceForm = () => {
                 setFormData({
                     companyId: '',
                     machineId: '',
-                    sendDetailsTo: [],
+                    sendDetailsTo: [], // { name, email }[]
                     countImageFile: null,
                     basePrice: '',
                     remarks: '',
@@ -1358,31 +1360,41 @@ const RentalInvoiceForm = () => {
                     </Box>
 
                     <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 3, mb: 3 }}>
-                        <FormControl fullWidth size="small" error={!!errors.sendDetailsTo}>
-                            <InputLabel id="send-details-to-label" required>Send Details To</InputLabel>
-                            <Select
-                                labelId="send-details-to-label"
-                                id="sendDetailsTo"
-                                name="sendDetailsTo"
-                                value={formData.sendDetailsTo}
-                                label="Send Details To"
-                                onChange={handleChange}
-                                disabled={!formData.companyId || contactOptions.length === 0}
-                                multiple
-                                renderValue={(selected) => {
-                                    const list = Array.isArray(selected) ? selected : [];
-                                    if (!list.length) return 'Select Option';
-                                    return list.map(opt => String(opt || '').trim()).filter(Boolean).join(', ');
-                                }}
-                            >
-                                {contactOptions?.map((option, index) => (
-                                    <MenuItem key={index} value={option}>
-                                        {option}
-                                    </MenuItem>
-                                ))}
-                            </Select>
-                            {errors.sendDetailsTo && <FormHelperText>{errors.sendDetailsTo}</FormHelperText>}
-                        </FormControl>
+                        <Autocomplete
+                            multiple
+                            id="sendDetailsTo"
+                            options={sendToAutocompleteOptions}
+                            disabled={!formData.companyId || sendToAutocompleteOptions.length === 0}
+                            getOptionLabel={(option) => option?.name || ''}
+                            isOptionEqualToValue={(a, b) => {
+                                const ae = (a?.email || '').trim().toLowerCase();
+                                const be = (b?.email || '').trim().toLowerCase();
+                                if (ae && be && ae === be) return true;
+                                if (!ae && !be) return (a?.name || '').trim() === (b?.name || '').trim();
+                                return false;
+                            }}
+                            value={Array.isArray(formData.sendDetailsTo) ? formData.sendDetailsTo : []}
+                            onChange={(_, newValue) => {
+                                setFormData((prev) => ({ ...prev, sendDetailsTo: newValue }));
+                                setErrors((prev) => ({ ...prev, sendDetailsTo: '' }));
+                            }}
+                            renderInput={(params) => (
+                                <TextField
+                                    {...params}
+                                    label="Send Details To"
+                                    InputLabelProps={{ ...params.InputLabelProps, required: true }}
+                                    inputProps={{
+                                        ...params.inputProps,
+                                        // Multiple Autocomplete keeps the combo input empty while chips hold values;
+                                        // native `required` would always fail on submit.
+                                        required: false,
+                                    }}
+                                    size="small"
+                                    error={!!errors.sendDetailsTo}
+                                    helperText={errors.sendDetailsTo}
+                                />
+                            )}
+                        />
 
                         <LocalizationProvider dateAdapter={AdapterDayjs}>
                             <DatePicker

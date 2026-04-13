@@ -37,6 +37,7 @@ import SearchIcon from '@mui/icons-material/Search'; // Import SearchIcon
 import InputAdornment from '@mui/material/InputAdornment'; // Import InputAdornment
 import DeleteIcon from '@mui/icons-material/Delete';
 import DownloadIcon from '@mui/icons-material/Download';
+import { formatSendDetailsToDisplay } from '../../utils/functions';
 
 const RENTAL_INVOICE_DOWNLOAD_BASE_URL = 'https://pub-bcab85dac0c64221ba6b6a756f991c46.r2.dev';
 const PAYMENT_COPY_DOWNLOAD_BASE_URL = 'https://pub-982db31d50054adebd29fa1792b12fb8.r2.dev';
@@ -1077,11 +1078,7 @@ function RentalInvoiceList(props) {
                                                 <TableCell>{entry.companyId?.companyName || 'N/A'}</TableCell>
                                                 <TableCell>{displayMachine?.serialNo || 'N/A'}</TableCell>
                                                 <TableCell>{displayMachine?.modelName || 'N/A'}</TableCell>
-                                                <TableCell>
-                                                    {Array.isArray(entry.sendDetailsTo)
-                                                        ? entry.sendDetailsTo.filter(Boolean).join(', ')
-                                                        : (entry.sendDetailsTo || 'N/A')}
-                                                </TableCell>
+                                                <TableCell>{formatSendDetailsToDisplay(entry.sendDetailsTo)}</TableCell>
                                                 <TableCell>{entry.invoiceDate ? new Date(entry.invoiceDate).toLocaleDateString() : (entry.entryDate ? new Date(entry.entryDate).toLocaleDateString() : (entry.createdAt ? new Date(entry.createdAt).toLocaleDateString() : 'N/A'))}</TableCell>
                                                 <TableCell>
                                                     {displayImage?.url ? (
