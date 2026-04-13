@@ -48,17 +48,20 @@ interface Product {
   a5Config: ProductConfig;
 }
 
-type SendDetailsRecipient = { name: string; email: string };
+type SendDetailsRecipient = { name: string; email: string; mobile: string };
 
 const EMAIL_IN_LABEL_MOBILE = /Email:\s*([^\s,)]+)/i;
+const MOBILE_IN_LABEL_MOBILE = /Mobile:\s*([^\s,)]+)/i;
 
 function legacyRecipientFromLabel(line: string): SendDetailsRecipient | null {
   const s = String(line).trim();
   if (!s) return null;
-  const m = s.match(EMAIL_IN_LABEL_MOBILE);
-  const email = m ? m[1].trim() : '';
+  const mEmail = s.match(EMAIL_IN_LABEL_MOBILE);
+  const email = mEmail ? mEmail[1].trim() : '';
+  const mMob = s.match(MOBILE_IN_LABEL_MOBILE);
+  const mobile = mMob ? mMob[1].trim() : '';
   if (!email) {
-    return { name: s, email: '' };
+    return { name: s, email: '', mobile };
   }
   const paren = s.indexOf('(');
   let name =
@@ -66,11 +69,11 @@ function legacyRecipientFromLabel(line: string): SendDetailsRecipient | null {
       ? s.slice(0, paren).trim()
       : s
           .replace(EMAIL_IN_LABEL_MOBILE, '')
-          .replace(/Mobile:\s*[^,)]*,?\s*/i, '')
+          .replace(MOBILE_IN_LABEL_MOBILE, '')
           .replace(/,\s*$/, '')
           .trim();
-  if (!name) name = s.replace(EMAIL_IN_LABEL_MOBILE, '').trim();
-  return { name, email };
+  if (!name) name = s.replace(EMAIL_IN_LABEL_MOBILE, '').replace(MOBILE_IN_LABEL_MOBILE, '').trim();
+  return { name, email, mobile };
 }
 
 function parseSendDetailsToForForm(value: unknown): SendDetailsRecipient[] {
@@ -80,12 +83,24 @@ function parseSendDetailsToForForm(value: unknown): SendDetailsRecipient[] {
       value.length > 0 &&
       typeof value[0] === 'object' &&
       value[0] !== null &&
-      ('name' in (value[0] as object) || 'email' in (value[0] as object))
+      ('name' in (value[0] as object) ||
+        'email' in (value[0] as object) ||
+        'mobile' in (value[0] as object))
     ) {
       return (value as any[])
         .map((x) => ({
-          name: String(x.name ?? '').trim(),
-          email: String(x.email ?? '').trim(),
+          name:
+            typeof x.name === 'string' || typeof x.name === 'number'
+              ? String(x.name).trim()
+              : '',
+          email:
+            typeof x.email === 'string' || typeof x.email === 'number'
+              ? String(x.email).trim()
+              : '',
+          mobile:
+            typeof x.mobile === 'string' || typeof x.mobile === 'number'
+              ? String(x.mobile).trim()
+              : '',
         }))
         .filter((x) => x.name && x.name !== '[object Object]');
     }
@@ -113,7 +128,10 @@ function sameSendRecipient(a: SendDetailsRecipient, b: SendDetailsRecipient): bo
   const ae = (a.email || '').trim().toLowerCase();
   const be = (b.email || '').trim().toLowerCase();
   if (ae && be && ae === be) return true;
-  if (!ae && !be) return (a.name || '').trim() === (b.name || '').trim();
+  const am = (a.mobile || '').trim().toLowerCase();
+  const bm = (b.mobile || '').trim().toLowerCase();
+  if (am && bm && am === bm) return true;
+  if (!ae && !be && !am && !bm) return (a.name || '').trim() === (b.name || '').trim();
   return false;
 }
 
@@ -127,6 +145,10 @@ function serializeSendDetailsPayload(recipients: SendDetailsRecipient[]): string
       email:
         typeof r?.email === 'string' || typeof r?.email === 'number'
           ? String(r.email).trim()
+          : '',
+      mobile:
+        typeof r?.mobile === 'string' || typeof r?.mobile === 'number'
+          ? String(r.mobile).trim()
           : '',
     }))
     .filter((r) => r.name);
@@ -282,6 +304,7 @@ const RentalInvoiceFormScreen = () => {
         .map((person: any) => ({
           name: String(person?.name || '').trim(),
           email: String(person?.email || '').trim(),
+          mobile: String(person?.mobile || '').trim(),
         }))
         .filter((p: SendDetailsRecipient) => p.name);
       setContactPersons(options);

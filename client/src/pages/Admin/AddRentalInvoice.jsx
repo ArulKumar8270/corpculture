@@ -41,7 +41,7 @@ const RentalInvoiceForm = () => {
     const [formData, setFormData] = useState({
         companyId: companyId ? companyId : '',
         machineId: '',
-        sendDetailsTo: [], // { name, email }[]
+        sendDetailsTo: [], // { name, email, mobile }[]
         countImageFile: null,
         remarks: '',
         invoiceDate: dayjs(), // Invoice date with default to today
@@ -81,20 +81,33 @@ const RentalInvoiceForm = () => {
             .map((person) => ({
                 name: String(person?.name || '').trim(),
                 email: String(person?.email || '').trim(),
+                mobile: String(person?.mobile || '').trim(),
             }))
             .filter((p) => p.name);
     }, [selectedCompanyForSend]);
 
     const sendToAutocompleteOptions = useMemo(() => {
         const map = new Map();
-        const keyOf = (p) => (p.email ? p.email.toLowerCase() : `n:${(p.name || '').toLowerCase()}`);
+        const keyOf = (p) => {
+            const e = (p.email || '').trim().toLowerCase();
+            if (e) return `e:${e}`;
+            const m = (p.mobile || '').trim().toLowerCase();
+            if (m) return `m:${m}`;
+            return `n:${(p.name || '').trim().toLowerCase()}`;
+        };
         for (const p of baseSendToContacts) {
             map.set(keyOf(p), p);
         }
         for (const r of formData.sendDetailsTo || []) {
             if (!r || !String(r.name || '').trim()) continue;
             const k = keyOf(r);
-            if (!map.has(k)) map.set(k, { name: r.name, email: r.email || '' });
+            if (!map.has(k)) {
+                map.set(k, {
+                    name: r.name,
+                    email: r.email || '',
+                    mobile: r.mobile || '',
+                });
+            }
         }
         return Array.from(map.values());
     }, [baseSendToContacts, formData.sendDetailsTo]);
@@ -732,6 +745,10 @@ const RentalInvoiceForm = () => {
                         typeof r?.email === 'string' || typeof r?.email === 'number'
                             ? String(r.email).trim()
                             : '',
+                    mobile:
+                        typeof r?.mobile === 'string' || typeof r?.mobile === 'number'
+                            ? String(r.mobile).trim()
+                            : '',
                 }))
                 .filter((r) => r.name);
             if (!recipientsPayload.length) {
@@ -862,7 +879,7 @@ const RentalInvoiceForm = () => {
                 setFormData({
                     companyId: '',
                     machineId: '',
-                    sendDetailsTo: [], // { name, email }[]
+                    sendDetailsTo: [], // { name, email, mobile }[]
                     countImageFile: null,
                     remarks: '',
                     invoiceDate: dayjs(), // Reset to today
@@ -949,7 +966,7 @@ const RentalInvoiceForm = () => {
                 setFormData({
                     companyId: '',
                     machineId: '',
-                    sendDetailsTo: [], // { name, email }[]
+                    sendDetailsTo: [], // { name, email, mobile }[]
                     countImageFile: null,
                     basePrice: '',
                     remarks: '',
@@ -1370,7 +1387,12 @@ const RentalInvoiceForm = () => {
                                 const ae = (a?.email || '').trim().toLowerCase();
                                 const be = (b?.email || '').trim().toLowerCase();
                                 if (ae && be && ae === be) return true;
-                                if (!ae && !be) return (a?.name || '').trim() === (b?.name || '').trim();
+                                const am = (a?.mobile || '').trim().toLowerCase();
+                                const bm = (b?.mobile || '').trim().toLowerCase();
+                                if (am && bm && am === bm) return true;
+                                if (!ae && !be && !am && !bm) {
+                                    return (a?.name || '').trim() === (b?.name || '').trim();
+                                }
                                 return false;
                             }}
                             value={Array.isArray(formData.sendDetailsTo) ? formData.sendDetailsTo : []}

@@ -151,14 +151,17 @@ export const formatSendDetailsToDisplay = (value) => {
 };
 
 const EMAIL_IN_LABEL = /Email:\s*([^\s,)]+)/i;
+const MOBILE_IN_LABEL = /Mobile:\s*([^\s,)]+)/i;
 
 const legacyRecipientFromLabel = (line) => {
     const s = String(line).trim();
     if (!s) return null;
-    const m = s.match(EMAIL_IN_LABEL);
-    const email = m ? m[1].trim() : '';
+    const mEmail = s.match(EMAIL_IN_LABEL);
+    const email = mEmail ? mEmail[1].trim() : '';
+    const mMob = s.match(MOBILE_IN_LABEL);
+    const mobile = mMob ? mMob[1].trim() : '';
     if (!email) {
-        return { name: s, email: '' };
+        return { name: s, email: '', mobile };
     }
     const paren = s.indexOf('(');
     let name =
@@ -166,14 +169,17 @@ const legacyRecipientFromLabel = (line) => {
             ? s.slice(0, paren).trim()
             : s
                   .replace(EMAIL_IN_LABEL, '')
-                  .replace(/Mobile:\s*[^,)]*,?\s*/i, '')
+                  .replace(MOBILE_IN_LABEL, '')
                   .replace(/,\s*$/, '')
                   .trim();
-    if (!name) name = s.replace(EMAIL_IN_LABEL, '').trim();
-    return { name, email };
+    if (!name) name = s.replace(EMAIL_IN_LABEL, '').replace(MOBILE_IN_LABEL, '').trim();
+    return { name, email, mobile };
 };
 
-/** Form state for rental send-details: { name, email }[] */
+const scalarFormField = (v) =>
+    typeof v === 'string' || typeof v === 'number' ? String(v).trim() : '';
+
+/** Form state for rental send-details: { name, email, mobile }[] */
 export const parseSendDetailsToForForm = (value) => {
     if (!value) return [];
     if (Array.isArray(value)) {
@@ -181,12 +187,13 @@ export const parseSendDetailsToForForm = (value) => {
             value.length > 0 &&
             typeof value[0] === 'object' &&
             value[0] !== null &&
-            ('name' in value[0] || 'email' in value[0])
+            ('name' in value[0] || 'email' in value[0] || 'mobile' in value[0])
         ) {
             return value
                 .map((x) => ({
-                    name: String(x.name ?? '').trim(),
-                    email: String(x.email ?? '').trim(),
+                    name: scalarFormField(x.name),
+                    email: scalarFormField(x.email),
+                    mobile: scalarFormField(x.mobile),
                 }))
                 .filter((x) => x.name && x.name !== '[object Object]');
         }
