@@ -24,6 +24,7 @@ import {
     Paper,
     Chip,
     Autocomplete,
+    CircularProgress,
 } from "@mui/material";
 import qrCode from "../assets/images/qrCode.png";
 
@@ -46,6 +47,7 @@ const UserProfile = () => {
     const [selectedCompany, setSelectedCompany] = useState("");
     const [invoices, setInvoices] = useState([]);
     const [loadingInvoices, setLoadingInvoices] = useState(false);
+    const [loadingCompanies, setLoadingCompanies] = useState(false);
     const [openPaymentModal, setOpenPaymentModal] = useState(false);
     const [selectedInvoice, setSelectedInvoice] = useState(null);
     const [companyPendingInvoice, setCompanyPendingInvoice] = useState([]);
@@ -99,6 +101,7 @@ const UserProfile = () => {
         const fetchCompanies = async () => {
             if (!auth?.token) return;
             try {
+                setLoadingCompanies(true);
                 const { data } = await axios.get(
                     `${import.meta.env.VITE_SERVER_URL}/api/v1/company/all?limit=1000`,
                     {
@@ -110,6 +113,8 @@ const UserProfile = () => {
                 }
             } catch (err) {
                 console.error("Error fetching companies:", err);
+            } finally {
+                setLoadingCompanies(false);
             }
         };
         fetchCompanies();
@@ -580,14 +585,14 @@ const UserProfile = () => {
                                 {employee.pincode || "N/A"}
                             </span>
                         </div>
-                        {employee.salary && (
+                        {/* {employee.salary && (
                             <div className="flex justify-between items-center">
                                 <span className="text-gray-600">Salary:</span>
                                 <span className="font-bold text-blue-600 text-lg">
                                     ₹{employee.salary.toLocaleString("en-IN")}
                                 </span>
                             </div>
-                        )}
+                        )} */}
                     </div>
                 </div>
 
@@ -784,12 +789,12 @@ const UserProfile = () => {
                                 setSelectedCompany(newValue ? newValue._id : '');
                             }}
                             filterOptions={(options, { inputValue }) => {
-                                if (!inputValue || inputValue.trim() === '') {
-                                    return [];
-                                }
-                                return options.filter((option) =>
-                                    option.companyName?.toLowerCase().includes(inputValue.toLowerCase())
-                                );
+                                const q = String(inputValue || '').trim().toLowerCase();
+                                // Show a short default list when empty, so dropdown isn't blank.
+                                if (!q) return options.slice(0, 50);
+                                return options
+                                    .filter((option) => option.companyName?.toLowerCase().includes(q))
+                                    .slice(0, 100);
                             }}
                             noOptionsText="No companies found"
                             openOnFocus={false}
@@ -799,6 +804,15 @@ const UserProfile = () => {
                                     placeholder="Search Company"
                                     variant="outlined"
                                     InputLabelProps={{ shrink: true }}
+                                    InputProps={{
+                                        ...params.InputProps,
+                                        endAdornment: (
+                                            <>
+                                                {loadingCompanies ? <CircularProgress color="inherit" size={18} /> : null}
+                                                {params.InputProps.endAdornment}
+                                            </>
+                                        ),
+                                    }}
                                 />
                             )}
                         />

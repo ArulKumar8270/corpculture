@@ -54,7 +54,7 @@ const EmployeeActivityLogListScreen = () => {
         Toast.show({ type: 'error', text1: data?.message || 'Failed to load logs' });
       }
     } catch {
-      Toast.show({ type: 'error', text1: 'Failed to load activity logs' });
+      Toast.show({ type: 'error', text1: 'Failed to load petrol forms' });
       setLogs([]);
       setTotalCount(0);
     } finally {
@@ -122,7 +122,7 @@ const EmployeeActivityLogListScreen = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>My activity logs</Text>
+      <Text style={styles.title}>My petrol forms</Text>
       <View style={styles.filters}>
         <TextInput
           style={styles.filterInput}
@@ -154,7 +154,7 @@ const EmployeeActivityLogListScreen = () => {
           keyExtractor={(item) => item._id}
           renderItem={renderItem}
           refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchLogs} />}
-          ListEmptyComponent={<Text style={styles.empty}>No activity logs found.</Text>}
+          ListEmptyComponent={<Text style={styles.empty}>No petrol forms found.</Text>}
           contentContainerStyle={{ paddingBottom: 24 }}
         />
       )}

@@ -452,7 +452,11 @@ const RentalQuotationListScreen = () => {
         <View style={styles.entryDetails}>
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Send Details To:</Text>
-            <Text style={styles.detailValue}>{item.sendDetailsTo || 'N/A'}</Text>
+            <Text style={styles.detailValue}>
+              {Array.isArray(item.sendDetailsTo)
+                ? item.sendDetailsTo.filter(Boolean).join(', ')
+                : item.sendDetailsTo || 'N/A'}
+            </Text>
           </View>
           {item.assignedTo && (
             <View style={styles.detailRow}>

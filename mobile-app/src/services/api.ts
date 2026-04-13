@@ -7,13 +7,13 @@ import * as sampleData from '../data/sampleData';
 // In production APK builds, environment variables may not be available
 // So we use Constants.expoConfig.extra or fallback to hardcoded URL
 const getApiBaseUrl = () => {
-  // Try to get from expo config extra (set in app.json)
-  if (Constants.expoConfig?.extra?.apiUrl) {
-    return Constants.expoConfig.extra.apiUrl;
-  }
-  // Try environment variable (works in development)
+  // Prefer environment variable (works in development & can override builds)
   if (process.env.EXPO_PUBLIC_API_URL) {
     return process.env.EXPO_PUBLIC_API_URL;
+  }
+  // Fallback to expo config extra (set in app.json) - used in production builds.
+  if (Constants.expoConfig?.extra?.apiUrl) {
+    return Constants.expoConfig.extra.apiUrl;
   }
   // Fallback to hardcoded URL (for production builds)
   return 'https://app.corpculture.tech/api/v1';
@@ -43,7 +43,13 @@ api.interceptors.request.use(
     try {
       const token = await AsyncStorage.getItem('authToken');
       if (token) {
-        config.headers.Authorization = token;
+        // Backend expects raw JWT (no "Bearer "); also guard against stray whitespace/quotes.
+        const cleaned = String(token)
+          .trim()
+          .replace(/^Bearer\s+/i, '')
+          .replace(/^"(.*)"$/, '$1')
+          .trim();
+        config.headers.Authorization = cleaned;
       }
     } catch (error) {
       console.error('Error getting token:', error);

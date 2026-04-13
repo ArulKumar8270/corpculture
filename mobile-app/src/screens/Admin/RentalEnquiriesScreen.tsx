@@ -10,6 +10,7 @@ import {
   Alert,
   Modal,
   ScrollView,
+  Linking,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 // @ts-ignore - @expo/vector-icons is available via expo dependency
@@ -434,17 +435,23 @@ const RentalEnquiriesScreen = () => {
 
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Phone:</Text>
-            <Text style={styles.detailValue}>{item.phone || 'N/A'}</Text>
+            <TouchableOpacity
+              onPress={() => {
+                const p = String(item.phone || '').trim();
+                if (!p) return;
+                Linking.openURL(`tel:${p}`);
+              }}
+              disabled={!item.phone}
+            >
+              <Text style={[styles.detailValue, item.phone ? styles.phoneLink : null]}>
+                {item.phone ? 'Call' : 'N/A'}
+              </Text>
+            </TouchableOpacity>
           </View>
 
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Contact Person:</Text>
             <Text style={styles.detailValue}>{item.contactPerson || 'N/A'}</Text>
-          </View>
-
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Email:</Text>
-            <Text style={styles.detailValue}>{item.email || 'N/A'}</Text>
           </View>
 
           <View style={styles.detailRow}>
@@ -803,6 +810,10 @@ const styles = StyleSheet.create({
     flex: 2,
     textAlign: 'right',
     lineHeight: 20,
+  },
+  phoneLink: {
+    color: '#019ee3',
+    fontWeight: '700',
   },
   employeePicker: {
     flex: 2,

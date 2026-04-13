@@ -45,7 +45,7 @@ const RentalInvoiceForm = () => {
     const [formData, setFormData] = useState({
         companyId: companyId ? companyId : '',
         machineId: '',
-        sendDetailsTo: '',
+        sendDetailsTo: [],
         countImageFile: null,
         remarks: '',
         invoiceDate: dayjs(), // Invoice date with default to today
@@ -227,11 +227,21 @@ const RentalInvoiceForm = () => {
                     if (data?.success) {
                         const entry = data.entry;
 
+                        const parseSendDetailsTo = (v) => {
+                            if (!v) return [];
+                            if (Array.isArray(v)) return v.filter(Boolean);
+                            const s = String(v).trim();
+                            if (!s) return [];
+                            return s.includes('\n')
+                                ? s.split('\n').map(x => x.trim()).filter(Boolean)
+                                : [s];
+                        };
+
                         // Set basic form data
                         setFormData({
                             companyId: entry.companyId?._id || '',
                             machineId: entry.machineId?._id || '',
-                            sendDetailsTo: entry?.sendDetailsTo || '',
+                            sendDetailsTo: parseSendDetailsTo(entry?.sendDetailsTo),
                             countImageFile: null,
                             remarks: entry.remarks || '',
                             invoiceDate: entry.invoiceDate ? dayjs(entry.invoiceDate) : dayjs(), // Set invoice date if exists, otherwise default to today
@@ -443,9 +453,9 @@ const RentalInvoiceForm = () => {
         if (formData.companyId && companies.length > 0) {
             const selectedCompany = companies[0];
             if (selectedCompany && selectedCompany.contactPersons) {
-                const options = selectedCompany.contactPersons.map(person =>
-                    `${person.name} (Mobile: ${person.mobile}, Email: ${person.email})`
-                );
+                const options = selectedCompany.contactPersons
+                    .map(person => String(person?.name || '').trim())
+                    .filter(Boolean);
                 setContactOptions(options);
             } else {
                 setContactOptions([]);
@@ -455,7 +465,7 @@ const RentalInvoiceForm = () => {
         }
         // Reset sendDetailsTo when company changes, unless in edit mode and it's already set
         if (!id) { // {{ edit_4 }}
-            setFormData(prev => ({ ...prev, sendDetailsTo: '' })); // {{ edit_4 }}
+            setFormData(prev => ({ ...prev, sendDetailsTo: [] })); // {{ edit_4 }}
         } // {{ edit_4 }}
     }, [formData.companyId, companies, id]); // Added id to dependencies // {{ edit_4 }}
 
@@ -487,7 +497,13 @@ const RentalInvoiceForm = () => {
             }));
             setErrors(prev => ({ ...prev, [name]: '' })); // Clear error for nested field
         } else {
-            setFormData(prev => ({ ...prev, [name]: value }));
+            if (name === 'sendDetailsTo') {
+                // MUI Select multiple returns string[]; autofill may return a string.
+                const next = typeof value === 'string' ? value.split('\n').filter(Boolean) : value;
+                setFormData(prev => ({ ...prev, [name]: next }));
+            } else {
+                setFormData(prev => ({ ...prev, [name]: value }));
+            }
             setErrors(prev => ({ ...prev, [name]: '' })); // Clear error on change
         }
     };
@@ -589,7 +605,9 @@ const RentalInvoiceForm = () => {
     const validateForm = () => {
         let tempErrors = {};
         if (!formData.companyId) tempErrors.companyId = "Company is required.";
-        if (!formData.sendDetailsTo) tempErrors.sendDetailsTo = "Send Details To is required.";
+        if (!formData.sendDetailsTo || (Array.isArray(formData.sendDetailsTo) && formData.sendDetailsTo.length === 0)) {
+            tempErrors.sendDetailsTo = "Send Details To is required.";
+        }
 
         // Validate products array
         products.forEach((product, index) => {
@@ -711,12 +729,15 @@ const RentalInvoiceForm = () => {
             }
             data.append('companyId', finalCompanyId);
 
-            if (!formData.sendDetailsTo) {
+            if (!formData.sendDetailsTo || (Array.isArray(formData.sendDetailsTo) && formData.sendDetailsTo.length === 0)) {
                 toast.error("Send Details To is required.");
                 setLoading(false);
                 return;
             }
-            data.append('sendDetailsTo', formData.sendDetailsTo);
+            const sendDetailsToValue = Array.isArray(formData.sendDetailsTo)
+                ? formData.sendDetailsTo.map(v => String(v).trim()).filter(Boolean).join('\n')
+                : (formData.sendDetailsTo || '');
+            data.append('sendDetailsTo', sendDetailsToValue);
             data.append('remarks', formData.remarks || '');
             data.append('invoiceDate', formData.invoiceDate ? formData.invoiceDate.toISOString() : new Date().toISOString()); // Add invoice date
             if (employeeName) {
@@ -839,7 +860,7 @@ const RentalInvoiceForm = () => {
                 setFormData({
                     companyId: '',
                     machineId: '',
-                    sendDetailsTo: '',
+                    sendDetailsTo: [],
                     countImageFile: null,
                     remarks: '',
                     invoiceDate: dayjs(), // Reset to today
@@ -926,7 +947,7 @@ const RentalInvoiceForm = () => {
                 setFormData({
                     companyId: '',
                     machineId: '',
-                    sendDetailsTo: '',
+                    sendDetailsTo: [],
                     countImageFile: null,
                     basePrice: '',
                     remarks: '',
@@ -1347,10 +1368,13 @@ const RentalInvoiceForm = () => {
                                 label="Send Details To"
                                 onChange={handleChange}
                                 disabled={!formData.companyId || contactOptions.length === 0}
+                                multiple
+                                renderValue={(selected) => {
+                                    const list = Array.isArray(selected) ? selected : [];
+                                    if (!list.length) return 'Select Option';
+                                    return list.map(opt => String(opt || '').trim()).filter(Boolean).join(', ');
+                                }}
                             >
-                                <MenuItem value="">
-                                    <em>Select Option</em>
-                                </MenuItem>
                                 {contactOptions?.map((option, index) => (
                                     <MenuItem key={index} value={option}>
                                         {option}

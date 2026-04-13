@@ -10,6 +10,7 @@ import {
   Alert,
   Modal,
   FlatList,
+  Linking,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 // @ts-ignore - @expo/vector-icons is available via expo dependency
@@ -326,11 +327,18 @@ const ServiceEnquiriesScreen = () => {
       <View style={styles.enquiryDetails}>
         <View style={styles.detailRow}>
           <Icon name="phone" size={16} color="#666" />
-          <Text style={styles.detailText}>{item.phone || 'N/A'}</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Icon name="email" size={16} color="#666" />
-          <Text style={styles.detailText}>{item.email || 'N/A'}</Text>
+          <TouchableOpacity
+            onPress={() => {
+              const p = String(item.phone || '').trim();
+              if (!p) return;
+              Linking.openURL(`tel:${p}`);
+            }}
+            disabled={!item.phone}
+          >
+            <Text style={[styles.detailText, item.phone ? styles.phoneLink : null]}>
+              {item.phone ? 'Call' : 'N/A'}
+            </Text>
+          </TouchableOpacity>
         </View>
         <View style={styles.detailRow}>
           <Icon name="location-on" size={16} color="#666" />
@@ -890,6 +898,10 @@ const styles = StyleSheet.create({
     color: '#666',
     marginLeft: 8,
     flex: 1,
+  },
+  phoneLink: {
+    color: '#019ee3',
+    fontWeight: '700',
   },
   imageLink: {
     flexDirection: 'row',

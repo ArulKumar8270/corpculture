@@ -361,7 +361,7 @@ const AdminDashboardScreen = () => {
     },
     {
       id: 'activityLogForm',
-      title: 'Activity Log',
+      title: 'Petrol Form',
       icon: 'list-alt',
       screen: 'ActivityLogForm',
       permissionKey: 'accountSettings',
@@ -417,7 +417,7 @@ const AdminDashboardScreen = () => {
     },
     {
       id: 'activityLogReport',
-      title: 'Activity Log Report',
+      title: 'Petrol Form Report',
       icon: 'assessment',
       screen: 'ActivityLogReport',
       permissionKey: 'reports',

@@ -326,7 +326,7 @@ const ProfileStack = () => (
     <Stack.Screen name="Deactivate" component={DeactivateScreen} options={{ title: 'Deactivate Account' }} />
     <Stack.Screen name="Payslips" component={PayslipListScreen} options={{ title: 'My Payslips' }} />
     <Stack.Screen name="PayslipView" component={PayslipViewScreen} options={{ title: 'Payslip' }} />
-    <Stack.Screen name="ActivityLogList" component={EmployeeActivityLogListScreen} options={{ title: 'My Activity Logs' }} />
+    <Stack.Screen name="ActivityLogList" component={EmployeeActivityLogListScreen} options={{ title: 'My Petrol Forms' }} />
   </Stack.Navigator>
 );
 
@@ -350,7 +350,7 @@ const EmployeeStack = () => (
     <Stack.Screen name="EmployeeList" component={EmployeeListScreen} options={{ headerShown: false }} />
     <Stack.Screen name="AddEmployee" component={AddEmployeeScreen} options={{ title: 'Add/Edit Employee' }} />
     <Stack.Screen name="EmployeeDetails" component={EmployeeDetailsScreen} options={{ title: 'Employee Details' }} />
-    <Stack.Screen name="ActivityLogForm" component={EmployeeActivityLogFormScreen} options={{ title: 'Activity Log' }} />
+    <Stack.Screen name="ActivityLogForm" component={EmployeeActivityLogFormScreen} options={{ title: 'Petrol Form' }} />
     <Stack.Screen name="LeaveForm" component={EmployeeLeaveFormScreen} options={{ title: 'Leave Application' }} />
   </Stack.Navigator>
 );
@@ -381,7 +381,7 @@ const ReportsStack = () => (
     <Stack.Screen name="ServiceEnquiriesReport" component={ServiceEnquiriesReportScreen} options={{ title: 'Service Enquiries Report' }} />
     <Stack.Screen name="ServiceInvoicesReport" component={ServiceInvoicesReportScreen} options={{ title: 'Service Invoices Report' }} />
     <Stack.Screen name="ServiceReportsReport" component={ServiceReportsReportScreen} options={{ title: 'Service Reports Report' }} />
-    <Stack.Screen name="ActivityLogReport" component={ActivityLogReportScreen} options={{ title: 'Activity Log Report' }} />
+    <Stack.Screen name="ActivityLogReport" component={ActivityLogReportScreen} options={{ title: 'Petrol Form Report' }} />
     <Stack.Screen name="LeaveReport" component={LeaveReportScreen} options={{ title: 'Leave Report' }} />
   </Stack.Navigator>
 );

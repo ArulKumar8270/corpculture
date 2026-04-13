@@ -15,6 +15,8 @@ import DeactivateScreen from '../screens/Common/DeactivateScreen';
 import PayslipListScreen from '../screens/Common/PayslipListScreen';
 import PayslipViewScreen from '../screens/Common/PayslipViewScreen';
 import EmployeeActivityLogListScreen from '../screens/Common/EmployeeActivityLogListScreen';
+import EmployeeActivityLogFormScreen from '../screens/Admin/EmployeeActivityLogFormScreen';
+import EmployeeLeaveFormScreen from '../screens/Admin/EmployeeLeaveFormScreen';
 
 // Product Management
 import ProductManagementScreen from '../screens/Admin/ProductManagementScreen';
@@ -292,7 +294,9 @@ const ProfileStack = () => (
     <Stack.Screen name="Deactivate" component={DeactivateScreen} options={{ title: 'Deactivate Account' }} />
     <Stack.Screen name="Payslips" component={PayslipListScreen} options={{ title: 'My Payslips' }} />
     <Stack.Screen name="PayslipView" component={PayslipViewScreen} options={{ title: 'Payslip' }} />
-    <Stack.Screen name="ActivityLogList" component={EmployeeActivityLogListScreen} options={{ title: 'My Activity Logs' }} />
+    <Stack.Screen name="ActivityLogList" component={EmployeeActivityLogListScreen} options={{ title: 'My Petrol Forms' }} />
+    <Stack.Screen name="ActivityLogForm" component={EmployeeActivityLogFormScreen} options={{ title: 'Petrol Form' }} />
+    <Stack.Screen name="LeaveForm" component={EmployeeLeaveFormScreen} options={{ title: 'Leave Application' }} />
   </Stack.Navigator>
 );
 

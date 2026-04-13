@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { normalizeSendDetailsTo } from "../utils/normalizeSendDetailsTo.js";
 
 const configSchema = new mongoose.Schema({
     bwOldCount: { type: Number, default: 0 },
@@ -75,10 +76,10 @@ const rentalPaymentEntrySchema = new mongoose.Schema({
         ref: 'Company',
         required: true,
     },
+    // Stored as BSON array of strings; Mixed accepts legacy single string until re-saved
     sendDetailsTo: {
-        type: String,
+        type: mongoose.Schema.Types.Mixed,
         required: true,
-        trim: true,
     },
     countImageUpload: {
         public_id: {
@@ -194,6 +195,29 @@ const rentalPaymentEntrySchema = new mongoose.Schema({
         trim: true,
     },
 }, { timestamps: true });
+
+function coerceSendDetailsToOnDoc(doc) {
+    if (doc == null || doc.sendDetailsTo === undefined) return;
+    doc.sendDetailsTo = normalizeSendDetailsTo(doc.sendDetailsTo);
+}
+
+rentalPaymentEntrySchema.pre("save", function (next) {
+    const n = normalizeSendDetailsTo(this.sendDetailsTo);
+    if (n.length === 0) {
+        return next(new Error("sendDetailsTo must include at least one recipient"));
+    }
+    this.sendDetailsTo = n;
+    next();
+});
+
+rentalPaymentEntrySchema.post("find", function (docs) {
+    if (!Array.isArray(docs)) return;
+    for (const d of docs) coerceSendDetailsToOnDoc(d);
+});
+
+rentalPaymentEntrySchema.post("findOne", function (doc) {
+    coerceSendDetailsToOnDoc(doc);
+});
 
 // Check if the model already exists before defining it
 export default mongoose.models.RentalPaymentEntry || mongoose.model('RentalPaymentEntry', rentalPaymentEntrySchema);

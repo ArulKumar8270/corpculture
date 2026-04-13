@@ -1077,7 +1077,11 @@ function RentalInvoiceList(props) {
                                                 <TableCell>{entry.companyId?.companyName || 'N/A'}</TableCell>
                                                 <TableCell>{displayMachine?.serialNo || 'N/A'}</TableCell>
                                                 <TableCell>{displayMachine?.modelName || 'N/A'}</TableCell>
-                                                <TableCell>{entry.sendDetailsTo || 'N/A'}</TableCell>
+                                                <TableCell>
+                                                    {Array.isArray(entry.sendDetailsTo)
+                                                        ? entry.sendDetailsTo.filter(Boolean).join(', ')
+                                                        : (entry.sendDetailsTo || 'N/A')}
+                                                </TableCell>
                                                 <TableCell>{entry.invoiceDate ? new Date(entry.invoiceDate).toLocaleDateString() : (entry.entryDate ? new Date(entry.entryDate).toLocaleDateString() : (entry.createdAt ? new Date(entry.createdAt).toLocaleDateString() : 'N/A'))}</TableCell>
                                                 <TableCell>
                                                     {displayImage?.url ? (

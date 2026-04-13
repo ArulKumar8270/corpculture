@@ -50,6 +50,23 @@ function invoicePaymentEmailsFromRecord(inv) {
     return one ? [one] : [];
 }
 
+function deriveInitialPaymentAmount(invoice) {
+    const stored = invoice?.paymentAmount;
+    const n = stored !== undefined && stored !== null && stored !== '' ? Number(stored) : NaN;
+    if (invoice?.status === 'Paid' && (Number.isNaN(n) || n === 0)) {
+        return Number(invoice?.grandTotal) || 0;
+    }
+    if (!Number.isNaN(n)) return n;
+    return 0;
+}
+
+function paymentCoversGrandTotal(paymentAmt, grandTotal) {
+    const p = Number(paymentAmt);
+    const g = Number(grandTotal);
+    if (Number.isNaN(p) || Number.isNaN(g)) return false;
+    return p + 1e-6 >= g;
+}
+
 // Row component for each invoice, allowing expansion to show products
 function InvoiceRow(props) {
     const { invoice, navigate, invoiceType, invoiceCount } = props;
@@ -224,6 +241,34 @@ function InvoiceRow(props) {
         }
         setCompanyContactPersons(persons);
 
+        const initialPay = deriveInitialPaymentAmount(invoice);
+        const grand = Number(invoice.grandTotal) || 0;
+        setSelectedInvoiceIds([]);
+
+        if (initialPay < grand) {
+            setPendingAmount(grand - initialPay);
+            setBalanceAmount(0);
+            setCompanyPendingInvoice([]);
+        } else if (initialPay > grand) {
+            setBalanceAmount(initialPay - grand);
+            setPendingAmount(0);
+            try {
+                const response = await axios.post(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/all`,
+                    { companyId: invoice?.companyId, tdsAmount: { $eq: null }, status: { $ne: 'Paid' } },
+                    { headers: { Authorization: auth.token } }
+                );
+                setCompanyPendingInvoice(response.data?.serviceInvoices || []);
+            } catch (err) {
+                console.log(err, 'Api error');
+                setCompanyPendingInvoice([]);
+            }
+        } else {
+            setPendingAmount(0);
+            setBalanceAmount(0);
+            setCompanyPendingInvoice([]);
+        }
+
         setPaymentForm({
             modeOfPayment: invoice.modeOfPayment || '',
             bankName: invoice.bankName || '',
@@ -233,7 +278,7 @@ function InvoiceRow(props) {
             companyNamePayment: invoice.companyNamePayment || '',
             paymentContactEmails: invoicePaymentEmailsFromRecord(invoice),
             otherPaymentMode: invoice.otherPaymentMode || '',
-            paymentAmount: invoice.paymentAmount || 0,
+            paymentAmount: initialPay,
             paymentAmountType: invoice.paymentAmountType || '',
             grandTotal: Number(invoice.grandTotal).toFixed(2) || 0,
         });
@@ -273,12 +318,15 @@ function InvoiceRow(props) {
 
         if (name === "paymentAmount") {
             setSelectedInvoiceIds([]) // reset allocation when amount changes
-            if (value < invoice?.grandTotal) {
-                let balanceAmount = invoice?.grandTotal - value;
+            const numVal = Number(value);
+            const grand = Number(invoice?.grandTotal);
+            if (numVal < grand) {
+                let balanceAmount = grand - numVal;
                 setPendingAmount(balanceAmount)
                 setBalanceAmount(0)
+                setCompanyPendingInvoice([])
             } else {
-                let balanceAmount = Number(value) - Number(invoice?.grandTotal);
+                let balanceAmount = numVal - grand;
                 setBalanceAmount(balanceAmount)
                 setPendingAmount(0)
                 try {
@@ -340,13 +388,12 @@ function InvoiceRow(props) {
                 return;
             }
 
-            const currentInvoicePayment = Number(paymentForm?.paymentAmount) >= Number(paymentForm?.grandTotal)
-                ? Number(paymentForm?.grandTotal)
-                : Number(paymentForm?.paymentAmount);
-            const currentPayload = buildPaymentPayload(
-                currentInvoicePayment,
-                Number(paymentForm?.paymentAmount) >= Number(paymentForm?.grandTotal) || paymentForm.paymentAmountType === 'TDS'
-            );
+            const gt = Number(paymentForm?.grandTotal) || Number(invoice?.grandTotal) || 0;
+            const payNum = Number(paymentForm?.paymentAmount);
+            const covers = paymentCoversGrandTotal(payNum, gt);
+            const currentInvoicePayment = covers ? gt : payNum;
+            const isFullPayment = covers || paymentForm.paymentAmountType === 'TDS';
+            const currentPayload = buildPaymentPayload(currentInvoicePayment, isFullPayment);
 
             await axios.put(
                 `${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/update/${invoice._id}`,

@@ -24,6 +24,14 @@ import { MaterialIcons as Icon } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
 import axios from 'axios';
 import { getApiBaseUrl } from '../../services/api';
+import QRCode from 'react-native-qrcode-svg';
+
+const paymentCoversGrandTotal = (paymentAmt: any, grandTotal: any) => {
+  const p = Number(paymentAmt);
+  const g = Number(grandTotal);
+  if (Number.isNaN(p) || Number.isNaN(g)) return false;
+  return p + 1e-6 >= g;
+};
 
 const ProfileScreen = () => {
   const navigation = useNavigation();
@@ -42,6 +50,8 @@ const ProfileScreen = () => {
   const [loadingCompanies, setLoadingCompanies] = useState(false);
   const [employee, setEmployee] = useState<any>(null);
   const [loadingEmployee, setLoadingEmployee] = useState(false);
+  const [employeeLoadError, setEmployeeLoadError] = useState<string | null>(null);
+  const [companiesLoadError, setCompaniesLoadError] = useState<string | null>(null);
   const [companyPickerVisible, setCompanyPickerVisible] = useState(false);
   const [modeOfPaymentPickerVisible, setModeOfPaymentPickerVisible] = useState(false);
   const [amountTypePickerVisible, setAmountTypePickerVisible] = useState(false);
@@ -94,22 +104,28 @@ const ProfileScreen = () => {
     }
   };
 
+  const authToken = String(token || '')
+    .trim()
+    .replace(/^Bearer\s+/i, '')
+    .replace(/^"(.*)"$/, '$1')
+    .trim();
 
-  console.log(token, 'user23452345', user?._id);
+  console.log(authToken, 'user23452345', user?._id);
   // Fetch employee data
   const fetchEmployeeData = async () => {
-    if (!user?._id || !token) {
+    if (!user?._id || !authToken) {
       setLoadingEmployee(false);
       return;
     }
     
     try {
       setLoadingEmployee(true);
-      console.log('user?._id23452345', user?._id, `${getApiBaseUrl()}/employee/user/${user?._id}`, token);
+      setEmployeeLoadError(null);
+      console.log('user?._id23452345', user?._id, `${getApiBaseUrl()}/employee/user/${user?._id}`, authToken);
       const response = await axios.get(
         `${getApiBaseUrl()}/employee/user/${user?._id}`,
         { 
-          headers: { Authorization: token || '' },
+          headers: { Authorization: authToken },
           timeout: 30000,
         }
       );
@@ -126,10 +142,27 @@ const ProfileScreen = () => {
       if (error.response?.status === 404) {
         // 404 is expected if employee doesn't exist - silently handle
         setEmployee(null);
+        setEmployeeLoadError(null);
       } else {
         // Log other errors for debugging
         console.error('Error fetching employee data:', error.response?.data || error.message);
         setEmployee(null);
+        const status = error.response?.status;
+        const msg = error.response?.data?.message || error.message || 'Failed to load employee';
+        setEmployeeLoadError(`Employee load failed (${status || 'ERR'}): ${msg}`);
+
+        // Common when API base changed: token is no longer valid on the new backend.
+        if (status === 401 || status === 403 || (status === 500 && String(msg).toLowerCase().includes('server error'))) {
+          await AsyncStorage.removeItem('authToken');
+          await AsyncStorage.removeItem('auth');
+          dispatch(clearAuth());
+          dispatch(clearPermissions());
+          Toast.show({
+            type: 'error',
+            text1: 'Session expired',
+            text2: 'Please login again',
+          });
+        }
       }
     } finally {
       setLoadingEmployee(false);
@@ -142,10 +175,11 @@ const ProfileScreen = () => {
     
     try {
       setLoadingCompanies(true);
+      setCompaniesLoadError(null);
       const response = await axios.get(
         `${getApiBaseUrl()}/company/all?limit=1000`,
         { 
-          headers: { Authorization: token || '' },
+          headers: { Authorization: authToken },
           timeout: 30000,
         }
       );
@@ -155,6 +189,9 @@ const ProfileScreen = () => {
       }
     } catch (error: any) {
       console.error('Error fetching companies:', error);
+      const status = error.response?.status;
+      const msg = error.response?.data?.message || error.message || 'Failed to load companies';
+      setCompaniesLoadError(`Companies load failed (${status || 'ERR'}): ${msg}`);
       Toast.show({
         type: 'error',
         text1: 'Error',
@@ -167,7 +204,7 @@ const ProfileScreen = () => {
 
   // Fetch invoices for selected company
   const fetchInvoicesForCompany = async (companyId: string) => {
-    if (!companyId || !token) {
+    if (!companyId || !authToken) {
       setInvoices([]);
       return;
     }
@@ -179,9 +216,11 @@ const ProfileScreen = () => {
         {
           companyId: companyId,
           invoiceType: 'invoice',
+          // Match web profile: show unpaid invoices for payment updates
+          status: { $ne: 'Paid' },
         },
         { 
-          headers: { Authorization: token || '' },
+          headers: { Authorization: authToken },
           timeout: 30000,
         }
       );
@@ -211,7 +250,7 @@ const ProfileScreen = () => {
       if (user?.name) {
         setName(user.name);
       }
-    }, [user?.role, token, user?._id, user?.name])
+    }, [user?.role, authToken, user?._id, user?.name])
   );
 
   // Fetch invoices when company is selected
@@ -221,7 +260,7 @@ const ProfileScreen = () => {
     } else {
       setInvoices([]);
     }
-  }, [selectedCompany, token]);
+  }, [selectedCompany, authToken]);
 
   const handleOpenPaymentModal = (invoice: any, type: 'rental' | 'service') => {
     setSelectedInvoice(invoice);
@@ -275,7 +314,7 @@ const ProfileScreen = () => {
             },
             {
               headers: {
-                Authorization: token || '',
+                Authorization: authToken,
               },
             }
           );
@@ -294,56 +333,44 @@ const ProfileScreen = () => {
     if (!selectedInvoice) return;
 
     try {
-      let status = 'Paid';
-      if (balanceAmount && selectedPendingInvoiceId) {
-        status = 'Unpaid';
-      } else if (
-        Number(paymentForm?.paymentAmount) >= Number(paymentForm?.grandTotal) ||
-        paymentForm.paymentAmountType === 'TDS'
-      ) {
-        status = 'Paid';
-      } else {
-        status = 'Unpaid';
-      }
-
-      const payload: any = {
-        modeOfPayment: paymentForm.modeOfPayment,
-        bankName: paymentForm.bankName,
-        transactionDetails: paymentForm.transactionDetails,
-        chequeDate: paymentForm.chequeDate,
-        transferDate: paymentForm.transferDate,
-        companyNamePayment: paymentForm.companyNamePayment,
-        otherPaymentMode: paymentForm.otherPaymentMode,
-        paymentAmountType: paymentForm.paymentAmountType,
-        paymentAmount:
-          balanceAmount && selectedPendingInvoiceId
-            ? Number(balanceAmount)
-            : paymentForm?.paymentAmount && parseFloat(paymentForm.paymentAmount) >= paymentForm?.grandTotal
-            ? Number(paymentForm?.grandTotal)
-            : Number(paymentForm?.paymentAmount) || 0,
-        tdsAmount: 0,
-        pendingAmount: 0,
-        status: status,
+      const buildPayload = (payAmount: number, isFull: boolean) => {
+        const status = isFull ? 'Paid' : 'Unpaid';
+        const payload: any = {
+          modeOfPayment: paymentForm.modeOfPayment,
+          bankName: paymentForm.bankName,
+          transactionDetails: paymentForm.transactionDetails,
+          chequeDate: paymentForm.chequeDate,
+          transferDate: paymentForm.transferDate,
+          companyNamePayment: paymentForm.companyNamePayment,
+          otherPaymentMode: paymentForm.otherPaymentMode,
+          paymentAmountType: paymentForm.paymentAmountType,
+          paymentAmount: Number(payAmount) || 0,
+          tdsAmount: 0,
+          pendingAmount: 0,
+          status,
+        };
+        if (paymentForm.paymentAmountType === 'TDS') {
+          payload.tdsAmount = pendingAmount || 0;
+        } else if (paymentForm.paymentAmountType === 'Pending') {
+          payload.pendingAmount = pendingAmount || 0;
+        }
+        return payload;
       };
 
-      if (paymentForm.paymentAmountType === 'TDS') {
-        payload.tdsAmount = pendingAmount || 0;
-      } else if (paymentForm.paymentAmountType === 'Pending') {
-        payload.pendingAmount = pendingAmount || 0;
-      }
+      const gt = Number(paymentForm?.grandTotal) || Number(selectedInvoice?.grandTotal) || 0;
+      const payNum = Number(paymentForm?.paymentAmount);
+      const covers = paymentCoversGrandTotal(payNum, gt);
+      const currentInvoicePayment = covers ? gt : payNum;
+      const currentPayload = buildPayload(currentInvoicePayment, covers || paymentForm.paymentAmountType === 'TDS');
 
-      const invoiceId = balanceAmount && selectedPendingInvoiceId ? selectedPendingInvoiceId : selectedInvoice._id;
-      const endpoint = `/service-invoice/update/${invoiceId}`;
-      
-      const res = await axios.put(
-        `${getApiBaseUrl()}${endpoint}`,
-        payload,
-        {
-          headers: {
-            Authorization: token || '',
-          },
-        }
-      );
+      const currentEndpoint =
+        invoiceType === 'rental'
+          ? `/rental-payment/${selectedInvoice._id}`
+          : `/service-invoice/update/${selectedInvoice._id}`;
+
+      const res = await axios.put(`${getApiBaseUrl()}${currentEndpoint}`, currentPayload, {
+        headers: { Authorization: authToken },
+      });
 
       if (res.data?.success) {
         Toast.show({
@@ -352,17 +379,25 @@ const ProfileScreen = () => {
           text2: res.data.message || 'Payment details updated successfully!',
         });
         
-        // If there's a balance amount, save to the pending invoice as well
-        if (balanceAmount && selectedPendingInvoiceId) {
-          setTimeout(() => {
-            handleSavePaymentDetails();
-          }, 1000);
-        } else {
-          setPaymentModalVisible(false);
-          // Refresh invoices for the selected company
-          if (selectedCompany) {
-            fetchInvoicesForCompany(selectedCompany);
+        // Allocate remaining balance to selected pending invoice (one invoice allocation, same as existing UI)
+        if (balanceAmount > 0 && selectedPendingInvoiceId) {
+          const allocPayload = buildPayload(Number(balanceAmount), Number(balanceAmount) >= (Number(gt) || 0));
+          const allocEndpoint =
+            invoiceType === 'rental'
+              ? `/rental-payment/${selectedPendingInvoiceId}`
+              : `/service-invoice/update/${selectedPendingInvoiceId}`;
+          try {
+            await axios.put(`${getApiBaseUrl()}${allocEndpoint}`, allocPayload, {
+              headers: { Authorization: authToken },
+            });
+          } catch (e) {
+            console.error('Error allocating to pending invoice:', e);
           }
+        }
+
+        setPaymentModalVisible(false);
+        if (selectedCompany) {
+          fetchInvoicesForCompany(selectedCompany);
         }
       }
     } catch (error: any) {
@@ -427,6 +462,12 @@ const ProfileScreen = () => {
               <Text style={styles.detailValue}>{getDepartmentName()}</Text>
             </View>
             <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Address:</Text>
+              <Text style={styles.detailValue} numberOfLines={3} ellipsizeMode="tail">
+                {employee.address || 'N/A'}
+              </Text>
+            </View>
+            <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Type:</Text>
               <Text style={styles.detailValue}>{employee.employeeType || 'N/A'}</Text>
             </View>
@@ -444,6 +485,14 @@ const ProfileScreen = () => {
               <Text style={styles.detailLabel}>Pincode:</Text>
               <Text style={styles.detailValue}>{employee.pincode || 'N/A'}</Text>
             </View>
+            {/* {employee.salary ? (
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Salary:</Text>
+                <Text style={styles.salaryValue}>
+                  ₹{Number(employee.salary || 0).toLocaleString('en-IN')}
+                </Text>
+              </View>
+            ) : null} */}
           </View>
 
           {/* Footer Banner */}
@@ -457,6 +506,35 @@ const ProfileScreen = () => {
           <ActivityIndicator size="large" color="#007AFF" />
           <Text style={styles.loadingText}>Loading employee details...</Text>
         </View>
+      ) : user?.role === 3 ? (
+        <View style={styles.employeeFallbackCard}>
+          <Text style={styles.employeeFallbackTitle}>Employee profile not loaded</Text>
+          <Text style={styles.employeeFallbackSubTitle} numberOfLines={4} ellipsizeMode="tail">
+            {employeeLoadError || 'No employee record found for this user.'}
+          </Text>
+          <Text style={styles.employeeFallbackHint} numberOfLines={2} ellipsizeMode="tail">
+            API: {getApiBaseUrl()}
+          </Text>
+          <View style={styles.employeeFallbackActions}>
+            <TouchableOpacity
+              style={[styles.employeeFallbackBtn, styles.employeeFallbackBtnPrimary]}
+              onPress={fetchEmployeeData}
+            >
+              <Text style={styles.employeeFallbackBtnText}>Retry</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.employeeFallbackBtn, styles.employeeFallbackBtnSecondary]}
+              onPress={handleLogout}
+            >
+              <Text style={styles.employeeFallbackBtnText}>Logout</Text>
+            </TouchableOpacity>
+          </View>
+          {companiesLoadError ? (
+            <Text style={styles.employeeFallbackSubTitle} numberOfLines={3} ellipsizeMode="tail">
+              {companiesLoadError}
+            </Text>
+          ) : null}
+        </View>
       ) : (
         <View style={styles.header}>
           <View style={styles.avatar}>
@@ -466,6 +544,28 @@ const ProfileScreen = () => {
           <Text style={styles.role}>{getRoleName(user?.role || 0)}</Text>
         </View>
       )}
+
+      {/* Petrol Form & Leave Application Buttons (match web) */}
+      {user?.role === 3 && employee && !loadingEmployee ? (
+        <View style={styles.actionButtonsRow}>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.primaryActionButton]}
+            onPress={() =>
+              (Number(user?.role) === 1
+                ? (navigation as any).navigate('Employees', { screen: 'ActivityLogForm' })
+                : (navigation as any).navigate('Profile', { screen: 'ActivityLogForm' }))
+            }
+          >
+            <Text style={styles.actionButtonText}>Petrol Form</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.secondaryActionButton]}
+            onPress={() => (navigation as any).navigate('LeaveForm')}
+          >
+            <Text style={styles.actionButtonText}>Leave Application</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
 
       {user?.role === 0 && (
         <View style={styles.section}>
@@ -526,14 +626,14 @@ const ProfileScreen = () => {
             <Text style={styles.detailLabel}>Pincode:</Text>
             <Text style={styles.detailValue}>{employee.pincode || 'N/A'}</Text>
           </View>
-          {employee.salary && (
+          {/* {employee.salary && (
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Salary:</Text>
               <Text style={styles.salaryValue}>
                 ₹{employee.salary.toLocaleString('en-IN')}
               </Text>
             </View>
-          )}
+          )} */}
         </View>
       )}
 
@@ -586,7 +686,7 @@ const ProfileScreen = () => {
                         },
                         {
                           headers: {
-                            Authorization: token || '',
+                            Authorization: authToken,
                           },
                         }
                       );
@@ -726,6 +826,39 @@ const ProfileScreen = () => {
           )}
         </View>
       )}
+
+      {/* Account Information + QR Code (match web) */}
+      {user?.role === 3 ? (
+        <>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Account Information</Text>
+            <View style={styles.accountInfoRow}>
+              <Text style={styles.accountInfoLabel}>Bank Name:</Text>
+              <Text style={styles.accountInfoValue}>HDFC BANK</Text>
+            </View>
+            <View style={styles.accountInfoRow}>
+              <Text style={styles.accountInfoLabel}>A/C NO:</Text>
+              <Text style={styles.accountInfoValue}>50200041713896</Text>
+            </View>
+            <View style={styles.accountInfoRow}>
+              <Text style={styles.accountInfoLabel}>A/C Name:</Text>
+              <Text style={styles.accountInfoValue}>CORPCULTURE</Text>
+            </View>
+            <View style={styles.accountInfoRow}>
+              <Text style={styles.accountInfoLabel}>IFSC Code:</Text>
+              <Text style={styles.accountInfoValue}>HDFC0000492</Text>
+            </View>
+            <View style={[styles.accountInfoRow, styles.accountInfoRowLast]}>
+              <Text style={styles.accountInfoLabel}>Branch:</Text>
+              <Text style={styles.accountInfoValue}>Kilpauk</Text>
+            </View>
+          </View>
+
+          <View style={[styles.section, styles.qrSection]}>
+            <QRCode value="https://corpculture.nicknameinfotech.com/admin/dashboard/profile" size={200} />
+          </View>
+        </>
+      ) : null}
 
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
         <Icon name="logout" size={24} color="#FF3B30" />
@@ -1643,6 +1776,53 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     alignItems: 'center',
   },
+  actionButtonsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingHorizontal: 20,
+    marginTop: 12,
+  },
+  actionButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  primaryActionButton: {
+    backgroundColor: '#019ee3',
+  },
+  secondaryActionButton: {
+    backgroundColor: '#2b6cb0',
+  },
+  actionButtonText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  accountInfoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  accountInfoRowLast: {
+    borderBottomWidth: 0,
+  },
+  accountInfoLabel: {
+    color: '#666',
+    fontWeight: '600',
+  },
+  accountInfoValue: {
+    color: '#111',
+    fontWeight: '800',
+  },
+  qrSection: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   footerText: {
     fontSize: 14,
     fontWeight: 'bold',
@@ -1663,6 +1843,52 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontSize: 14,
     color: '#666',
+  },
+  employeeFallbackCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 16,
+    marginHorizontal: 16,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  employeeFallbackTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 6,
+  },
+  employeeFallbackSubTitle: {
+    fontSize: 13,
+    color: '#374151',
+    marginBottom: 8,
+  },
+  employeeFallbackHint: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginBottom: 12,
+  },
+  employeeFallbackActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  employeeFallbackBtn: {
+    flex: 1,
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  employeeFallbackBtnPrimary: {
+    backgroundColor: '#019ee3',
+  },
+  employeeFallbackBtnSecondary: {
+    backgroundColor: '#111827',
+  },
+  employeeFallbackBtnText: {
+    color: '#ffffff',
+    fontWeight: '700',
+    fontSize: 13,
   },
   pickerButtonLoading: {
     flexDirection: 'row',

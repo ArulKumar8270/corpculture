@@ -33,6 +33,7 @@ const EmployeeActivityLogFormScreen = () => {
   const { token } = useSelector((state: RootState) => state.auth);
   const route = useRoute();
   const editLogId = (route.params as any)?.editLogId as string | undefined;
+  const preselectedFromCompanyId = (route.params as any)?.preselectedFromCompanyId as string | undefined;
   const isEdit = !!editLogId;
   const [companies, setCompanies] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -72,7 +73,7 @@ const EmployeeActivityLogFormScreen = () => {
         headers: { Authorization: token || '' },
       });
       if (!data?.success || !data?.activityLog) {
-        Toast.show({ type: 'error', text1: data?.message || 'Failed to load activity log' });
+        Toast.show({ type: 'error', text1: data?.message || 'Failed to load petrol form' });
         return;
       }
       const log = data.activityLog;
@@ -93,7 +94,7 @@ const EmployeeActivityLogFormScreen = () => {
     } catch (err: any) {
       Toast.show({
         type: 'error',
-        text1: err.response?.data?.message || 'Failed to load activity log',
+        text1: err.response?.data?.message || 'Failed to load petrol form',
       });
     } finally {
       setLoading(false);
@@ -105,6 +106,15 @@ const EmployeeActivityLogFormScreen = () => {
       fetchLogForEdit();
     }
   }, [isEdit, companies.length, fetchLogForEdit]);
+
+  useEffect(() => {
+    if (isEdit) return;
+    if (!preselectedFromCompanyId) return;
+    const c = companiesById[String(preselectedFromCompanyId)];
+    if (c?._id) {
+      setFromCompany(c);
+    }
+  }, [isEdit, preselectedFromCompanyId, companiesById]);
 
   const fetchCompanies = async () => {
     try {
@@ -163,7 +173,7 @@ const EmployeeActivityLogFormScreen = () => {
         ? await axios.put(url, payload, { headers: { Authorization: token || '' } })
         : await axios.post(url, payload, { headers: { Authorization: token || '' } });
       if (data?.success) {
-        Toast.show({ type: 'success', text1: isEdit ? 'Activity log updated' : 'Activity log created successfully' });
+        Toast.show({ type: 'success', text1: isEdit ? 'Petrol form updated' : 'Petrol form created successfully' });
         if (!isEdit) {
           setForm({
             date: new Date().toISOString().split('T')[0],
@@ -178,12 +188,12 @@ const EmployeeActivityLogFormScreen = () => {
           setToCompany(null);
         }
       } else {
-        Toast.show({ type: 'error', text1: data?.message || 'Failed to create activity log' });
+        Toast.show({ type: 'error', text1: data?.message || 'Failed to create petrol form' });
       }
     } catch (err: any) {
       Toast.show({
         type: 'error',
-        text1: err.response?.data?.message || 'Failed to create activity log',
+        text1: err.response?.data?.message || 'Failed to create petrol form',
       });
     } finally {
       setLoading(false);

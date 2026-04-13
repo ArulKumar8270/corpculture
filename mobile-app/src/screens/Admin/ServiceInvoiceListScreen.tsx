@@ -25,6 +25,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { PaymentContactEmailsField } from '../../components/PaymentContactEmailsField';
 import { invoicePaymentEmailsFromRecord, normalizePaymentContactPayload } from '../../utils/invoicePaymentEmails';
 
+const INVOICE_DOWNLOAD_BASE_URL = 'https://pub-ef65b8bdb5974dd191a466c3120cd6b3.r2.dev';
+
 const ServiceInvoiceListScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
@@ -34,7 +36,7 @@ const ServiceInvoiceListScreen = () => {
 
   const [invoices, setInvoices] = useState<any[]>([]);
   const [invoiceCount, setInvoiceCount] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [serviceTitleFilter, setServiceTitleFilter] = useState('');
   const [employeeFilter, setEmployeeFilter] = useState('');
@@ -62,6 +64,60 @@ const ServiceInvoiceListScreen = () => {
     grandTotal: 0,
     paymentContactEmails: [] as string[],
   });
+
+  const isSameLocalDay = (a: any, b: Date) => {
+    const d = a ? new Date(a) : null;
+    if (!d || Number.isNaN(d.getTime())) return false;
+    return (
+      d.getFullYear() === b.getFullYear() &&
+      d.getMonth() === b.getMonth() &&
+      d.getDate() === b.getDate()
+    );
+  };
+
+  const resolveDownloadUrl = (candidateUrl: string) => {
+    if (!candidateUrl) return candidateUrl;
+    if (/^https?:\/\//i.test(candidateUrl)) return candidateUrl;
+    // If backend ever returns a relative URL, prefix with server base (api/v1 stripped).
+    const apiBase = String(getApiBaseUrl() || '').trim();
+    const serverBase = apiBase.replace(/\/api\/v1\/?$/i, '');
+    const path = candidateUrl.startsWith('/') ? candidateUrl : `/${candidateUrl}`;
+    return `${serverBase}${path}`;
+  };
+
+  const handleDownloadInvoiceMobile = async (invoice: any) => {
+    const candidateUrlRaw =
+      Array.isArray(invoice?.invoiceLink) && invoice.invoiceLink.length > 0
+        ? invoice.invoiceLink[0]
+        : invoice?._id
+          ? `${INVOICE_DOWNLOAD_BASE_URL}/${invoice._id}`
+          : '';
+
+    const candidateUrl = resolveDownloadUrl(String(candidateUrlRaw || ''));
+    if (!candidateUrl) {
+      Toast.show({ type: 'error', text1: 'Invoice id missing' });
+      return;
+    }
+
+    try {
+      const res = await fetch(candidateUrl, { method: 'HEAD' });
+      if (!res.ok) {
+        Toast.show({
+          type: 'error',
+          text1: 'Please send invoice then download',
+        });
+        return;
+      }
+    } catch {
+      // Ignore HEAD failure; still try to open.
+    }
+
+    try {
+      await Linking.openURL(candidateUrl);
+    } catch {
+      Toast.show({ type: 'error', text1: 'Unable to open download link' });
+    }
+  };
   const [balanceAmount, setBalanceAmount] = useState(0);
   const [pendingAmount, setPendingAmount] = useState(0);
   const [companyPendingInvoices, setCompanyPendingInvoices] = useState<any[]>([]);
@@ -107,24 +163,39 @@ const ServiceInvoiceListScreen = () => {
   }, [invoices]);
 
   useEffect(() => {
+    if (!token) {
+      setLoading(false);
+      return;
+    }
     fetchInvoices();
     fetchInvoicesCount();
-  }, [invoiceType, token]);
+  }, [invoiceType, token, user?._id, user?.role]);
 
   useEffect(() => {
     setPage(0);
   }, [searchTerm, serviceTitleFilter, employeeFilter, companyFilter, statusFilter]);
 
   const fetchInvoices = async () => {
+    if (!token) {
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       let response;
       if (user?.role === 3) {
-        response = await axios.get(
-          `${getApiBaseUrl()}/service-invoice/assignedTo/${user?._id}/${invoiceType}`,
+        if (!user._id) {
+          setInvoices([]);
+          setLoading(false);
+          return;
+        }
+        // Backend exposes POST /service-invoice/assignedTo/:userId/:invoiceType (not GET)
+        response = await axios.post(
+          `${getApiBaseUrl()}/service-invoice/assignedTo/${user._id}/${invoiceType}`,
+          {},
           {
             headers: {
-              Authorization: token || '',
+              Authorization: token,
             },
           }
         );
@@ -147,7 +218,14 @@ const ServiceInvoiceListScreen = () => {
       }
 
       if (response.data?.success) {
-        setInvoices(response.data.serviceInvoices || []);
+        const list = response.data.serviceInvoices || [];
+        if (user?.role === 3) {
+          const today = new Date();
+          const todaysOnly = list.filter((inv: any) => isSameLocalDay(inv?.invoiceDate || inv?.createdAt, today));
+          setInvoices(todaysOnly);
+        } else {
+          setInvoices(list);
+        }
       } else {
         setInvoices([]);
       }
@@ -764,6 +842,15 @@ const ServiceInvoiceListScreen = () => {
             </TouchableOpacity>
           )}
           <TouchableOpacity
+            style={[styles.actionButton, styles.downloadButton]}
+            onPress={() => handleDownloadInvoiceMobile(item)}
+          >
+            <Icon name="download" size={18} color="#007AFF" />
+            <Text style={styles.actionButtonText}>
+              Download {invoiceType === 'quotation' ? 'Quotation' : 'Invoice'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
             style={[styles.actionButton, styles.sendButton]}
             onPress={() => onSendInvoice(item)}
             disabled={isSendingThis}
@@ -813,6 +900,31 @@ const ServiceInvoiceListScreen = () => {
               </>
             )}
           </TouchableOpacity>
+          {item.companyId ? (
+            <TouchableOpacity
+              style={[styles.actionButton, styles.activityButton]}
+              onPress={() =>
+                (Number(user?.role) === 1
+                  ? (navigation as any).navigate('Employees', {
+                      screen: 'ActivityLogForm',
+                      params: {
+                        preselectedFromCompanyId:
+                          typeof item.companyId === 'object' ? item.companyId?._id : item.companyId,
+                      },
+                    })
+                  : (navigation as any).navigate('Profile', {
+                      screen: 'ActivityLogForm',
+                      params: {
+                        preselectedFromCompanyId:
+                          typeof item.companyId === 'object' ? item.companyId?._id : item.companyId,
+                      },
+                    }))
+              }
+            >
+              <Icon name="playlist-add-check" size={18} color="#007AFF" />
+              <Text style={styles.actionButtonText}>Submit Activity</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
 
         {/* Expanded Content */}
@@ -1845,6 +1957,12 @@ const styles = StyleSheet.create({
   },
   uploadButton: {
     backgroundColor: '#28a745',
+  },
+  downloadButton: {
+    backgroundColor: '#e3f2fd',
+  },
+  activityButton: {
+    backgroundColor: '#e3f2fd',
   },
   actionButtonText: {
     fontSize: 12,

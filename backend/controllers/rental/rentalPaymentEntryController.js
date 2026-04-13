@@ -3,6 +3,7 @@ import cloudinary from "cloudinary";
 import rentalProductModel from "../../models/rentalProductModel.js";
 import Company from "../../models/companyModel.js";
 import CommonDetails from "../../models/commonDetailsModel.js";
+import { normalizeSendDetailsTo } from "../../utils/normalizeSendDetailsTo.js";
 
 // Helper to calculate counts
 const calculateCountAmount = (machineOld, entryNew, freeC, extraAmt) => {
@@ -213,7 +214,8 @@ export const createRentalPaymentEntry = async (req, res) => {
 
         // Basic validation - check if fields exist and are not empty strings
         const hasCompanyId = companyId && companyId.toString().trim() !== '';
-        const hasSendDetailsTo = sendDetailsTo && sendDetailsTo.toString().trim() !== '';
+        const sendDetailsToNorm = normalizeSendDetailsTo(sendDetailsTo);
+        const hasSendDetailsTo = sendDetailsToNorm.length > 0;
 
         if (!hasSendDetailsTo || !hasCompanyId) {
             return res.status(400).send({
@@ -221,7 +223,7 @@ export const createRentalPaymentEntry = async (req, res) => {
                 message: "Missing required fields (sendDetailsTo, companyId)",
                 received: {
                     companyId: companyId || 'missing',
-                    sendDetailsTo: sendDetailsTo || 'missing'
+                    sendDetailsTo: sendDetailsTo ?? 'missing'
                 }
             });
         }
@@ -277,7 +279,7 @@ export const createRentalPaymentEntry = async (req, res) => {
                 invoiceNumber,
                 rentalId,
                 companyId,
-                sendDetailsTo,
+                sendDetailsTo: sendDetailsToNorm,
                 countImageUpload: countImageUploadUrl,
                 invoiceType,
                 invoiceDate: finalInvoiceDate, // Use parsed invoice date
@@ -443,7 +445,7 @@ export const createRentalPaymentEntry = async (req, res) => {
                 invoiceNumber,
                 rentalId,
                 companyId,
-                sendDetailsTo,
+                sendDetailsTo: sendDetailsToNorm,
                 countImageUpload: countImageUploadUrl,
                 invoiceType,
                 invoiceDate: finalInvoiceDate, // Use parsed invoice date
@@ -1015,7 +1017,16 @@ export const updateRentalPaymentEntry = async (req, res) => {
         }
 
         // Update other fields
-        if (sendDetailsTo) entry.sendDetailsTo = sendDetailsTo;
+        if (sendDetailsTo !== undefined) {
+            const n = normalizeSendDetailsTo(sendDetailsTo);
+            if (n.length === 0) {
+                return res.status(400).send({
+                    success: false,
+                    message: 'sendDetailsTo must include at least one recipient',
+                });
+            }
+            entry.sendDetailsTo = n;
+        }
         if (remarks !== undefined) entry.remarks = remarks;
         // Update invoiceDate if provided (parsedInvoiceDate will be null if invalid or not provided)
         if (invoiceDate !== undefined) {

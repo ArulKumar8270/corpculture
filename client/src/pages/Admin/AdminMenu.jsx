@@ -271,7 +271,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                             }
                                         >
                                             <div className="h-10 px-8 flex items-center">
-                                                My Activity Logs
+                                                My Petrol Forms
                                             </div>
                                         </NavLink>
                                     </>

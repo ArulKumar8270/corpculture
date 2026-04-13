@@ -79,7 +79,7 @@ const ActivityLogReportScreen = () => {
       } catch (err: any) {
         Toast.show({
           type: 'error',
-          text1: err.response?.data?.message || 'Failed to fetch activity logs',
+          text1: err.response?.data?.message || 'Failed to fetch petrol forms',
         });
       } finally {
         setLoading(false);
@@ -232,7 +232,10 @@ const ActivityLogReportScreen = () => {
             style={styles.editButton}
             onPress={() => {
               // Navigate to Activity Log form in edit mode
-              (navigation as any).navigate('ActivityLogForm', { editLogId: item._id });
+              (navigation as any).navigate('Employees', {
+                screen: 'ActivityLogForm',
+                params: { editLogId: item._id },
+              });
             }}
           >
             <Text style={styles.editButtonText}>Edit</Text>
@@ -344,7 +347,7 @@ const ActivityLogReportScreen = () => {
           }
           ListEmptyComponent={
             <View style={styles.empty}>
-              <Text style={styles.emptyText}>No activity logs found</Text>
+              <Text style={styles.emptyText}>No petrol forms found</Text>
             </View>
           }
         />

@@ -100,7 +100,7 @@ const EmployeeActivityLogList = () => {
         component="h1"
         sx={{ mb: 2, color: "#019ee3", fontWeight: "bold" }}
       >
-        My Activity Logs
+        My Petrol Forms
       </Typography>
 
       <Paper sx={{ p: 2, mb: 2 }}>

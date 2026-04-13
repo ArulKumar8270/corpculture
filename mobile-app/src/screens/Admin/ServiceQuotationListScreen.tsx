@@ -31,7 +31,7 @@ const ServiceQuotationListScreen = () => {
   const [quotations, setQuotations] = useState<any[]>([]);
   const [quotationCount, setQuotationCount] = useState(0);
   const [invoiceCount, setInvoiceCount] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedQuotations, setExpandedQuotations] = useState<Set<string>>(new Set());
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
@@ -53,16 +53,21 @@ const ServiceQuotationListScreen = () => {
   });
 
   useEffect(() => {
+    if (!token) {
+      setLoading(false);
+      return;
+    }
     fetchQuotations();
     fetchInvoicesCount();
-  }, [token]);
+  }, [token, user?._id, user?.role]);
 
   // Refresh quotations when screen comes into focus
   useFocusEffect(
     useCallback(() => {
+      if (!token) return;
       fetchQuotations();
       fetchInvoicesCount();
-    }, [token])
+    }, [token, user?._id, user?.role])
   );
 
   useEffect(() => {
@@ -70,12 +75,22 @@ const ServiceQuotationListScreen = () => {
   }, [searchTerm]);
 
   const fetchQuotations = async () => {
+    if (!token) {
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       let response;
       if (user?.role === 3) {
-        response = await axios.get(
-          `${getApiBaseUrl()}/service-invoice/assignedTo/${user?._id}/quotation`,
+        if (!user._id) {
+          setQuotations([]);
+          setLoading(false);
+          return;
+        }
+        response = await axios.post(
+          `${getApiBaseUrl()}/service-invoice/assignedTo/${user._id}/quotation`,
+          {},
           {
             headers: {
               Authorization: token || '',

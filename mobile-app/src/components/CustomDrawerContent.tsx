@@ -134,8 +134,9 @@ const CustomDrawerContent = (props: CustomDrawerContentProps) => {
       'Deactivate': 'Profile',
       'Payslips': 'Profile',
       'PayslipView': 'Profile',
-      'ActivityLogForm': 'Employees',
-      'LeaveForm': 'Employees',
+      // Admin has an "Employees" drawer; employees have forms under Profile stack.
+      'ActivityLogForm': isAdmin ? 'Employees' : 'Profile',
+      'LeaveForm': isAdmin ? 'Employees' : 'Profile',
       'ReportsDashboard': 'Reports',
       'CompanyReports': 'Reports',
       'ServiceReportsSummary': 'Reports',
@@ -242,7 +243,7 @@ const CustomDrawerContent = (props: CustomDrawerContentProps) => {
               style={styles.menuItem}
               onPress={() => navigateToScreen('ActivityLogList')}
             >
-              <Text style={styles.menuItemText}>My Activity Logs</Text>
+              <Text style={styles.menuItemText}>My Petrol Forms</Text>
             </TouchableOpacity>
           </View>
         )}

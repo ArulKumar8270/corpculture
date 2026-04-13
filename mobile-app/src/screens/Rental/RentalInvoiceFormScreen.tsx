@@ -88,7 +88,7 @@ const RentalInvoiceFormScreen = () => {
   const [formData, setFormData] = useState({
     companyId: initialCompanyId,
     machineId: '',
-    sendDetailsTo: '',
+    sendDetailsTo: [] as string[],
     countImageFile: null as string | null,
     remarks: '',
     invoiceDate: new Date().toISOString(), // Match web: default to today
@@ -96,6 +96,33 @@ const RentalInvoiceFormScreen = () => {
     a4Config: { bwOldCount: '', bwNewCount: '' } as ProductConfig,
     a5Config: { bwOldCount: '', bwNewCount: '' } as ProductConfig,
   });
+
+  const parseSendDetailsTo = (value: any): string[] => {
+    if (!value) return [];
+    if (Array.isArray(value)) return value.map((v) => String(v)).filter(Boolean);
+    const s = String(value).trim();
+    if (!s) return [];
+    // Use newline as our multi-select delimiter (safe because option string contains commas).
+    if (s.includes('\n')) return s.split('\n').map((x) => x.trim()).filter(Boolean);
+    return [s];
+  };
+
+  const serializeSendDetailsTo = (values: string[]) => {
+    const cleaned = (values || []).map((v) => String(v).trim()).filter(Boolean);
+    return cleaned.join('\n');
+  };
+
+  const sendToDisplayLabel = (option: string) => {
+    const s = String(option || '').trim();
+    if (!s) return '';
+    return s;
+  };
+
+  const sendToSummary = (values: string[]) => {
+    const labels = (values || []).map(sendToDisplayLabel).filter(Boolean);
+    if (!labels.length) return '--select Option--';
+    return labels.join(', ');
+  };
 
   const [products, setProducts] = useState<Product[]>([
     {
@@ -154,7 +181,7 @@ const RentalInvoiceFormScreen = () => {
     if (entryId || !initialCompanyId) return;
     setFormData((prev) => {
       if (prev.companyId === initialCompanyId) return prev;
-      return { ...prev, companyId: initialCompanyId, sendDetailsTo: '' };
+      return { ...prev, companyId: initialCompanyId, sendDetailsTo: [] };
     });
   }, [entryId, initialCompanyId]);
 
@@ -187,15 +214,15 @@ const RentalInvoiceFormScreen = () => {
     const selectedCompany = companies.find((comp) => String(comp._id) === String(formData.companyId));
     const persons = selectedCompany?.contactPersons ?? companyData?.contactPersons;
     if (persons && Array.isArray(persons)) {
-      const options = persons.map(
-        (person: any) => `${person.name || ''} (Mobile: ${person.mobile || ''}, Email: ${person.email || ''})`
-      );
+      const options = persons
+        .map((person: any) => String(person?.name || '').trim())
+        .filter(Boolean);
       setContactOptions(options);
     } else {
       setContactOptions([]);
     }
     if (!entryId) {
-      setFormData((prev) => ({ ...prev, sendDetailsTo: '' }));
+      setFormData((prev) => ({ ...prev, sendDetailsTo: [] }));
     }
   }, [formData.companyId, companies, companyData, entryId]);
 
@@ -435,7 +462,7 @@ const RentalInvoiceFormScreen = () => {
         setFormData({
           companyId: entry.companyId?._id || entry.companyId || '',
           machineId: entry.machineId?._id || entry.machineId || '',
-          sendDetailsTo: entry?.sendDetailsTo || '',
+          sendDetailsTo: parseSendDetailsTo(entry?.sendDetailsTo),
           countImageFile: null,
           remarks: entry.remarks || '',
           invoiceDate: entry.invoiceDate ? new Date(entry.invoiceDate).toISOString() : new Date().toISOString(),
@@ -567,7 +594,7 @@ const RentalInvoiceFormScreen = () => {
     setFormData({
       companyId: initialCompanyId,
       machineId: '',
-      sendDetailsTo: '',
+      sendDetailsTo: [],
       countImageFile: null,
       remarks: '',
       invoiceDate: new Date().toISOString(),
@@ -629,7 +656,7 @@ const RentalInvoiceFormScreen = () => {
       if (!currentEntryId && normalizedId) {
         setFormData((prev) => {
           if (String(prev.companyId) === normalizedId) return prev;
-          return { ...prev, companyId: normalizedId, sendDetailsTo: '' };
+          return { ...prev, companyId: normalizedId, sendDetailsTo: [] };
         });
       }
 
@@ -797,7 +824,7 @@ const RentalInvoiceFormScreen = () => {
       });
       return false;
     }
-    if (!formData.sendDetailsTo) {
+    if (!formData.sendDetailsTo || formData.sendDetailsTo.length === 0) {
       Toast.show({
         type: 'error',
         text1: 'Validation Error',
@@ -1011,7 +1038,7 @@ const RentalInvoiceFormScreen = () => {
         return;
       }
       data.append('companyId', finalCompanyId);
-      data.append('sendDetailsTo', formData.sendDetailsTo);
+      data.append('sendDetailsTo', serializeSendDetailsTo(formData.sendDetailsTo));
       data.append('remarks', formData.remarks || '');
       data.append('invoiceDate', formData.invoiceDate ? new Date(formData.invoiceDate).toISOString() : new Date().toISOString());
       // Use employeeId (User ID) for assignedTo, fallback to employeeName if employeeId not available
@@ -1410,7 +1437,7 @@ const RentalInvoiceFormScreen = () => {
           disabled={!formData.companyId || contactOptions.length === 0}
         >
           <Text style={styles.pickerButtonText}>
-            {formData.sendDetailsTo || '--select Option--'}
+            {sendToSummary(formData.sendDetailsTo)}
           </Text>
           <Icon name="arrow-drop-down" size={24} color="#666" />
         </TouchableOpacity>
@@ -1578,11 +1605,21 @@ const RentalInvoiceFormScreen = () => {
                 <TouchableOpacity
                   style={styles.pickerOption}
                   onPress={() => {
-                    setFormData({ ...formData, sendDetailsTo: item });
-                    setSendToPickerVisible(false);
+                    const exists = formData.sendDetailsTo?.includes(item);
+                    const next = exists
+                      ? (formData.sendDetailsTo || []).filter((x) => x !== item)
+                      : [...(formData.sendDetailsTo || []), item];
+                    setFormData({ ...formData, sendDetailsTo: next });
                   }}
                 >
-                  <Text style={styles.pickerOptionText}>{item}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                    <Icon
+                      name={formData.sendDetailsTo?.includes(item) ? 'check-box' : 'check-box-outline-blank'}
+                      size={20}
+                      color="#019ee3"
+                    />
+                    <Text style={[styles.pickerOptionText, { flex: 1 }]}>{item}</Text>
+                  </View>
                 </TouchableOpacity>
               )}
             />
@@ -1590,7 +1627,7 @@ const RentalInvoiceFormScreen = () => {
               style={styles.modalButton}
               onPress={() => setSendToPickerVisible(false)}
             >
-              <Text style={styles.modalButtonText}>Cancel</Text>
+              <Text style={styles.modalButtonText}>Done</Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>

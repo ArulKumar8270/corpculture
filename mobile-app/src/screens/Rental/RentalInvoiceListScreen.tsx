@@ -26,6 +26,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { PaymentContactEmailsField } from '../../components/PaymentContactEmailsField';
 import { invoicePaymentEmailsFromRecord, normalizePaymentContactPayload } from '../../utils/invoicePaymentEmails';
 
+const RENTAL_INVOICE_DOWNLOAD_BASE_URL = 'https://pub-bcab85dac0c64221ba6b6a756f991c46.r2.dev';
+
 const RentalInvoiceListScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
@@ -68,6 +70,59 @@ const RentalInvoiceListScreen = () => {
   const [pendingAmount, setPendingAmount] = useState(0);
   const [companyPendingInvoices, setCompanyPendingInvoices] = useState<any[]>([]);
   const [selectedPendingInvoiceId, setSelectedPendingInvoiceId] = useState<string | null>(null);
+
+  const isSameLocalDay = (a: any, b: Date) => {
+    const d = a ? new Date(a) : null;
+    if (!d || Number.isNaN(d.getTime())) return false;
+    return (
+      d.getFullYear() === b.getFullYear() &&
+      d.getMonth() === b.getMonth() &&
+      d.getDate() === b.getDate()
+    );
+  };
+
+  const resolveDownloadUrl = (candidateUrl: string) => {
+    if (!candidateUrl) return candidateUrl;
+    if (/^https?:\/\//i.test(candidateUrl)) return candidateUrl;
+    const apiBase = String(getApiBaseUrl() || '').trim();
+    const serverBase = apiBase.replace(/\/api\/v1\/?$/i, '');
+    const path = candidateUrl.startsWith('/') ? candidateUrl : `/${candidateUrl}`;
+    return `${serverBase}${path}`;
+  };
+
+  const handleDownloadInvoiceMobile = async (entry: any) => {
+    const candidateUrlRaw =
+      Array.isArray(entry?.invoiceLink) && entry.invoiceLink.length > 0
+        ? entry.invoiceLink[0]
+        : entry?._id
+          ? `${RENTAL_INVOICE_DOWNLOAD_BASE_URL}/${entry._id}`
+          : '';
+
+    const candidateUrl = resolveDownloadUrl(String(candidateUrlRaw || ''));
+    if (!candidateUrl) {
+      Toast.show({ type: 'error', text1: 'Invoice id missing' });
+      return;
+    }
+
+    try {
+      const res = await fetch(candidateUrl, { method: 'HEAD' });
+      if (!res.ok) {
+        Toast.show({
+          type: 'error',
+          text1: 'Please send invoice then download',
+        });
+        return;
+      }
+    } catch {
+      // Ignore HEAD failure; still try to open.
+    }
+
+    try {
+      await Linking.openURL(candidateUrl);
+    } catch {
+      Toast.show({ type: 'error', text1: 'Unable to open download link' });
+    }
+  };
   const [modeOfPaymentPickerVisible, setModeOfPaymentPickerVisible] = useState(false);
   const [amountTypePickerVisible, setAmountTypePickerVisible] = useState(false);
   const [pendingInvoicePickerVisible, setPendingInvoicePickerVisible] = useState(false);
@@ -170,7 +225,16 @@ const RentalInvoiceListScreen = () => {
       }
 
       if (response.data?.success) {
-        setRentalEntries(response.data.entries || []);
+        const list = response.data.entries || [];
+        if (user?.role === 3) {
+          const today = new Date();
+          const todaysOnly = list.filter((entry: any) =>
+            isSameLocalDay(entry?.invoiceDate || entry?.entryDate || entry?.createdAt, today)
+          );
+          setRentalEntries(todaysOnly);
+        } else {
+          setRentalEntries(list);
+        }
       } else {
         setRentalEntries([]);
       }
@@ -750,7 +814,11 @@ const RentalInvoiceListScreen = () => {
         <View style={styles.entryDetails}>
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Send Details To:</Text>
-            <Text style={styles.detailValue}>{item.sendDetailsTo || 'N/A'}</Text>
+            <Text style={styles.detailValue}>
+              {Array.isArray(item.sendDetailsTo)
+                ? item.sendDetailsTo.filter(Boolean).join(', ')
+                : item.sendDetailsTo || 'N/A'}
+            </Text>
           </View>
           {item.assignedTo && (
             <View style={styles.detailRow}>
@@ -806,6 +874,15 @@ const RentalInvoiceListScreen = () => {
             </TouchableOpacity>
           )}
           <TouchableOpacity
+            style={[styles.actionButton, styles.downloadButton]}
+            onPress={() => handleDownloadInvoiceMobile(item)}
+          >
+            <Icon name="download" size={18} color="#007AFF" />
+            <Text style={styles.actionButtonText}>
+              Download {invoiceType === 'quotation' ? 'Quotation' : 'Invoice'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
             style={[styles.actionButton, styles.sendButton]}
             onPress={() => onSendInvoice(item)}
             disabled={isSendingThis}
@@ -855,6 +932,31 @@ const RentalInvoiceListScreen = () => {
               </>
             )}
           </TouchableOpacity>
+          {item.companyId ? (
+            <TouchableOpacity
+              style={[styles.actionButton, styles.activityButton]}
+              onPress={() =>
+                (Number(user?.role) === 1
+                  ? (navigation as any).navigate('Employees', {
+                      screen: 'ActivityLogForm',
+                      params: {
+                        preselectedFromCompanyId:
+                          typeof item.companyId === 'object' ? item.companyId?._id : item.companyId,
+                      },
+                    })
+                  : (navigation as any).navigate('Profile', {
+                      screen: 'ActivityLogForm',
+                      params: {
+                        preselectedFromCompanyId:
+                          typeof item.companyId === 'object' ? item.companyId?._id : item.companyId,
+                      },
+                    }))
+              }
+            >
+              <Icon name="playlist-add-check" size={18} color="#007AFF" />
+              <Text style={styles.actionButtonText}>Submit Activity</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
 
         {/* Expanded Content */}
@@ -1936,6 +2038,12 @@ const styles = StyleSheet.create({
   },
   uploadButton: {
     backgroundColor: '#28a745',
+  },
+  downloadButton: {
+    backgroundColor: '#e3f2fd',
+  },
+  activityButton: {
+    backgroundColor: '#e3f2fd',
   },
   actionButtonText: {
     fontSize: 12,

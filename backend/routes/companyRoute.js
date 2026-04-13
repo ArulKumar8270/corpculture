@@ -17,7 +17,17 @@ const router = express.Router();
 router.post("/create", createCompany);
 
 // Get all companys
-router.get("/all", requireSignIn, requirePermission("otherSettingsAllCompany", "view"), getAllCompanies);
+router.get(
+    "/all",
+    requireSignIn,
+    (req, res, next) => {
+        // Employees (role 3) need company list for workflows (reports/invoices/profile).
+        // Admins are handled by requirePermission (admin bypass) below.
+        if (Number(req.user?.role) === 3) return next();
+        return requirePermission("otherSettingsAllCompany", "view")(req, res, next);
+    },
+    getAllCompanies
+);
 
 // Get single company
 router.get("/get/:id", getCompanyById);

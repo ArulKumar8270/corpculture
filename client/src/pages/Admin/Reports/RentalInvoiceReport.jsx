@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     Box,
     Typography,
@@ -19,7 +19,12 @@ import {
     InputLabel,
     Select,
     MenuItem,
-    TablePagination
+    TablePagination,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    Autocomplete,
 } from '@mui/material';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import EditIcon from '@mui/icons-material/Edit';
@@ -35,9 +40,52 @@ import { saveAs } from 'file-saver';
 const RENTAL_INVOICE_DOWNLOAD_BASE_URL = 'https://pub-bcab85dac0c64221ba6b6a756f991c46.r2.dev';
 const PAYMENT_COPY_DOWNLOAD_BASE_URL = 'https://pub-982db31d50054adebd29fa1792b12fb8.r2.dev';
 
+function invoicePaymentEmailsFromRecord(inv) {
+    if (Array.isArray(inv?.paymentContactEmails) && inv.paymentContactEmails.length) {
+        return [...new Set(inv.paymentContactEmails.map((e) => String(e || '').trim()).filter(Boolean))];
+    }
+    const one = String(inv?.paymentContactEmail || '').trim();
+    return one ? [one] : [];
+}
+
+function paymentCoversGrandTotal(paymentAmt, grandTotal) {
+    const p = Number(paymentAmt);
+    const g = Number(grandTotal);
+    if (Number.isNaN(p) || Number.isNaN(g)) return false;
+    return p + 1e-6 >= g;
+}
+
+/** Align with RentalInvoiceList + default amount to grand total when Paid and paymentAmount missing. */
+function openRentalPaymentFormDefaults(invoice) {
+    let initialPaymentAmount = 0;
+    let initialPaymentAmountType = '';
+    if (Number(invoice?.tdsAmount) > 0) {
+        initialPaymentAmount = Number(invoice.tdsAmount);
+        initialPaymentAmountType = 'TDS';
+    } else if (Number(invoice?.pendingAmount) > 0) {
+        initialPaymentAmount = Number(invoice.pendingAmount);
+        initialPaymentAmountType = 'Pending';
+    }
+    let paymentAmount;
+    if (invoice?.paymentAmount !== undefined && invoice?.paymentAmount !== null && invoice?.paymentAmount !== '') {
+        paymentAmount = Number(invoice.paymentAmount);
+    } else {
+        paymentAmount = initialPaymentAmount;
+    }
+    if (
+        (paymentAmount === 0 || Number.isNaN(paymentAmount)) &&
+        invoice?.status === 'Paid' &&
+        !initialPaymentAmountType
+    ) {
+        paymentAmount = Number(invoice?.grandTotal) || 0;
+    }
+    const paymentAmountType = invoice?.paymentAmountType || initialPaymentAmountType || '';
+    return { paymentAmount, paymentAmountType };
+}
+
 const RentalInvoiceReport = (props) => {
     const navigate = useNavigate();
-    const { auth } = useAuth();
+    const { auth, userPermissions } = useAuth();
     const [rentalInvoices, setRentalInvoices] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -50,7 +98,44 @@ const RentalInvoiceReport = (props) => {
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [totalCount, setTotalCount] = useState(0);
     const [exporting, setExporting] = useState(false);
-    const { companyId: filterCompanyId } = useParams(); // If filtering by company from another page
+    const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+    const [paymentInvoice, setPaymentInvoice] = useState(null);
+    const [paymentForm, setPaymentForm] = useState({});
+    const [companyContactPersons, setCompanyContactPersons] = useState([]);
+    const [companyPendingInvoice, setCompanyPendingInvoice] = useState([]);
+    const [selectedInvoiceIds, setSelectedInvoiceIds] = useState([]);
+    const [balanceAmount, setBalanceAmount] = useState(0);
+    const [pendingAmount, setPendingAmount] = useState(0);
+    const [savingPayment, setSavingPayment] = useState(false);
+    const { companyId: filterCompanyId } = useParams();
+
+    const hasPermission = (key) =>
+        userPermissions?.some((p) => p.key === key && p.actions.includes('edit')) || auth?.user?.role === 1;
+
+    const contactsWithEmail = useMemo(() => {
+        const seen = new Set();
+        const list = [];
+        for (const cp of companyContactPersons) {
+            const email = (cp?.email || '').trim();
+            if (email && !seen.has(email)) {
+                seen.add(email);
+                list.push(cp);
+            }
+        }
+        return list;
+    }, [companyContactPersons]);
+
+    const paymentEmailAutocompleteOptions = useMemo(() => {
+        const fromContacts = contactsWithEmail.map((cp) => (cp?.email || '').trim()).filter(Boolean);
+        const selected = (paymentForm.paymentContactEmails || []).map((e) => String(e || '').trim()).filter(Boolean);
+        return [...new Set([...selected, ...fromContacts])];
+    }, [contactsWithEmail, paymentForm.paymentContactEmails]);
+
+    const selectedAllocatedTotal =
+        companyPendingInvoice
+            ?.filter((inv) => selectedInvoiceIds.includes(inv._id))
+            .reduce((sum, inv) => sum + Number(inv?.grandTotal || 0), 0) || 0;
+    const remainingToAllocate = Math.max(0, (balanceAmount || 0) - selectedAllocatedTotal);
 
     const buildListRequestBody = (currentPage, currentLimit) => ({
         invoiceType: props?.type,
@@ -71,9 +156,12 @@ const RentalInvoiceReport = (props) => {
         invoiceNumber = '',
         paymentStatus = '',
         currentPage = page,
-        currentRowsPerPage = rowsPerPage
+        currentRowsPerPage = rowsPerPage,
+        silent = false
     ) => {
-        setLoading(true);
+        if (!silent) {
+            setLoading(true);
+        }
         setError(null);
         try {
             const requestBody = {
@@ -107,7 +195,9 @@ const RentalInvoiceReport = (props) => {
             console.error('Error fetching rental invoices:', err);
             setError(err.response?.data?.message || 'Error fetching rental invoices.');
         } finally {
-            setLoading(false);
+            if (!silent) {
+                setLoading(false);
+            }
         }
     };
 
@@ -211,6 +301,277 @@ const RentalInvoiceReport = (props) => {
             window.open(candidateUrl, '_blank', 'noopener,noreferrer');
         } catch (e) {
             window.open(candidateUrl, '_blank', 'noopener,noreferrer');
+        }
+    };
+
+    const togglePendingInvoiceSelection = (pendingInv) => {
+        const id = pendingInv._id;
+        const amount = Number(pendingInv?.grandTotal || 0);
+        setSelectedInvoiceIds((prev) => {
+            if (prev.includes(id)) return prev.filter((x) => x !== id);
+            const currentTotal =
+                companyPendingInvoice
+                    ?.filter((inv) => prev.includes(inv._id))
+                    .reduce((s, inv) => s + Number(inv?.grandTotal || 0), 0) || 0;
+            if (currentTotal + amount <= (balanceAmount || 0)) return [...prev, id];
+            return prev;
+        });
+    };
+
+    const handleOpenPaymentDetailsModal = async (invoice) => {
+        setPaymentInvoice(invoice);
+        const companyId = invoice?.companyId?._id || invoice?.companyId;
+        let persons = [];
+        if (companyId && auth?.token) {
+            try {
+                const { data } = await axios.get(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/company/get/${companyId}`,
+                    { headers: { Authorization: auth.token } }
+                );
+                if (data?.success && Array.isArray(data.company?.contactPersons)) {
+                    persons = data.company.contactPersons;
+                }
+            } catch (e) {
+                console.error(e);
+                toast.error('Could not load company contacts.');
+            }
+        }
+        setCompanyContactPersons(persons);
+
+        const { paymentAmount: initialPay, paymentAmountType: initialPayType } = openRentalPaymentFormDefaults(invoice);
+        const grand = Number(invoice.grandTotal) || 0;
+
+        setSelectedInvoiceIds([]);
+        if (initialPay < grand) {
+            setPendingAmount(grand - initialPay);
+            setBalanceAmount(0);
+            setCompanyPendingInvoice([]);
+        } else if (initialPay > grand) {
+            setBalanceAmount(initialPay - grand);
+            setPendingAmount(0);
+            try {
+                const response = await axios.post(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/all/`,
+                    {
+                        companyId: invoice?.companyId,
+                        tdsAmount: { $eq: null },
+                        status: { $ne: 'Paid' },
+                    },
+                    { headers: { Authorization: auth.token } }
+                );
+                setCompanyPendingInvoice(response.data?.entries || []);
+            } catch (err) {
+                console.log(err, 'Api error');
+                setCompanyPendingInvoice([]);
+            }
+        } else {
+            setPendingAmount(0);
+            setBalanceAmount(0);
+            setCompanyPendingInvoice([]);
+        }
+
+        setPaymentForm({
+            modeOfPayment: invoice?.modeOfPayment || 'CASH',
+            bankName: invoice?.bankName || '',
+            transactionDetails: invoice?.transactionDetails || '',
+            chequeDate: invoice?.chequeDate ? new Date(invoice.chequeDate).toISOString().split('T')[0] : '',
+            transferDate: invoice?.transferDate ? new Date(invoice.transferDate).toISOString().split('T')[0] : '',
+            companyNamePayment: invoice?.companyNamePayment || '',
+            paymentContactEmails: invoicePaymentEmailsFromRecord(invoice),
+            otherPaymentMode: invoice?.otherPaymentMode || '',
+            invoiceId: invoice?._id,
+            paymentAmount: initialPay,
+            paymentAmountType: initialPayType,
+            grandTotal: Number(invoice?.grandTotal) || 0,
+            companyId: invoice?.companyId,
+        });
+        setPaymentModalOpen(true);
+    };
+
+    const handleClosePaymentDetailsModal = () => {
+        setPaymentModalOpen(false);
+        setPaymentInvoice(null);
+        setSelectedInvoiceIds([]);
+        setCompanyContactPersons([]);
+        setCompanyPendingInvoice([]);
+        setBalanceAmount(0);
+        setPendingAmount(0);
+    };
+
+    const handlePaymentFormChange = async (e) => {
+        const { name, value } = e.target;
+        setPaymentForm((prev) => ({ ...prev, [name]: value }));
+
+        if (name === 'paymentAmount' && paymentInvoice) {
+            setSelectedInvoiceIds([]);
+            const numVal = Number(value);
+            const grand = Number(paymentInvoice?.grandTotal);
+            if (numVal < grand) {
+                setPendingAmount(grand - numVal);
+                setBalanceAmount(0);
+                setCompanyPendingInvoice([]);
+            } else {
+                setBalanceAmount(numVal - grand);
+                setPendingAmount(0);
+                try {
+                    const response = await axios.post(
+                        `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/all/`,
+                        {
+                            companyId: paymentInvoice?.companyId || paymentForm?.companyId,
+                            tdsAmount: { $eq: null },
+                            status: { $ne: 'Paid' },
+                        },
+                        { headers: { Authorization: auth.token } }
+                    );
+                    setCompanyPendingInvoice(response.data?.entries || []);
+                } catch (err) {
+                    console.log(err, 'Api error');
+                }
+            }
+        }
+    };
+
+    const buildPaymentPayload = (paymentAmount, isFullPayment = false) => {
+        const status = isFullPayment ? 'Paid' : 'Unpaid';
+        const payload = {
+            modeOfPayment: paymentForm.modeOfPayment,
+            bankName: paymentForm.bankName,
+            transactionDetails: paymentForm.transactionDetails,
+            chequeDate: paymentForm.chequeDate,
+            transferDate: paymentForm.transferDate,
+            companyNamePayment: paymentForm.companyNamePayment,
+            paymentContactEmails: [
+                ...new Set((paymentForm.paymentContactEmails || []).map((e) => String(e || '').trim()).filter(Boolean)),
+            ],
+            paymentContactEmail:
+                (paymentForm.paymentContactEmails || []).map((e) => String(e || '').trim()).filter(Boolean)[0] || '',
+            otherPaymentMode: paymentForm.otherPaymentMode,
+            paymentAmountType: paymentForm.paymentAmountType,
+            paymentAmount: Number(paymentAmount),
+            tdsAmount: 0,
+            pendingAmount: 0,
+            status,
+        };
+        if (paymentForm.paymentAmountType === 'TDS') {
+            payload.tdsAmount = pendingAmount || 0;
+        } else if (paymentForm.paymentAmountType === 'Pending') {
+            payload.pendingAmount = pendingAmount || 0;
+        }
+        return payload;
+    };
+
+    const handleSavePaymentDetails = async (targetInvoiceIdArg, amountArg) => {
+        if (!paymentInvoice?._id) return;
+        const isMultiSave = typeof targetInvoiceIdArg === 'string' && amountArg != null;
+        try {
+            if (isMultiSave) {
+                const pendingInv = companyPendingInvoice?.find((i) => i._id === targetInvoiceIdArg);
+                const payload = buildPaymentPayload(
+                    amountArg,
+                    amountArg >= (Number(pendingInv?.grandTotal) || 0)
+                );
+                await axios.put(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/${targetInvoiceIdArg}`,
+                    payload,
+                    { headers: { Authorization: auth.token } }
+                );
+                return;
+            }
+
+            setSavingPayment(true);
+            const inv = paymentInvoice;
+            const gt = Number(paymentForm?.grandTotal) || Number(inv?.grandTotal) || 0;
+            const payNum = Number(paymentForm?.paymentAmount);
+            const covers = paymentCoversGrandTotal(payNum, gt);
+            const currentInvoicePayment = covers ? gt : payNum;
+            const isFullPayment = covers || paymentForm.paymentAmountType === 'TDS';
+            const currentPayload = buildPaymentPayload(currentInvoicePayment, isFullPayment);
+
+            await axios.put(
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/${inv._id}`,
+                currentPayload,
+                { headers: { Authorization: auth.token } }
+            );
+
+            for (const invId of selectedInvoiceIds) {
+                const pendingInv = companyPendingInvoice?.find((i) => i._id === invId);
+                const amt = Number(pendingInv?.grandTotal || 0);
+                if (amt <= 0) continue;
+                await handleSavePaymentDetails(invId, amt);
+            }
+
+            const allocatedInvoices = (selectedInvoiceIds || [])
+                .map((invId) => {
+                    const pInv = companyPendingInvoice?.find((i) => i._id === invId);
+                    if (!pInv) return null;
+                    const d = pInv.invoiceDate || pInv.entryDate || pInv.createdAt;
+                    return {
+                        invoiceId: pInv._id,
+                        amount: Number(pInv?.grandTotal || 0),
+                        invoiceDate: d,
+                        grandTotal: pInv?.grandTotal,
+                    };
+                })
+                .filter(Boolean);
+
+            const invDate = inv.invoiceDate || inv.entryDate || inv.createdAt;
+
+            const n8nPayload = {
+                invoiceId: inv._id,
+                invoice: {
+                    _id: inv._id,
+                    grandTotal: inv.grandTotal,
+                    invoiceDate: invDate,
+                    companyId: inv.companyId,
+                    invoiceNumber: inv.invoiceNumber,
+                },
+                payment: {
+                    modeOfPayment: paymentForm.modeOfPayment,
+                    paymentAmount: Number(paymentForm.paymentAmount) || 0,
+                    bankName: paymentForm.bankName,
+                    transactionDetails: paymentForm.transactionDetails,
+                    chequeDate: paymentForm.chequeDate,
+                    transferDate: paymentForm.transferDate,
+                    companyNamePayment: paymentForm.companyNamePayment,
+                    paymentContactEmails: [
+                        ...new Set((paymentForm.paymentContactEmails || []).map((e) => String(e || '').trim()).filter(Boolean)),
+                    ],
+                    otherPaymentMode: paymentForm.otherPaymentMode,
+                    paymentAmountType: paymentForm.paymentAmountType,
+                    currentInvoicePayment,
+                },
+                allocatedToInvoices: allocatedInvoices,
+            };
+
+            try {
+                await axios.post(
+                    'https://n8n.nicknameinfo.net/webhook/fb83e945-2e49-4a73-acce-fd08632ef1a8',
+                    n8nPayload
+                );
+                toast.success('Payment updated (ack sent).');
+            } catch (webhookError) {
+                console.error('n8n webhook error:', webhookError);
+                toast.error(webhookError?.message || 'Payment updated, but ack failed.');
+            }
+
+            handleClosePaymentDetailsModal();
+            await fetchRentalInvoices(
+                fromDate,
+                toDate,
+                companyNameFilter,
+                invoiceNumberFilter,
+                paymentStatusFilter,
+                page,
+                rowsPerPage,
+                true
+            );
+        } catch (error) {
+            console.error('Error updating payment details:', error);
+            toast.error(error.response?.data?.message || 'Something went wrong while updating payment details.');
+        } finally {
+            if (!isMultiSave) {
+                setSavingPayment(false);
+            }
         }
     };
 
@@ -393,7 +754,7 @@ const RentalInvoiceReport = (props) => {
                                 <TableCell>Company</TableCell>
                                 <TableCell>Machine Model / Serial</TableCell>
                                 <TableCell>Invoice Date</TableCell>
-                                <TableCell>Grand Total</TableCell> {/* Placeholder */}
+                                <TableCell>Grand Total</TableCell>
                                 <TableCell>Payment Details</TableCell>
                                 <TableCell>Status</TableCell>
                                 <TableCell align="center">PDF</TableCell>
@@ -402,7 +763,7 @@ const RentalInvoiceReport = (props) => {
                         <TableBody>
                             {rentalInvoices.length === 0 && !loading ? (
                                 <TableRow>
-                                    <TableCell colSpan={10} align="center" sx={{ py: 3, color: 'text.secondary' }}>
+                                    <TableCell colSpan={9} align="center" sx={{ py: 3, color: 'text.secondary' }}>
                                         No rental invoices found.
                                     </TableCell>
                                 </TableRow>
@@ -414,8 +775,18 @@ const RentalInvoiceReport = (props) => {
                                         <TableCell>{invoice.companyId?.companyName || 'N/A'}</TableCell>
                                         <TableCell>{`${invoice.machineId?.modelName || 'N/A'} / ${invoice.machineId?.serialNo || 'N/A'}`}</TableCell>
                                         <TableCell>{invoice.invoiceDate ? new Date(invoice.invoiceDate).toLocaleDateString() : (invoice.entryDate ? new Date(invoice.entryDate).toLocaleDateString() : (invoice.createdAt ? new Date(invoice.createdAt).toLocaleDateString() : 'N/A'))}</TableCell>
-                                        <TableCell>N/A</TableCell> {/* Grand Total placeholder */}
+                                        <TableCell>{Number(invoice.grandTotal ?? 0).toFixed(2)}</TableCell>
                                         <TableCell>
+                                            {hasPermission('serviceInvoice') && !isQuotationReport ? (
+                                                <Button
+                                                    size="small"
+                                                    variant="outlined"
+                                                    sx={{ mb: 1, display: 'block' }}
+                                                    onClick={() => handleOpenPaymentDetailsModal(invoice)}
+                                                >
+                                                    Edit payment
+                                                </Button>
+                                            ) : null}
                                             <p>Mode: {invoice?.modeOfPayment || 'N/A'}</p>
                                             {invoice?.bankName && <p>Bank: {invoice?.bankName}</p>}
                                             {invoice?.chequeDate && <p>Cheque Date: {new Date(invoice?.chequeDate).toLocaleDateString()}</p>}
@@ -492,6 +863,310 @@ const RentalInvoiceReport = (props) => {
                     onPageChange={handleChangePage}
                     onRowsPerPageChange={handleChangeRowsPerPage}
                 />
+
+                <Dialog open={paymentModalOpen} onClose={handleClosePaymentDetailsModal} maxWidth="sm" fullWidth>
+                    <DialogTitle>Payment Details (RS: {paymentForm?.grandTotal})</DialogTitle>
+                    <DialogContent>
+                        {paymentInvoice ? (
+                            <>
+                                <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                                    Invoice company: {paymentInvoice.companyId?.companyName || 'N/A'}
+                                </Typography>
+                                <Autocomplete
+                                    multiple
+                                    freeSolo
+                                    options={paymentEmailAutocompleteOptions}
+                                    value={paymentForm.paymentContactEmails || []}
+                                    onChange={(event, newValue) => {
+                                        const cleaned = [...new Set(newValue.map((v) => String(v || '').trim()).filter(Boolean))];
+                                        setPaymentForm((prev) => ({ ...prev, paymentContactEmails: cleaned }));
+                                    }}
+                                    getOptionLabel={(option) => option}
+                                    filterSelectedOptions
+                                    renderOption={(props, option) => {
+                                        const cp = contactsWithEmail.find((c) => (c?.email || '').trim() === option);
+                                        const label = cp
+                                            ? `${cp.name || 'Contact'} — ${option}${cp.mobile ? ` (${cp.mobile})` : ''}`
+                                            : option;
+                                        return (
+                                            <li {...props} key={option}>
+                                                {label}
+                                            </li>
+                                        );
+                                    }}
+                                    renderTags={(value, getTagProps) =>
+                                        value.map((option, index) => (
+                                            <Chip variant="outlined" label={option} {...getTagProps({ index })} key={`${option}-${index}`} />
+                                        ))
+                                    }
+                                    renderInput={(params) => (
+                                        <TextField
+                                            {...params}
+                                            margin="normal"
+                                            size="small"
+                                            label="Contact persons (email)"
+                                            placeholder={
+                                                contactsWithEmail.length ? 'Pick contacts or type email, Enter to add' : 'Type email, Enter to add'
+                                            }
+                                            helperText="Multi-select company contacts and/or add any email; all are saved on this invoice."
+                                        />
+                                    )}
+                                />
+                                <FormControl fullWidth margin="normal" size="small">
+                                    <InputLabel id="rental-report-mode-of-payment-label">Mode Of Payment</InputLabel>
+                                    <Select
+                                        labelId="rental-report-mode-of-payment-label"
+                                        id="modeOfPayment"
+                                        name="modeOfPayment"
+                                        value={paymentForm.modeOfPayment}
+                                        onChange={handlePaymentFormChange}
+                                        label="Mode Of Payment"
+                                    >
+                                        <MenuItem value="">--select Payment Mode--</MenuItem>
+                                        <MenuItem value="CHEQUE">CHEQUE</MenuItem>
+                                        <MenuItem value="BANK TRANSFER">BANK TRANSFER</MenuItem>
+                                        <MenuItem value="CASH">CASH</MenuItem>
+                                        <MenuItem value="OTHERS">OTHERS</MenuItem>
+                                        <MenuItem value="UPI">UPI</MenuItem>
+                                    </Select>
+                                </FormControl>
+
+                                {paymentForm.modeOfPayment === 'CHEQUE' && (
+                                    <>
+                                        <TextField
+                                            fullWidth
+                                            margin="normal"
+                                            label="Cheque Number"
+                                            name="transactionDetails"
+                                            value={paymentForm.transactionDetails}
+                                            onChange={handlePaymentFormChange}
+                                            size="small"
+                                        />
+                                        <TextField
+                                            fullWidth
+                                            margin="normal"
+                                            label="Cheque Date"
+                                            name="chequeDate"
+                                            type="date"
+                                            value={paymentForm.chequeDate}
+                                            onChange={handlePaymentFormChange}
+                                            size="small"
+                                            InputLabelProps={{ shrink: true }}
+                                        />
+                                        <TextField
+                                            fullWidth
+                                            margin="normal"
+                                            label="Bank Name"
+                                            name="bankName"
+                                            value={paymentForm.bankName}
+                                            onChange={handlePaymentFormChange}
+                                            size="small"
+                                        />
+                                        <TextField
+                                            fullWidth
+                                            margin="normal"
+                                            label="Company Name"
+                                            name="companyNamePayment"
+                                            value={paymentForm.companyNamePayment}
+                                            onChange={handlePaymentFormChange}
+                                            size="small"
+                                        />
+                                    </>
+                                )}
+                                {paymentForm.modeOfPayment === 'BANK TRANSFER' && (
+                                    <>
+                                        <TextField
+                                            fullWidth
+                                            margin="normal"
+                                            label="Transaction ID"
+                                            name="transactionDetails"
+                                            value={paymentForm.transactionDetails}
+                                            onChange={handlePaymentFormChange}
+                                            size="small"
+                                        />
+                                        <TextField
+                                            fullWidth
+                                            margin="normal"
+                                            label="Transfer Date"
+                                            name="transferDate"
+                                            type="date"
+                                            value={paymentForm.transferDate}
+                                            onChange={handlePaymentFormChange}
+                                            size="small"
+                                            InputLabelProps={{ shrink: true }}
+                                        />
+                                        <TextField
+                                            fullWidth
+                                            margin="normal"
+                                            label="Bank Name"
+                                            name="bankName"
+                                            value={paymentForm.bankName}
+                                            onChange={handlePaymentFormChange}
+                                            size="small"
+                                        />
+                                        <TextField
+                                            fullWidth
+                                            margin="normal"
+                                            label="Company Name"
+                                            name="companyNamePayment"
+                                            value={paymentForm.companyNamePayment}
+                                            onChange={handlePaymentFormChange}
+                                            size="small"
+                                        />
+                                    </>
+                                )}
+                                {paymentForm.modeOfPayment === 'UPI' && (
+                                    <>
+                                        <TextField
+                                            fullWidth
+                                            margin="normal"
+                                            label="UPI ID"
+                                            name="transactionDetails"
+                                            value={paymentForm.transactionDetails}
+                                            onChange={handlePaymentFormChange}
+                                            size="small"
+                                        />
+                                        <TextField
+                                            fullWidth
+                                            margin="normal"
+                                            label="Company Name"
+                                            name="companyNamePayment"
+                                            value={paymentForm.companyNamePayment}
+                                            onChange={handlePaymentFormChange}
+                                            size="small"
+                                        />
+                                        <TextField
+                                            fullWidth
+                                            margin="normal"
+                                            label="Transfer Date"
+                                            name="transferDate"
+                                            type="date"
+                                            value={paymentForm.transferDate}
+                                            onChange={handlePaymentFormChange}
+                                            size="small"
+                                            InputLabelProps={{ shrink: true }}
+                                        />
+                                    </>
+                                )}
+                                {paymentForm.modeOfPayment === 'OTHERS' && (
+                                    <TextField
+                                        fullWidth
+                                        margin="normal"
+                                        label="Other Payment Mode"
+                                        name="otherPaymentMode"
+                                        value={paymentForm.otherPaymentMode}
+                                        onChange={handlePaymentFormChange}
+                                        size="small"
+                                    />
+                                )}
+                                <TextField
+                                    fullWidth
+                                    margin="normal"
+                                    label="Amount"
+                                    name="paymentAmount"
+                                    type="number"
+                                    value={paymentForm.paymentAmount}
+                                    onChange={handlePaymentFormChange}
+                                    size="small"
+                                />
+
+                                {companyPendingInvoice?.length > 0 && balanceAmount > 0 && (
+                                    <>
+                                        <p>Previous Invoice Balance - Rs {balanceAmount.toFixed(2)}</p>
+                                        <p>
+                                            <strong>Allocated to selected invoices - Rs {selectedAllocatedTotal.toFixed(2)}</strong>
+                                        </p>
+                                        {remainingToAllocate > 0 && (
+                                            <p style={{ color: '#666' }}>
+                                                Remaining to allocate - Rs {remainingToAllocate.toFixed(2)} (select more invoices so total equals
+                                                balance)
+                                            </p>
+                                        )}
+                                        {remainingToAllocate === 0 && selectedInvoiceIds.length > 0 && (
+                                            <p style={{ color: 'green' }}>Amount fully allocated.</p>
+                                        )}
+                                        <FormControl fullWidth margin="normal" size="small">
+                                            <InputLabel id="rental-report-select-pending-label" shrink>
+                                                Select Pending Invoices
+                                            </InputLabel>
+                                            <Box sx={{ mt: 1, maxHeight: 220, overflow: 'auto', border: '1px solid #ccc', borderRadius: 1, p: 1 }}>
+                                                {companyPendingInvoice
+                                                    ?.filter((pendingInv) => pendingInv._id !== paymentInvoice._id)
+                                                    .map((pendingInv) => {
+                                                        const invAmount = Number(pendingInv?.grandTotal || 0);
+                                                        const canSelect =
+                                                            invAmount <= remainingToAllocate || selectedInvoiceIds.includes(pendingInv._id);
+                                                        const dateStr =
+                                                            pendingInv.invoiceDate || pendingInv.entryDate || pendingInv.createdAt;
+                                                        return (
+                                                            <Box
+                                                                key={pendingInv._id}
+                                                                onClick={() => canSelect && togglePendingInvoiceSelection(pendingInv)}
+                                                                sx={{
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    gap: 1,
+                                                                    py: 0.5,
+                                                                    px: 1,
+                                                                    cursor: canSelect ? 'pointer' : 'not-allowed',
+                                                                    bgcolor: selectedInvoiceIds.includes(pendingInv._id)
+                                                                        ? 'action.selected'
+                                                                        : 'transparent',
+                                                                    borderRadius: 1,
+                                                                }}
+                                                            >
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={selectedInvoiceIds.includes(pendingInv._id)}
+                                                                    onChange={() => {}}
+                                                                    disabled={!canSelect}
+                                                                />
+                                                                <span>
+                                                                    {dateStr ? new Date(dateStr).toLocaleDateString() : 'N/A'} - Rs{' '}
+                                                                    {pendingInv?.grandTotal}
+                                                                </span>
+                                                            </Box>
+                                                        );
+                                                    })}
+                                            </Box>
+                                        </FormControl>
+                                    </>
+                                )}
+
+                                {pendingAmount > 0 && (
+                                    <FormControl fullWidth margin="normal" size="small">
+                                        <InputLabel id="rental-report-amount-type-label">Amount Type</InputLabel>
+                                        <Select
+                                            labelId="rental-report-amount-type-label"
+                                            id="paymentAmountType"
+                                            name="paymentAmountType"
+                                            value={paymentForm.paymentAmountType}
+                                            onChange={handlePaymentFormChange}
+                                            label="Amount Type"
+                                        >
+                                            <MenuItem value="">--select Amount Type--</MenuItem>
+                                            <MenuItem value="TDS">TDS Amount</MenuItem>
+                                            <MenuItem value="Pending">Pending Amount</MenuItem>
+                                        </Select>
+                                    </FormControl>
+                                )}
+                            </>
+                        ) : null}
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={handleClosePaymentDetailsModal} color="primary" disabled={savingPayment}>
+                            Close
+                        </Button>
+                        <Button
+                            onClick={() => handleSavePaymentDetails()}
+                            color="primary"
+                            variant="contained"
+                            disabled={savingPayment || !paymentInvoice}
+                        >
+                            {savingPayment ? 'Saving…' : 'Save changes'}
+                        </Button>
+                    </DialogActions>
+                </Dialog>
             </Paper>
         </Box>
     );
