@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,7 @@ import {
   ActivityIndicator,
   ScrollView,
 } from 'react-native';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 // @ts-ignore - @expo/vector-icons is available via expo dependency
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
@@ -26,11 +26,22 @@ const CompanyListScreen = () => {
   const [companies, setCompanies] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState(''); // Input value for search
-  const [appliedSearch, setAppliedSearch] = useState(''); // Applied search filter
+  const [searchQuery, setSearchQuery] = useState('');
+  const [appliedSearch, setAppliedSearch] = useState('');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [totalCount, setTotalCount] = useState(0);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setAppliedSearch(searchQuery.trim());
+    }, 350);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [appliedSearch]);
 
   useEffect(() => {
     if (token) {
@@ -89,15 +100,10 @@ const CompanyListScreen = () => {
     setPage(0); // Reset to first page when changing rows per page
   };
 
-  const handleApplyFilter = () => {
-    setAppliedSearch(searchQuery);
-    setPage(0); // Reset to first page when applying filters
-  };
-
   const handleClearFilter = () => {
     setSearchQuery('');
     setAppliedSearch('');
-    setPage(0); // Reset to first page when clearing filters
+    setPage(0);
   };
 
   const renderCompany = ({ item }: { item: any }) => {
@@ -149,7 +155,10 @@ const CompanyListScreen = () => {
     );
   };
 
-  const canAdd = hasPermission('reportsCompanyList', 'edit') || user?.role === 1;
+  const canAdd =
+    hasPermission('reportsCompanyList', 'edit') ||
+    user?.role === 1 ||
+    Number(user?.role) === 1;
 
   if (loading && companies.length === 0) {
     return (
@@ -187,31 +196,31 @@ const CompanyListScreen = () => {
         )}
       </View>
 
-      {/* Filter Section */}
+      {/* Search — debounced; matches server fields (name, GST, address, city, contacts, etc.) */}
       <View style={styles.filterSection}>
-        <Text style={styles.filterTitle}>Filters</Text>
+        <Text style={styles.filterTitle}>Search companies</Text>
         <View style={styles.filterInputContainer}>
           <Icon name="search" size={20} color="#999" style={styles.searchIcon} />
           <TextInput
             style={styles.filterInput}
-            placeholder="Search by company name, pincode, GST, address, city, state, or contact"
+            placeholder="Name, GST, pincode, city, address, contact…"
             value={searchQuery}
             onChangeText={setSearchQuery}
             placeholderTextColor="#999"
-            onSubmitEditing={handleApplyFilter}
+            returnKeyType="search"
+            clearButtonMode="while-editing"
           />
+          {searchQuery.length > 0 ? (
+            <TouchableOpacity onPress={handleClearFilter} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Icon name="close" size={22} color="#666" />
+            </TouchableOpacity>
+          ) : null}
         </View>
-        <View style={styles.filterButtons}>
-          <TouchableOpacity style={styles.applyButton} onPress={handleApplyFilter}>
-            <Text style={styles.applyButtonText}>Apply Filter</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.clearButton} onPress={handleClearFilter}>
-            <Text style={styles.clearButtonText}>Clear</Text>
-          </TouchableOpacity>
-        </View>
+        <Text style={styles.searchHint}>Results update as you type.</Text>
       </View>
 
       <FlatList
+        style={styles.list}
         data={companies}
         renderItem={renderCompany}
         keyExtractor={(item) => item._id}
@@ -379,35 +388,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
   },
-  filterButtons: {
-    flexDirection: 'row',
-    gap: 10,
+  searchHint: {
+    fontSize: 12,
+    color: '#888',
+    marginTop: 4,
   },
-  applyButton: {
+  list: {
     flex: 1,
-    backgroundColor: '#019ee3',
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  applyButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  clearButton: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  clearButtonText: {
-    color: '#666',
-    fontSize: 16,
-    fontWeight: '600',
   },
   paginationContainer: {
     backgroundColor: '#fff',

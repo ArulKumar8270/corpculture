@@ -21,12 +21,29 @@ export const createLeaveController = async (req, res) => {
             totalDays,
             reason,
             contactDuringLeave,
+            companyName,
+            declarationAccepted,
+            employeeSignatureName,
         } = req.body;
 
         if (!leaveType || !leaveFrom || !leaveTo || !totalDays || !reason) {
             return res.status(400).send({
                 success: false,
                 message: "Leave type, from date, to date, total days and reason are required",
+            });
+        }
+
+        if (!declarationAccepted) {
+            return res.status(400).send({
+                success: false,
+                message: "You must accept the special declarations to submit this leave application",
+            });
+        }
+        const sig = (employeeSignatureName || "").trim();
+        if (!sig) {
+            return res.status(400).send({
+                success: false,
+                message: "Employee signature (typed name) is required",
             });
         }
 
@@ -40,6 +57,10 @@ export const createLeaveController = async (req, res) => {
             totalDays: Number(totalDays),
             reason,
             contactDuringLeave: contactDuringLeave || "",
+            companyName: companyName ? String(companyName).trim() : "",
+            declarationAccepted: true,
+            employeeSignatureName: sig,
+            employeeSignDate: new Date(),
         });
 
         await leave.save();
@@ -179,19 +200,59 @@ export const updateLeaveController = async (req, res) => {
             totalDays,
             reason,
             contactDuringLeave,
+            companyName,
+            declarationAccepted,
+            employeeSignatureName,
         } = req.body;
+
+        const patch = {
+            ...(leaveType && { leaveType }),
+            ...(leaveFrom && { leaveFrom: new Date(leaveFrom) }),
+            ...(leaveTo && { leaveTo: new Date(leaveTo) }),
+            ...(totalDays !== undefined && { totalDays: Number(totalDays) }),
+            ...(reason && { reason }),
+            ...(contactDuringLeave !== undefined && { contactDuringLeave }),
+            ...(companyName !== undefined && { companyName: String(companyName).trim() }),
+        };
+        if (leaveType) {
+            if (leaveType === "Other" && leaveTypeOther !== undefined) {
+                patch.leaveTypeOther = leaveTypeOther;
+            } else if (leaveType !== "Other") {
+                patch.leaveTypeOther = "";
+            }
+        }
+        if (declarationAccepted === false) {
+            return res.status(400).send({
+                success: false,
+                message: "Updated leave must keep the special declarations accepted",
+            });
+        }
+        const existingSig = String(existing.employeeSignatureName || "").trim();
+        const incompleteLegacy = !existing.declarationAccepted || !existingSig;
+        if (incompleteLegacy && !declarationAccepted) {
+            return res.status(400).send({
+                success: false,
+                message: "Please accept the special declarations to update this application",
+            });
+        }
+        const sig = employeeSignatureName != null ? String(employeeSignatureName).trim() : undefined;
+        if (incompleteLegacy && !sig && !existingSig) {
+            return res.status(400).send({
+                success: false,
+                message: "Employee signature (typed name) is required",
+            });
+        }
+        if (declarationAccepted === true) {
+            patch.declarationAccepted = true;
+        }
+        if (sig) {
+            patch.employeeSignatureName = sig;
+            patch.employeeSignDate = new Date();
+        }
 
         const leave = await EmployeeLeave.findOneAndUpdate(
             { _id: id, employeeId: employee._id },
-            {
-                ...(leaveType && { leaveType }),
-                ...(leaveType !== undefined && leaveType === "Other" && { leaveTypeOther }),
-                ...(leaveFrom && { leaveFrom: new Date(leaveFrom) }),
-                ...(leaveTo && { leaveTo: new Date(leaveTo) }),
-                ...(totalDays !== undefined && { totalDays: Number(totalDays) }),
-                ...(reason && { reason }),
-                ...(contactDuringLeave !== undefined && { contactDuringLeave }),
-            },
+            patch,
             { new: true, runValidators: true }
         );
 
@@ -308,7 +369,17 @@ export const getAllLeavesController = async (req, res) => {
 export const updateLeaveStatusAdminController = async (req, res) => {
     try {
         const { id } = req.params;
-        const { status, managerApproval, hrApproval, managerRemarks, hrRemarks } = req.body;
+        const {
+            status,
+            managerApproval,
+            hrApproval,
+            managerRemarks,
+            hrRemarks,
+            reportingManagerName,
+            reportingManagerSignDate,
+            hrApproverName,
+            hrApproverSignDate,
+        } = req.body;
 
         const leave = await EmployeeLeave.findById(id);
         if (!leave) {
@@ -324,6 +395,18 @@ export const updateLeaveStatusAdminController = async (req, res) => {
         if (hrApproval !== undefined) update.hrApproval = hrApproval;
         if (managerRemarks !== undefined) update.managerRemarks = managerRemarks;
         if (hrRemarks !== undefined) update.hrRemarks = hrRemarks;
+        if (reportingManagerName !== undefined) {
+            update.reportingManagerName = String(reportingManagerName || "").trim();
+        }
+        if (reportingManagerSignDate !== undefined && reportingManagerSignDate !== "") {
+            update.reportingManagerSignDate = new Date(reportingManagerSignDate);
+        }
+        if (hrApproverName !== undefined) {
+            update.hrApproverName = String(hrApproverName || "").trim();
+        }
+        if (hrApproverSignDate !== undefined && hrApproverSignDate !== "") {
+            update.hrApproverSignDate = new Date(hrApproverSignDate);
+        }
 
         const updated = await EmployeeLeave.findByIdAndUpdate(
             id,

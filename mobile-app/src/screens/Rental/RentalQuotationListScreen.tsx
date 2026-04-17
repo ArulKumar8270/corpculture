@@ -23,7 +23,7 @@ import axios from 'axios';
 import { getApiBaseUrl } from '../../services/api';
 import Toast from 'react-native-toast-message';
 import * as ImagePicker from 'expo-image-picker';
-import { formatSendDetailsToDisplay } from '../../utils/functions';
+import { formatSendDetailsToDetail } from '../../utils/functions';
 
 // RentalQuotationListScreen uses the same implementation as RentalInvoiceListScreen
 // but with invoiceType='quotation' by default
@@ -451,10 +451,10 @@ const RentalQuotationListScreen = () => {
         </TouchableOpacity>
 
         <View style={styles.entryDetails}>
-          <View style={styles.detailRow}>
+          <View style={styles.sendDetailsBlock}>
             <Text style={styles.detailLabel}>Send Details To:</Text>
-            <Text style={styles.detailValue}>
-              {formatSendDetailsToDisplay(item.sendDetailsTo)}
+            <Text style={styles.detailValueMultiline}>
+              {formatSendDetailsToDetail(item.sendDetailsTo)}
             </Text>
           </View>
           {item.assignedTo && (
@@ -702,6 +702,16 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#333',
+  },
+  sendDetailsBlock: {
+    marginBottom: 8,
+  },
+  detailValueMultiline: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginTop: 4,
+    lineHeight: 20,
   },
   actionButtons: {
     flexDirection: 'row',

@@ -1,6 +1,53 @@
 import Payslip from "../../models/payslipModel.js";
 import Employee from "../../models/employeeModel.js";
 
+function buildPayslipFieldsFromBody(body, employee) {
+    const earnings = body.earnings && typeof body.earnings === "object" ? body.earnings : {};
+    const deductions = body.deductions && typeof body.deductions === "object" ? body.deductions : {};
+    const ratings = body.ratings && typeof body.ratings === "object" ? body.ratings : {};
+
+    return {
+        employeeId: employee._id,
+        employeeName: body.employeeName || employee.name,
+        employeeIdNo: body.employeeIdNo != null ? String(body.employeeIdNo) : "",
+        designation: body.designation != null ? String(body.designation) : (Array.isArray(employee.designation) ? employee.designation[0] : employee.designation) || "",
+        dateOfJoining: body.dateOfJoining ? new Date(body.dateOfJoining) : (employee.hireDate ? new Date(employee.hireDate) : undefined),
+        payPeriod: body.payPeriod || "",
+        payDate: body.payDate ? new Date(body.payDate) : new Date(),
+        paidDays: Number(body.paidDays) || 0,
+        lopDays: Number(body.lopDays) || 0,
+        earnings: {
+            basic: Number(earnings.basic) || 0,
+            petrolAllowance: Number(earnings.petrolAllowance) || 0,
+            bikeAllowance: Number(earnings.bikeAllowance) || 0,
+            byBenefit: Number(earnings.byBenefit) || 0,
+            foodAllowance: Number(earnings.foodAllowance) || 0,
+            incentives: Number(earnings.incentives) || 0,
+        },
+        deductions: {
+            taxPayable: Number(deductions.taxPayable) || 0,
+        },
+        ratings: {
+            timing: Number(ratings.timing) || 0,
+            leave: Number(ratings.leave) || 0,
+            workFb: Number(ratings.workFb) || 0,
+            incentive: Number(ratings.incentive) || 0,
+            firmFb: Number(ratings.firmFb) || 0,
+        },
+    };
+}
+
+async function assertUserMayModifyPayslip(req, payslipDoc) {
+    const isAdmin = Number(req.user?.role) === 1;
+    if (isAdmin) return true;
+    const emp = await Employee.findOne({ userId: req.user._id }).lean();
+    const slipEmpId = payslipDoc.employeeId?.toString();
+    if (!emp || !slipEmpId || emp._id.toString() !== slipEmpId) {
+        return false;
+    }
+    return true;
+}
+
 export const createPayslipController = async (req, res) => {
     try {
         const body = req.body || {};
@@ -13,39 +60,7 @@ export const createPayslipController = async (req, res) => {
             return res.status(404).send({ success: false, message: "Employee not found" });
         }
 
-        const earnings = body.earnings && typeof body.earnings === "object" ? body.earnings : {};
-        const deductions = body.deductions && typeof body.deductions === "object" ? body.deductions : {};
-        const ratings = body.ratings && typeof body.ratings === "object" ? body.ratings : {};
-
-        const payload = {
-            employeeId,
-            employeeName: body.employeeName || employee.name,
-            employeeIdNo: body.employeeIdNo != null ? String(body.employeeIdNo) : "",
-            designation: body.designation != null ? String(body.designation) : (Array.isArray(employee.designation) ? employee.designation[0] : employee.designation) || "",
-            dateOfJoining: body.dateOfJoining ? new Date(body.dateOfJoining) : (employee.hireDate ? new Date(employee.hireDate) : undefined),
-            payPeriod: body.payPeriod || "",
-            payDate: body.payDate ? new Date(body.payDate) : new Date(),
-            paidDays: Number(body.paidDays) || 0,
-            lopDays: Number(body.lopDays) || 0,
-            earnings: {
-                basic: Number(earnings.basic) || 0,
-                petrolAllowance: Number(earnings.petrolAllowance) || 0,
-                bikeAllowance: Number(earnings.bikeAllowance) || 0,
-                byBenefit: Number(earnings.byBenefit) || 0,
-                foodAllowance: Number(earnings.foodAllowance) || 0,
-                incentives: Number(earnings.incentives) || 0,
-            },
-            deductions: {
-                taxPayable: Number(deductions.taxPayable) || 0,
-            },
-            ratings: {
-                timing: Number(ratings.timing) || 0,
-                leave: Number(ratings.leave) || 0,
-                workFb: Number(ratings.workFb) || 0,
-                incentive: Number(ratings.incentive) || 0,
-                firmFb: Number(ratings.firmFb) || 0,
-            },
-        };
+        const payload = buildPayslipFieldsFromBody(body, employee);
 
         const payslip = await Payslip.create(payload);
         const doc = await Payslip.findById(payslip._id).lean();
@@ -57,6 +72,54 @@ export const createPayslipController = async (req, res) => {
     } catch (error) {
         console.error("Create payslip error:", error);
         res.status(500).send({ success: false, message: "Error creating payslip", error });
+    }
+};
+
+export const updatePayslipController = async (req, res) => {
+    try {
+        const payslip = await Payslip.findById(req.params.id);
+        if (!payslip) {
+            return res.status(404).send({ success: false, message: "Payslip not found" });
+        }
+        const may = await assertUserMayModifyPayslip(req, payslip);
+        if (!may) {
+            return res.status(403).send({ success: false, message: "Not allowed to update this payslip" });
+        }
+
+        const body = req.body || {};
+        const targetEmployeeId = body.employeeId || payslip.employeeId;
+        const employee = await Employee.findById(targetEmployeeId).select("name designation hireDate").lean();
+        if (!employee) {
+            return res.status(404).send({ success: false, message: "Employee not found" });
+        }
+
+        const payload = buildPayslipFieldsFromBody(body, employee);
+        Object.assign(payslip, payload);
+        await payslip.save();
+
+        const doc = await Payslip.findById(payslip._id).populate("employeeId", "name email designation").lean();
+        res.status(200).send({ success: true, payslip: normalizePayslip(doc) });
+    } catch (error) {
+        console.error("Update payslip error:", error);
+        res.status(500).send({ success: false, message: "Error updating payslip", error });
+    }
+};
+
+export const deletePayslipController = async (req, res) => {
+    try {
+        const payslip = await Payslip.findById(req.params.id);
+        if (!payslip) {
+            return res.status(404).send({ success: false, message: "Payslip not found" });
+        }
+        const may = await assertUserMayModifyPayslip(req, payslip);
+        if (!may) {
+            return res.status(403).send({ success: false, message: "Not allowed to delete this payslip" });
+        }
+        await Payslip.deleteOne({ _id: payslip._id });
+        res.status(200).send({ success: true, message: "Payslip deleted" });
+    } catch (error) {
+        console.error("Delete payslip error:", error);
+        res.status(500).send({ success: false, message: "Error deleting payslip", error });
     }
 };
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useLayoutEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,7 @@ import {
   Platform,
   Modal,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import axios from 'axios';
@@ -37,8 +37,31 @@ function formatPayPeriod(ymd: string) {
   return d.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
 }
 
+/** Reverse server "MMM YYYY" (e.g. Apr 2026) to first-of-month YYYY-MM-DD for the date field. */
+function payPeriodLabelToYmd(payPeriod: string, payDateFallback: string) {
+  const fb = payDateFallback ? new Date(payDateFallback) : new Date();
+  const fallbackYmd = `${fb.getFullYear()}-${String(fb.getMonth() + 1).padStart(2, '0')}-01`;
+  if (!payPeriod || typeof payPeriod !== 'string') return fallbackYmd;
+  const m = payPeriod.trim().match(/^([A-Za-z]{3,})\s+(\d{4})$/);
+  if (!m) return fallbackYmd;
+  const d = new Date(`${m[1]} 1, ${m[2]}`);
+  if (Number.isNaN(d.getTime())) return fallbackYmd;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+}
+
+function cleanAuthHeader(raw: string | null | undefined) {
+  if (!raw) return '';
+  return String(raw)
+    .trim()
+    .replace(/^Bearer\s+/i, '')
+    .replace(/^"(.*)"$/, '$1')
+    .trim();
+}
+
 const AddPayslipScreen = () => {
   const navigation = useNavigation<any>();
+  const route = useRoute<any>();
+  const payslipId = route.params?.payslipId as string | undefined;
   const { token } = useSelector((s: RootState) => s.auth);
   const [employees, setEmployees] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -60,13 +83,22 @@ const AddPayslipScreen = () => {
   const [totalKm, setTotalKm] = useState(0);
   const [kmLoading, setKmLoading] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [initializingEdit, setInitializingEdit] = useState(!!payslipId);
+  const prevEmployeeIdRef = useRef<string>('');
+
+  const auth = useMemo(() => cleanAuthHeader(token), [token]);
+  const apiBase = useMemo(() => String(getApiBaseUrl() || '').replace(/\/$/, ''), []);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({ title: payslipId ? 'Edit Payslip' : 'Add Payslip' });
+  }, [navigation, payslipId]);
 
   useEffect(() => {
     const run = async () => {
-      if (!token) return;
+      if (!auth) return;
       try {
-        const { data } = await axios.get(`${getApiBaseUrl()}/employee/all`, {
-          headers: { Authorization: token },
+        const { data } = await axios.get(`${apiBase}/employee/all`, {
+          headers: { Authorization: auth },
         });
         if (data?.success) setEmployees(data.employees || []);
       } catch {
@@ -74,29 +106,102 @@ const AddPayslipScreen = () => {
       }
     };
     run();
-  }, [token]);
+  }, [auth, apiBase]);
 
   useEffect(() => {
-    if (!employeeId) return;
-    const emp = employees.find((e) => e._id === employeeId);
-    if (emp) {
-      setEmployeeName(emp.name || '');
-      setEmployeeIdNo(emp.idCradNo || emp.employeeIdNo || '');
-      const des = Array.isArray(emp.designation) ? emp.designation[0] : emp.designation || '';
-      setDesignation(des || '');
-      setDateOfJoining(emp.hireDate ? new Date(emp.hireDate).toISOString().split('T')[0] : '');
-      setEarnings((prev) => ({
-        ...prev,
-        basic: Number(emp.salary) || 0,
-        bikeAllowance: Number(emp.bikeAllowance) || 0,
-      }));
+    if (!employeeId) {
+      prevEmployeeIdRef.current = '';
+      return;
     }
-  }, [employeeId, employees]);
+    const emp = employees.find((e) => e._id === employeeId);
+    if (!emp) {
+      prevEmployeeIdRef.current = employeeId;
+      return;
+    }
+    const fromUser =
+      prevEmployeeIdRef.current !== '' && prevEmployeeIdRef.current !== employeeId;
+    if (payslipId && !fromUser) {
+      prevEmployeeIdRef.current = employeeId;
+      return;
+    }
+    setEmployeeName(emp.name || '');
+    setEmployeeIdNo(emp.idCradNo || emp.employeeIdNo || '');
+    const des = Array.isArray(emp.designation) ? emp.designation[0] : emp.designation || '';
+    setDesignation(des || '');
+    setDateOfJoining(emp.hireDate ? new Date(emp.hireDate).toISOString().split('T')[0] : '');
+    setEarnings((prev) => ({
+      ...prev,
+      basic: Number(emp.salary) || 0,
+      bikeAllowance: Number(emp.bikeAllowance) || 0,
+    }));
+    prevEmployeeIdRef.current = employeeId;
+  }, [employeeId, employees, payslipId]);
+
+  const hydrateFromPayslip = useCallback((p: any) => {
+    const empRef = p?.employeeId;
+    const empId =
+      typeof empRef === 'object' && empRef?._id != null
+        ? String(empRef._id)
+        : empRef != null
+          ? String(empRef)
+          : '';
+    prevEmployeeIdRef.current = '';
+    setEmployeeId(empId);
+    setEmployeeName(p?.employeeName || '');
+    setEmployeeIdNo(p?.employeeIdNo != null ? String(p.employeeIdNo) : '');
+    setDesignation(p?.designation != null ? String(p.designation) : '');
+    const doj = p?.dateOfJoining ? new Date(p.dateOfJoining).toISOString().split('T')[0] : '';
+    setDateOfJoining(doj);
+    const pd = p?.payDate ? new Date(p.payDate).toISOString().split('T')[0] : '';
+    setPayPeriodDate(payPeriodLabelToYmd(String(p?.payPeriod || ''), pd));
+    setPayDate(pd || new Date().toISOString().split('T')[0]);
+    setPaidDays(String(p?.paidDays ?? 31));
+    setLopDays(String(p?.lopDays ?? 0));
+    setEarnings({ ...defaultEarnings, ...(p?.earnings || {}) });
+    setDeductions({ ...defaultDeductions, ...(p?.deductions || {}) });
+    setRatings({ ...defaultRatings, ...(p?.ratings || {}) });
+  }, []);
+
+  useEffect(() => {
+    if (!payslipId || !auth) {
+      setInitializingEdit(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        setInitializingEdit(true);
+        const { data } = await axios.get(`${apiBase}/payslip/${payslipId}`, {
+          headers: { Authorization: auth },
+        });
+        if (cancelled) return;
+        if (data?.success && data.payslip) {
+          hydrateFromPayslip(data.payslip);
+        } else {
+          Toast.show({ type: 'error', text1: data?.message || 'Payslip not found' });
+          navigation.goBack();
+        }
+      } catch (e: any) {
+        if (!cancelled) {
+          Toast.show({
+            type: 'error',
+            text1: e?.response?.data?.message || 'Failed to load payslip',
+          });
+          navigation.goBack();
+        }
+      } finally {
+        if (!cancelled) setInitializingEdit(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [payslipId, auth, apiBase, navigation, hydrateFromPayslip]);
 
   useEffect(() => {
     let cancelled = false;
     const fetchKm = async () => {
-      if (!token || !employeeId || !payPeriodDate || !payDate) {
+      if (!auth || !employeeId || !payPeriodDate || !payDate) {
         setTotalKm(0);
         return;
       }
@@ -110,8 +215,8 @@ const AddPayslipScreen = () => {
           toDate: payDate,
         });
         const { data } = await axios.get(
-          `${getApiBaseUrl()}/employee-activity-log/admin/all?${params.toString()}`,
-          { headers: { Authorization: token } }
+          `${apiBase}/employee-activity-log/admin/all?${params.toString()}`,
+          { headers: { Authorization: auth } }
         );
         if (cancelled) return;
         const logs = Array.isArray(data?.activityLogs) ? data.activityLogs : [];
@@ -127,7 +232,7 @@ const AddPayslipScreen = () => {
     return () => {
       cancelled = true;
     };
-  }, [token, employeeId, payPeriodDate, payDate]);
+  }, [auth, apiBase, employeeId, payPeriodDate, payDate]);
 
   const grossEarnings = useMemo(
     () => Object.values(earnings).reduce((a, b) => a + b, 0),
@@ -145,6 +250,10 @@ const AddPayslipScreen = () => {
       return;
     }
     const payPeriod = formatPayPeriod(payPeriodDate);
+    if (!auth) {
+      Toast.show({ type: 'error', text1: 'Not signed in' });
+      return;
+    }
     setLoading(true);
     try {
       const payload = {
@@ -161,19 +270,31 @@ const AddPayslipScreen = () => {
         deductions,
         ratings,
       };
-      const { data } = await axios.post(`${getApiBaseUrl()}/payslip/create`, payload, {
-        headers: { Authorization: token },
-      });
-      if (data?.success) {
-        Toast.show({ type: 'success', text1: 'Payslip created' });
-        navigation.navigate('AdminPayslipList');
+      if (payslipId) {
+        const { data } = await axios.put(`${apiBase}/payslip/${payslipId}`, payload, {
+          headers: { Authorization: auth },
+        });
+        if (data?.success) {
+          Toast.show({ type: 'success', text1: 'Payslip updated' });
+          navigation.navigate('AdminPayslipList');
+        } else {
+          Toast.show({ type: 'error', text1: data?.message || 'Failed to update' });
+        }
       } else {
-        Toast.show({ type: 'error', text1: data?.message || 'Failed' });
+        const { data } = await axios.post(`${apiBase}/payslip/create`, payload, {
+          headers: { Authorization: auth },
+        });
+        if (data?.success) {
+          Toast.show({ type: 'success', text1: 'Payslip created' });
+          navigation.navigate('AdminPayslipList');
+        } else {
+          Toast.show({ type: 'error', text1: data?.message || 'Failed' });
+        }
       }
     } catch (e: any) {
       Toast.show({
         type: 'error',
-        text1: e.response?.data?.message || 'Failed to create payslip',
+        text1: e.response?.data?.message || (payslipId ? 'Failed to update payslip' : 'Failed to create payslip'),
       });
     } finally {
       setLoading(false);
@@ -182,6 +303,15 @@ const AddPayslipScreen = () => {
 
   const earningKeys = Object.keys(defaultEarnings) as (keyof typeof defaultEarnings)[];
   const ratingKeys = Object.keys(defaultRatings) as (keyof typeof defaultRatings)[];
+
+  if (initializingEdit) {
+    return (
+      <View style={styles.initWrap}>
+        <ActivityIndicator size="large" color="#019ee3" />
+        <Text style={styles.initText}>Loading payslip…</Text>
+      </View>
+    );
+  }
 
   return (
     <KeyboardAvoidingView
@@ -257,7 +387,11 @@ const AddPayslipScreen = () => {
         </Text>
 
         <TouchableOpacity style={styles.submit} onPress={submit} disabled={loading}>
-          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitText}>Submit payslip</Text>}
+          {loading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.submitText}>{payslipId ? 'Save changes' : 'Submit payslip'}</Text>
+          )}
         </TouchableOpacity>
       </ScrollView>
 
@@ -340,6 +474,8 @@ function ModalEmployeePicker({
 }
 
 const styles = StyleSheet.create({
+  initWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f5f5f5' },
+  initText: { marginTop: 12, color: '#666' },
   container: { flex: 1, backgroundColor: '#f5f5f5' },
   content: { padding: 16, paddingBottom: 40 },
   section: { fontSize: 16, fontWeight: '700', color: '#019ee3', marginTop: 16, marginBottom: 8 },

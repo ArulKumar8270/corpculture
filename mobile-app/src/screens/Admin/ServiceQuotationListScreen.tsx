@@ -11,6 +11,7 @@ import {
   Modal,
   ScrollView,
   Linking,
+  Platform,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 // @ts-ignore - @expo/vector-icons is available via expo dependency
@@ -41,6 +42,7 @@ const ServiceQuotationListScreen = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const ROWS_PER_PAGE_OPTIONS = [5, 10, 25, 50, 100];
+  const LIST_BOTTOM_PADDING = Platform.OS === 'ios' ? 140 : 120;
 
   const [paymentForm, setPaymentForm] = useState({
     modeOfPayment: '',
@@ -585,6 +587,7 @@ const ServiceQuotationListScreen = () => {
           keyExtractor={(item) => item._id}
           refreshing={loading}
           onRefresh={fetchQuotations}
+          contentContainerStyle={{ paddingBottom: LIST_BOTTOM_PADDING }}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Icon name="description" size={64} color="#ccc" />
@@ -1151,6 +1154,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#eee',
+    // Keep pagination fully tappable above bottom navigation / system UI
+    paddingBottom: Platform.OS === 'ios' ? 36 : 24,
   },
   rowsPerPageRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
   rowsPerPageLabel: { fontSize: 14, color: '#666', marginRight: 8 },

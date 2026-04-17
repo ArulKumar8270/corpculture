@@ -1243,7 +1243,7 @@ function RentalInvoiceList(props) {
                                                                 size="small"
                                                                 onClick={() => navigate('/admin/dashboard/activity-log', { state: { preselectedCompany: typeof entry.companyId === 'object' ? entry.companyId : { _id: entry.companyId } } })}
                                                             >
-                                                                Submit activity
+                                                                Petrol Form
                                                             </Button>
                                                         )}
                                                     </Stack>

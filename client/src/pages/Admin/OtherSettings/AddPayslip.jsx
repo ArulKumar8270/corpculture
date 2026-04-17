@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { useAuth } from "../../../context/auth";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import SeoData from "../../../SEO/SeoData";
+import Spinner from "../../../components/Spinner";
 import {
     Paper,
     TextField,
@@ -31,8 +32,12 @@ const defaultRatings = { timing: 0, leave: 0, workFb: 0, incentive: 0, firmFb: 0
 const AddPayslip = () => {
     const { auth } = useAuth();
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const editId = searchParams.get("id") || "";
+    const prevEmpRef = useRef("");
     const [employees, setEmployees] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [initLoading, setInitLoading] = useState(!!editId);
     const [employeeId, setEmployeeId] = useState("");
     const [employeeName, setEmployeeName] = useState("");
     const [employeeIdNo, setEmployeeIdNo] = useState("");
@@ -64,21 +69,86 @@ const AddPayslip = () => {
     }, [auth?.token]);
 
     useEffect(() => {
-        if (!employeeId) return;
-        const emp = employees.find((e) => e._id === employeeId);
-        if (emp) {
-            setEmployeeName(emp.name || "");
-            setEmployeeIdNo(emp.idCradNo || emp.employeeIdNo || "");
-            setDesignation(Array.isArray(emp.designation) ? emp.designation[0] : emp.designation || "");
-            setDateOfJoining(emp.hireDate ? dayjs(emp.hireDate).format("YYYY-MM-DD") : "");
-            // Auto-fill earnings from employee master
-            setEarnings((prev) => ({
-                ...prev,
-                basic: Number(emp.salary) || 0,
-                bikeAllowance: Number(emp.bikeAllowance) || 0,
-            }));
+        if (!employeeId) {
+            prevEmpRef.current = "";
+            return;
         }
-    }, [employeeId, employees]);
+        const emp = employees.find((e) => e._id === employeeId);
+        if (!emp) {
+            prevEmpRef.current = employeeId;
+            return;
+        }
+        const fromUser = prevEmpRef.current !== "" && prevEmpRef.current !== employeeId;
+        if (editId && !fromUser) {
+            prevEmpRef.current = employeeId;
+            return;
+        }
+        setEmployeeName(emp.name || "");
+        setEmployeeIdNo(emp.idCradNo || emp.employeeIdNo || "");
+        setDesignation(Array.isArray(emp.designation) ? emp.designation[0] : emp.designation || "");
+        setDateOfJoining(emp.hireDate ? dayjs(emp.hireDate).format("YYYY-MM-DD") : "");
+        setEarnings((prev) => ({
+            ...prev,
+            basic: Number(emp.salary) || 0,
+            bikeAllowance: Number(emp.bikeAllowance) || 0,
+        }));
+        prevEmpRef.current = employeeId;
+    }, [employeeId, employees, editId]);
+
+    useEffect(() => {
+        if (!editId) {
+            setInitLoading(false);
+            return;
+        }
+        if (!auth?.token) return;
+        let cancelled = false;
+        (async () => {
+            try {
+                setInitLoading(true);
+                const { data } = await axios.get(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/payslip/${editId}`,
+                    { headers: { Authorization: auth.token } }
+                );
+                if (cancelled) return;
+                if (!data?.success || !data.payslip) {
+                    toast.error(data?.message || "Payslip not found");
+                    navigate("../payslip");
+                    return;
+                }
+                const p = data.payslip;
+                prevEmpRef.current = "";
+                const empRef = p.employeeId;
+                const eid =
+                    typeof empRef === "object" && empRef?._id != null ? String(empRef._id) : String(empRef || "");
+                setEmployeeId(eid);
+                setEmployeeName(p.employeeName || "");
+                setEmployeeIdNo(p.employeeIdNo != null ? String(p.employeeIdNo) : "");
+                setDesignation(p.designation != null ? String(p.designation) : "");
+                setDateOfJoining(p.dateOfJoining ? dayjs(p.dateOfJoining).format("YYYY-MM-DD") : "");
+                const m = String(p.payPeriod || "").trim().match(/^([A-Za-z]+)\s+(\d{4})$/);
+                if (m) {
+                    const d = dayjs(`${m[1]} 1, ${m[2]}`);
+                    if (d.isValid()) setPayPeriodDate(d.format("YYYY-MM-DD"));
+                }
+                setPayDate(p.payDate ? dayjs(p.payDate).format("YYYY-MM-DD") : dayjs().format("YYYY-MM-DD"));
+                setPaidDays(Number(p.paidDays) || 0);
+                setLopDays(Number(p.lopDays) || 0);
+                setEarnings({ ...defaultEarnings, ...(p.earnings || {}) });
+                setDeductions({ ...defaultDeductions, ...(p.deductions || {}) });
+                setRatings({ ...defaultRatings, ...(p.ratings || {}) });
+            } catch (e) {
+                if (!cancelled) {
+                    toast.error(e.response?.data?.message || "Failed to load payslip");
+                    navigate("../payslip");
+                }
+            } finally {
+                if (!cancelled) setInitLoading(false);
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [editId, auth?.token, navigate]);
 
     useEffect(() => {
         let cancelled = false;
@@ -155,27 +225,53 @@ const AddPayslip = () => {
                 deductions,
                 ratings,
             };
-            const { data } = await axios.post(
-                `${import.meta.env.VITE_SERVER_URL}/api/v1/payslip/create`,
-                payload,
-                { headers: { Authorization: auth?.token } }
-            );
-            if (data?.success) {
-                toast.success("Payslip created successfully.");
-                navigate("../payslip");
-            } else toast.error(data?.message || "Failed to create payslip.");
+            if (editId) {
+                const { data } = await axios.put(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/payslip/${editId}`,
+                    payload,
+                    { headers: { Authorization: auth?.token } }
+                );
+                if (data?.success) {
+                    toast.success("Payslip updated successfully.");
+                    navigate("../payslip");
+                } else toast.error(data?.message || "Failed to update payslip.");
+            } else {
+                const { data } = await axios.post(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/payslip/create`,
+                    payload,
+                    { headers: { Authorization: auth?.token } }
+                );
+                if (data?.success) {
+                    toast.success("Payslip created successfully.");
+                    navigate("../payslip");
+                } else toast.error(data?.message || "Failed to create payslip.");
+            }
         } catch (err) {
-            toast.error(err.response?.data?.message || "Failed to create payslip.");
+            toast.error(
+                err.response?.data?.message ||
+                    (editId ? "Failed to update payslip." : "Failed to create payslip.")
+            );
         } finally {
             setLoading(false);
         }
     };
 
+    if (initLoading) {
+        return (
+            <>
+                <SeoData title={editId ? "Edit Payslip | Admin" : "Add Payslip | Admin"} />
+                <div className="p-8 flex justify-center">
+                    <Spinner />
+                </div>
+            </>
+        );
+    }
+
     return (
         <>
-            <SeoData title="Add Payslip | Admin" />
+            <SeoData title={editId ? "Edit Payslip | Admin" : "Add Payslip | Admin"} />
             <div className="p-4 max-w-4xl mx-auto">
-                <h1 className="text-2xl font-bold text-gray-800 mb-6">Add Payslip</h1>
+                <h1 className="text-2xl font-bold text-gray-800 mb-6">{editId ? "Edit Payslip" : "Add Payslip"}</h1>
                 <Paper className="p-6 shadow-lg rounded-2xl">
                     <form onSubmit={handleSubmit}>
                         <Grid container spacing={3}>
@@ -267,7 +363,7 @@ const AddPayslip = () => {
                             </Grid>
                             <Grid item xs={12} className="flex gap-3">
                                 <Button type="submit" variant="contained" disabled={loading} className="bg-gradient-to-r from-[#019ee3] to-[#afcb09]">
-                                    {loading ? "Saving..." : "Submit Payslip"}
+                                    {loading ? "Saving..." : editId ? "Save changes" : "Submit Payslip"}
                                 </Button>
                                 <Button type="button" variant="outlined" onClick={() => navigate("../payslip")}>Cancel</Button>
                             </Grid>

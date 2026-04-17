@@ -77,6 +77,9 @@ const AdminDashboardScreen = () => {
       'OldInvoicesList': 'Settings',
       'MenuSettings': 'Settings',
       'GlobalSettings': 'Settings',
+      'AdminPayslipList': 'Settings',
+      'AddPayslip': 'Settings',
+      'AdminPayslipView': 'Settings',
       'CreditSettings': 'Settings',
       'GiftSettings': 'Settings',
       'ProductCreate': 'Products',
@@ -433,7 +436,7 @@ const AdminDashboardScreen = () => {
     },
   ];
 
-  // Other Settings Section (order matches web: Company, GST, Menu setting, Settings, Category, Credit, Gift)
+  // Other Settings Section (order matches web: Company, GST, Menu setting, Payslips, Settings, Category, Credit, Gift)
   const otherSettingsItems: MenuItem[] = [
     {
       id: 'companyList',
@@ -458,6 +461,14 @@ const AdminDashboardScreen = () => {
       screen: 'MenuSettings',
       permissionKey: 'otherSettingsMenuSetting',
       color: '#9C27B0',
+    },
+    {
+      id: 'payslipAdmin',
+      title: 'Payslips',
+      icon: 'payments',
+      screen: 'AdminPayslipList',
+      permissionKey: 'otherSettingsPayslip',
+      color: '#009688',
     },
     {
       id: 'globalSettings',

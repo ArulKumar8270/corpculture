@@ -18,9 +18,15 @@ import {
 import AddIcon from "@mui/icons-material/Add";
 
 const PayslipList = () => {
-    const { auth } = useAuth();
+    const { auth, userPermissions } = useAuth();
     const [payslips, setPayslips] = useState([]);
     const [loading, setLoading] = useState(true);
+
+    const canPayslip = (action) =>
+        Number(auth?.user?.role) === 1 ||
+        (userPermissions || []).some(
+            (p) => p.key === "otherSettingsPayslip" && Array.isArray(p.actions) && p.actions.includes(action)
+        );
 
     const fetchPayslips = async () => {
         try {
@@ -42,6 +48,22 @@ const PayslipList = () => {
         if (auth?.token) fetchPayslips();
     }, [auth?.token]);
 
+    const handleDelete = async (p) => {
+        if (!window.confirm(`Delete payslip for ${p.employeeName || p.employeeId?.name || "this employee"}?`)) return;
+        try {
+            const { data } = await axios.delete(
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/payslip/${p._id}`,
+                { headers: { Authorization: auth?.token } }
+            );
+            if (data?.success) {
+                toast.success("Payslip deleted.");
+                fetchPayslips();
+            } else toast.error(data?.message || "Delete failed.");
+        } catch (err) {
+            toast.error(err.response?.data?.message || "Delete failed.");
+        }
+    };
+
     const formatDate = (d) => (d ? new Date(d).toLocaleDateString("en-IN") : "-");
     const formatMoney = (n) => (n != null ? `₹${Number(n).toLocaleString("en-IN")}` : "₹0");
 
@@ -51,7 +73,7 @@ const PayslipList = () => {
             <div className="p-4">
                 <div className="flex justify-between items-center mb-6">
                     <h1 className="text-2xl font-bold text-gray-800">Payslips</h1>
-                    {Number(auth?.user?.role) === 1 && (
+                    {(Number(auth?.user?.role) === 1 || canPayslip("add")) && (
                         <Link to="../addPayslip">
                             <Button
                                 variant="contained"
@@ -90,9 +112,25 @@ const PayslipList = () => {
                                         <TableCell>{formatDate(p.payDate)}</TableCell>
                                         <TableCell align="right">{formatMoney(p.netPay)}</TableCell>
                                         <TableCell align="center">
-                                            <Link to={`../payslip/view/${p._id}`} className="text-[#019ee3] font-medium">
-                                                View
-                                            </Link>
+                                            <div className="flex flex-wrap gap-2 justify-center items-center">
+                                                <Link to={`../payslip/view/${p._id}`} className="text-[#019ee3] font-medium">
+                                                    View
+                                                </Link>
+                                                {canPayslip("edit") && (
+                                                    <Link to={`../addPayslip?id=${p._id}`} className="text-[#555] font-medium">
+                                                        Edit
+                                                    </Link>
+                                                )}
+                                                {canPayslip("delete") && (
+                                                    <button
+                                                        type="button"
+                                                        className="text-red-600 font-medium hover:underline"
+                                                        onClick={() => handleDelete(p)}
+                                                    >
+                                                        Delete
+                                                    </button>
+                                                )}
+                                            </div>
                                         </TableCell>
                                     </TableRow>
                                 ))}

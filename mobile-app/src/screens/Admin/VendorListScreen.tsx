@@ -8,6 +8,7 @@ import {
   TextInput,
   ActivityIndicator,
   Alert,
+  Platform,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 // @ts-ignore - @expo/vector-icons is available via expo dependency
@@ -29,6 +30,7 @@ const VendorListScreen = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const ROWS_PER_PAGE_OPTIONS = [5, 10, 25, 50, 100];
+  const LIST_BOTTOM_PADDING = Platform.OS === 'ios' ? 140 : 120;
 
   useFocusEffect(
     useCallback(() => {
@@ -248,7 +250,10 @@ const VendorListScreen = () => {
               <Text style={styles.emptyText}>No vendors found</Text>
             </View>
           }
-          contentContainerStyle={paginatedVendors.length === 0 ? styles.emptyListContent : undefined}
+          contentContainerStyle={[
+            paginatedVendors.length === 0 ? styles.emptyListContent : null,
+            { paddingBottom: LIST_BOTTOM_PADDING },
+          ]}
           ListFooterComponent={
             <View style={styles.paginationWrapper}>
               {filteredVendors.length > 0 && (
@@ -443,6 +448,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#eee',
+    // Keep pagination fully tappable above bottom navigation / system UI
+    paddingBottom: Platform.OS === 'ios' ? 36 : 24,
   },
   rowsPerPageRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
   rowsPerPageLabel: { fontSize: 14, color: '#666', marginRight: 8 },

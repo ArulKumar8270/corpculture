@@ -922,7 +922,7 @@ const ServiceInvoiceListScreen = () => {
               }
             >
               <Icon name="playlist-add-check" size={18} color="#007AFF" />
-              <Text style={styles.actionButtonText}>Submit Activity</Text>
+              <Text style={styles.actionButtonText}>Petrol Form</Text>
             </TouchableOpacity>
           ) : null}
         </View>

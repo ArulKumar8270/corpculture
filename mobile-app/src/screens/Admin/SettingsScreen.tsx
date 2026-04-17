@@ -59,7 +59,7 @@ const SettingsScreen = () => {
       title: 'Payslips (HR)',
       icon: 'payments',
       screen: 'AdminPayslipList' as never,
-      permissionKey: '__adminOnlyPayslip__',
+      permissionKey: 'otherSettingsPayslip',
     },
     {
       id: 'gift',
@@ -80,9 +80,6 @@ const SettingsScreen = () => {
   // Filter menu items based on permissions (admins see all)
   const settingsMenu = allSettingsMenu.filter((item) => {
     if (item.permissionKey === '__adminOnlyAllOrders__') {
-      return user?.role === 1 || Number(user?.role) === 1;
-    }
-    if (item.permissionKey === '__adminOnlyPayslip__') {
       return user?.role === 1 || Number(user?.role) === 1;
     }
     if (user?.role === 1 || Number(user?.role) === 1) return true;

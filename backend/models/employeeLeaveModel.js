@@ -43,6 +43,38 @@ const employeeLeaveSchema = new mongoose.Schema(
             type: String,
             trim: true,
         },
+        companyName: {
+            type: String,
+            trim: true,
+        },
+        /** Employee must accept all special declarations before submit. */
+        declarationAccepted: {
+            type: Boolean,
+            default: false,
+        },
+        /** Typed name as employee signature (Section 5). */
+        employeeSignatureName: {
+            type: String,
+            trim: true,
+        },
+        employeeSignDate: {
+            type: Date,
+        },
+        /** Section 6 — office use (optional; admin may fill). */
+        reportingManagerName: {
+            type: String,
+            trim: true,
+        },
+        reportingManagerSignDate: {
+            type: Date,
+        },
+        hrApproverName: {
+            type: String,
+            trim: true,
+        },
+        hrApproverSignDate: {
+            type: Date,
+        },
         status: {
             type: String,
             enum: ["Pending", "Approved", "Rejected"],

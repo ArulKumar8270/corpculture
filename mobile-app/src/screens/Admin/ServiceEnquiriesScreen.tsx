@@ -10,7 +10,11 @@ import {
   Alert,
   Modal,
   FlatList,
+  Image,
+  Pressable,
   Linking,
+  Platform,
+  Dimensions,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 // @ts-ignore - @expo/vector-icons is available via expo dependency
@@ -22,6 +26,38 @@ import axios from 'axios';
 import { getApiBaseUrl } from '../../services/api';
 import Toast from 'react-native-toast-message';
 // Using custom picker modal instead of @react-native-picker/picker
+
+/** Encode path segments so spaces and special chars in filenames (e.g. R2 URLs) load in <Image />. */
+function safeRemoteImageUri(raw: string): string {
+  const s = String(raw || '').trim();
+  if (!s) return s;
+  if (!/^https?:\/\//i.test(s)) {
+    try {
+      return encodeURI(s);
+    } catch {
+      return s;
+    }
+  }
+  try {
+    const u = new URL(s);
+    const pathParts = u.pathname.split('/').map((seg) => {
+      if (!seg) return seg;
+      try {
+        return encodeURIComponent(decodeURIComponent(seg));
+      } catch {
+        return encodeURIComponent(seg);
+      }
+    });
+    u.pathname = pathParts.join('/');
+    return u.toString();
+  } catch {
+    try {
+      return encodeURI(s);
+    } catch {
+      return s;
+    }
+  }
+}
 
 const ServiceEnquiriesScreen = () => {
   const navigation = useNavigation();
@@ -43,6 +79,9 @@ const ServiceEnquiriesScreen = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const ROWS_PER_PAGE_OPTIONS = [5, 10, 25, 50, 100];
+  const LIST_BOTTOM_PADDING = Platform.OS === 'ios' ? 140 : 120;
+  const [imagePreviewUri, setImagePreviewUri] = useState<string | null>(null);
+  const [imagePreviewFailed, setImagePreviewFailed] = useState(false);
 
   // Base filtered data by service title (for counts and list)
   const baseFiltered = React.useMemo(() => {
@@ -325,7 +364,7 @@ const ServiceEnquiriesScreen = () => {
       </View>
 
       <View style={styles.enquiryDetails}>
-        <View style={styles.detailRow}>
+        {/* <View style={styles.detailRow}>
           <Icon name="phone" size={16} color="#666" />
           <TouchableOpacity
             onPress={() => {
@@ -339,7 +378,7 @@ const ServiceEnquiriesScreen = () => {
               {item.phone ? 'Call' : 'N/A'}
             </Text>
           </TouchableOpacity>
-        </View>
+        </View> */}
         <View style={styles.detailRow}>
           <Icon name="location-on" size={16} color="#666" />
           <Text style={styles.detailText}>{item.location || 'N/A'}</Text>
@@ -348,8 +387,8 @@ const ServiceEnquiriesScreen = () => {
           <TouchableOpacity
             style={styles.imageLink}
             onPress={() => {
-              // Open image in browser or image viewer
-              Alert.alert('Service Image', `Image URL: ${item.serviceImage}`);
+              setImagePreviewFailed(false);
+              setImagePreviewUri(safeRemoteImageUri(String(item.serviceImage)));
             }}
           >
             <Icon name="image" size={16} color="#007AFF" />
@@ -542,6 +581,7 @@ const ServiceEnquiriesScreen = () => {
           keyExtractor={(item) => item._id}
           refreshing={loading}
           onRefresh={fetchAllServices}
+          contentContainerStyle={{ paddingBottom: LIST_BOTTOM_PADDING }}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Icon name="inbox" size={64} color="#ccc" />
@@ -694,9 +734,64 @@ const ServiceEnquiriesScreen = () => {
           </View>
         </TouchableOpacity>
       </Modal>
+
+      <Modal
+        visible={!!imagePreviewUri}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setImagePreviewUri(null);
+          setImagePreviewFailed(false);
+        }}
+      >
+        <View style={styles.imageModalRoot}>
+          <Pressable
+            style={styles.imageModalBackdrop}
+            onPress={() => {
+              setImagePreviewUri(null);
+              setImagePreviewFailed(false);
+            }}
+          />
+          <View style={styles.imageModalCard}>
+            <View style={styles.imageModalHeader}>
+              <Text style={styles.imageModalTitle}>Service image</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setImagePreviewUri(null);
+                  setImagePreviewFailed(false);
+                }}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              >
+                <Icon name="close" size={26} color="#222" />
+              </TouchableOpacity>
+            </View>
+            {imagePreviewUri && !imagePreviewFailed ? (
+              <Image
+                source={{ uri: imagePreviewUri }}
+                style={styles.imageModalImage}
+                resizeMode="contain"
+                onError={() => setImagePreviewFailed(true)}
+              />
+            ) : null}
+            {imagePreviewFailed && imagePreviewUri ? (
+              <View style={styles.imageModalFallback}>
+                <Text style={styles.imageModalFallbackText}>Could not load this image.</Text>
+                <TouchableOpacity
+                  style={styles.imageModalOpenLink}
+                  onPress={() => Linking.openURL(imagePreviewUri).catch(() => {})}
+                >
+                  <Text style={styles.imageModalOpenLinkText}>Open link in browser</Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
+
+const { height: SCREEN_H } = Dimensions.get('window');
 
 const styles = StyleSheet.create({
   container: {
@@ -767,6 +862,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#eee',
+    // Keep pagination fully tappable above bottom navigation / home indicator
+    paddingBottom: Platform.OS === 'ios' ? 36 : 24,
   },
   rowsPerPageRow: {
     flexDirection: 'row',
@@ -913,6 +1010,62 @@ const styles = StyleSheet.create({
     color: '#007AFF',
     marginLeft: 8,
     textDecorationLine: 'underline',
+  },
+  imageModalRoot: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: 16,
+  },
+  imageModalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+  },
+  imageModalCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    overflow: 'hidden',
+    maxHeight: SCREEN_H * 0.85,
+    zIndex: 1,
+  },
+  imageModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#ddd',
+  },
+  imageModalTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#222',
+  },
+  imageModalImage: {
+    width: '100%',
+    height: Math.min(SCREEN_H * 0.62, 520),
+    backgroundColor: '#111',
+  },
+  imageModalFallback: {
+    padding: 24,
+    alignItems: 'center',
+  },
+  imageModalFallbackText: {
+    fontSize: 15,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  imageModalOpenLink: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    backgroundColor: '#019ee3',
+    borderRadius: 8,
+  },
+  imageModalOpenLinkText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 15,
   },
   complaintContainer: {
     marginTop: 10,

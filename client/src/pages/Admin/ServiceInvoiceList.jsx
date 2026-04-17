@@ -821,7 +821,7 @@ function InvoiceRow(props) {
                             sx={{ ml: 1, my: 1 }}
                             onClick={() => navigate('/admin/dashboard/activity-log', { state: { preselectedCompany: typeof invoice.companyId === 'object' ? invoice.companyId : { _id: invoice.companyId } } })}
                         >
-                            Submit activity
+                           Petrol Form
                         </Button>
                     )}
                 </TableCell>

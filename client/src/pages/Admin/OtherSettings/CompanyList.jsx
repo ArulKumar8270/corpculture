@@ -59,6 +59,16 @@ const CompanyList = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [auth?.token, page, rowsPerPage, appliedSearch]);
 
+    useEffect(() => {
+        const t = setTimeout(() => {
+            setAppliedSearch(searchQuery.trim());
+        }, 350);
+        return () => clearTimeout(t);
+    }, [searchQuery]);
+
+    useEffect(() => {
+        setPage(0);
+    }, [appliedSearch]);
 
     const isAdmin = Number(auth?.user?.role) === 1;
 
@@ -96,18 +106,12 @@ const CompanyList = () => {
 
     const handleSearchChange = (e) => {
         setSearchQuery(e.target.value);
-        // Don't trigger search automatically - wait for Apply Filter button
-    };
-
-    const handleApplyFilter = () => {
-        setAppliedSearch(searchQuery);
-        setPage(0); // Reset to first page when applying filters
     };
 
     const handleClearFilter = () => {
         setSearchQuery('');
         setAppliedSearch('');
-        setPage(0); // Reset to first page when clearing filters
+        setPage(0);
     };
 
     if (loading) {
@@ -143,32 +147,22 @@ const CompanyList = () => {
             </div>
             {/* Filter Section */}
             <Paper className="p-4 mb-4 shadow-md rounded-xl bg-white">
-                <Typography variant="h6" className="mb-3 text-[#019ee3] font-semibold">
-                    Filters
+                <Typography variant="h6" className="mb-1 text-[#019ee3] font-semibold">
+                    Search companies
                 </Typography>
-                <div className="flex gap-4 items-end">
+                <Typography variant="body2" className="text-gray-500 mb-3">
+                    Results update as you type (name, GST, pincode, city, address, contacts).
+                </Typography>
+                <div className="flex gap-4 items-end flex-wrap">
                     <TextField
-                        label="Search Companies"
+                        label="Search"
                         variant="outlined"
                         size="small"
                         value={searchQuery}
                         onChange={handleSearchChange}
-                        className="flex-1"
-                        placeholder="Search by company name, pincode, GST, address, city, state, or contact"
-                        onKeyPress={(e) => {
-                            if (e.key === 'Enter') {
-                                handleApplyFilter();
-                            }
-                        }}
+                        className="flex-1 min-w-[200px]"
+                        placeholder="Name, GST, pincode, city…"
                     />
-                    <Button
-                        variant="contained"
-                        color="primary"
-                        onClick={handleApplyFilter}
-                        className="bg-[#019ee3] hover:bg-[#017bb3] text-white px-6 py-2 rounded"
-                    >
-                        Apply Filter
-                    </Button>
                     <Button
                         variant="outlined"
                         color="secondary"

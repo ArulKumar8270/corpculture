@@ -24,7 +24,10 @@ import axios from 'axios';
 import { getApiBaseUrl } from '../../services/api';
 import Toast from 'react-native-toast-message';
 import * as ImagePicker from 'expo-image-picker';
-import { getTotalRentalInvoicePayment } from '../../utils/functions';
+import {
+  getTotalRentalInvoicePayment,
+  formatSendDetailsRecipientsButtonSummary,
+} from '../../utils/functions';
 
 interface ProductConfig {
   bwOldCount: number | string;
@@ -203,12 +206,6 @@ const RentalInvoiceFormScreen = () => {
     a4Config: { bwOldCount: '', bwNewCount: '' } as ProductConfig,
     a5Config: { bwOldCount: '', bwNewCount: '' } as ProductConfig,
   });
-
-  const sendToSummary = (values: SendDetailsRecipient[]) => {
-    const labels = (values || []).map((r) => r.name).filter(Boolean);
-    if (!labels.length) return '--select Option--';
-    return labels.join(', ');
-  };
 
   const [products, setProducts] = useState<Product[]>([
     {
@@ -1527,8 +1524,8 @@ const RentalInvoiceFormScreen = () => {
           onPress={() => setSendToPickerVisible(true)}
           disabled={!formData.companyId || contactPersons.length === 0}
         >
-          <Text style={styles.pickerButtonText}>
-            {sendToSummary(formData.sendDetailsTo)}
+          <Text style={styles.pickerButtonText} numberOfLines={4}>
+            {formatSendDetailsRecipientsButtonSummary(formData.sendDetailsTo)}
           </Text>
           <Icon name="arrow-drop-down" size={24} color="#666" />
         </TouchableOpacity>
@@ -1705,7 +1702,7 @@ const RentalInvoiceFormScreen = () => {
                     setFormData({ ...formData, sendDetailsTo: next });
                   }}
                 >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8, flex: 1 }}>
                     <Icon
                       name={
                         (formData.sendDetailsTo || []).some((x) => sameSendRecipient(x, person))
@@ -1714,8 +1711,16 @@ const RentalInvoiceFormScreen = () => {
                       }
                       size={20}
                       color="#019ee3"
+                      style={{ marginTop: 2 }}
                     />
-                    <Text style={[styles.pickerOptionText, { flex: 1 }]}>{person.name}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.pickerOptionText}>{person.name}</Text>
+                      {(person.mobile || person.email) ? (
+                        <Text style={styles.pickerOptionSubtext} numberOfLines={2}>
+                          {[person.mobile, person.email].filter(Boolean).join(' · ')}
+                        </Text>
+                      ) : null}
+                    </View>
                   </View>
                 </TouchableOpacity>
               )}
@@ -1946,6 +1951,11 @@ const styles = StyleSheet.create({
   pickerOptionText: {
     fontSize: 16,
     color: '#333',
+  },
+  pickerOptionSubtext: {
+    fontSize: 13,
+    color: '#666',
+    marginTop: 4,
   },
   modalButton: {
     backgroundColor: '#e0e0e0',

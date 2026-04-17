@@ -11,6 +11,7 @@ import {
   Modal,
   ScrollView,
   Linking,
+  Platform,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 // @ts-ignore - @expo/vector-icons is available via expo dependency
@@ -52,6 +53,7 @@ const RentalEnquiriesScreen = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const ROWS_PER_PAGE_OPTIONS = [5, 10, 25, 50, 100];
+  const LIST_BOTTOM_PADDING = Platform.OS === 'ios' ? 140 : 120;
 
   useEffect(() => {
     fetchEmployees();
@@ -433,7 +435,7 @@ const RentalEnquiriesScreen = () => {
             <Text style={styles.detailValue}>{item.customerType || 'N/A'}</Text>
           </View>
 
-          <View style={styles.detailRow}>
+          {/* <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Phone:</Text>
             <TouchableOpacity
               onPress={() => {
@@ -447,7 +449,7 @@ const RentalEnquiriesScreen = () => {
                 {item.phone ? 'Call' : 'N/A'}
               </Text>
             </TouchableOpacity>
-          </View>
+          </View> */}
 
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Contact Person:</Text>
@@ -556,7 +558,10 @@ const RentalEnquiriesScreen = () => {
             <Text style={styles.emptyText}>No rental enquiries found</Text>
           </View>
         }
-        contentContainerStyle={paginatedEnquiries.length === 0 ? styles.emptyListContent : undefined}
+        contentContainerStyle={[
+          paginatedEnquiries.length === 0 ? styles.emptyListContent : null,
+          { paddingBottom: LIST_BOTTOM_PADDING },
+        ]}
         refreshing={loading}
         onRefresh={fetchAllRentals}
         ListFooterComponent={
@@ -897,6 +902,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#eee',
+    // Keep pagination fully tappable above bottom navigation / system UI
+    paddingBottom: Platform.OS === 'ios' ? 36 : 24,
   },
   rowsPerPageRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
   rowsPerPageLabel: { fontSize: 14, color: '#666', marginRight: 8 },

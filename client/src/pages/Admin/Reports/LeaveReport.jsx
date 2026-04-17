@@ -47,6 +47,14 @@ const LeaveReport = () => {
     const [openDetail, setOpenDetail] = useState(false);
     const [updatingId, setUpdatingId] = useState(null);
     const [newStatus, setNewStatus] = useState("");
+    const [officeFields, setOfficeFields] = useState({
+        managerRemarks: "",
+        hrRemarks: "",
+        reportingManagerName: "",
+        reportingManagerSignDate: "",
+        hrApproverName: "",
+        hrApproverSignDate: "",
+    });
 
     useEffect(() => {
         fetchEmployees();
@@ -128,16 +136,17 @@ const LeaveReport = () => {
         fetchLeaves("", "", "", "", 0, rowsPerPage);
     };
 
-    const handleStatusUpdate = async (leaveId, status) => {
+    const handleStatusUpdate = async (leaveId, status, extra = {}) => {
         try {
             setUpdatingId(leaveId);
+            const body = { status, ...extra };
             const { data } = await axios.put(
                 `${import.meta.env.VITE_SERVER_URL}/api/v1/employee-leave/admin/status/${leaveId}`,
-                { status },
+                body,
                 { headers: { Authorization: auth?.token } }
             );
             if (data?.success) {
-                toast.success("Status updated.");
+                toast.success("Leave record updated.");
                 setLeaves((prev) =>
                     prev.map((l) => (l._id === leaveId ? data.leave : l))
                 );
@@ -152,6 +161,35 @@ const LeaveReport = () => {
         } finally {
             setUpdatingId(null);
         }
+    };
+
+    const buildOfficePayload = () => ({
+        managerRemarks: officeFields.managerRemarks,
+        hrRemarks: officeFields.hrRemarks,
+        reportingManagerName: officeFields.reportingManagerName,
+        ...(officeFields.reportingManagerSignDate
+            ? { reportingManagerSignDate: officeFields.reportingManagerSignDate }
+            : {}),
+        hrApproverName: officeFields.hrApproverName,
+        ...(officeFields.hrApproverSignDate ? { hrApproverSignDate: officeFields.hrApproverSignDate } : {}),
+    });
+
+    const openLeaveDetail = (row) => {
+        setDetailLeave(row);
+        setNewStatus(row.status);
+        setOfficeFields({
+            managerRemarks: row.managerRemarks || "",
+            hrRemarks: row.hrRemarks || "",
+            reportingManagerName: row.reportingManagerName || "",
+            reportingManagerSignDate: row.reportingManagerSignDate
+                ? dayjs(row.reportingManagerSignDate).format("YYYY-MM-DD")
+                : "",
+            hrApproverName: row.hrApproverName || "",
+            hrApproverSignDate: row.hrApproverSignDate
+                ? dayjs(row.hrApproverSignDate).format("YYYY-MM-DD")
+                : "",
+        });
+        setOpenDetail(true);
     };
 
     const handleChangePage = (event, newPage) => {
@@ -278,11 +316,7 @@ const LeaveReport = () => {
                                                 <Button
                                                     size="small"
                                                     variant="outlined"
-                                                    onClick={() => {
-                                                        setDetailLeave(row);
-                                                        setNewStatus(row.status);
-                                                        setOpenDetail(true);
-                                                    }}
+                                                    onClick={() => openLeaveDetail(row)}
                                                 >
                                                     View
                                                 </Button>
@@ -319,33 +353,105 @@ const LeaveReport = () => {
                             {detailLeave.contactDuringLeave && (
                                 <Typography><strong>Contact During Leave:</strong> {detailLeave.contactDuringLeave}</Typography>
                             )}
-                            <Typography><strong>Status:</strong> <Chip label={detailLeave.status} color={statusColor(detailLeave.status)} size="small" /></Typography>
-                            {detailLeave.status === "Pending" && (
-                                <FormControl fullWidth size="small" sx={{ mt: 2 }}>
-                                    <InputLabel>Update Status</InputLabel>
-                                    <Select
-                                        value={newStatus}
-                                        label="Update Status"
-                                        onChange={(e) => setNewStatus(e.target.value)}
-                                    >
-                                        <MenuItem value="Pending">Pending</MenuItem>
-                                        <MenuItem value="Approved">Approved</MenuItem>
-                                        <MenuItem value="Rejected">Rejected</MenuItem>
-                                    </Select>
-                                </FormControl>
+                            {detailLeave.companyName && (
+                                <Typography><strong>Company Name:</strong> {detailLeave.companyName}</Typography>
                             )}
+                            <Typography sx={{ mt: 1 }}>
+                                <strong>Declarations accepted:</strong>{" "}
+                                {detailLeave.declarationAccepted ? "Yes" : "No"}
+                            </Typography>
+                            {(detailLeave.employeeSignatureName || detailLeave.employeeSignDate) && (
+                                <Typography>
+                                    <strong>Employee signature:</strong> {detailLeave.employeeSignatureName || "—"}
+                                    {detailLeave.employeeSignDate
+                                        ? ` (${dayjs(detailLeave.employeeSignDate).format("DD-MM-YYYY")})`
+                                        : ""}
+                                </Typography>
+                            )}
+                            <Typography sx={{ mt: 1.5, fontWeight: "bold" }}>6. For Office Use Only</Typography>
+                            <TextField
+                                fullWidth
+                                size="small"
+                                label="Remarks (Reporting Manager)"
+                                value={officeFields.managerRemarks}
+                                onChange={(e) => setOfficeFields((o) => ({ ...o, managerRemarks: e.target.value }))}
+                                multiline
+                                minRows={2}
+                                sx={{ mt: 1 }}
+                            />
+                            <TextField
+                                fullWidth
+                                size="small"
+                                label="Reporting Manager Name"
+                                value={officeFields.reportingManagerName}
+                                onChange={(e) => setOfficeFields((o) => ({ ...o, reportingManagerName: e.target.value }))}
+                                sx={{ mt: 1 }}
+                            />
+                            <TextField
+                                fullWidth
+                                size="small"
+                                label="Reporting Manager — Signature Date"
+                                type="date"
+                                value={officeFields.reportingManagerSignDate}
+                                onChange={(e) => setOfficeFields((o) => ({ ...o, reportingManagerSignDate: e.target.value }))}
+                                InputLabelProps={{ shrink: true }}
+                                sx={{ mt: 1 }}
+                            />
+                            <TextField
+                                fullWidth
+                                size="small"
+                                label="HR remarks"
+                                value={officeFields.hrRemarks}
+                                onChange={(e) => setOfficeFields((o) => ({ ...o, hrRemarks: e.target.value }))}
+                                multiline
+                                minRows={2}
+                                sx={{ mt: 1 }}
+                            />
+                            <TextField
+                                fullWidth
+                                size="small"
+                                label="HR Approver Name"
+                                value={officeFields.hrApproverName}
+                                onChange={(e) => setOfficeFields((o) => ({ ...o, hrApproverName: e.target.value }))}
+                                sx={{ mt: 1 }}
+                            />
+                            <TextField
+                                fullWidth
+                                size="small"
+                                label="HR — Signature Date"
+                                type="date"
+                                value={officeFields.hrApproverSignDate}
+                                onChange={(e) => setOfficeFields((o) => ({ ...o, hrApproverSignDate: e.target.value }))}
+                                InputLabelProps={{ shrink: true }}
+                                sx={{ mt: 1 }}
+                            />
+                            <Typography><strong>Status:</strong> <Chip label={detailLeave.status} color={statusColor(detailLeave.status)} size="small" /></Typography>
+                            <FormControl fullWidth size="small" sx={{ mt: 2 }}>
+                                <InputLabel>Leave Status</InputLabel>
+                                <Select
+                                    value={newStatus}
+                                    label="Leave Status"
+                                    onChange={(e) => setNewStatus(e.target.value)}
+                                >
+                                    <MenuItem value="Pending">Pending</MenuItem>
+                                    <MenuItem value="Approved">Approved</MenuItem>
+                                    <MenuItem value="Rejected">Rejected</MenuItem>
+                                </Select>
+                            </FormControl>
                         </Box>
                     )}
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={() => setOpenDetail(false)}>Close</Button>
-                    {detailLeave?.status === "Pending" && newStatus !== detailLeave?.status && (
+                    {detailLeave && (
                         <Button
                             variant="contained"
-                            disabled={updatingId === detailLeave?._id}
-                            onClick={() => handleStatusUpdate(detailLeave._id, newStatus)}
+                            disabled={updatingId === detailLeave._id}
+                            onClick={() =>
+                                handleStatusUpdate(detailLeave._id, newStatus, buildOfficePayload())
+                            }
                         >
-                            {updatingId === detailLeave?._id ? "Updating..." : "Update Status"}
+                            {updatingId === detailLeave._id ? "Saving..." : "Save"}
                         </Button>
                     )}
                 </DialogActions>

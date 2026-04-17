@@ -25,12 +25,28 @@ import {
     DialogTitle,
     DialogContent,
     DialogActions,
+    FormControlLabel,
+    Checkbox,
+    Divider,
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import dayjs from "dayjs";
 
-const LEAVE_TYPES = ["Casual Leave", "Sick Leave", "Earned Leave", "Other"];
+const LEAVE_TYPE_OPTIONS = [
+    { value: "Casual Leave", label: "Casual" },
+    { value: "Sick Leave", label: "Sick" },
+    { value: "Earned Leave", label: "Earned" },
+    { value: "Other", label: "Other" },
+];
+
+const DECLARATION_BULLETS = [
+    "I confirm that I have applied for this leave with prior approval.",
+    "If leave is taken on Saturday / Monday, I confirm that this request is submitted at least 3–5 days in advance.",
+    "I understand that unauthorized leave may result in salary deduction.",
+    "I am aware that if leave is taken on Saturday and/or Monday without approval, Sunday will also be considered for deduction (up to 3 days salary deduction).",
+    "I understand that leave benefits for the next month are applicable only if I have full attendance in the current month.",
+];
 
 const EmployeeLeaveForm = () => {
     const { auth } = useAuth();
@@ -39,6 +55,7 @@ const EmployeeLeaveForm = () => {
     const [leaves, setLeaves] = useState([]);
     const [loadingLeaves, setLoadingLeaves] = useState(true);
     const [formData, setFormData] = useState({
+        companyName: "",
         leaveType: "Casual Leave",
         leaveTypeOther: "",
         leaveFrom: "",
@@ -46,6 +63,8 @@ const EmployeeLeaveForm = () => {
         totalDays: "",
         reason: "",
         contactDuringLeave: "",
+        declarationAccepted: false,
+        employeeSignatureName: "",
     });
     const [editId, setEditId] = useState(null);
     const [openEdit, setOpenEdit] = useState(false);
@@ -60,10 +79,8 @@ const EmployeeLeaveForm = () => {
                     { headers: { Authorization: auth.token } }
                 );
                 if (data?.success) {
-                setEmployee(data.employee);
-                // Debug: Log designation to see what's coming
-                console.log("Employee designation:", data.employee?.designation);
-            }
+                    setEmployee(data.employee);
+                }
             } catch (err) {
                 console.error("Error fetching employee:", err);
             }
@@ -92,8 +109,9 @@ const EmployeeLeaveForm = () => {
     };
 
     const handleInputChange = (e) => {
-        const { name, value } = e.target;
-        setFormData((prev) => ({ ...prev, [name]: value }));
+        const { name, value, type, checked } = e.target;
+        const v = type === "checkbox" ? checked : value;
+        setFormData((prev) => ({ ...prev, [name]: v }));
         if ((name === "leaveFrom" || name === "leaveTo") && formData.leaveFrom && formData.leaveTo) {
             // Recalc total days when both dates change in same tick we do it in effect
         }
@@ -158,19 +176,36 @@ const EmployeeLeaveForm = () => {
             toast.error("Please specify leave type when selecting Other.");
             return;
         }
+        if (!formData.declarationAccepted) {
+            toast.error("Please accept the special declarations (Section 4).");
+            return;
+        }
+        if (!formData.employeeSignatureName?.trim()) {
+            toast.error("Please enter your name as signature (Section 5).");
+            return;
+        }
         try {
             setLoading(true);
             const { data } = await axios.post(
                 `${import.meta.env.VITE_SERVER_URL}/api/v1/employee-leave/create`,
                 {
-                    ...formData,
+                    leaveType: formData.leaveType,
+                    leaveTypeOther: formData.leaveType === "Other" ? formData.leaveTypeOther : undefined,
+                    leaveFrom: formData.leaveFrom,
+                    leaveTo: formData.leaveTo,
                     totalDays: Number(formData.totalDays),
+                    reason: formData.reason,
+                    contactDuringLeave: formData.contactDuringLeave,
+                    companyName: formData.companyName,
+                    declarationAccepted: true,
+                    employeeSignatureName: formData.employeeSignatureName.trim(),
                 },
                 { headers: { Authorization: auth?.token } }
             );
             if (data?.success) {
                 toast.success(data.message || "Leave application submitted.");
                 setFormData({
+                    companyName: "",
                     leaveType: "Casual Leave",
                     leaveTypeOther: "",
                     leaveFrom: "",
@@ -178,6 +213,8 @@ const EmployeeLeaveForm = () => {
                     totalDays: "",
                     reason: "",
                     contactDuringLeave: "",
+                    declarationAccepted: false,
+                    employeeSignatureName: "",
                 });
                 fetchMyLeaves();
             } else toast.error(data?.message || "Failed to submit.");
@@ -191,6 +228,7 @@ const EmployeeLeaveForm = () => {
     const handleEditClick = (row) => {
         setEditId(row._id);
         setEditForm({
+            companyName: row.companyName || "",
             leaveType: row.leaveType,
             leaveTypeOther: row.leaveTypeOther || "",
             leaveFrom: row.leaveFrom ? dayjs(row.leaveFrom).format("YYYY-MM-DD") : "",
@@ -198,13 +236,16 @@ const EmployeeLeaveForm = () => {
             totalDays: String(row.totalDays || ""),
             reason: row.reason || "",
             contactDuringLeave: row.contactDuringLeave || "",
+            declarationAccepted: !!row.declarationAccepted,
+            employeeSignatureName: row.employeeSignatureName || "",
         });
         setOpenEdit(true);
     };
 
     const handleEditChange = (e) => {
-        const { name, value } = e.target;
-        setEditForm((prev) => ({ ...prev, [name]: value }));
+        const { name, value, type, checked } = e.target;
+        const v = type === "checkbox" ? checked : value;
+        setEditForm((prev) => ({ ...prev, [name]: v }));
     };
 
     const handleEditSubmit = async () => {
@@ -212,10 +253,33 @@ const EmployeeLeaveForm = () => {
             toast.error("Please fill all required fields.");
             return;
         }
+        if (editForm.leaveType === "Other" && !editForm.leaveTypeOther?.trim()) {
+            toast.error("Please specify leave type when selecting Other.");
+            return;
+        }
+        if (!editForm.declarationAccepted) {
+            toast.error("Please accept the special declarations.");
+            return;
+        }
+        if (!editForm.employeeSignatureName?.trim()) {
+            toast.error("Please enter your name as signature.");
+            return;
+        }
         try {
             const { data } = await axios.put(
                 `${import.meta.env.VITE_SERVER_URL}/api/v1/employee-leave/update/${editId}`,
-                { ...editForm, totalDays: Number(editForm.totalDays) },
+                {
+                    companyName: editForm.companyName,
+                    leaveType: editForm.leaveType,
+                    leaveTypeOther: editForm.leaveType === "Other" ? editForm.leaveTypeOther : undefined,
+                    leaveFrom: editForm.leaveFrom,
+                    leaveTo: editForm.leaveTo,
+                    totalDays: Number(editForm.totalDays),
+                    reason: editForm.reason,
+                    contactDuringLeave: editForm.contactDuringLeave,
+                    declarationAccepted: true,
+                    employeeSignatureName: editForm.employeeSignatureName.trim(),
+                },
                 { headers: { Authorization: auth?.token } }
             );
             if (data?.success) {
@@ -253,14 +317,29 @@ const EmployeeLeaveForm = () => {
 
     return (
         <Box sx={{ p: 3, maxWidth: 900, mx: "auto" }}>
-            <Typography variant="h5" sx={{ mb: 3, color: "#019ee3", fontWeight: "bold" }}>
+            <Typography variant="h5" sx={{ mb: 1, color: "#019ee3", fontWeight: "bold" }}>
                 Employee Leave Application Form
             </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                Complete Sections 1–5 and submit. Section 6 is completed by Reporting Manager / HR.
+            </Typography>
 
-            {/* Employee Details (auto) */}
+            <Paper sx={{ p: 3, mb: 2 }}>
+                <TextField
+                    fullWidth
+                    size="small"
+                    name="companyName"
+                    label="Company Name"
+                    value={formData.companyName}
+                    onChange={handleInputChange}
+                    placeholder="Optional"
+                />
+            </Paper>
+
+            {/* 1. Employee Details (auto) */}
             <Paper sx={{ p: 3, mb: 3 }}>
                 <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-                    Employee Details
+                    1. Employee Details
                 </Typography>
                 <Grid container spacing={2}>
                     <Grid item xs={12} sm={6}>
@@ -302,10 +381,10 @@ const EmployeeLeaveForm = () => {
                 </Grid>
             </Paper>
 
-            {/* Leave Application Form */}
+            {/* 2–5 Application */}
             <Paper sx={{ p: 3, mb: 3 }}>
                 <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-                    Leave Details
+                    2. Leave Details
                 </Typography>
                 <form onSubmit={handleSubmit}>
                     <Grid container spacing={2}>
@@ -318,9 +397,9 @@ const EmployeeLeaveForm = () => {
                                     label="Leave Type"
                                     onChange={handleInputChange}
                                 >
-                                    {LEAVE_TYPES.map((t) => (
-                                        <MenuItem key={t} value={t}>
-                                            {t}
+                                    {LEAVE_TYPE_OPTIONS.map((t) => (
+                                        <MenuItem key={t.value} value={t.value}>
+                                            {t.label}
                                         </MenuItem>
                                     ))}
                                 </Select>
@@ -344,7 +423,7 @@ const EmployeeLeaveForm = () => {
                                 fullWidth
                                 size="small"
                                 name="leaveFrom"
-                                label="Leave Period - From"
+                                label="From Date"
                                 type="date"
                                 value={formData.leaveFrom}
                                 onChange={handleInputChange}
@@ -357,7 +436,7 @@ const EmployeeLeaveForm = () => {
                                 fullWidth
                                 size="small"
                                 name="leaveTo"
-                                label="Leave Period - To"
+                                label="To Date"
                                 type="date"
                                 value={formData.leaveTo}
                                 onChange={handleInputChange}
@@ -370,7 +449,7 @@ const EmployeeLeaveForm = () => {
                                 fullWidth
                                 size="small"
                                 name="totalDays"
-                                label="Total Days"
+                                label="Total No. of Days"
                                 type="number"
                                 inputProps={{ min: 1 }}
                                 value={formData.totalDays}
@@ -379,11 +458,14 @@ const EmployeeLeaveForm = () => {
                             />
                         </Grid>
                         <Grid item xs={12}>
+                            <Typography variant="subtitle2" fontWeight="bold" sx={{ mt: 1, mb: 0.5 }}>
+                                3. Reason for Leave
+                            </Typography>
                             <TextField
                                 fullWidth
                                 size="small"
                                 name="reason"
-                                label="Reason for Leave"
+                                label="Reason"
                                 multiline
                                 rows={3}
                                 value={formData.reason}
@@ -396,13 +478,66 @@ const EmployeeLeaveForm = () => {
                                 fullWidth
                                 size="small"
                                 name="contactDuringLeave"
-                                label="Contact During Leave (Phone / Email)"
+                                label="Contact During Leave (Phone / Email) — optional"
                                 multiline
                                 rows={2}
                                 value={formData.contactDuringLeave}
                                 onChange={handleInputChange}
                             />
                         </Grid>
+
+                        <Grid item xs={12}>
+                            <Divider sx={{ my: 1 }} />
+                            <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
+                                4. Special Declaration (Mandatory)
+                            </Typography>
+                            <Box component="ul" sx={{ m: 0, pl: 2.5, mb: 1 }}>
+                                {DECLARATION_BULLETS.map((line) => (
+                                    <Typography key={line} component="li" variant="body2" sx={{ mb: 0.75 }}>
+                                        {line}
+                                    </Typography>
+                                ))}
+                            </Box>
+                            <FormControlLabel
+                                control={
+                                    <Checkbox
+                                        name="declarationAccepted"
+                                        checked={formData.declarationAccepted}
+                                        onChange={handleInputChange}
+                                        color="primary"
+                                    />
+                                }
+                                label="I confirm that I have read and accept all of the above declarations."
+                            />
+                        </Grid>
+
+                        <Grid item xs={12} sm={6}>
+                            <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 0.5 }}>
+                                5. Employee Signature
+                            </Typography>
+                            <TextField
+                                fullWidth
+                                size="small"
+                                name="employeeSignatureName"
+                                label="Signature (type your full name)"
+                                value={formData.employeeSignatureName}
+                                onChange={handleInputChange}
+                                required
+                            />
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 0.5 }}>
+                                Date
+                            </Typography>
+                            <TextField
+                                fullWidth
+                                size="small"
+                                label="Date"
+                                value={dayjs().format("DD-MM-YYYY")}
+                                InputProps={{ readOnly: true }}
+                            />
+                        </Grid>
+
                         <Grid item xs={12}>
                             <Button
                                 type="submit"
@@ -415,6 +550,16 @@ const EmployeeLeaveForm = () => {
                         </Grid>
                     </Grid>
                 </form>
+            </Paper>
+
+            <Paper variant="outlined" sx={{ p: 3, mb: 3, borderStyle: "dashed" }}>
+                <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                    6. For Office Use Only
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                    Leave status, remarks, reporting manager and HR approval are recorded here after you submit.
+                    You can track status in &quot;My Leave Applications&quot; below.
+                </Typography>
             </Paper>
 
             {/* My Leave Applications */}
@@ -481,6 +626,16 @@ const EmployeeLeaveForm = () => {
                 <DialogContent>
                     <Grid container spacing={2} sx={{ mt: 0.5 }}>
                         <Grid item xs={12}>
+                            <TextField
+                                fullWidth
+                                size="small"
+                                name="companyName"
+                                label="Company Name"
+                                value={editForm.companyName}
+                                onChange={handleEditChange}
+                            />
+                        </Grid>
+                        <Grid item xs={12}>
                             <FormControl fullWidth size="small">
                                 <InputLabel>Leave Type</InputLabel>
                                 <Select
@@ -489,8 +644,8 @@ const EmployeeLeaveForm = () => {
                                     label="Leave Type"
                                     onChange={handleEditChange}
                                 >
-                                    {LEAVE_TYPES.map((t) => (
-                                        <MenuItem key={t} value={t}>{t}</MenuItem>
+                                    {LEAVE_TYPE_OPTIONS.map((t) => (
+                                        <MenuItem key={t.value} value={t.value}>{t.label}</MenuItem>
                                     ))}
                                 </Select>
                             </FormControl>
@@ -536,7 +691,7 @@ const EmployeeLeaveForm = () => {
                                 fullWidth
                                 size="small"
                                 name="totalDays"
-                                label="Total Days"
+                                label="Total No. of Days"
                                 type="number"
                                 inputProps={{ min: 1 }}
                                 value={editForm.totalDays}
@@ -562,6 +717,29 @@ const EmployeeLeaveForm = () => {
                                 name="contactDuringLeave"
                                 label="Contact During Leave"
                                 value={editForm.contactDuringLeave}
+                                onChange={handleEditChange}
+                            />
+                        </Grid>
+                        <Grid item xs={12}>
+                            <FormControlLabel
+                                control={
+                                    <Checkbox
+                                        name="declarationAccepted"
+                                        checked={editForm.declarationAccepted}
+                                        onChange={handleEditChange}
+                                        color="primary"
+                                    />
+                                }
+                                label="I accept the special declarations (Section 4)."
+                            />
+                        </Grid>
+                        <Grid item xs={12}>
+                            <TextField
+                                fullWidth
+                                size="small"
+                                name="employeeSignatureName"
+                                label="Employee signature (typed name)"
+                                value={editForm.employeeSignatureName}
                                 onChange={handleEditChange}
                             />
                         </Grid>

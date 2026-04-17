@@ -7,9 +7,11 @@ import {
   TouchableOpacity,
   TextInput,
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
+  Modal,
+  FlatList,
+  Pressable,
 } from 'react-native';
 import { useFocusEffect, useRoute } from '@react-navigation/native';
 // @ts-ignore
@@ -41,6 +43,13 @@ const EmployeeActivityLogFormScreen = () => {
   const [fromCompany, setFromCompany] = useState<any>(null);
   const [toCompany, setToCompany] = useState<any>(null);
   const [companyPicker, setCompanyPicker] = useState<'from' | 'to' | null>(null);
+  const [companySearch, setCompanySearch] = useState('');
+
+  const filteredCompanies = useMemo(() => {
+    const q = companySearch.trim().toLowerCase();
+    if (!q) return companies;
+    return companies.filter((c) => (c.companyName || '').toLowerCase().includes(q));
+  }, [companies, companySearch]);
   const [form, setForm] = useState({
     date: new Date().toISOString().split('T')[0],
     km: '',
@@ -204,6 +213,17 @@ const EmployeeActivityLogFormScreen = () => {
     if (companyPicker === 'from') setFromCompany(company);
     else if (companyPicker === 'to') setToCompany(company);
     setCompanyPicker(null);
+    setCompanySearch('');
+  };
+
+  const openCompanyPicker = (which: 'from' | 'to') => {
+    setCompanySearch('');
+    setCompanyPicker(which);
+  };
+
+  const closeCompanyPicker = () => {
+    setCompanyPicker(null);
+    setCompanySearch('');
   };
 
   if (loadingCompanies) {
@@ -232,7 +252,7 @@ const EmployeeActivityLogFormScreen = () => {
         <Text style={styles.label}>From Company *</Text>
         <TouchableOpacity
           style={styles.pickerButton}
-          onPress={() => setCompanyPicker('from')}
+          onPress={() => openCompanyPicker('from')}
         >
           <Text style={fromCompany ? styles.pickerText : styles.pickerPlaceholder}>
             {fromCompany?.companyName || 'Select company'}
@@ -243,33 +263,13 @@ const EmployeeActivityLogFormScreen = () => {
         <Text style={styles.label}>To Company *</Text>
         <TouchableOpacity
           style={styles.pickerButton}
-          onPress={() => setCompanyPicker('to')}
+          onPress={() => openCompanyPicker('to')}
         >
           <Text style={toCompany ? styles.pickerText : styles.pickerPlaceholder}>
             {toCompany?.companyName || 'Select company'}
           </Text>
           <Icon name="arrow-drop-down" size={24} color="#666" />
         </TouchableOpacity>
-
-        {companyPicker && (
-          <View style={styles.modalList}>
-            {companies.map((c) => (
-              <TouchableOpacity
-                key={c._id}
-                style={styles.modalItem}
-                onPress={() => selectCompany(c)}
-              >
-                <Text style={styles.modalItemText}>{c.companyName}</Text>
-              </TouchableOpacity>
-            ))}
-            <TouchableOpacity
-              style={styles.modalItem}
-              onPress={() => setCompanyPicker(null)}
-            >
-              <Text style={styles.cancelText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        )}
 
         <Text style={styles.label}>KM</Text>
         <TextInput
@@ -355,6 +355,53 @@ const EmployeeActivityLogFormScreen = () => {
           )}
         </TouchableOpacity>
       </ScrollView>
+
+      <Modal
+        visible={!!companyPicker}
+        transparent
+        animationType="fade"
+        onRequestClose={closeCompanyPicker}
+      >
+        <View style={styles.modalRoot}>
+          <Pressable style={styles.modalBackdrop} onPress={closeCompanyPicker} />
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>
+              {companyPicker === 'from' ? 'From company' : 'To company'}
+            </Text>
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search companies…"
+              placeholderTextColor="#999"
+              value={companySearch}
+              onChangeText={setCompanySearch}
+              autoCorrect={false}
+              autoCapitalize="none"
+            />
+            <FlatList
+              data={filteredCompanies}
+              keyExtractor={(item) => String(item._id)}
+              style={styles.modalListScroll}
+              keyboardShouldPersistTaps="handled"
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.modalItem}
+                  onPress={() => selectCompany(item)}
+                >
+                  <Text style={styles.modalItemText} numberOfLines={2}>
+                    {item.companyName}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              ListEmptyComponent={
+                <Text style={styles.modalEmpty}>No companies match your search.</Text>
+              }
+            />
+            <TouchableOpacity style={styles.modalCancelBtn} onPress={closeCompanyPicker}>
+              <Text style={styles.cancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 };
@@ -387,10 +434,54 @@ const styles = StyleSheet.create({
   },
   pickerText: { fontSize: 16, color: '#333' },
   pickerPlaceholder: { fontSize: 16, color: '#999' },
-  modalList: { backgroundColor: '#fff', borderRadius: 8, borderWidth: 1, borderColor: '#ccc', marginTop: 8, maxHeight: 200 },
-  modalItem: { padding: 14, borderBottomWidth: 1, borderBottomColor: '#eee' },
+  modalRoot: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 24,
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  modalCard: {
+    width: '100%',
+    alignSelf: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    maxHeight: '80%',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#222',
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 8,
+  },
+  searchInput: {
+    marginHorizontal: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 16,
+    backgroundColor: '#fafafa',
+  },
+  modalListScroll: { flexGrow: 0, maxHeight: 360 },
+  modalItem: { paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#eee' },
   modalItemText: { fontSize: 16, color: '#333' },
-  cancelText: { fontSize: 16, color: '#019ee3' },
+  modalEmpty: { padding: 20, textAlign: 'center', color: '#888', fontSize: 15 },
+  modalCancelBtn: { paddingVertical: 14, alignItems: 'center', borderTopWidth: 1, borderTopColor: '#eee' },
+  cancelText: { fontSize: 16, color: '#019ee3', fontWeight: '600' },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 6 },
   chip: {
     paddingVertical: 6,

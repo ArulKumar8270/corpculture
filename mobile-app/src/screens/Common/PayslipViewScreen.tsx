@@ -6,6 +6,7 @@ import {
   ScrollView,
   ActivityIndicator,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
@@ -37,21 +38,39 @@ const formatMoney = (n: any) => {
 const STAR = '★';
 const STAR_EMPTY = '☆';
 
+function cleanAuthHeader(raw: string | null | undefined) {
+  if (!raw) return '';
+  return String(raw)
+    .trim()
+    .replace(/^Bearer\s+/i, '')
+    .replace(/^"(.*)"$/, '$1')
+    .trim();
+}
+
 const PayslipViewScreen = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const route = useRoute();
   const { token } = useSelector((state: RootState) => state.auth);
   const id = (route.params as any)?.id;
+  const routeName = (route as { name?: string }).name;
+  const canManage =
+    (route.params as any)?.canManage === true || routeName === 'AdminPayslipView';
   const [payslip, setPayslip] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [pdfLoading, setPdfLoading] = useState(false);
 
   const fetchPayslip = useCallback(async () => {
-    if (!id || !token) return;
+    const auth = cleanAuthHeader(token);
+    if (!id || !auth) {
+      setPayslip(null);
+      setLoading(false);
+      return;
+    }
+    const base = String(getApiBaseUrl() || '').replace(/\/$/, '');
     try {
       setLoading(true);
-      const { data } = await axios.get(`${getApiBaseUrl()}/payslip/${id}`, {
-        headers: { Authorization: token },
+      const { data } = await axios.get(`${base}/payslip/${id}`, {
+        headers: { Authorization: auth },
       });
       if (data?.success) setPayslip(data.payslip);
       else Toast.show({ type: 'error', text1: 'Error', text2: data?.message || 'Payslip not found' });
@@ -67,6 +86,39 @@ const PayslipViewScreen = () => {
       fetchPayslip();
     }, [fetchPayslip])
   );
+
+  const confirmDelete = () => {
+    if (!id || !payslip) return;
+    const auth = cleanAuthHeader(token);
+    if (!auth) return;
+    const label = (payslip.employeeName || payslip.employeeId?.name || 'this payslip').toString();
+    Alert.alert('Delete payslip', `Remove payslip for ${label}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          const base = String(getApiBaseUrl() || '').replace(/\/$/, '');
+          try {
+            const { data } = await axios.delete(`${base}/payslip/${id}`, {
+              headers: { Authorization: auth },
+            });
+            if (data?.success) {
+              Toast.show({ type: 'success', text1: 'Payslip deleted' });
+              navigation.goBack();
+            } else {
+              Toast.show({ type: 'error', text1: data?.message || 'Delete failed' });
+            }
+          } catch (e: any) {
+            Toast.show({
+              type: 'error',
+              text1: e?.response?.data?.message || 'Delete failed',
+            });
+          }
+        },
+      },
+    ]);
+  };
 
   const sharePdf = async () => {
     if (!payslip) return;
@@ -134,6 +186,22 @@ const PayslipViewScreen = () => {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      {canManage ? (
+        <View style={styles.adminBar}>
+          <TouchableOpacity
+            style={styles.editBtn}
+            onPress={() => navigation.navigate('AddPayslip', { payslipId: id })}
+            activeOpacity={0.85}
+          >
+            <Icon name="edit" size={20} color="#fff" />
+            <Text style={styles.editBtnText}>Edit</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.deleteBtn} onPress={confirmDelete} activeOpacity={0.85}>
+            <Icon name="delete-outline" size={20} color="#fff" />
+            <Text style={styles.deleteBtnText}>Delete</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
       <TouchableOpacity
         style={styles.pdfButton}
         onPress={sharePdf}
@@ -230,6 +298,29 @@ const PayslipViewScreen = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f5f5' },
   content: { padding: 16, paddingBottom: 32 },
+  adminBar: { flexDirection: 'row', gap: 10, marginBottom: 12 },
+  editBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#019ee3',
+    paddingVertical: 12,
+    borderRadius: 10,
+    gap: 6,
+  },
+  editBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  deleteBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#c62828',
+    paddingVertical: 12,
+    borderRadius: 10,
+    gap: 6,
+  },
+  deleteBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
   pdfButton: {
     flexDirection: 'row',
     alignItems: 'center',

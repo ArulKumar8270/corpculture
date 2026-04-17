@@ -669,6 +669,14 @@ const CustomDrawerContent = (props: CustomDrawerContentProps) => {
                 <Text style={styles.menuItemText}>Menu setting</Text>
               </TouchableOpacity>
             )}
+            {(isAdmin || hasPermission('otherSettingsPayslip', 'view')) && (
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => navigateToScreen('AdminPayslipList')}
+              >
+                <Text style={styles.menuItemText}>Payslips</Text>
+              </TouchableOpacity>
+            )}
             {(isAdmin || hasPermission('salesAllCategory', 'view')) && (
               <TouchableOpacity
                 style={styles.menuItem}

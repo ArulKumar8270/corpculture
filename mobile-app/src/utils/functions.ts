@@ -153,7 +153,7 @@ export const getTotalRentalInvoicePayment = (entry: any) => {
     };
 };
 
-/** Rental invoice send-details: show names; supports legacy string[] or { name, email }[]. */
+/** Rental invoice send-details: names only (compact); supports legacy string[] or { name, email, mobile }[]. */
 export const formatSendDetailsToDisplay = (value: unknown): string => {
     if (value == null || value === '') return 'N/A';
     if (Array.isArray(value)) {
@@ -179,4 +179,48 @@ export const formatSendDetailsToDisplay = (value: unknown): string => {
     if (!t) return 'N/A';
     const p = t.indexOf('(');
     return p !== -1 ? t.slice(0, p).trim() : t;
+};
+
+type SendDetailsRecipientLike = { name?: string; email?: string; mobile?: string };
+
+/** Multiline block for expanded list rows: name, then email / mobile indented. */
+export const formatSendDetailsToDetail = (value: unknown): string => {
+    if (value == null || value === '') return 'N/A';
+    if (Array.isArray(value)) {
+        if (value.length === 0) return 'N/A';
+        const first = value[0] as any;
+        if (typeof first === 'object' && first !== null && 'name' in first) {
+            return (value as SendDetailsRecipientLike[])
+                .map((x) => {
+                    const n = String(x?.name || '').trim();
+                    if (!n) return '';
+                    const e = String(x?.email || '').trim();
+                    const m = String(x?.mobile || '').trim();
+                    const lines = [n];
+                    if (e) lines.push(`  ${e}`);
+                    if (m) lines.push(`  ${m}`);
+                    return lines.join('\n');
+                })
+                .filter(Boolean)
+                .join('\n\n');
+        }
+        return formatSendDetailsToDisplay(value);
+    }
+    return formatSendDetailsToDisplay(value);
+};
+
+/** Form picker / button summary: "Name (mobile), Name2" when mobile exists. */
+export const formatSendDetailsRecipientsButtonSummary = (
+    value: SendDetailsRecipientLike[] | null | undefined
+): string => {
+    const labels = (value || [])
+        .map((r) => {
+            const n = String(r?.name || '').trim();
+            const m = String(r?.mobile || '').trim();
+            if (!n) return '';
+            return m ? `${n} (${m})` : n;
+        })
+        .filter(Boolean);
+    if (!labels.length) return '--select Option--';
+    return labels.join(', ');
 };

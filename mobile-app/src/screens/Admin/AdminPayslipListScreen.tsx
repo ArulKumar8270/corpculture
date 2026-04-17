@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
@@ -24,32 +25,91 @@ const AdminPayslipListScreen = () => {
   const [loading, setLoading] = useState(true);
   const isAdmin = user?.role === 1 || Number(user?.role) === 1;
 
-  const load = async () => {
-    if (!token) return;
+  const cleanAuthHeader = (raw: string | null | undefined) => {
+    if (!raw) return '';
+    return String(raw)
+      .trim()
+      .replace(/^Bearer\s+/i, '')
+      .replace(/^"(.*)"$/, '$1')
+      .trim();
+  };
+
+  const load = useCallback(async () => {
+    const auth = cleanAuthHeader(token);
+    if (!auth) {
+      setPayslips([]);
+      setLoading(false);
+      return;
+    }
+    const base = String(getApiBaseUrl() || '').replace(/\/$/, '');
     try {
       setLoading(true);
-      const { data } = await axios.get(`${getApiBaseUrl()}/payslip/all`, {
-        headers: { Authorization: token },
+      const { data } = await axios.get(`${base}/payslip/all`, {
+        headers: { Authorization: auth },
       });
-      if (data?.success) setPayslips(data.payslips || []);
-      else setPayslips([]);
-    } catch {
-      Toast.show({ type: 'error', text1: 'Failed to load payslips' });
+      if (data?.success) {
+        setPayslips(Array.isArray(data.payslips) ? data.payslips : []);
+      } else {
+        setPayslips([]);
+        Toast.show({
+          type: 'error',
+          text1: 'Payslips',
+          text2: data?.message || 'Failed to load payslips.',
+        });
+      }
+    } catch (e: any) {
+      const msg =
+        e?.response?.data?.message ||
+        e?.response?.data?.error ||
+        e?.message ||
+        'Failed to load payslips.';
+      Toast.show({ type: 'error', text1: 'Payslips', text2: String(msg) });
       setPayslips([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
 
   useFocusEffect(
     useCallback(() => {
       load();
-    }, [token])
+    }, [load])
   );
 
   const formatDate = (d: any) => (d ? new Date(d).toLocaleDateString('en-IN') : '—');
   const formatMoney = (n: any) =>
     n != null ? `₹${Number(n).toLocaleString('en-IN')}` : '₹0';
+
+  const deletePayslip = (id: string, label: string) => {
+    const auth = cleanAuthHeader(token);
+    if (!auth) return;
+    Alert.alert('Delete payslip', `Remove payslip for ${label}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          const base = String(getApiBaseUrl() || '').replace(/\/$/, '');
+          try {
+            const { data } = await axios.delete(`${base}/payslip/${id}`, {
+              headers: { Authorization: auth },
+            });
+            if (data?.success) {
+              Toast.show({ type: 'success', text1: 'Payslip deleted' });
+              load();
+            } else {
+              Toast.show({ type: 'error', text1: data?.message || 'Delete failed' });
+            }
+          } catch (e: any) {
+            Toast.show({
+              type: 'error',
+              text1: e?.response?.data?.message || 'Delete failed',
+            });
+          }
+        },
+      },
+    ]);
+  };
 
   return (
     <View style={styles.container}>
@@ -76,18 +136,46 @@ const AdminPayslipListScreen = () => {
           ListEmptyComponent={
             <Text style={styles.empty}>No payslips yet. Add one for an employee.</Text>
           }
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.card}
-              onPress={() => navigation.navigate('AdminPayslipView', { id: item._id })}
-            >
-              <Text style={styles.empName}>{item.employeeName || item.employeeId?.name || '—'}</Text>
-              <Text style={styles.row}>Period: {item.payPeriod}</Text>
-              <Text style={styles.row}>Pay date: {formatDate(item.payDate)}</Text>
-              <Text style={styles.net}>Net: {formatMoney(item.netPay)}</Text>
-              <Text style={styles.view}>View →</Text>
-            </TouchableOpacity>
-          )}
+          renderItem={({ item }) => {
+            const name = item.employeeName || item.employeeId?.name || '—';
+            return (
+              <View style={styles.card}>
+                <View style={styles.cardTop}>
+                  <TouchableOpacity
+                    style={styles.cardMain}
+                    onPress={() =>
+                      navigation.navigate('AdminPayslipView', { id: item._id, canManage: true })
+                    }
+                    activeOpacity={0.75}
+                  >
+                    <Text style={styles.empName}>{name}</Text>
+                    <Text style={styles.row}>Period: {item.payPeriod}</Text>
+                    <Text style={styles.row}>Pay date: {formatDate(item.payDate)}</Text>
+                    <Text style={styles.net}>Net: {formatMoney(item.netPay)}</Text>
+                    <Text style={styles.view}>View →</Text>
+                  </TouchableOpacity>
+                  {isAdmin ? (
+                    <View style={styles.cardActions}>
+                      <TouchableOpacity
+                        style={styles.iconBtn}
+                        onPress={() => navigation.navigate('AddPayslip', { payslipId: item._id })}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Icon name="edit" size={22} color="#019ee3" />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.iconBtn}
+                        onPress={() => deletePayslip(item._id, name)}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Icon name="delete-outline" size={22} color="#c62828" />
+                      </TouchableOpacity>
+                    </View>
+                  ) : null}
+                </View>
+              </View>
+            );
+          }}
         />
       )}
     </View>
@@ -120,11 +208,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     marginHorizontal: 16,
     marginTop: 12,
-    padding: 16,
+    padding: 12,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: '#e8e8e8',
   },
+  cardTop: { flexDirection: 'row', alignItems: 'flex-start' },
+  cardMain: { flex: 1, paddingRight: 4 },
+  cardActions: { flexDirection: 'column', gap: 4, paddingTop: 2 },
+  iconBtn: { padding: 6 },
   empName: { fontSize: 16, fontWeight: '700', color: '#222', marginBottom: 6 },
   row: { fontSize: 13, color: '#666', marginBottom: 2 },
   net: { fontSize: 15, fontWeight: '600', color: '#019ee3', marginTop: 6 },

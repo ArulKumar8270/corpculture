@@ -12,8 +12,8 @@ export const usePermissions = () => {
   const { user } = useSelector((state: RootState) => state.auth);
 
   const hasPermission = (key: string, action: string = 'view'): boolean => {
-    // Admins (role === 1) have all permissions
-    if (user?.role === 1) {
+    // Admins (role 1) have all permissions — role may be number or string from API/persist
+    if (user?.role === 1 || Number(user?.role) === 1) {
       return true;
     }
 

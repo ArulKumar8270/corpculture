@@ -25,7 +25,7 @@ import Toast from 'react-native-toast-message';
 import * as ImagePicker from 'expo-image-picker';
 import { PaymentContactEmailsField } from '../../components/PaymentContactEmailsField';
 import { invoicePaymentEmailsFromRecord, normalizePaymentContactPayload } from '../../utils/invoicePaymentEmails';
-import { formatSendDetailsToDisplay } from '../../utils/functions';
+import { formatSendDetailsToDetail } from '../../utils/functions';
 
 const RENTAL_INVOICE_DOWNLOAD_BASE_URL = 'https://pub-bcab85dac0c64221ba6b6a756f991c46.r2.dev';
 
@@ -813,10 +813,10 @@ const RentalInvoiceListScreen = () => {
         </TouchableOpacity>
 
         <View style={styles.entryDetails}>
-          <View style={styles.detailRow}>
+          <View style={styles.sendDetailsBlock}>
             <Text style={styles.detailLabel}>Send Details To:</Text>
-            <Text style={styles.detailValue}>
-              {formatSendDetailsToDisplay(item.sendDetailsTo)}
+            <Text style={styles.detailValueMultiline}>
+              {formatSendDetailsToDetail(item.sendDetailsTo)}
             </Text>
           </View>
           {item.assignedTo && (
@@ -953,7 +953,7 @@ const RentalInvoiceListScreen = () => {
               }
             >
               <Icon name="playlist-add-check" size={18} color="#007AFF" />
-              <Text style={styles.actionButtonText}>Submit Activity</Text>
+              <Text style={styles.actionButtonText}>Petrol Form</Text>
             </TouchableOpacity>
           ) : null}
         </View>
@@ -2002,6 +2002,16 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#333',
+  },
+  sendDetailsBlock: {
+    marginBottom: 8,
+  },
+  detailValueMultiline: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginTop: 4,
+    lineHeight: 20,
   },
   countImage: {
     width: 50,
