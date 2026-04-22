@@ -7,6 +7,19 @@ const materialSchema = new mongoose.Schema({
         required: true,
         trim: true,
     },
+    // Per-product fields (requested): keep optional for backward compatibility
+    serialNo: {
+        type: String,
+        trim: true,
+    },
+    usageData: {
+        type: String,
+        trim: true,
+    },
+    description: {
+        type: String,
+        trim: true,
+    },
     quantity: {
         type: Number,
         required: true,
@@ -73,12 +86,10 @@ const reportSchema = new mongoose.Schema({
     },
     modelNo: {
         type: String,
-        required: true,
         trim: true,
     },
     serialNo: {
         type: String,
-        required: true,
         trim: true,
     },
     branch: {

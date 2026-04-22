@@ -458,13 +458,13 @@ const RentalEnquiriesScreen = () => {
 
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Address:</Text>
-            <Text style={styles.detailValue}>{item.address || 'N/A'}</Text>
-          </View>
-
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Location:</Text>
             <Text style={styles.detailValue}>{item.location || 'N/A'}</Text>
           </View>
+
+          {/* <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Location:</Text>
+            <Text style={styles.detailValue}>{item.location || 'N/A'}</Text>
+          </View> */}
 
           {item.complaint && (
             <View style={styles.detailRow}>

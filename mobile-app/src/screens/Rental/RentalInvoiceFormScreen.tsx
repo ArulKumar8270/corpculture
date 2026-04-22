@@ -162,6 +162,7 @@ const RentalInvoiceFormScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const { user, token } = useSelector((state: RootState) => state.auth);
+  const isEmployeeUser = user?.role === 3;
   const params = route.params as any;
   const entryId = params?.id;
   const invoiceType = params?.invoiceType || 'invoice';
@@ -1531,33 +1532,35 @@ const RentalInvoiceFormScreen = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Invoice Date - match web */}
-      <View
-        style={styles.section}
-        onLayout={(e) => {
-          invoiceDateSectionY.current = e.nativeEvent.layout.y;
-        }}
-      >
-        <Text style={styles.label}>Invoice Date</Text>
-        <TextInput
-          style={styles.configInput}
-          value={formData.invoiceDate ? formData.invoiceDate.slice(0, 10) : ''}
-          onChangeText={(text) => {
-            const trimmed = text.trim();
-            if (!trimmed) {
-              setFormData((prev) => ({ ...prev, invoiceDate: new Date().toISOString() }));
-              return;
-            }
-            const d = new Date(trimmed);
-            if (!isNaN(d.getTime())) {
-              setFormData((prev) => ({ ...prev, invoiceDate: d.toISOString() }));
-            }
+      {/* Invoice Date — hidden for employees (role 3); submit still uses default today in formData.invoiceDate */}
+      {!isEmployeeUser && (
+        <View
+          style={styles.section}
+          onLayout={(e) => {
+            invoiceDateSectionY.current = e.nativeEvent.layout.y;
           }}
-          placeholder="YYYY-MM-DD"
-          placeholderTextColor="#999"
-          onFocus={scrollToInvoiceDate}
-        />
-      </View>
+        >
+          <Text style={styles.label}>Invoice Date</Text>
+          <TextInput
+            style={styles.configInput}
+            value={formData.invoiceDate ? formData.invoiceDate.slice(0, 10) : ''}
+            onChangeText={(text) => {
+              const trimmed = text.trim();
+              if (!trimmed) {
+                setFormData((prev) => ({ ...prev, invoiceDate: new Date().toISOString() }));
+                return;
+              }
+              const d = new Date(trimmed);
+              if (!isNaN(d.getTime())) {
+                setFormData((prev) => ({ ...prev, invoiceDate: d.toISOString() }));
+              }
+            }}
+            placeholder="YYYY-MM-DD"
+            placeholderTextColor="#999"
+            onFocus={scrollToInvoiceDate}
+          />
+        </View>
+      )}
 
       {/* Remarks */}
       <View
@@ -1715,11 +1718,11 @@ const RentalInvoiceFormScreen = () => {
                     />
                     <View style={{ flex: 1 }}>
                       <Text style={styles.pickerOptionText}>{person.name}</Text>
-                      {(person.mobile || person.email) ? (
+                      {/* {(person.mobile || person.email) ? (
                         <Text style={styles.pickerOptionSubtext} numberOfLines={2}>
                           {[person.mobile, person.email].filter(Boolean).join(' · ')}
                         </Text>
-                      ) : null}
+                      ) : null} */}
                     </View>
                   </View>
                 </TouchableOpacity>

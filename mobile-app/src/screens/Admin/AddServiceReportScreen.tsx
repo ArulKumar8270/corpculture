@@ -27,6 +27,9 @@ interface MaterialGroup {
   products: Array<{
     id?: string;
     productName: string;
+    serialNo?: string;
+    usageData?: string;
+    description?: string;
     quantity: number;
     rate: number;
     totalAmount: number;
@@ -54,13 +57,13 @@ const AddServiceReportScreen = () => {
     remarksPendingWorks: '',
     accessService: '',
     modelNo: '',
-    serialNo: '',
     branch: '',
     reference: '',
-    usageData: '',
-    description: '',
     materialProductName: '',
     materialQuantity: '',
+    materialSerialNo: '',
+    materialUsageData: '',
+    materialDescription: '',
   });
 
   const [materialGroups, setMaterialGroups] = useState<MaterialGroup[]>([]);
@@ -128,13 +131,13 @@ const AddServiceReportScreen = () => {
             remarksPendingWorks: fetchedReport.remarksPendingWorks || '',
             accessService: fetchedReport.accessService || '',
             modelNo: fetchedReport.modelNo || '',
-            serialNo: fetchedReport.serialNo || '',
             branch: fetchedReport.branch || '',
             reference: fetchedReport.reference || '',
-            usageData: fetchedReport.usageData || '',
-            description: fetchedReport.description || '',
             materialProductName: '',
             materialQuantity: '',
+            materialSerialNo: '',
+            materialUsageData: '',
+            materialDescription: '',
           });
           if (Array.isArray(fetchedReport.materialGroups) && fetchedReport.materialGroups.length > 0) {
             setMaterialGroups(
@@ -288,6 +291,9 @@ const AddServiceReportScreen = () => {
       ...prev,
       materialProductName: '',
       materialQuantity: '',
+      materialSerialNo: '',
+      materialUsageData: '',
+      materialDescription: '',
     }));
   };
 
@@ -298,6 +304,9 @@ const AddServiceReportScreen = () => {
       ...prev,
       materialProductName: '',
       materialQuantity: '',
+      materialSerialNo: '',
+      materialUsageData: '',
+      materialDescription: '',
     }));
   };
 
@@ -337,6 +346,9 @@ const AddServiceReportScreen = () => {
     const productRate = selectedProduct.rate || 0;
     const productData = {
       productName: productName,
+      serialNo: formData.materialSerialNo?.trim() || '',
+      usageData: formData.materialUsageData?.trim() || '',
+      description: formData.materialDescription?.trim() || '',
       quantity: quantity,
       rate: productRate,
       totalAmount: quantity * productRate,
@@ -376,6 +388,9 @@ const AddServiceReportScreen = () => {
       ...prev,
       materialProductName: '',
       materialQuantity: '',
+      materialSerialNo: '',
+      materialUsageData: '',
+      materialDescription: '',
     }));
   };
 
@@ -393,6 +408,9 @@ const AddServiceReportScreen = () => {
       ...prev,
       materialProductName: productToEdit ? productToEdit._id : '',
       materialQuantity: product.quantity.toString(),
+      materialSerialNo: product.serialNo || '',
+      materialUsageData: product.usageData || '',
+      materialDescription: product.description || '',
     }));
   };
 
@@ -472,6 +490,9 @@ const AddServiceReportScreen = () => {
           // Ensure all numeric fields are numbers
           return {
             productName: productName, // Already a string from extractProductName
+            serialNo: typeof rest.serialNo === 'string' ? rest.serialNo : '',
+            usageData: typeof rest.usageData === 'string' ? rest.usageData : '',
+            description: typeof rest.description === 'string' ? rest.description : '',
             quantity: Number(rest.quantity) || 0,
             rate: Number(rest.rate) || 0,
             totalAmount: Number(rest.totalAmount) || 0,
@@ -487,11 +508,8 @@ const AddServiceReportScreen = () => {
         remarksPendingWorks: formData.remarksPendingWorks,
         accessService: formData.accessService,
         modelNo: formData.modelNo,
-        serialNo: formData.serialNo,
         branch: formData.branch,
         reference: formData.reference,
-        usageData: formData.usageData,
-        description: formData.description,
         assignedTo: employeeId || user?._id,
         reportFor: reportFor,
         materialGroups: cleanedMaterialGroups,
@@ -604,14 +622,6 @@ const AddServiceReportScreen = () => {
           placeholder="Enter Model No"
         />
 
-        <Text style={styles.label}>Serial No</Text>
-        <TextInput
-          style={styles.input}
-          value={formData.serialNo}
-          onChangeText={(text) => handleChange('serialNo', text)}
-          placeholder="Enter Serial No"
-        />
-
         <Text style={styles.label}>Branch</Text>
         <TouchableOpacity
           style={styles.pickerButton}
@@ -631,24 +641,7 @@ const AddServiceReportScreen = () => {
           onChangeText={(text) => handleChange('reference', text)}
           placeholder="Enter Reference"
         />
-
-        <Text style={styles.label}>Usage Data</Text>
-        <TextInput
-          style={styles.input}
-          value={formData.usageData}
-          onChangeText={(text) => handleChange('usageData', text)}
-          placeholder="Enter Usage Data"
-        />
-
-        <Text style={styles.label}>Description</Text>
-        <TextInput
-          style={[styles.input, styles.textArea]}
-          value={formData.description}
-          onChangeText={(text) => handleChange('description', text)}
-          placeholder="Enter Description"
-          multiline
-          numberOfLines={2}
-        />
+        {/* serialNo / usageData / description are now entered per-product in Materials */}
 
         <Text style={styles.sectionTitle}>Material Groups</Text>
         <View style={styles.groupButtons}>
@@ -707,6 +700,32 @@ const AddServiceReportScreen = () => {
               keyboardType="numeric"
             />
 
+            <Text style={styles.label}>Serial No (per product)</Text>
+            <TextInput
+              style={styles.input}
+              value={formData.materialSerialNo}
+              onChangeText={(text) => handleChange('materialSerialNo', text)}
+              placeholder="Optional"
+            />
+
+            <Text style={styles.label}>Usage Data (per product)</Text>
+            <TextInput
+              style={styles.input}
+              value={formData.materialUsageData}
+              onChangeText={(text) => handleChange('materialUsageData', text)}
+              placeholder="Optional"
+            />
+
+            <Text style={styles.label}>Description (per product)</Text>
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              value={formData.materialDescription}
+              onChangeText={(text) => handleChange('materialDescription', text)}
+              placeholder="Optional"
+              multiline
+              numberOfLines={2}
+            />
+
             <TouchableOpacity
               style={styles.saveProductButton}
               onPress={handleSaveProduct}
@@ -725,6 +744,9 @@ const AddServiceReportScreen = () => {
                     ...prev,
                     materialProductName: '',
                     materialQuantity: '',
+                    materialSerialNo: '',
+                    materialUsageData: '',
+                    materialDescription: '',
                   }));
                 }}
               >
@@ -751,6 +773,17 @@ const AddServiceReportScreen = () => {
                     <Text style={styles.productName}>
                       {product.productName ? String(product.productName) : 'Unknown Product'}
                     </Text>
+                    {product.serialNo ? (
+                      <Text style={styles.productDetails}>Serial: {product.serialNo}</Text>
+                    ) : null}
+                    {product.usageData ? (
+                      <Text style={styles.productDetails}>Usage: {product.usageData}</Text>
+                    ) : null}
+                    {product.description ? (
+                      <Text style={styles.productDetails} numberOfLines={2}>
+                        Desc: {product.description}
+                      </Text>
+                    ) : null}
                     <Text style={styles.productDetails}>
                       Qty: {product.quantity || 0} | Rate: ₹{product.rate || 0} | Total: ₹{product.totalAmount || 0}
                     </Text>

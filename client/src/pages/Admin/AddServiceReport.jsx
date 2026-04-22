@@ -24,7 +24,6 @@ import {
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
-import DescriptionIcon from '@mui/icons-material/Description'; // Icon for Corpculture Report
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'; // Import useParams
 import toast from 'react-hot-toast';
 import axios from 'axios'; // Assuming axios is used for API calls
@@ -46,15 +45,14 @@ const AddServiceReport = (props) => {
         company: companyId, // This will store the company _id
         problemReport: '',
         remarksPendingWorks: '',
-        accessService: '',
-        modelNo: '',
         serialNo: '',
         branch: '', // This will store the branch name
         reference: '',
-        usageData: '', // New field
-        description: '', // New field
         materialProductName: '', // For adding new material (will store product _id)
         materialQuantity: '',    // For adding new material
+        materialSerialNo: '',
+        materialUsageData: '',
+        materialDescription: '',
     });
 
     // State for material groups
@@ -97,15 +95,14 @@ const AddServiceReport = (props) => {
                             company: fetchedReport.company?._id || '', // Assuming company is populated
                             problemReport: fetchedReport.problemReport || '',
                             remarksPendingWorks: fetchedReport.remarksPendingWorks || '',
-                            accessService: fetchedReport.accessService || '',
-                            modelNo: fetchedReport.modelNo || '',
                             serialNo: fetchedReport.serialNo || '',
                             branch: fetchedReport.branch || '',
                             reference: fetchedReport.reference || '',
-                            usageData: fetchedReport.usageData || '', // Populate new field
-                            description: fetchedReport.description || '', // Populate new field
                             materialProductName: '', // Reset for new material entry
                             materialQuantity: '',    // Reset for new material entry
+                            materialSerialNo: '',
+                            materialUsageData: '',
+                            materialDescription: '',
                         });
                         // If backend supports groups, use them; else, wrap materials in a single group
                         if (Array.isArray(fetchedReport.materialGroups) && fetchedReport.materialGroups.length > 0) {
@@ -284,6 +281,9 @@ const AddServiceReport = (props) => {
             ...prev,
             materialProductName: '',
             materialQuantity: '',
+            materialSerialNo: '',
+            materialUsageData: '',
+            materialDescription: '',
         }));
     };
 
@@ -304,6 +304,9 @@ const AddServiceReport = (props) => {
         const productName = extractProductName(selectedProduct);
         const productData = {
             productName: productName,
+            serialNo: reportData.materialSerialNo?.trim() || '',
+            usageData: reportData.materialUsageData?.trim() || '',
+            description: reportData.materialDescription?.trim() || '',
             quantity: quantity,
             rate: selectedProduct.rate,
             totalAmount: quantity * selectedProduct.rate,
@@ -343,6 +346,9 @@ const AddServiceReport = (props) => {
             ...prevData,
             materialProductName: '',
             materialQuantity: '',
+            materialSerialNo: '',
+            materialUsageData: '',
+            materialDescription: '',
         }));
     };
 
@@ -360,6 +366,9 @@ const AddServiceReport = (props) => {
             ...prevData,
             materialProductName: productToEdit ? productToEdit._id : '',
             materialQuantity: product.quantity.toString(), // Convert number to string for TextField
+            materialSerialNo: product.serialNo || '',
+            materialUsageData: product.usageData || '',
+            materialDescription: product.description || '',
         }));
     };
 
@@ -381,6 +390,9 @@ const AddServiceReport = (props) => {
                 ...prevData,
                 materialProductName: '',
                 materialQuantity: '',
+                materialSerialNo: '',
+                materialUsageData: '',
+                materialDescription: '',
             }));
         }
     };
@@ -395,6 +407,9 @@ const AddServiceReport = (props) => {
                 ...prev,
                 materialProductName: '',
                 materialQuantity: '',
+                materialSerialNo: '',
+                materialUsageData: '',
+                materialDescription: '',
             }));
         }
         toast.success('Material group removed!');
@@ -421,13 +436,8 @@ const AddServiceReport = (props) => {
             company: reportData.company, // This is the company _id
             problemReport: reportData.problemReport,
             remarksPendingWorks: reportData.remarksPendingWorks,
-            accessService: reportData.accessService,
-            modelNo: reportData.modelNo,
-            serialNo: reportData.serialNo,
             branch: reportData.branch, // This is the branch name string
             reference: reportData.reference,
-            usageData: reportData.usageData, // Add new field
-            description: reportData.description, // Add new field
             assignedTo: employeeName,
             reportFor: reportFor,
             // Send materialGroups as array of objects, without temporary 'id' field from products
@@ -494,25 +504,19 @@ const AddServiceReport = (props) => {
             company: '',
             problemReport: '',
             remarksPendingWorks: '',
-            accessService: '',
-            modelNo: '',
             serialNo: '',
             branch: '',
             reference: '',
-            usageData: '', // Reset new field
-            description: '', // Reset new field
             materialProductName: '',
             materialQuantity: '',
+            materialSerialNo: '',
+            materialUsageData: '',
+            materialDescription: '',
         });
         setMaterialGroups([]); // Reset material groups
         setSelectedGroupIndex(null); // Reset selected group
         setEditingProductId(null); // Reset product editing state
         toast.info('Form cancelled and reset.');
-    };
-
-    const handleCorpcultureReport = () => {
-        // Implement logic for "Corpculture Report" button
-        toast.info('Corpculture Report button clicked (placeholder)!');
     };
 
     if (loading) {
@@ -589,30 +593,6 @@ const AddServiceReport = (props) => {
                         <TextField
                             fullWidth
                             margin="normal"
-                            label="Access Service"
-                            name="accessService"
-                            value={reportData.accessService}
-                            onChange={handleChange}
-                            placeholder="ENTER ACCESS SERVICE"
-                            size="small"
-                        />
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                        <TextField
-                            fullWidth
-                            margin="normal"
-                            label="Model No"
-                            name="modelNo"
-                            value={reportData.modelNo}
-                            onChange={handleChange}
-                            placeholder="ENTER MODEL NO"
-                            size="small"
-                        />
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                        <TextField
-                            fullWidth
-                            margin="normal"
                             label="Serial No"
                             name="serialNo"
                             value={reportData.serialNo}
@@ -651,32 +631,7 @@ const AddServiceReport = (props) => {
                             size="small"
                         />
                     </Grid>
-                    <Grid item xs={12} sm={6}>
-                        <TextField
-                            fullWidth
-                            margin="normal"
-                            label="Usage Data"
-                            name="usageData"
-                            value={reportData.usageData}
-                            onChange={handleChange}
-                            placeholder="Enter Usage Data"
-                            size="small"
-                        />
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                        <TextField
-                            fullWidth
-                            margin="normal"
-                            label="Description"
-                            name="description"
-                            value={reportData.description}
-                            onChange={handleChange}
-                            placeholder="Enter Description"
-                            multiline
-                            rows={2}
-                            size="small"
-                        />
-                    </Grid>
+                    {/* usageData & description are now per-product (inside Materials) */}
                 </Grid>
 
                 <Typography variant="h6" component="h2" gutterBottom sx={{ mt: 4, mb: 2, color: '#019ee3' }}>
@@ -734,6 +689,41 @@ const AddServiceReport = (props) => {
                                 size="small"
                             />
                         </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <TextField
+                                fullWidth
+                                label="Serial No (per product)"
+                                name="materialSerialNo"
+                                value={reportData.materialSerialNo}
+                                onChange={handleChange}
+                                placeholder="Optional"
+                                size="small"
+                            />
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <TextField
+                                fullWidth
+                                label="Usage Data (per product)"
+                                name="materialUsageData"
+                                value={reportData.materialUsageData}
+                                onChange={handleChange}
+                                placeholder="Optional"
+                                size="small"
+                            />
+                        </Grid>
+                        <Grid item xs={12}>
+                            <TextField
+                                fullWidth
+                                label="Description (per product)"
+                                name="materialDescription"
+                                value={reportData.materialDescription}
+                                onChange={handleChange}
+                                placeholder="Optional"
+                                multiline
+                                rows={2}
+                                size="small"
+                            />
+                        </Grid>
                         <Grid item xs={12} sm={3}>
                             <Button
                                 variant="outlined"
@@ -753,6 +743,9 @@ const AddServiceReport = (props) => {
                                             ...prevData,
                                             materialProductName: '',
                                             materialQuantity: '',
+                                            materialSerialNo: '',
+                                            materialUsageData: '',
+                                            materialDescription: '',
                                         }));
                                     }}
                                     fullWidth
@@ -771,14 +764,6 @@ const AddServiceReport = (props) => {
                     </Button>
                     <Button variant="contained" sx={{ bgcolor: '#dc3545', '&:hover': { bgcolor: '#c82333' } }} onClick={handleCancel}>
                         Cancel
-                    </Button>
-                    <Button
-                        variant="contained"
-                        sx={{ bgcolor: '#ffc107', color: 'black', '&:hover': { bgcolor: '#e0a800' } }}
-                        startIcon={<DescriptionIcon />}
-                        onClick={handleCorpcultureReport}
-                    >
-                        Corpculture Report
                     </Button>
                 </Box>
             </Paper>
@@ -799,6 +784,9 @@ const AddServiceReport = (props) => {
                             <TableRow sx={{ bgcolor: '#f0f0f0' }}>
                                 <TableCell>S.No</TableCell>
                                 <TableCell>Product Name</TableCell>
+                                <TableCell>Serial No</TableCell>
+                                <TableCell>Usage Data</TableCell>
+                                <TableCell>Description</TableCell>
                                 <TableCell align="right">Quantity</TableCell>
                                 <TableCell align="right">Total Amount</TableCell>
                                 <TableCell align="center">Action</TableCell>
@@ -807,7 +795,7 @@ const AddServiceReport = (props) => {
                         <TableBody>
                             {group.products.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={5} align="center" sx={{ py: 3, color: 'text.secondary' }}>
+                                    <TableCell colSpan={8} align="center" sx={{ py: 3, color: 'text.secondary' }}>
                                         No products added to this group yet.
                                     </TableCell>
                                 </TableRow>
@@ -821,6 +809,9 @@ const AddServiceReport = (props) => {
                                         <TableRow key={product.id}>
                                             <TableCell>{productIdx + 1}</TableCell>
                                             <TableCell>{productName}</TableCell>
+                                            <TableCell>{product.serialNo || '—'}</TableCell>
+                                            <TableCell>{product.usageData || '—'}</TableCell>
+                                            <TableCell>{product.description || '—'}</TableCell>
                                             <TableCell align="right">{product.quantity}</TableCell>
                                             <TableCell align="right">{product.totalAmount}</TableCell>
                                             <TableCell align="center">

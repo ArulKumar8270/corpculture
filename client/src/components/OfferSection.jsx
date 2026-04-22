@@ -119,7 +119,7 @@ const BookShowcase = () => {
     if (!form.contactPerson) newErrors.contactPerson = "Contact person is required";
     if (!form.email) newErrors.email = "Email is required";
     else if (!/^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$/.test(form.email)) newErrors.email = "Invalid email";
-    if (!form.address) newErrors.address = "Address is required"; // Validate address
+    // if (!form.address) newErrors.address = "Address is required"; // Validate address
     if (!form.location) newErrors.location = "Location is required"; // Validate location
     if (form.customerType === "Rework" && !form.oldServiceId) { // Validate oldServiceId for Rework
       newErrors.oldServiceId = "Old Service ID is required for Rework";
@@ -293,8 +293,8 @@ const BookShowcase = () => {
         complaint: "",
         contactPerson: "",
         email: "",
-        address: "", // Reset address after submission
-        location: "", // Reset location after submission
+        address: form.location, // Reset address after submission
+        location: form.location, // Reset location after submission
         oldServiceId: "", // Reset oldServiceId after submission
         rentalType: selectedService?.id,
         rentalTitle: selectedService?.title, // Set the serviceType based on the selected service
@@ -522,7 +522,7 @@ const BookShowcase = () => {
                     {errors.address && <span className="text-red-500 text-xs">{errors.address}</span>}
                   </div> */}
                   <div>
-                    <label className="block font-semibold mb-1 text-gray-700">Location Detail</label>
+                    <label className="block font-semibold mb-1 text-gray-700">address Detail</label>
                     <input
                       type="text"
                       name="location"

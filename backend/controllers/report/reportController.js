@@ -23,8 +23,11 @@ export const createReport = async (req, res) => {
         } = req.body;
 
         // Basic Validation
-        if (!reportType || !company || !problemReport || !modelNo || !serialNo || !branch) {
-            return res.status(400).send({ success: false, message: 'Missing required fields: reportType, company, problemReport, modelNo, serialNo, branch.' });
+        if (!reportType || !company || !problemReport || !branch) {
+            return res.status(400).send({
+                success: false,
+                message: 'Missing required fields: reportType, company, problemReport, branch.',
+            });
         }
 
         // Validate Company ID

@@ -19,6 +19,16 @@ import axios from 'axios';
 import { getApiBaseUrl } from '../../services/api';
 import Toast from 'react-native-toast-message';
 
+function companyIdFromReport(report: any): string | undefined {
+  const c = report?.company;
+  if (c && typeof c === 'object' && c._id) return String(c._id);
+  if (typeof c === 'string' && c.trim()) return c.trim();
+  const cid = report?.companyId;
+  if (cid && typeof cid === 'object' && cid._id) return String(cid._id);
+  if (typeof cid === 'string' && cid.trim()) return cid.trim();
+  return undefined;
+}
+
 const RentalReportsScreen = () => {
   const navigation = useNavigation();
   const { user, token } = useSelector((state: RootState) => state.auth);
@@ -174,6 +184,24 @@ const RentalReportsScreen = () => {
     ]);
   };
 
+  const navigatePetrolForm = (report: any) => {
+    const preselectedFromCompanyId = companyIdFromReport(report);
+    if (!preselectedFromCompanyId) {
+      Toast.show({
+        type: 'info',
+        text1: 'No company on this report',
+        text2: 'Cannot pre-fill petrol form company.',
+      });
+      return;
+    }
+    const params = { preselectedFromCompanyId };
+    if (Number(user?.role) === 1) {
+      (navigation as any).navigate('Employees', { screen: 'ActivityLogForm', params });
+    } else {
+      (navigation as any).navigate('Profile', { screen: 'ActivityLogForm', params });
+    }
+  };
+
   const handleSendReport = async (reportId: string, companyId: string) => {
     setSendingReport(reportId);
     try {
@@ -308,6 +336,15 @@ const RentalReportsScreen = () => {
               </>
             )}
           </TouchableOpacity>
+          {(user?.role === 1 || user?.role === 3) && companyIdFromReport(item) ? (
+            <TouchableOpacity
+              style={[styles.actionButton, styles.editButton]}
+              onPress={() => navigatePetrolForm(item)}
+            >
+              <Icon name="playlist-add-check" size={18} color="#007AFF" />
+              <Text style={styles.actionButtonText}>Petrol Form</Text>
+            </TouchableOpacity>
+          ) : null}
           {(hasPermission('rentalReport', 'edit') || user?.role === 1) && (
             <TouchableOpacity
               style={[styles.actionButton, styles.editButton]}

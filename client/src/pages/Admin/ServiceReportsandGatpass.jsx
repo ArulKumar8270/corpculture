@@ -34,6 +34,7 @@ import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown'; // Im
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';   // Import up arrow icon
 import SendIcon from '@mui/icons-material/Send'; // Import SendIcon
 import DownloadIcon from '@mui/icons-material/Download';
+import LocalGasStationIcon from '@mui/icons-material/LocalGasStation';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import axios from 'axios';
@@ -64,6 +65,20 @@ const ServiceReportsandGatpass = (props) => {
 
     const hasPermission = (key) => {
         return userPermissions.some(p => p.key === key && p.actions.includes('edit')) || auth?.user?.role === 1;
+    };
+
+    const goToPetrolForm = (report) => {
+        const companyId =
+            typeof report?.company === 'object'
+                ? report?.company?._id
+                : report?.company;
+        if (!companyId) {
+            toast.error('Company not found for this report.');
+            return;
+        }
+        navigate('/admin/dashboard/activity-log', {
+            state: { preselectedCompany: { _id: companyId } },
+        });
     };
 
     const fetchReports = async (
@@ -434,11 +449,7 @@ const ServiceReportsandGatpass = (props) => {
                                 <TableCell>Report Type</TableCell>
                                 <TableCell>Company</TableCell>
                                 <TableCell>Problem Report</TableCell>
-                                <TableCell>Model No</TableCell>
-                                <TableCell>Serial No</TableCell>
                                 <TableCell>Branch</TableCell>
-                                <TableCell>Usage Data</TableCell>
-                                <TableCell>Description</TableCell>
                                 <TableCell>Submitted At</TableCell>
                                 <TableCell>Assigned To</TableCell>
                                 <TableCell align="center">Actions</TableCell>
@@ -468,11 +479,7 @@ const ServiceReportsandGatpass = (props) => {
                                             <TableCell>{report.reportType}</TableCell>
                                             <TableCell>{report.company?.companyName || 'N/A'}</TableCell> {/* Assuming company is populated */}
                                             <TableCell>{report.problemReport}</TableCell>
-                                            <TableCell>{report.modelNo}</TableCell>
-                                            <TableCell>{report.serialNo}</TableCell>
                                             <TableCell>{report.branch}</TableCell>
-                                            <TableCell>{report.usageData || 'N/A'}</TableCell>
-                                            <TableCell>{report.description || 'N/A'}</TableCell>
                                             <TableCell>{new Date(report.createdAt).toLocaleDateString()}</TableCell>
                                             <TableCell>
                                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -502,6 +509,13 @@ const ServiceReportsandGatpass = (props) => {
                                                         {onSendn8n ? <CircularProgress size={24} /> : <SendIcon />}
                                                     </IconButton>
                                                 </Tooltip>
+                                                {auth?.user?.role === 3 && (report?.company?._id || report?.company) ? (
+                                                    <Tooltip title="Petrol Form">
+                                                        <IconButton onClick={() => goToPetrolForm(report)} color="primary">
+                                                            <LocalGasStationIcon />
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                ) : null}
                                                 <Tooltip title="Download Report">
                                                     <IconButton onClick={() => handleDownloadReport(report._id)} color="primary">
                                                         <DownloadIcon />
@@ -521,7 +535,7 @@ const ServiceReportsandGatpass = (props) => {
                                         </TableRow>
                                         {/* Expanded row for materials */}
                                         <TableRow>
-                                            <TableCell style={{ paddingBottom: 0, paddingTop: 0, width: "100%" }} colSpan={12}> {/* Adjusted colspan */}
+                                            <TableCell style={{ paddingBottom: 0, paddingTop: 0, width: "100%" }} colSpan={9}> {/* Adjusted colspan */}
                                                 <Collapse in={expandedReportId === report._id} timeout="auto" unmountOnExit>
                                                     <Box sx={{ margin: 1 }}>
                                                         <Typography variant="h6" gutterBottom component="div">
@@ -539,6 +553,9 @@ const ServiceReportsandGatpass = (props) => {
                                                                             <TableHead>
                                                                                 <TableRow>
                                                                                     <TableCell>Product Name</TableCell>
+                                                                                    <TableCell>Serial No</TableCell>
+                                                                                    <TableCell>Usage Data</TableCell>
+                                                                                    <TableCell>Description</TableCell>
                                                                                     <TableCell align="right">Quantity</TableCell>
                                                                                     <TableCell align="right">Rate</TableCell>
                                                                                     <TableCell align="right">Total Amount</TableCell>
@@ -550,6 +567,9 @@ const ServiceReportsandGatpass = (props) => {
                                                                                         <TableCell component="th" scope="row">
                                                                                             {material.productName}
                                                                                         </TableCell>
+                                                                                        <TableCell>{material.serialNo || '—'}</TableCell>
+                                                                                        <TableCell>{material.usageData || '—'}</TableCell>
+                                                                                        <TableCell>{material.description || '—'}</TableCell>
                                                                                         <TableCell align="right">{material.quantity}</TableCell>
                                                                                         <TableCell align="right">{material.rate}</TableCell>
                                                                                         <TableCell align="right">{material.totalAmount}</TableCell>
