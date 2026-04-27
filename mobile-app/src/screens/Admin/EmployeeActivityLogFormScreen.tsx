@@ -44,6 +44,7 @@ const EmployeeActivityLogFormScreen = () => {
   const [toCompany, setToCompany] = useState<any>(null);
   const [companyPicker, setCompanyPicker] = useState<'from' | 'to' | null>(null);
   const [companySearch, setCompanySearch] = useState('');
+  const [petrolPricePerKm, setPetrolPricePerKm] = useState(0);
 
   const filteredCompanies = useMemo(() => {
     const q = companySearch.trim().toLowerCase();
@@ -73,6 +74,30 @@ const EmployeeActivityLogFormScreen = () => {
       if (token) fetchCompanies();
     }, [token])
   );
+
+  useEffect(() => {
+    const fetchPetrolPrice = async () => {
+      if (!token) return;
+      try {
+        const { data } = await axios.get(`${getApiBaseUrl()}/common-details`, {
+          headers: { Authorization: token || '' },
+        });
+        if (data?.success) {
+          const v = Number(data?.commonDetails?.petrolPricePerKm || 0);
+          setPetrolPricePerKm(Number.isFinite(v) ? v : 0);
+        }
+      } catch {
+        setPetrolPricePerKm(0);
+      }
+    };
+    fetchPetrolPrice();
+  }, [token]);
+
+  const calcAmount = (km: unknown) => {
+    const n = Number(km);
+    if (!Number.isFinite(n)) return 0;
+    return n * petrolPricePerKm;
+  };
 
   const fetchLogForEdit = useCallback(async () => {
     if (!token || !editLogId) return;
@@ -281,6 +306,17 @@ const EmployeeActivityLogFormScreen = () => {
           placeholderTextColor="#999"
         />
 
+        <Text style={styles.label}>Amount (₹)</Text>
+        <TextInput
+          style={[styles.input, styles.inputDisabled]}
+          value={petrolPricePerKm > 0 && form.km !== '' ? calcAmount(form.km).toFixed(2) : ''}
+          editable={false}
+          placeholder={
+            petrolPricePerKm > 0 ? `KM × ₹${petrolPricePerKm}/KM` : 'Set Petrol Price (₹/KM) in Settings'
+          }
+          placeholderTextColor="#999"
+        />
+
         <Text style={styles.label}>In Time</Text>
         <TextInput
           style={styles.input}
@@ -420,6 +456,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     backgroundColor: '#fff',
   },
+  inputDisabled: { backgroundColor: '#f0f0f0', color: '#555' },
   textArea: { minHeight: 80, textAlignVertical: 'top' },
   pickerButton: {
     flexDirection: 'row',

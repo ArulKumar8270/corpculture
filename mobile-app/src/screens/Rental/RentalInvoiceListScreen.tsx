@@ -685,19 +685,31 @@ const RentalInvoiceListScreen = () => {
   const onSendInvoice = async (entry: any) => {
     setSendingInvoice(entry._id);
     try {
-      await axios.post('https://n8n.nicknameinfo.net/webhook/f8d3ad37-a38e-4a38-a06e-09c74fdc3b91', {
+      // Rental invoices use a different n8n webhook than service invoices.
+      await axios.post('https://n8n.nicknameinfo.net/webhook/60f841c0-76d9-47c3-8a4c-7129ceca00df', {
         invoiceId: entry._id,
-      });
+      }, { timeout: 30000 });
+      try {
+        await axios.put(
+          `${getApiBaseUrl()}/rental-payment/${entry._id}`,
+          { invoiceSendStatus: 'Sent', invoiceSentAt: new Date().toISOString() },
+          { headers: { Authorization: token || '' }, timeout: 30000 }
+        );
+      } catch {
+        // ignore: webhook already triggered
+      }
       Toast.show({
         type: 'success',
         text1: 'Success',
         text2: 'Invoice sent successfully!',
       });
+      fetchRentalEntries();
     } catch (error: any) {
+      console.error('Send rental invoice failed:', error?.response?.status, error?.response?.data || error?.message);
       Toast.show({
         type: 'error',
         text1: 'Error',
-        text2: 'Failed to send invoice',
+        text2: error?.response?.data?.message || error?.message || 'Failed to send invoice',
       });
     } finally {
       setSendingInvoice(null);

@@ -280,8 +280,7 @@ const RentalReportsScreen = () => {
           <View style={styles.reportHeaderLeft}>
             <Text style={styles.reportType}>{item.reportType || 'Rental_Report'}</Text>
             <Text style={styles.companyName}>{item.company?.companyName || 'N/A'}</Text>
-            <Text style={styles.modelNo}>Model: {item.modelNo || 'N/A'}</Text>
-            <Text style={styles.serialNo}>Serial: {item.serialNo || 'N/A'}</Text>
+            {/* Model/Serial/Usage/Description are now per-product (inside Materials) */}
           </View>
           <Icon
             name={isExpanded ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
@@ -298,14 +297,6 @@ const RentalReportsScreen = () => {
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Branch:</Text>
             <Text style={styles.detailValue}>{item.branch || 'N/A'}</Text>
-          </View>
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Usage Data:</Text>
-            <Text style={styles.detailValue}>{item.usageData || 'N/A'}</Text>
-          </View>
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Description:</Text>
-            <Text style={styles.detailValue}>{item.description || 'N/A'}</Text>
           </View>
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Submitted At:</Text>
@@ -377,6 +368,17 @@ const RentalReportsScreen = () => {
                       <View key={matIndex} style={styles.materialRow}>
                         <View style={styles.materialInfo}>
                           <Text style={styles.materialName}>{material.productName}</Text>
+                          {material.serialNo ? (
+                            <Text style={styles.materialDetails}>Serial: {material.serialNo}</Text>
+                          ) : null}
+                          {material.usageData ? (
+                            <Text style={styles.materialDetails}>Usage: {material.usageData}</Text>
+                          ) : null}
+                          {material.description ? (
+                            <Text style={styles.materialDetails} numberOfLines={2}>
+                              Desc: {material.description}
+                            </Text>
+                          ) : null}
                           <Text style={styles.materialDetails}>
                             Qty: {material.quantity} | Rate: ₹{material.rate} | Total: ₹
                             {material.totalAmount}
@@ -394,6 +396,17 @@ const RentalReportsScreen = () => {
                 <View key={matIndex} style={styles.materialRow}>
                   <View style={styles.materialInfo}>
                     <Text style={styles.materialName}>{material.productName}</Text>
+                    {material.serialNo ? (
+                      <Text style={styles.materialDetails}>Serial: {material.serialNo}</Text>
+                    ) : null}
+                    {material.usageData ? (
+                      <Text style={styles.materialDetails}>Usage: {material.usageData}</Text>
+                    ) : null}
+                    {material.description ? (
+                      <Text style={styles.materialDetails} numberOfLines={2}>
+                        Desc: {material.description}
+                      </Text>
+                    ) : null}
                     <Text style={styles.materialDetails}>
                       Qty: {material.quantity} | Rate: ₹{material.rate} | Total: ₹{material.totalAmount}
                     </Text>

@@ -64,7 +64,7 @@ export const getCommonDetails = async (req, res) => {
 // Update Common Details (updates the single document)
 export const updateCommonDetails = async (req, res) => {
     try {
-        const { invoiceCount, reportCount, globalInvoiceFormat, fromMail } = req.body;
+        const { invoiceCount, reportCount, globalInvoiceFormat, fromMail, petrolPricePerKm } = req.body;
 
         // Build update object with only provided fields
         const updateData = {};
@@ -72,6 +72,7 @@ export const updateCommonDetails = async (req, res) => {
         if (reportCount !== undefined) updateData.reportCount = reportCount;
         if (globalInvoiceFormat !== undefined) updateData.globalInvoiceFormat = globalInvoiceFormat;
         if (fromMail !== undefined) updateData.fromMail = fromMail;
+        if (petrolPricePerKm !== undefined) updateData.petrolPricePerKm = petrolPricePerKm;
 
         // If globalInvoiceFormat is being updated, extract the starting number from it
         // and automatically sync the invoiceCount to match the format's starting number

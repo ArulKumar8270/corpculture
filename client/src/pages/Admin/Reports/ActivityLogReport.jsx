@@ -41,10 +41,30 @@ const ActivityLogReport = () => {
     const [totalCount, setTotalCount] = useState(0);
     const [employees, setEmployees] = useState([]);
     const [loadingEmployees, setLoadingEmployees] = useState(false);
+    const [petrolPricePerKm, setPetrolPricePerKm] = useState(0);
 
     useEffect(() => {
         fetchEmployees();
     }, []);
+
+    useEffect(() => {
+        const fetchCommon = async () => {
+            try {
+                const { data } = await axios.get(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/common-details`,
+                    { headers: { Authorization: auth?.token } }
+                );
+                if (data?.success) {
+                    const v = Number(data?.commonDetails?.petrolPricePerKm || 0);
+                    setPetrolPricePerKm(Number.isFinite(v) ? v : 0);
+                }
+            } catch (e) {
+                // non-blocking: default 0
+                setPetrolPricePerKm(0);
+            }
+        };
+        if (auth?.token) fetchCommon();
+    }, [auth?.token]);
 
     useEffect(() => {
         if (auth?.token) {
@@ -181,6 +201,12 @@ const ActivityLogReport = () => {
             return timeString;
         }
         return timeString;
+    };
+
+    const calcAmount = (km) => {
+        const n = Number(km);
+        if (!Number.isFinite(n)) return 0;
+        return n * petrolPricePerKm;
     };
 
     return (
@@ -327,6 +353,9 @@ const ActivityLogReport = () => {
                                             KM
                                         </TableCell>
                                         <TableCell sx={{ fontWeight: 'bold' }}>
+                                            Amount
+                                        </TableCell>
+                                        <TableCell sx={{ fontWeight: 'bold' }}>
                                             In Time
                                         </TableCell>
                                         <TableCell sx={{ fontWeight: 'bold' }}>
@@ -404,6 +433,11 @@ const ActivityLogReport = () => {
                                             </TableCell>
                                             <TableCell>
                                                 {log.km || 'N/A'}
+                                            </TableCell>
+                                            <TableCell>
+                                                {petrolPricePerKm > 0 && log.km != null
+                                                    ? `₹${calcAmount(log.km).toFixed(2)}`
+                                                    : '—'}
                                             </TableCell>
                                             <TableCell>
                                                 {formatTime(log.inTime)}

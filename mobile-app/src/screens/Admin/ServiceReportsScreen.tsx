@@ -375,16 +375,6 @@ const ServiceReportsScreen = () => {
               </View>
             )}
 
-            {/* Model & Serial Number */}
-            {(item.modelNo || item.serialNo) && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Model & Serial Number</Text>
-                <Text style={styles.sectionText}>
-                  Model: {item.modelNo || 'N/A'} | Serial: {item.serialNo || 'N/A'}
-                </Text>
-              </View>
-            )}
-
             {/* Branch */}
             {item.branch && (
               <View style={styles.section}>
@@ -401,21 +391,7 @@ const ServiceReportsScreen = () => {
               </View>
             )}
 
-            {/* Usage Data */}
-            {item.usageData && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Usage Data</Text>
-                <Text style={styles.sectionText}>{item.usageData}</Text>
-              </View>
-            )}
-
-            {/* Description */}
-            {item.description && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Description</Text>
-                <Text style={styles.sectionText}>{item.description}</Text>
-              </View>
-            )}
+            {/* Model/Serial/Usage/Description are now per-product (inside Materials) */}
 
             {/* Materials */}
             <View style={styles.section}>
@@ -429,6 +405,17 @@ const ServiceReportsScreen = () => {
                         <View key={matIndex} style={styles.materialRow}>
                           <View style={styles.materialInfo}>
                             <Text style={styles.materialName}>{material.productName}</Text>
+                            {material.serialNo ? (
+                              <Text style={styles.materialDetails}>Serial: {material.serialNo}</Text>
+                            ) : null}
+                            {material.usageData ? (
+                              <Text style={styles.materialDetails}>Usage: {material.usageData}</Text>
+                            ) : null}
+                            {material.description ? (
+                              <Text style={styles.materialDetails} numberOfLines={2}>
+                                Desc: {material.description}
+                              </Text>
+                            ) : null}
                             <Text style={styles.materialDetails}>
                               Qty: {material.quantity} | Rate: ₹{material.rate} | Total: ₹
                               {material.totalAmount}
@@ -446,6 +433,17 @@ const ServiceReportsScreen = () => {
                   <View key={matIndex} style={styles.materialRow}>
                     <View style={styles.materialInfo}>
                       <Text style={styles.materialName}>{material.productName}</Text>
+                      {material.serialNo ? (
+                        <Text style={styles.materialDetails}>Serial: {material.serialNo}</Text>
+                      ) : null}
+                      {material.usageData ? (
+                        <Text style={styles.materialDetails}>Usage: {material.usageData}</Text>
+                      ) : null}
+                      {material.description ? (
+                        <Text style={styles.materialDetails} numberOfLines={2}>
+                          Desc: {material.description}
+                        </Text>
+                      ) : null}
                       <Text style={styles.materialDetails}>
                         Qty: {material.quantity} | Rate: ₹{material.rate} | Total: ₹{material.totalAmount}
                       </Text>

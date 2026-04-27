@@ -45,7 +45,6 @@ const AddServiceReport = (props) => {
         company: companyId, // This will store the company _id
         problemReport: '',
         remarksPendingWorks: '',
-        serialNo: '',
         branch: '', // This will store the branch name
         reference: '',
         materialProductName: '', // For adding new material (will store product _id)
@@ -95,7 +94,6 @@ const AddServiceReport = (props) => {
                             company: fetchedReport.company?._id || '', // Assuming company is populated
                             problemReport: fetchedReport.problemReport || '',
                             remarksPendingWorks: fetchedReport.remarksPendingWorks || '',
-                            serialNo: fetchedReport.serialNo || '',
                             branch: fetchedReport.branch || '',
                             reference: fetchedReport.reference || '',
                             materialProductName: '', // Reset for new material entry
@@ -504,7 +502,6 @@ const AddServiceReport = (props) => {
             company: '',
             problemReport: '',
             remarksPendingWorks: '',
-            serialNo: '',
             branch: '',
             reference: '',
             materialProductName: '',
@@ -589,18 +586,7 @@ const AddServiceReport = (props) => {
                             size="small"
                         />
                     </Grid>
-                    <Grid item xs={12} sm={6}>
-                        <TextField
-                            fullWidth
-                            margin="normal"
-                            label="Serial No"
-                            name="serialNo"
-                            value={reportData.serialNo}
-                            onChange={handleChange}
-                            placeholder="ENTER SERIAL NO"
-                            size="small"
-                        />
-                    </Grid>
+                    {/* Serial No is now material-wise (in Materials) */}
                     <Grid item xs={12} sm={6}>
                         <FormControl fullWidth margin="normal" size="small">
                             <InputLabel id="branch-label">Branch</InputLabel>
@@ -692,7 +678,7 @@ const AddServiceReport = (props) => {
                         <Grid item xs={12} sm={6}>
                             <TextField
                                 fullWidth
-                                label="Serial No (per product)"
+                                label="Serial No (material wise)"
                                 name="materialSerialNo"
                                 value={reportData.materialSerialNo}
                                 onChange={handleChange}
@@ -703,7 +689,7 @@ const AddServiceReport = (props) => {
                         <Grid item xs={12} sm={6}>
                             <TextField
                                 fullWidth
-                                label="Usage Data (per product)"
+                                label="Usage Data (material wise)"
                                 name="materialUsageData"
                                 value={reportData.materialUsageData}
                                 onChange={handleChange}
@@ -714,7 +700,7 @@ const AddServiceReport = (props) => {
                         <Grid item xs={12}>
                             <TextField
                                 fullWidth
-                                label="Description (per product)"
+                                label="Description (material wise)"
                                 name="materialDescription"
                                 value={reportData.materialDescription}
                                 onChange={handleChange}
@@ -784,9 +770,9 @@ const AddServiceReport = (props) => {
                             <TableRow sx={{ bgcolor: '#f0f0f0' }}>
                                 <TableCell>S.No</TableCell>
                                 <TableCell>Product Name</TableCell>
-                                <TableCell>Serial No</TableCell>
-                                <TableCell>Usage Data</TableCell>
-                                <TableCell>Description</TableCell>
+                                <TableCell>Material Serial No</TableCell>
+                                <TableCell>Material Usage Data</TableCell>
+                                <TableCell>Material Description</TableCell>
                                 <TableCell align="right">Quantity</TableCell>
                                 <TableCell align="right">Total Amount</TableCell>
                                 <TableCell align="center">Action</TableCell>

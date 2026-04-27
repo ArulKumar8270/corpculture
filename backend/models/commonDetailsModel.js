@@ -17,6 +17,11 @@ const commonDetailsSchema = new mongoose.Schema({
         type: String,
         trim: true,
     },
+    petrolPricePerKm: {
+        type: Number,
+        default: 0,
+        min: 0,
+    },
 }, { timestamps: true });
 
 export default mongoose.model('CommonDetails', commonDetailsSchema);

@@ -23,6 +23,7 @@ const EmployeeActivityLogForm = () => {
     const preselectedCompany = location.state?.preselectedCompany;
     const editLogId = location.state?.editLogId;
     const isAdmin = Number(auth?.user?.role) === 1;
+    const [petrolPricePerKm, setPetrolPricePerKm] = useState(0);
     const [companies, setCompanies] = useState([]);
     const [loading, setLoading] = useState(false);
 
@@ -93,8 +94,33 @@ const EmployeeActivityLogForm = () => {
     const leaveOrWorkOptions = ['LEAVE', 'WORK'];
 
     useEffect(() => {
-        fetchCompanies();
-    }, []);
+        if (auth?.token) fetchCompanies();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [auth?.token]);
+
+    useEffect(() => {
+        const fetchPrice = async () => {
+            try {
+                const { data } = await axios.get(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/common-details`,
+                    { headers: { Authorization: auth?.token } }
+                );
+                if (data?.success) {
+                    const v = Number(data?.commonDetails?.petrolPricePerKm || 0);
+                    setPetrolPricePerKm(Number.isFinite(v) ? v : 0);
+                }
+            } catch {
+                setPetrolPricePerKm(0);
+            }
+        };
+        if (auth?.token) fetchPrice();
+    }, [auth?.token]);
+
+    const calcAmount = (km) => {
+        const n = Number(km);
+        if (!Number.isFinite(n)) return 0;
+        return n * petrolPricePerKm;
+    };
 
     const fetchCompanies = async () => {
         try {
@@ -151,6 +177,25 @@ const EmployeeActivityLogForm = () => {
         };
     };
 
+    const findCompanyFromList = useCallback(
+        (companyId, companyName) => {
+            const id = companyId != null ? String(companyId) : '';
+            if (id) {
+                const byId = companies.find((c) => String(c?._id) === id);
+                if (byId) return byId;
+            }
+            const name = String(companyName || '').trim().toLowerCase();
+            if (name) {
+                const byName = companies.find(
+                    (c) => String(c?.companyName || '').trim().toLowerCase() === name
+                );
+                if (byName) return byName;
+            }
+            return null;
+        },
+        [companies]
+    );
+
     const fetchLogForEdit = useCallback(
         async (id) => {
             if (!auth?.token || !id) return;
@@ -181,8 +226,10 @@ const EmployeeActivityLogForm = () => {
                 // Build routeDraft from company list
                 const fromCompanyId = (log.fromCompany?._id || log.fromCompany)?.toString();
                 const toCompanyId = (log.toCompany?._id || log.toCompany)?.toString();
-                const fromCompanyObj = companies.find((c) => c._id === fromCompanyId) || null;
-                const toCompanyObj = companies.find((c) => c._id === toCompanyId) || null;
+                const fromCompanyObj =
+                    findCompanyFromList(fromCompanyId, log.fromCompanyName) || null;
+                const toCompanyObj =
+                    findCompanyFromList(toCompanyId, log.toCompanyName) || null;
 
                 const fromAddr = hydrateAddressForCompany(
                     fromCompanyObj,
@@ -211,7 +258,7 @@ const EmployeeActivityLogForm = () => {
             }
         },
         // eslint-disable-next-line react-hooks/exhaustive-deps
-        [auth?.token, isAdmin, companies, getAddressOptionsForCompany]
+        [auth?.token, isAdmin, companies, getAddressOptionsForCompany, findCompanyFromList]
     );
 
     useEffect(() => {
@@ -498,6 +545,25 @@ const EmployeeActivityLogForm = () => {
                                 value={formData.km}
                                 onChange={handleInputChange}
                                 inputProps={{ min: 0 }}
+                            />
+                        </Grid>
+
+                        {/* Amount (auto) */}
+                        <Grid item xs={12} md={4}>
+                            <TextField
+                                fullWidth
+                                label="Amount (₹)"
+                                value={
+                                    petrolPricePerKm > 0 && formData.km !== ''
+                                        ? calcAmount(formData.km).toFixed(2)
+                                        : ''
+                                }
+                                InputProps={{ readOnly: true }}
+                                helperText={
+                                    petrolPricePerKm > 0
+                                        ? `Calculated as KM × ₹${petrolPricePerKm}/KM`
+                                        : 'Set Petrol Price (₹/KM) in Settings to calculate amount'
+                                }
                             />
                         </Grid>
 

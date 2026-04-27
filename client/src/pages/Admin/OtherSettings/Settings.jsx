@@ -27,6 +27,7 @@ const Settings = () => {
     const [settings, setSettings] = useState({
         globalInvoiceFormat: '',
         fromMail: '',
+        petrolPricePerKm: '',
     });
     const [mailInputType, setMailInputType] = useState('select'); // 'select' or 'custom'
 
@@ -60,6 +61,11 @@ const Settings = () => {
                 setSettings({
                     globalInvoiceFormat: data.commonDetails?.globalInvoiceFormat || '',
                     fromMail: savedMail,
+                    petrolPricePerKm:
+                        data.commonDetails?.petrolPricePerKm !== undefined &&
+                        data.commonDetails?.petrolPricePerKm !== null
+                            ? String(data.commonDetails.petrolPricePerKm)
+                            : '',
                 });
                 // Determine if saved mail is predefined or custom
                 setMailInputType(predefinedMails.includes(savedMail) ? 'select' : 'custom');
@@ -90,6 +96,10 @@ const Settings = () => {
                 {
                     globalInvoiceFormat: settings.globalInvoiceFormat,
                     fromMail: settings.fromMail, // Keep existing fromMail value
+                    petrolPricePerKm:
+                        settings.petrolPricePerKm === ''
+                            ? 0
+                            : Number(settings.petrolPricePerKm),
                 },
                 {
                     headers: {
@@ -124,6 +134,10 @@ const Settings = () => {
                 {
                     globalInvoiceFormat: settings.globalInvoiceFormat,
                     fromMail: settings.fromMail,
+                    petrolPricePerKm:
+                        settings.petrolPricePerKm === ''
+                            ? 0
+                            : Number(settings.petrolPricePerKm),
                 },
                 {
                     headers: {
@@ -241,6 +255,21 @@ const Settings = () => {
                             helperText="Enter a valid email address"
                         />
                     )}
+
+                    <TextField
+                        fullWidth
+                        margin="normal"
+                        label="Petrol Price (₹ per KM)"
+                        name="petrolPricePerKm"
+                        type="number"
+                        inputProps={{ min: 0, step: '0.01' }}
+                        value={settings.petrolPricePerKm}
+                        onChange={handleChange}
+                        variant="outlined"
+                        size="small"
+                        placeholder="e.g., 12"
+                        helperText="Used to calculate Petrol Form Report amount = KM × price."
+                    />
 
                     {hasPermission('otherSettingsSettings') && (
                         <Button
