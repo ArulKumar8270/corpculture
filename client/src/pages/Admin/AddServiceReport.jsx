@@ -40,6 +40,7 @@ const AddServiceReport = (props) => {
     const companyId = searchParams.get("companyId");
     // State for form fields
     const [reportData, setReportData] = useState({
+        reportNumber: '',
         reportType: reportFor || 'Service_Report', // Default to 'Service_Report'
         reportFor: reportFor,
         company: companyId, // This will store the company _id
@@ -89,6 +90,7 @@ const AddServiceReport = (props) => {
                     if (reportResponse.data.success) {
                         const fetchedReport = reportResponse.data.report;
                         setReportData({
+                            reportNumber: fetchedReport.reportNumber ?? '',
                             reportType: fetchedReport.reportType || 'Service_Report',
                             reportFor: fetchedReport.reportFor || 'service',
                             company: fetchedReport.company?._id || '', // Assuming company is populated
@@ -485,6 +487,9 @@ const AddServiceReport = (props) => {
 
 
             if (response.data.success) {
+                if (!reportId && response?.data?.report?.reportNumber != null) {
+                    toast.success(`Report created. Report No: ${response.data.report.reportNumber}`);
+                }
                 alert(response.data.message);
                 handleCancel(); // Reset form after successful submission/update
                 navigate('../serviceReportlist'); // Changed from ../serviceReportlist
@@ -498,6 +503,7 @@ const AddServiceReport = (props) => {
 
     const handleCancel = () => {
         setReportData({
+            reportNumber: '',
             reportType: 'Service_Report',
             company: '',
             problemReport: '',
@@ -527,7 +533,7 @@ const AddServiceReport = (props) => {
     return (
         <Box sx={{ p: 3, bgcolor: 'background.default', minHeight: '100vh' }}>
             <Typography variant="h5" component="h1" gutterBottom sx={{ mb: 3, color: '#019ee3', fontWeight: 'bold' }}>
-                {reportId ? `Edit ${reportFor}` : `Add ${reportFor}`} {/* Dynamic Title */}
+                {reportId ? `Edit` : `Add`} {/* Dynamic Title */}
             </Typography>
 
             <Paper elevation={3} sx={{ p: 4, mb: 4, borderRadius: '8px' }}>

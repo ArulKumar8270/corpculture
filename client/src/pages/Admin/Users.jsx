@@ -4,6 +4,7 @@ import { useAuth } from '../../context/auth';
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, TextField, Button,
   CircularProgress,
+  TablePagination,
   Select, MenuItem, FormControl, InputLabel, OutlinedInput, Chip, Box // Added new imports
 } from '@mui/material';
 import toast from 'react-hot-toast';
@@ -20,6 +21,8 @@ const Users = () => {
   const [isUpdating, setIsUpdating] = useState(false);
   const [categories, setCategories] = useState([]); // New state for categories
   const [searchQuery, setSearchQuery] = useState(''); // New state for search query
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
 
   useEffect(() => {
     fetchUsers();
@@ -38,7 +41,12 @@ const Users = () => {
           Authorization: auth.token,
         },
       });
-      let fetchedUsers = res.data.users || [];
+      const fetchedUsers = (res.data.users || []).map((u) => ({
+        ...u,
+        // Normalize to boolean for consistent checkbox behavior
+        isCommissionEnabled: Boolean(u?.isCommissionEnabled),
+        commission: Number(u?.commission || 0),
+      }));
       setUsers(fetchedUsers);
     } catch (error) {
       console.error("Error fetching users:", error);
@@ -196,8 +204,16 @@ const Users = () => {
     );
   });
 
+  const parentUsers = filteredUsers.filter(
+    (u) => !u.parentId && u?.role !== 3 && u?.role !== 1
+  );
+  const paginatedParents = parentUsers.slice(
+    page * rowsPerPage,
+    page * rowsPerPage + rowsPerPage
+  );
+
   return (
-    <div className="p-6 bg-gradient-to-br from-[#e6fbff] to-[#f7fafd] min-h-screen">
+    <div className="p-6 bg-gradient-to-br from-[#e6fbff] to-[#f7fafd] min-h-screen w-[87%]">
       <h1 className="text-2xl font-bold mb-6 text-[#019ee3]">Users</h1>
 
       {/* Search Input Field */}
@@ -217,31 +233,29 @@ const Users = () => {
         <div className="text-center py-10 text-lg text-gray-500">Loading...</div>
       ) : (
         <div className="overflow-x-auto bg-white rounded-xl shadow p-4">
-          <table className="min-w-full text-sm">
+          <table className="min-w-[1200px] w-full text-sm">
             <thead>
               <tr className="bg-gradient-to-r from-[#019ee3] to-[#afcb09] text-white">
-                <th className="py-2 px-3">Name</th>
-                <th className="py-2 px-3">Email</th>
-                <th className="py-2 px-3">Phone</th>
+                <th className="py-2 px-3 whitespace-nowrap">Name</th>
+                <th className="py-2 px-3 whitespace-nowrap">Email</th>
+                <th className="py-2 px-3 whitespace-nowrap">Phone</th>
                 <th className="py-2 px-3">Address</th>
-                <th className="py-2 px-3">Role</th>
-                <th className="py-2 px-3">Commission</th>
-                <th className="py-2 px-3">Is Commission</th>
-                <th className="py-2 px-3">PAN Number</th>
-                <th className="py-2 px-3">PAN Name</th>
-                <th className="py-2 px-3">Created</th>
-                {hasPermission("reportsUserList") ? <th className="py-2 px-3">Action</th> : null}
+                <th className="py-2 px-3 whitespace-nowrap">Role</th>
+                <th className="py-2 px-3 whitespace-nowrap">Commission</th>
+                <th className="py-2 px-3 whitespace-nowrap">Is Commission</th>
+                <th className="py-2 px-3 whitespace-nowrap">PAN Number</th>
+                <th className="py-2 px-3 whitespace-nowrap">PAN Name</th>
+                <th className="py-2 px-3 whitespace-nowrap">Created</th>
+                {hasPermission("reportsUserList") ? <th className="py-2 px-3 whitespace-nowrap">Action</th> : null}
               </tr>
             </thead>
             <tbody>
-              {filteredUsers?.length === 0 ? ( // Use filteredUsers here
+              {parentUsers.length === 0 ? (
                 <tr>
                   <td colSpan={11} className="text-center py-6 text-gray-400">No users found.</td>
                 </tr>
               ) : (
-                filteredUsers
-                  .filter(user => !user.parentId && user?.role !== 3 && user?.role !== 1) // Filter parents from filteredUsers
-                  .map(parent => (
+                paginatedParents.map(parent => (
                     <React.Fragment key={parent._id}>
                       <tr
                         className="border-b last:border-b-0 hover:bg-blue-50 font-semibold"
@@ -265,7 +279,7 @@ const Users = () => {
                         <td className="py-2 px-3">{parent.phone}</td>
                         <td className="py-2 px-3">{parent.address}</td>
                         <td className="py-2 px-3">{parent.role === 1 ? "Admin" : "User"}</td>
-                        <td className="py-2 px-3">{parent.commission?.toFixed(2)}</td>
+                        <td className="py-2 px-3">{Number(parent.commission || 0).toFixed(2)}</td>
                         <td className="py-2 px-3">
                           {!parent.parentId && (
                             <input
@@ -304,7 +318,7 @@ const Users = () => {
                               <td className="py-2 px-3">{child.phone}</td>
                               <td className="py-2 px-3">{child.address}</td>
                               <td className="py-2 px-3">{child.role === 1 ? "Admin" : "User"}</td>
-                              <td className="py-2 px-3">{child.commission?.toFixed(2)}</td>
+                              <td className="py-2 px-3">{Number(child.commission || 0).toFixed(2)}</td>
                               <td className="py-2 px-3"></td>
                               <td className="py-2 px-3">{child.pan?.number || "-"}</td>
                               <td className="py-2 px-3">{child.pan?.name || "-"}</td>
@@ -323,10 +337,25 @@ const Users = () => {
                           ))
                       )}
                     </React.Fragment>
-                  ))
+                ))
               )}
             </tbody>
           </table>
+
+          <div className="mt-2">
+            <TablePagination
+              component="div"
+              count={parentUsers.length}
+              page={page}
+              onPageChange={(_, newPage) => setPage(newPage)}
+              rowsPerPage={rowsPerPage}
+              onRowsPerPageChange={(e) => {
+                setRowsPerPage(parseInt(e.target.value, 10));
+                setPage(0);
+              }}
+              rowsPerPageOptions={[10, 25, 50, 100]}
+            />
+          </div>
         </div>
       )}
 

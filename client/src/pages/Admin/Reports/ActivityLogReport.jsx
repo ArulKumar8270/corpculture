@@ -20,7 +20,7 @@ import {
     Chip,
     Autocomplete,
 } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import axios from 'axios';
 import { useAuth } from '../../../context/auth';
@@ -28,6 +28,7 @@ import dayjs from 'dayjs';
 
 const ActivityLogReport = () => {
     const navigate = useNavigate();
+    const location = useLocation();
     const { auth } = useAuth();
     const [activityLogs, setActivityLogs] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -41,30 +42,10 @@ const ActivityLogReport = () => {
     const [totalCount, setTotalCount] = useState(0);
     const [employees, setEmployees] = useState([]);
     const [loadingEmployees, setLoadingEmployees] = useState(false);
-    const [petrolPricePerKm, setPetrolPricePerKm] = useState(0);
 
     useEffect(() => {
         fetchEmployees();
     }, []);
-
-    useEffect(() => {
-        const fetchCommon = async () => {
-            try {
-                const { data } = await axios.get(
-                    `${import.meta.env.VITE_SERVER_URL}/api/v1/common-details`,
-                    { headers: { Authorization: auth?.token } }
-                );
-                if (data?.success) {
-                    const v = Number(data?.commonDetails?.petrolPricePerKm || 0);
-                    setPetrolPricePerKm(Number.isFinite(v) ? v : 0);
-                }
-            } catch (e) {
-                // non-blocking: default 0
-                setPetrolPricePerKm(0);
-            }
-        };
-        if (auth?.token) fetchCommon();
-    }, [auth?.token]);
 
     useEffect(() => {
         if (auth?.token) {
@@ -77,7 +58,8 @@ const ActivityLogReport = () => {
                 rowsPerPage
             );
         }
-    }, [auth?.token, page, rowsPerPage]);
+        // Re-fetch when navigating back from Edit screen as well.
+    }, [auth?.token, page, rowsPerPage, location.key]);
 
     const fetchEmployees = async () => {
         try {
@@ -120,11 +102,17 @@ const ActivityLogReport = () => {
             if (to) queryParams.append('toDate', to);
             if (employeeId) queryParams.append('employeeId', employeeId);
             if (status) queryParams.append('status', status);
+            // Bust browser/proxy cache (prevents 304 stale list after edits)
+            queryParams.append('_ts', String(Date.now()));
 
             const response = await axios.get(
                 `${import.meta.env.VITE_SERVER_URL}/api/v1/employee-activity-log/admin/all?${queryParams.toString()}`,
                 {
-                    headers: { Authorization: auth?.token },
+                    headers: {
+                        Authorization: auth?.token,
+                        'Cache-Control': 'no-cache',
+                        Pragma: 'no-cache',
+                    },
                 }
             );
 
@@ -203,10 +191,10 @@ const ActivityLogReport = () => {
         return timeString;
     };
 
-    const calcAmount = (km) => {
-        const n = Number(km);
-        if (!Number.isFinite(n)) return 0;
-        return n * petrolPricePerKm;
+    const displayAmount = (log) => {
+        const stored = Number(log?.petrolAmount);
+        if (Number.isFinite(stored)) return `₹${stored.toFixed(2)}`;
+        return '—';
     };
 
     return (
@@ -432,12 +420,10 @@ const ActivityLogReport = () => {
                                                 )}
                                             </TableCell>
                                             <TableCell>
-                                                {log.km || 'N/A'}
+                                                {log.km ?? 'N/A'}
                                             </TableCell>
                                             <TableCell>
-                                                {petrolPricePerKm > 0 && log.km != null
-                                                    ? `₹${calcAmount(log.km).toFixed(2)}`
-                                                    : '—'}
+                                                {displayAmount(log)}
                                             </TableCell>
                                             <TableCell>
                                                 {formatTime(log.inTime)}

@@ -78,6 +78,11 @@ const rentalProductSchema = new mongoose.Schema({
         type: Number,
         default: 0,
     },
+    employeeCommission: {
+        type: Number,
+        default: 0,
+        min: 0,
+    },
     modelSpecs: {
         isA3Selected: { type: Boolean, default: false },
         isA4Selected: { type: Boolean, default: false },

@@ -532,7 +532,7 @@ const AddServiceInvoice = () => {
                         employeeId: invoice?.assignedTo?._id, // or employeeName if needed
                         invoiceId: invoice?._id,
                         productId: product.productId,
-                        quantity: product.benefitQuantity,
+                        quantity: product.benefitQuantity === '' || product.benefitQuantity == null ? 0 : Number(product.benefitQuantity),
                         reInstall: product.reInstall || false,
                         otherProducts: product.otherProducts || null,
                     };

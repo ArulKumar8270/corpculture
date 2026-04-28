@@ -38,7 +38,7 @@ const ActivityLogReportScreen = () => {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [employeePickerVisible, setEmployeePickerVisible] = useState(false);
-  const [petrolPricePerKm, setPetrolPricePerKm] = useState(0);
+  // Report shows stored amount from DB (petrolAmount); no need to fetch petrol price here.
 
   const totalPages = Math.ceil(totalCount / ROWS_PER_PAGE) || 1;
 
@@ -99,28 +99,10 @@ const ActivityLogReportScreen = () => {
     if (token) fetchLogs(page);
   }, [page, fetchLogs, token]);
 
-  useEffect(() => {
-    const fetchPetrolPrice = async () => {
-      if (!token) return;
-      try {
-        const { data } = await axios.get(`${getApiBaseUrl()}/common-details`, {
-          headers: { Authorization: token || '' },
-        });
-        if (data?.success) {
-          const v = Number(data?.commonDetails?.petrolPricePerKm || 0);
-          setPetrolPricePerKm(Number.isFinite(v) ? v : 0);
-        }
-      } catch {
-        setPetrolPricePerKm(0);
-      }
-    };
-    fetchPetrolPrice();
-  }, [token]);
-
-  const calcAmount = (km: unknown) => {
-    const n = Number(km);
-    if (!Number.isFinite(n)) return 0;
-    return n * petrolPricePerKm;
+  const displayAmount = (log: any) => {
+    const stored = Number(log?.petrolAmount);
+    if (Number.isFinite(stored)) return `₹${stored.toFixed(2)}`;
+    return '—';
   };
 
   const onRefresh = async () => {
@@ -239,7 +221,7 @@ const ActivityLogReportScreen = () => {
         <View style={styles.cardRow}>
           <Text style={styles.cardLabel}>Amount</Text>
           <Text style={styles.cardValue}>
-            {petrolPricePerKm > 0 && item.km != null ? `₹${calcAmount(item.km).toFixed(2)}` : '—'}
+            {displayAmount(item)}
           </Text>
         </View>
         <View style={styles.cardRow}>

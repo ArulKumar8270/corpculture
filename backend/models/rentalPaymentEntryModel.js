@@ -61,6 +61,12 @@ const rentalPaymentEntrySchema = new mongoose.Schema({
         type: String,
         trim: true,
     },
+    receiptNumber: {
+        type: Number,
+        unique: true,
+        sparse: true,
+        min: 1,
+    },
     machineId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'RentalProduct',

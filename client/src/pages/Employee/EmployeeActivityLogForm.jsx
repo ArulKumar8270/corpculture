@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import { useAuth } from '../../context/auth';
@@ -26,6 +26,7 @@ const EmployeeActivityLogForm = () => {
     const [petrolPricePerKm, setPetrolPricePerKm] = useState(0);
     const [companies, setCompanies] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [editLogRaw, setEditLogRaw] = useState(null);
 
     /** Address rows for a single company (delivery addresses, else billing). */
     const getAddressOptionsForCompany = useCallback((company) => {
@@ -122,6 +123,69 @@ const EmployeeActivityLogForm = () => {
         return n * petrolPricePerKm;
     };
 
+    const getAmountForCurrentKm = useCallback(() => {
+        const v = calcAmount(formData.km);
+        return Number.isFinite(v) && v >= 0 ? v : 0;
+    }, [formData.km, petrolPricePerKm]);
+
+    const isKmChangedOnEdit = useCallback(() => {
+        if (!editLogId) return false;
+        const currentKm = Number(formData.km);
+        const originalKm = Number(editLogRaw?.km);
+        if (!Number.isFinite(currentKm) || !Number.isFinite(originalKm)) return false;
+        return currentKm !== originalKm;
+    }, [editLogId, formData.km, editLogRaw?.km]);
+
+    const getAmountDisplayValue = useCallback(() => {
+        // If KM changed while editing, show recalculated amount
+        if (isKmChangedOnEdit()) {
+            return petrolPricePerKm > 0 && formData.km !== ''
+                ? getAmountForCurrentKm().toFixed(2)
+                : '';
+        }
+
+        // Otherwise show stored DB amount on edit (if available)
+        if (editLogId) {
+            const stored = Number(editLogRaw?.petrolAmount);
+            if (Number.isFinite(stored)) return stored.toFixed(2);
+        }
+
+        // Create mode (or legacy): compute from current KM + settings
+        return petrolPricePerKm > 0 && formData.km !== ''
+            ? getAmountForCurrentKm().toFixed(2)
+            : '';
+    }, [
+        editLogId,
+        editLogRaw?.petrolAmount,
+        formData.km,
+        petrolPricePerKm,
+        getAmountForCurrentKm,
+        isKmChangedOnEdit,
+    ]);
+
+    const getAmountHelperText = useCallback(() => {
+        if (editLogId) {
+            if (isKmChangedOnEdit()) {
+                return petrolPricePerKm > 0
+                    ? `Updated as KM × ₹${petrolPricePerKm}/KM`
+                    : 'Set Petrol Price (₹/KM) in Settings to calculate amount';
+            }
+            return 'Saved amount from DB';
+        }
+        return petrolPricePerKm > 0
+            ? `Calculated as KM × ₹${petrolPricePerKm}/KM`
+            : 'Set Petrol Price (₹/KM) in Settings to calculate amount';
+    }, [editLogId, petrolPricePerKm, isKmChangedOnEdit]);
+
+    const petrolAmountForPayload = useCallback(() => {
+        // Always send amount that matches the current KM input (if settings present),
+        // else fall back to stored DB value on edit, else 0.
+        if (petrolPricePerKm > 0 && formData.km !== '') return getAmountForCurrentKm();
+        const stored = Number(editLogRaw?.petrolAmount);
+        if (editLogId && Number.isFinite(stored) && stored >= 0) return stored;
+        return 0;
+    }, [editLogId, editLogRaw?.petrolAmount, formData.km, petrolPricePerKm, getAmountForCurrentKm]);
+
     const fetchCompanies = async () => {
         try {
             const { data } = await axios.get(
@@ -190,11 +254,52 @@ const EmployeeActivityLogForm = () => {
                     (c) => String(c?.companyName || '').trim().toLowerCase() === name
                 );
                 if (byName) return byName;
+                const byIncludes = companies.find((c) =>
+                    String(c?.companyName || '').trim().toLowerCase().includes(name)
+                );
+                if (byIncludes) return byIncludes;
             }
             return null;
         },
         [companies]
     );
+
+    const companyOptions = useMemo(() => {
+        const list = Array.isArray(companies) ? [...companies] : [];
+        const addIfMissing = (c) => {
+            if (!c) return;
+            const id = String(c?._id || '');
+            const name = String(c?.companyName || '').trim().toLowerCase();
+            const exists = list.some(
+                (x) =>
+                    (id && String(x?._id || '') === id) ||
+                    (name &&
+                        String(x?.companyName || '').trim().toLowerCase() === name)
+            );
+            if (!exists) list.push(c);
+        };
+        addIfMissing(routeDraft.fromCompany);
+        addIfMissing(routeDraft.toCompany);
+        return list;
+    }, [companies, routeDraft.fromCompany, routeDraft.toCompany]);
+
+    const fromAddressOptions = useMemo(() => {
+        const base = routeDraft.fromCompany ? getAddressOptionsForCompany(routeDraft.fromCompany) : [];
+        const val = routeDraft.fromAddress;
+        if (val && !base.some((o) => String(o?._id || '') === String(val?._id || ''))) {
+            return [val, ...base];
+        }
+        return base;
+    }, [routeDraft.fromCompany, routeDraft.fromAddress, getAddressOptionsForCompany]);
+
+    const toAddressOptions = useMemo(() => {
+        const base = routeDraft.toCompany ? getAddressOptionsForCompany(routeDraft.toCompany) : [];
+        const val = routeDraft.toAddress;
+        if (val && !base.some((o) => String(o?._id || '') === String(val?._id || ''))) {
+            return [val, ...base];
+        }
+        return base;
+    }, [routeDraft.toCompany, routeDraft.toAddress, getAddressOptionsForCompany]);
 
     const fetchLogForEdit = useCallback(
         async (id) => {
@@ -213,6 +318,7 @@ const EmployeeActivityLogForm = () => {
                 }
 
                 const log = data.activityLog;
+                setEditLogRaw(log);
                 setFormData((prev) => ({
                     ...prev,
                     date: log?.date ? new Date(log.date).toISOString().split('T')[0] : prev.date,
@@ -223,26 +329,69 @@ const EmployeeActivityLogForm = () => {
                     remarks: log?.remarks ?? '',
                 }));
 
-                // Build routeDraft from company list
+                // Hydrate From/To immediately from DB values (so edit shows even if companies not loaded)
                 const fromCompanyId = (log.fromCompany?._id || log.fromCompany)?.toString();
                 const toCompanyId = (log.toCompany?._id || log.toCompany)?.toString();
                 const fromCompanyObj =
-                    findCompanyFromList(fromCompanyId, log.fromCompanyName) || null;
+                    findCompanyFromList(fromCompanyId, log.fromCompanyName) ||
+                    (fromCompanyId || log.fromCompanyName
+                        ? {
+                              _id: fromCompanyId || 'from_legacy',
+                              companyName: log.fromCompanyName || '—',
+                          }
+                        : null);
                 const toCompanyObj =
-                    findCompanyFromList(toCompanyId, log.toCompanyName) || null;
+                    findCompanyFromList(toCompanyId, log.toCompanyName) ||
+                    (toCompanyId || log.toCompanyName
+                        ? {
+                              _id: toCompanyId || 'to_legacy',
+                              companyName: log.toCompanyName || '—',
+                          }
+                        : null);
 
-                const fromAddr = hydrateAddressForCompany(
-                    fromCompanyObj,
-                    log.fromAddressLine,
-                    log.fromPincode,
-                    `${fromCompanyId || 'from'}_existing`
-                );
-                const toAddr = hydrateAddressForCompany(
-                    toCompanyObj,
-                    log.toAddressLine,
-                    log.toPincode,
-                    `${toCompanyId || 'to'}_existing`
-                );
+                const fromAddr =
+                    hydrateAddressForCompany(
+                        companies.some((c) => String(c?._id) === String(fromCompanyObj?._id))
+                            ? fromCompanyObj
+                            : null,
+                        log.fromAddressLine,
+                        log.fromPincode,
+                        `${fromCompanyId || 'from'}_existing`
+                    ) ||
+                    (log.fromAddressLine
+                        ? {
+                              _id: `${fromCompanyId || 'from'}_existing`,
+                              companyId: fromCompanyId || null,
+                              companyName: log.fromCompanyName || fromCompanyObj?.companyName || '',
+                              addressLine: String(log.fromAddressLine || ''),
+                              pincode: String(log.fromPincode || ''),
+                              label: `${String(log.fromAddressLine || '')}${
+                                  log.fromPincode ? ` (${log.fromPincode})` : ''
+                              }`,
+                          }
+                        : null);
+
+                const toAddr =
+                    hydrateAddressForCompany(
+                        companies.some((c) => String(c?._id) === String(toCompanyObj?._id))
+                            ? toCompanyObj
+                            : null,
+                        log.toAddressLine,
+                        log.toPincode,
+                        `${toCompanyId || 'to'}_existing`
+                    ) ||
+                    (log.toAddressLine
+                        ? {
+                              _id: `${toCompanyId || 'to'}_existing`,
+                              companyId: toCompanyId || null,
+                              companyName: log.toCompanyName || toCompanyObj?.companyName || '',
+                              addressLine: String(log.toAddressLine || ''),
+                              pincode: String(log.toPincode || ''),
+                              label: `${String(log.toAddressLine || '')}${
+                                  log.toPincode ? ` (${log.toPincode})` : ''
+                              }`,
+                          }
+                        : null);
 
                 setRouteDraft({
                     fromCompany: fromCompanyObj,
@@ -262,11 +411,83 @@ const EmployeeActivityLogForm = () => {
     );
 
     useEffect(() => {
-        // Wait for companies list before hydrating routeDraft on edit
-        if (editLogId && companies.length > 0) {
-            fetchLogForEdit(editLogId);
-        }
+        if (editLogId) fetchLogForEdit(editLogId);
     }, [editLogId, companies.length, fetchLogForEdit]);
+
+    useEffect(() => {
+        if (!editLogId || !editLogRaw) return;
+
+        const log = editLogRaw;
+        const fromCompanyId = (log.fromCompany?._id || log.fromCompany)?.toString();
+        const toCompanyId = (log.toCompany?._id || log.toCompany)?.toString();
+        const fromCompanyObj =
+            findCompanyFromList(fromCompanyId, log.fromCompanyName) ||
+            (fromCompanyId || log.fromCompanyName
+                ? {
+                      _id: fromCompanyId || 'from_legacy',
+                      companyName: log.fromCompanyName || '—',
+                  }
+                : null);
+        const toCompanyObj =
+            findCompanyFromList(toCompanyId, log.toCompanyName) ||
+            (toCompanyId || log.toCompanyName
+                ? {
+                      _id: toCompanyId || 'to_legacy',
+                      companyName: log.toCompanyName || '—',
+                  }
+                : null);
+
+        const fromAddr =
+            hydrateAddressForCompany(
+                companies.some((c) => String(c?._id) === String(fromCompanyObj?._id))
+                    ? fromCompanyObj
+                    : null,
+                log.fromAddressLine,
+                log.fromPincode,
+                `${fromCompanyId || 'from'}_existing`
+            ) ||
+            (log.fromAddressLine
+                ? {
+                      _id: `${fromCompanyId || 'from'}_existing`,
+                      companyId: fromCompanyId || null,
+                      companyName: log.fromCompanyName || fromCompanyObj?.companyName || '',
+                      addressLine: String(log.fromAddressLine || ''),
+                      pincode: String(log.fromPincode || ''),
+                      label: `${String(log.fromAddressLine || '')}${
+                          log.fromPincode ? ` (${log.fromPincode})` : ''
+                      }`,
+                  }
+                : null);
+
+        const toAddr =
+            hydrateAddressForCompany(
+                companies.some((c) => String(c?._id) === String(toCompanyObj?._id))
+                    ? toCompanyObj
+                    : null,
+                log.toAddressLine,
+                log.toPincode,
+                `${toCompanyId || 'to'}_existing`
+            ) ||
+            (log.toAddressLine
+                ? {
+                      _id: `${toCompanyId || 'to'}_existing`,
+                      companyId: toCompanyId || null,
+                      companyName: log.toCompanyName || toCompanyObj?.companyName || '',
+                      addressLine: String(log.toAddressLine || ''),
+                      pincode: String(log.toPincode || ''),
+                      label: `${String(log.toAddressLine || '')}${
+                          log.toPincode ? ` (${log.toPincode})` : ''
+                      }`,
+                  }
+                : null);
+
+        setRouteDraft({
+            fromCompany: fromCompanyObj,
+            fromAddress: fromAddr,
+            toCompany: toCompanyObj,
+            toAddress: toAddr,
+        });
+    }, [editLogId, editLogRaw, companies, findCompanyFromList, hydrateAddressForCompany]);
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
@@ -344,6 +565,7 @@ const EmployeeActivityLogForm = () => {
                     toCompanyName: toAddr.companyName || '',
                     toAddressLine: toAddr.addressLine || '',
                     toPincode: toAddr.pincode || '',
+                    petrolAmount: petrolAmountForPayload(),
                 },
                 {
                     headers: {
@@ -421,12 +643,14 @@ const EmployeeActivityLogForm = () => {
                         <Grid item xs={12} md={6}>
                             <Autocomplete
                                 fullWidth
-                                options={companies}
+                                options={companyOptions}
                                 getOptionLabel={(option) =>
                                     option?.companyName || ''
                                 }
                                 isOptionEqualToValue={(option, value) =>
-                                    option?._id === value?._id
+                                    String(option?._id || '') === String(value?._id || '') ||
+                                    String(option?.companyName || '').trim().toLowerCase() ===
+                                        String(value?.companyName || '').trim().toLowerCase()
                                 }
                                 value={routeDraft.fromCompany}
                                 onChange={handleFromCompanyChange}
@@ -444,12 +668,10 @@ const EmployeeActivityLogForm = () => {
                             <Autocomplete
                                 fullWidth
                                 disabled={!routeDraft.fromCompany}
-                                options={getAddressOptionsForCompany(
-                                    routeDraft.fromCompany
-                                )}
+                                options={fromAddressOptions}
                                 getOptionLabel={(option) => option?.label || ''}
                                 isOptionEqualToValue={(option, value) =>
-                                    option?._id === value?._id
+                                    String(option?._id || '') === String(value?._id || '')
                                 }
                                 value={routeDraft.fromAddress}
                                 onChange={handleFromAddressChange}
@@ -480,12 +702,14 @@ const EmployeeActivityLogForm = () => {
                         <Grid item xs={12} md={6}>
                             <Autocomplete
                                 fullWidth
-                                options={companies}
+                                options={companyOptions}
                                 getOptionLabel={(option) =>
                                     option?.companyName || ''
                                 }
                                 isOptionEqualToValue={(option, value) =>
-                                    option?._id === value?._id
+                                    String(option?._id || '') === String(value?._id || '') ||
+                                    String(option?.companyName || '').trim().toLowerCase() ===
+                                        String(value?.companyName || '').trim().toLowerCase()
                                 }
                                 value={routeDraft.toCompany}
                                 onChange={handleToCompanyChange}
@@ -503,12 +727,10 @@ const EmployeeActivityLogForm = () => {
                             <Autocomplete
                                 fullWidth
                                 disabled={!routeDraft.toCompany}
-                                options={getAddressOptionsForCompany(
-                                    routeDraft.toCompany
-                                )}
+                                options={toAddressOptions}
                                 getOptionLabel={(option) => option?.label || ''}
                                 isOptionEqualToValue={(option, value) =>
-                                    option?._id === value?._id
+                                    String(option?._id || '') === String(value?._id || '')
                                 }
                                 value={routeDraft.toAddress}
                                 onChange={handleToAddressChange}
@@ -553,17 +775,9 @@ const EmployeeActivityLogForm = () => {
                             <TextField
                                 fullWidth
                                 label="Amount (₹)"
-                                value={
-                                    petrolPricePerKm > 0 && formData.km !== ''
-                                        ? calcAmount(formData.km).toFixed(2)
-                                        : ''
-                                }
+                                value={getAmountDisplayValue()}
                                 InputProps={{ readOnly: true }}
-                                helperText={
-                                    petrolPricePerKm > 0
-                                        ? `Calculated as KM × ₹${petrolPricePerKm}/KM`
-                                        : 'Set Petrol Price (₹/KM) in Settings to calculate amount'
-                                }
+                                helperText={getAmountHelperText()}
                             />
                         </Grid>
 

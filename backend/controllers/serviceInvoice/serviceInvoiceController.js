@@ -4,6 +4,7 @@ import ServiceProduct from "../../models/serviceProductModel.js"; // Assuming Se
 import Material from "../../models/materialModel.js"; // Import Material model for reducing units
 import cloudinary from "cloudinary";
 import CommonDetails from "../../models/commonDetailsModel.js";
+import Counter from "../../models/counterModel.js";
 // Helper function to calculate totals
 const calculateInvoiceTotals = (products) => {
     let subtotal = 0;
@@ -537,6 +538,30 @@ export const updateServiceInvoice = async (req, res) => {
         const serviceInvoice = await ServiceInvoice.findById(id);
         if (!serviceInvoice) {
             return res.status(404).send({ success: false, message: 'Service Invoice not found.' });
+        }
+
+        const isPaymentUpdate =
+            pendingAmount !== undefined ||
+            tdsAmount !== undefined ||
+            paymentAmountType !== undefined ||
+            paymentAmount !== undefined ||
+            modeOfPayment !== undefined ||
+            bankName !== undefined ||
+            transactionDetails !== undefined ||
+            chequeDate !== undefined ||
+            transferDate !== undefined ||
+            companyNamePayment !== undefined ||
+            otherPaymentMode !== undefined;
+
+        // Auto-generate Receipt No once when payment details are updated
+        if (isPaymentUpdate && serviceInvoice.receiptNumber == null) {
+            const counter = await Counter.findOneAndUpdate(
+                { key: "serviceReceiptNumber" },
+                { $inc: { seq: 1 } },
+                { new: true, upsert: true }
+            ).lean();
+            const next = Number(counter?.seq || 0) || 0;
+            if (next > 0) serviceInvoice.receiptNumber = next;
         }
 
         // Check if moving from quotation to invoice BEFORE updating invoiceType

@@ -37,6 +37,7 @@ const EmployeeActivityLogFormScreen = () => {
   const editLogId = (route.params as any)?.editLogId as string | undefined;
   const preselectedFromCompanyId = (route.params as any)?.preselectedFromCompanyId as string | undefined;
   const isEdit = !!editLogId;
+  const [editLogRaw, setEditLogRaw] = useState<any>(null);
   const [companies, setCompanies] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingCompanies, setLoadingCompanies] = useState(true);
@@ -99,6 +100,59 @@ const EmployeeActivityLogFormScreen = () => {
     return n * petrolPricePerKm;
   };
 
+  const normalizeTime = (t: unknown) => {
+    if (!t) return '';
+    const raw = String(t).trim();
+    if (!raw) return '';
+    const s = raw.replace('.', ':');
+    const m = s.match(/^(\d{1,2}):(\d{1,2})$/);
+    if (!m) return raw;
+    const hh = m[1].padStart(2, '0');
+    const mm = m[2].padStart(2, '0');
+    return `${hh}:${mm}`;
+  };
+
+  const isKmChangedOnEdit = () => {
+    if (!isEdit) return false;
+    const cur = Number(form.km);
+    const orig = Number(editLogRaw?.km);
+    if (!Number.isFinite(cur) || !Number.isFinite(orig)) return false;
+    return cur !== orig;
+  };
+
+  const amountForCurrentKm = () => {
+    const v = calcAmount(form.km);
+    return Number.isFinite(v) && v >= 0 ? v : 0;
+  };
+
+  const getAmountDisplay = () => {
+    if (isEdit && isKmChangedOnEdit()) {
+      return petrolPricePerKm > 0 && form.km !== '' ? amountForCurrentKm().toFixed(2) : '';
+    }
+    if (isEdit) {
+      const stored = Number(editLogRaw?.petrolAmount);
+      if (Number.isFinite(stored)) return stored.toFixed(2);
+    }
+    return petrolPricePerKm > 0 && form.km !== '' ? amountForCurrentKm().toFixed(2) : '';
+  };
+
+  const getAmountHint = () => {
+    if (isEdit) {
+      if (isKmChangedOnEdit()) {
+        return petrolPricePerKm > 0 ? `Updated as KM × ₹${petrolPricePerKm}/KM` : 'Set Petrol Price (₹/KM) in Settings';
+      }
+      return 'Saved amount from DB';
+    }
+    return petrolPricePerKm > 0 ? `KM × ₹${petrolPricePerKm}/KM` : 'Set Petrol Price (₹/KM) in Settings';
+  };
+
+  const petrolAmountForPayload = () => {
+    if (petrolPricePerKm > 0 && form.km !== '') return amountForCurrentKm();
+    const stored = Number(editLogRaw?.petrolAmount);
+    if (isEdit && Number.isFinite(stored) && stored >= 0) return stored;
+    return 0;
+  };
+
   const fetchLogForEdit = useCallback(async () => {
     if (!token || !editLogId) return;
     try {
@@ -111,16 +165,29 @@ const EmployeeActivityLogFormScreen = () => {
         return;
       }
       const log = data.activityLog;
+      setEditLogRaw(log);
       const fromId = (log.fromCompany?._id || log.fromCompany)?.toString();
       const toId = (log.toCompany?._id || log.toCompany)?.toString();
-      setFromCompany(fromId ? companiesById[fromId] || null : null);
-      setToCompany(toId ? companiesById[toId] || null : null);
+      setFromCompany(
+        fromId
+          ? companiesById[fromId] || { _id: fromId, companyName: log.fromCompanyName || '—' }
+          : log.fromCompanyName
+            ? { _id: 'from_legacy', companyName: log.fromCompanyName }
+            : null
+      );
+      setToCompany(
+        toId
+          ? companiesById[toId] || { _id: toId, companyName: log.toCompanyName || '—' }
+          : log.toCompanyName
+            ? { _id: 'to_legacy', companyName: log.toCompanyName }
+            : null
+      );
       setForm((prev) => ({
         ...prev,
         date: log?.date ? new Date(log.date).toISOString().split('T')[0] : prev.date,
         km: log?.km != null ? String(log.km) : '',
-        inTime: log?.inTime || '',
-        outTime: log?.outTime || '',
+        inTime: normalizeTime(log?.inTime),
+        outTime: normalizeTime(log?.outTime),
         callType: log?.callType || '',
         status: log?.status === 'PAID' ? 'PAID' : 'UNPAID',
         remarks: log?.remarks || '',
@@ -192,6 +259,7 @@ const EmployeeActivityLogFormScreen = () => {
         toAddressLine: (toCompany.billingAddress || '').trim() || undefined,
         toPincode: toCompany.pincode ? String(toCompany.pincode) : undefined,
         km: form.km ? Number(form.km) : 0,
+        petrolAmount: petrolAmountForPayload(),
         inTime: form.inTime || undefined,
         outTime: form.outTime || undefined,
         callType: form.callType || undefined,
@@ -309,11 +377,9 @@ const EmployeeActivityLogFormScreen = () => {
         <Text style={styles.label}>Amount (₹)</Text>
         <TextInput
           style={[styles.input, styles.inputDisabled]}
-          value={petrolPricePerKm > 0 && form.km !== '' ? calcAmount(form.km).toFixed(2) : ''}
+          value={getAmountDisplay()}
           editable={false}
-          placeholder={
-            petrolPricePerKm > 0 ? `KM × ₹${petrolPricePerKm}/KM` : 'Set Petrol Price (₹/KM) in Settings'
-          }
+          placeholder={getAmountHint()}
           placeholderTextColor="#999"
         />
 

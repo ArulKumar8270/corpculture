@@ -54,7 +54,8 @@ export const createRentalProduct = async (req, res) => {
             company, branch, department, modelName, serialNo, hsn, basePrice, gstType, paymentDate,
             openingDate, closingDate,
             modelSpecs, a3Config, a4Config, a5Config,
-            commission
+            commission,
+            employeeCommission
         } = req.body;
 
         // Basic Validation
@@ -93,6 +94,7 @@ export const createRentalProduct = async (req, res) => {
             basePrice: parseFloat(basePrice),
             gstType,
             commission,
+            employeeCommission: employeeCommission === undefined || employeeCommission === null || employeeCommission === "" ? 0 : parseFloat(employeeCommission),
             paymentDate: new Date(paymentDate),
             openingDate: openingDate ? new Date(openingDate) : undefined,
             closingDate: closingDate ? new Date(closingDate) : undefined,
@@ -177,7 +179,7 @@ export const updateRentalProduct = async (req, res) => {
         const {
             company, branch, department, modelName, serialNo, hsn, basePrice, gstType, paymentDate,
             openingDate, closingDate,
-            modelSpecs, a3Config, a4Config, a5Config, employeeId, commission
+            modelSpecs, a3Config, a4Config, a5Config, employeeId, commission, employeeCommission
         } = req.body;
 
         const hasAnyDateField =
@@ -268,6 +270,7 @@ export const updateRentalProduct = async (req, res) => {
                 basePrice: parseFloat(basePrice),
                 gstType,
                 commission,
+                employeeCommission: employeeCommission === undefined || employeeCommission === null || employeeCommission === "" ? 0 : parseFloat(employeeCommission),
                 paymentDate: pdFull,
                 openingDate: parseDateInput(openingDate),
                 closingDate: parseDateInput(closingDate),

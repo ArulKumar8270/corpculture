@@ -22,8 +22,9 @@ import { useAuth } from '../../../context/auth';
 const Settings = () => {
     const { auth, userPermissions } = useAuth();
     const [loading, setLoading] = useState(false);
-    const [saving, setSaving] = useState(false);
     const [savingInvoiceFormat, setSavingInvoiceFormat] = useState(false);
+    const [savingFromMail, setSavingFromMail] = useState(false);
+    const [savingPetrolPrice, setSavingPetrolPrice] = useState(false);
     const [settings, setSettings] = useState({
         globalInvoiceFormat: '',
         fromMail: '',
@@ -95,11 +96,7 @@ const Settings = () => {
                 `${import.meta.env.VITE_SERVER_URL}/api/v1/common-details`,
                 {
                     globalInvoiceFormat: settings.globalInvoiceFormat,
-                    fromMail: settings.fromMail, // Keep existing fromMail value
-                    petrolPricePerKm:
-                        settings.petrolPricePerKm === ''
-                            ? 0
-                            : Number(settings.petrolPricePerKm),
+                    // Save invoice format only
                 },
                 {
                     headers: {
@@ -120,20 +117,49 @@ const Settings = () => {
         }
     };
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
+    const handleSaveFromMail = async () => {
         if (!hasPermission('otherSettingsSettings')) {
             toast.error('You do not have permission to update settings');
             return;
         }
 
         try {
-            setSaving(true);
+            setSavingFromMail(true);
             const { data } = await axios.put(
                 `${import.meta.env.VITE_SERVER_URL}/api/v1/common-details`,
                 {
-                    globalInvoiceFormat: settings.globalInvoiceFormat,
                     fromMail: settings.fromMail,
+                    // Save fromMail only
+                },
+                {
+                    headers: {
+                        Authorization: auth.token,
+                    },
+                }
+            );
+            if (data?.success) {
+                toast.success('From Mail updated successfully!');
+            } else {
+                toast.error(data?.message || 'Failed to update From Mail');
+            }
+        } catch (error) {
+            console.error('Error updating from mail:', error);
+            toast.error(error.response?.data?.message || 'Failed to update From Mail');
+        } finally {
+            setSavingFromMail(false);
+        }
+    };
+
+    const handleSavePetrolPrice = async () => {
+        if (!hasPermission('otherSettingsSettings')) {
+            toast.error('You do not have permission to update settings');
+            return;
+        }
+        try {
+            setSavingPetrolPrice(true);
+            const { data } = await axios.put(
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/common-details`,
+                {
                     petrolPricePerKm:
                         settings.petrolPricePerKm === ''
                             ? 0
@@ -146,15 +172,15 @@ const Settings = () => {
                 }
             );
             if (data?.success) {
-                toast.success('Settings updated successfully!');
+                toast.success('Petrol Price updated successfully!');
             } else {
-                toast.error(data?.message || 'Failed to update settings');
+                toast.error(data?.message || 'Failed to update Petrol Price');
             }
         } catch (error) {
-            console.error('Error updating settings:', error);
-            toast.error(error.response?.data?.message || 'Failed to update settings');
+            console.error('Error updating petrol price:', error);
+            toast.error(error.response?.data?.message || 'Failed to update Petrol Price');
         } finally {
-            setSaving(false);
+            setSavingPetrolPrice(false);
         }
     };
 
@@ -173,7 +199,7 @@ const Settings = () => {
             </Typography>
 
             <Paper elevation={3} sx={{ p: 3, borderRadius: '8px', maxWidth: 800 }}>
-                <form onSubmit={handleSubmit}>
+                <form onSubmit={(e) => e.preventDefault()}>
                     <Typography variant="h6" gutterBottom sx={{ mb: 2, color: '#019ee3' }}>
                         Global Settings
                     </Typography>
@@ -255,33 +281,46 @@ const Settings = () => {
                             helperText="Enter a valid email address"
                         />
                     )}
-
-                    <TextField
-                        fullWidth
-                        margin="normal"
-                        label="Petrol Price (₹ per KM)"
-                        name="petrolPricePerKm"
-                        type="number"
-                        inputProps={{ min: 0, step: '0.01' }}
-                        value={settings.petrolPricePerKm}
-                        onChange={handleChange}
-                        variant="outlined"
-                        size="small"
-                        placeholder="e.g., 12"
-                        helperText="Used to calculate Petrol Form Report amount = KM × price."
-                    />
-
                     {hasPermission('otherSettingsSettings') && (
                         <Button
-                            type="submit"
                             variant="contained"
                             color="primary"
-                            disabled={saving}
-                            sx={{ mt: 3 }}
+                            onClick={handleSaveFromMail}
+                            disabled={savingFromMail}
+                            sx={{ mt: 1 }}
                         >
-                            {saving ? <CircularProgress size={24} /> : 'Save Settings'}
+                            {savingFromMail ? <CircularProgress size={24} /> : 'Save From Mail'}
                         </Button>
                     )}
+
+                    <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start', mt: 2 }}>
+                        <TextField
+                            fullWidth
+                            margin="normal"
+                            label="Petrol Price (₹ per KM)"
+                            name="petrolPricePerKm"
+                            type="number"
+                            inputProps={{ min: 0, step: '0.01' }}
+                            value={settings.petrolPricePerKm}
+                            onChange={handleChange}
+                            variant="outlined"
+                            size="small"
+                            placeholder="e.g., 12"
+                            helperText="Used to calculate Petrol Form Report amount = KM × price."
+                            sx={{ flex: 1 }}
+                        />
+                        {hasPermission('otherSettingsSettings') && (
+                            <Button
+                                variant="contained"
+                                color="primary"
+                                onClick={handleSavePetrolPrice}
+                                disabled={savingPetrolPrice}
+                                sx={{ mt: 2, minWidth: 160 }}
+                            >
+                                {savingPetrolPrice ? <CircularProgress size={24} /> : 'Save Petrol Price'}
+                            </Button>
+                        )}
+                    </Box>
                 </form>
             </Paper>
         </Box>

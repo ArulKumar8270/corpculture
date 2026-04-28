@@ -14,6 +14,12 @@ const serviceInvoiceSchema = new mongoose.Schema({
         type: String,
         trim: true,
     },
+    receiptNumber: {
+        type: Number,
+        unique: true,
+        sparse: true,
+        min: 1,
+    },
     companyId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Company', // Reference to the Company model

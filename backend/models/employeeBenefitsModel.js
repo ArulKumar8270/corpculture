@@ -18,7 +18,8 @@ const employeeBenefitsSchema = new mongoose.Schema({
     },
     quantity: {
         type: Number,
-        min: 1,
+        min: 0,
+        default: 0,
     },
     reInstall: {
         type: Boolean,

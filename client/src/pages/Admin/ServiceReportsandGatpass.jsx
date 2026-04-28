@@ -367,7 +367,7 @@ const ServiceReportsandGatpass = (props) => {
         <Box sx={{ p: 3, bgcolor: 'background.default', minHeight: '100vh', overflow: 'auto', width: '91%' }}>
             <div className='flex justify-between'>
                 <Typography variant="h5" component="h1" gutterBottom sx={{ mb: 3, color: '#019ee3', fontWeight: 'bold' }}>
-                    Reports & Gatpass
+                    Reports
                 </Typography>
                 {/* <Typography variant="h5" component="h1" gutterBottom sx={{ mb: 3, color: '#019ee3', fontWeight: 'bold' }}>
                     <Button onClick={() => navigate("../addServiceReport")} color="primary">

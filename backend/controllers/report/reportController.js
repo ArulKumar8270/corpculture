@@ -1,5 +1,7 @@
 import Report from "../../models/reportModel.js";
 import Company from "../../models/companyModel.js"; // Assuming Company model path
+import Counter from "../../models/counterModel.js";
+import mongoose from "mongoose";
 
 // Create Report
 export const createReport = async (req, res) => {
@@ -57,7 +59,15 @@ export const createReport = async (req, res) => {
             }
         }
 
+        const counter = await Counter.findOneAndUpdate(
+            { key: "reportNumber" },
+            { $inc: { seq: 1 } },
+            { new: true, upsert: true }
+        ).lean();
+        const reportNumber = Number(counter?.seq || 0) || 0;
+
         const newReport = new Report({
+            reportNumber: reportNumber > 0 ? reportNumber : undefined,
             reportType,
             serviceId,
             reportFor,
@@ -88,6 +98,23 @@ export const createReport = async (req, res) => {
 // Get All Reports
 export const getAllReports = async (req, res) => {
     try {
+        // Backward-compat: some integrations call GET /api/v1/report/:id
+        // but our primary "by id" route is /getById/:id.
+        const maybeId = req.params?.reportType;
+        if (maybeId && mongoose.Types.ObjectId.isValid(maybeId)) {
+            const report = await Report.findById(maybeId)
+                .populate("company")
+                .populate("assignedTo");
+            if (!report) {
+                return res.status(404).send({ success: false, message: "Report not found" });
+            }
+            return res.status(200).send({
+                success: true,
+                message: "Report fetched successfully",
+                report,
+            });
+        }
+
         const {
             fromDate,
             toDate,

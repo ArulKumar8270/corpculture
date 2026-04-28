@@ -844,6 +844,23 @@ const AdminMenu = ({ toggleMenu }) => {
                                                         </div>
                                                     </NavLink>
                                                 )}
+                                                {hasPermission('reportsEmployeeList') && (
+                                                    <NavLink
+                                                        to="./employeeBenefitsReport"
+                                                        onClick={scrollToTop}
+                                                        className={({ isActive }) =>
+                                                            `rounded-lg mx-2 my-1 transition-all ${isActive
+                                                                ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
+                                                                : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
+                                                            }`
+                                                        }
+                                                    >
+                                                        <div className="h-10 px-8 flex items-center gap-3">
+                                                            <AssessmentIcon sx={{ fontSize: "20px" }} />
+                                                            Employee Benefits
+                                                        </div>
+                                                    </NavLink>
+                                                )}
                                             </div>
                                         )}
                                     </div>

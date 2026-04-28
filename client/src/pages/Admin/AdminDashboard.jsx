@@ -7,6 +7,7 @@ import CreateProduct from "./CreateProduct";
 import AllProducts from "./AllProducts";
 import AllCategories from "./AllCategories";
 import Users from "./Users";
+import EmployeeBenefitsReport from "./Reports/EmployeeBenefitsReport";
 import Deactivate from "../Auth/Deactivate";
 import EditProduct from "./EditProduct";
 import SeoData from "../../SEO/SeoData";
@@ -147,6 +148,7 @@ const AdminDashboard = () => {
                             <Route path="rentalInvoiceList" element={<RentalInvoiceList invoice={"invoice"}/>} />
                             <Route path="rentalQuotationList" element={<RentalInvoiceList invoice={"quotation"}/>} />
                             <Route path="users" element={<Users />} />
+                            <Route path="employeeBenefitsReport" element={<EmployeeBenefitsReport />} />
                             {/* Add the new route for Service Enquiries */}
                             <Route path="service-enquiries" element={<AdminServices />} />
                             <Route path="rental-enquiries" element={<AdminRental />} />

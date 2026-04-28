@@ -6,7 +6,7 @@ import Material from "../../models/materialModel.js"; // Import Material model
 // Create Service Product
 export const createServiceProduct = async (req, res) => {
     try {
-        const { company, productName, sku, hsn, quantity, rate, gstType, totalAmount, commission } = req.body;
+        const { company, productName, sku, hsn, quantity, rate, gstType, totalAmount, commission, employeeCommission } = req.body;
 
         // Validation
         if (!company || !productName || !sku || quantity === undefined || rate === undefined || !gstType || totalAmount === undefined) {
@@ -55,6 +55,7 @@ export const createServiceProduct = async (req, res) => {
             rate: parseFloat(rate),
             gstType,
             commission,
+            employeeCommission: employeeCommission === undefined || employeeCommission === null || employeeCommission === "" ? 0 : parseFloat(employeeCommission),
             totalAmount: parseFloat(totalAmount),
         });
 
@@ -131,7 +132,7 @@ export const getServiceProductsByCompany = async (req, res) => {
 export const updateServiceProduct = async (req, res) => {
     try {
         const { id } = req.params;
-        const { company, productName, sku, hsn, quantity, rate, gstType, totalAmount, commission } = req.body;
+        const { company, productName, sku, hsn, quantity, rate, gstType, totalAmount, commission, employeeCommission } = req.body;
 
         // Basic validation for required fields (can be more granular)
         if (!company || !productName || !sku || quantity === undefined || rate === undefined || !gstType || totalAmount === undefined) {
@@ -182,6 +183,7 @@ export const updateServiceProduct = async (req, res) => {
                 rate: parseFloat(rate),
                 gstType,
                 commission,
+                employeeCommission: employeeCommission === undefined || employeeCommission === null || employeeCommission === "" ? 0 : parseFloat(employeeCommission),
                 totalAmount: parseFloat(totalAmount),
             },
             { new: true, runValidators: true }

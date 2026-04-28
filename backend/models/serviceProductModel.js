@@ -37,6 +37,11 @@ const serviceProductSchema = new mongoose.Schema({
         required: true,
         min: 0,
     },
+    employeeCommission: {
+        type: Number,
+        default: 0,
+        min: 0,
+    },
     gstType: [{ // Changed to an array of ObjectIds
         type: mongoose.Schema.Types.ObjectId,
         ref: 'GST', // Reference to the GST model we created earlier

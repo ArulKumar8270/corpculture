@@ -25,6 +25,7 @@ const AddServiceProduct = () => {
     const [gstTypeIds, setGstTypeIds] = useState([]); // Changed to array for multiple selection
     const [totalAmount, setTotalAmount] = useState(0);
     const [commission, setCommission] = useState(''); // New state for commission
+    const [employeeCommission, setEmployeeCommission] = useState(''); // New state for employee commission
 
     const [companies, setCompanies] = useState([]);
     const [gstOptions, setGstOptions] = useState([]); // Stores GST types with their percentages
@@ -190,6 +191,7 @@ const AddServiceProduct = () => {
                 setQuantity(product.quantity);
                 setRate(product.rate);
                 setCommission(product.commission || ''); // Populate commission field
+                setEmployeeCommission(product.employeeCommission ?? ''); // Populate employee commission field
                 // Set gstTypeIds from the fetched product data
                 // Assuming product.gstType is an array of populated GST objects or just IDs
                 setGstTypeIds(Array.isArray(product.gstType) ? product.gstType.map(g => typeof g === 'object' ? g._id : g) : []);
@@ -249,7 +251,11 @@ const AddServiceProduct = () => {
                 rate: parseFloat(rate),
                 gstType: gstTypeIds, // Send the array of IDs
                 totalAmount: parseFloat(totalAmount),
-                commission: parseFloat(commission)
+                commission: parseFloat(commission),
+                employeeCommission:
+                    employeeCommission === '' || employeeCommission == null
+                        ? 0
+                        : parseFloat(employeeCommission),
             };
 
             if (product_id) {
@@ -276,6 +282,7 @@ const AddServiceProduct = () => {
                     setGstTypeIds([]); // Clear selected GST types
                     setTotalAmount(0);
                     setCommission(''); // Clear commission
+                    setEmployeeCommission(''); // Clear employee commission
                 } else {
                     toast.error(data?.message || 'Failed to add product.');
                 }
@@ -491,6 +498,18 @@ const AddServiceProduct = () => {
                             inputProps={{ step: "0.01" }}
                         />
                     {/* // ) : null} */}
+
+                    <TextField
+                        label="Employee Commission"
+                        type="number"
+                        placeholder="Enter Employee Commission"
+                        value={employeeCommission}
+                        onChange={(e) => setEmployeeCommission(e.target.value)}
+                        fullWidth
+                        variant="outlined"
+                        size="small"
+                        inputProps={{ step: "0.01", min: 0 }}
+                    />
 
                     <TextField
                         label="Total Amount"

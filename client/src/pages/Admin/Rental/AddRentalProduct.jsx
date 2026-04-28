@@ -92,6 +92,7 @@ const AddRentalProduct = () => {
     const [openingDate, setOpeningDate] = useState(null); // dayjs object
     const [closingDate, setClosingDate] = useState(null); // dayjs object
     const [commission, setCommission] = useState('');
+    const [employeeCommission, setEmployeeCommission] = useState('');
 
 
     // Model Specifications checkboxes
@@ -253,6 +254,7 @@ const AddRentalProduct = () => {
                 setOpeningDate(product.openingDate ? dayjs(product.openingDate) : null);
                 setClosingDate(product.closingDate ? dayjs(product.closingDate) : null);
                 setCommission(product.commission || '');
+                setEmployeeCommission(product.employeeCommission ?? '');
 
                 setModelSpecs({
                     isA3Selected: product.modelSpecs?.isA3Selected || false,
@@ -313,6 +315,10 @@ const AddRentalProduct = () => {
             openingDate: openingDate ? dayjs(openingDate).utc().startOf('day').toISOString() : null,
             closingDate: closingDate ? dayjs(closingDate).utc().startOf('day').toISOString() : null,
             commission: commission === '' || commission == null ? undefined : parseFloat(commission),
+            employeeCommission:
+                employeeCommission === '' || employeeCommission == null
+                    ? 0
+                    : parseFloat(employeeCommission),
             modelSpecs,
             a3Config: modelSpecs.isA3Selected ? a3Config : {},
             a4Config: modelSpecs.isA4Selected ? a4Config : {},
@@ -348,6 +354,7 @@ const AddRentalProduct = () => {
                     setOpeningDate(null);
                     setClosingDate(null);
                     setCommission('');
+                    setEmployeeCommission('');
                     setModelSpecs({ isA3Selected: false, isA4Selected: false, isA5Selected: false });
                     setA3Config({});
                     setA4Config({});
@@ -548,6 +555,18 @@ const AddRentalProduct = () => {
                             fullWidth
                             variant="outlined"
                             size="small"
+                        />
+
+                        <TextField
+                            label="Employee Commission"
+                            type="number"
+                            placeholder="Enter Employee Commission"
+                            value={employeeCommission}
+                            onChange={(e) => setEmployeeCommission(e.target.value)}
+                            fullWidth
+                            variant="outlined"
+                            size="small"
+                            inputProps={{ step: "0.01", min: 0 }}
                         />
 
                         <div className="md:col-span-2 lg:col-span-3">

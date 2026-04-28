@@ -55,6 +55,10 @@ const employeeActivityLogSchema = new mongoose.Schema(
             type: Number,
             min: 0,
         },
+        petrolAmount: {
+            type: Number,
+            min: 0,
+        },
         inTime: {
             type: String,
             trim: true,

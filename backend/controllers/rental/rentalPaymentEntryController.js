@@ -4,6 +4,7 @@ import rentalProductModel from "../../models/rentalProductModel.js";
 import Company from "../../models/companyModel.js";
 import CommonDetails from "../../models/commonDetailsModel.js";
 import { normalizeSendDetailsTo } from "../../utils/normalizeSendDetailsTo.js";
+import Counter from "../../models/counterModel.js";
 
 // Helper to calculate counts
 const calculateCountAmount = (machineOld, entryNew, freeC, extraAmt) => {
@@ -805,6 +806,30 @@ export const updateRentalPaymentEntry = async (req, res) => {
 
         if (!entry) {
             return res.status(404).send({ success: false, message: 'Rental Payment Entry not found.' });
+        }
+
+        const isPaymentUpdate =
+            pendingAmount !== undefined ||
+            tdsAmount !== undefined ||
+            paymentAmountType !== undefined ||
+            paymentAmount !== undefined ||
+            modeOfPayment !== undefined ||
+            bankName !== undefined ||
+            transactionDetails !== undefined ||
+            chequeDate !== undefined ||
+            transferDate !== undefined ||
+            companyNamePayment !== undefined ||
+            otherPaymentMode !== undefined;
+
+        // Auto-generate Receipt No once when payment details are updated
+        if (isPaymentUpdate && entry.receiptNumber == null) {
+            const counter = await Counter.findOneAndUpdate(
+                { key: "rentalReceiptNumber" },
+                { $inc: { seq: 1 } },
+                { new: true, upsert: true }
+            ).lean();
+            const next = Number(counter?.seq || 0) || 0;
+            if (next > 0) entry.receiptNumber = next;
         }
 
         // Check if moving from quotation to invoice BEFORE updating invoiceType

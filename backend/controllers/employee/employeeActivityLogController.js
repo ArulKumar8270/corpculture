@@ -1,6 +1,34 @@
 import EmployeeActivityLog from "../../models/employeeActivityLogModel.js";
 import Company from "../../models/companyModel.js";
 import Employee from "../../models/employeeModel.js";
+import CommonDetails from "../../models/commonDetailsModel.js";
+
+async function computePetrolAmount(km) {
+    const n = Number(km);
+    if (!Number.isFinite(n) || n <= 0) return 0;
+    const common = await CommonDetails.findOne({})
+        .sort({ updatedAt: -1, createdAt: -1 })
+        .lean();
+    const price = Number(common?.petrolPricePerKm || 0);
+    if (!Number.isFinite(price) || price <= 0) return 0;
+    return n * price;
+}
+
+async function getLatestPetrolPricePerKm() {
+    const common = await CommonDetails.findOne({})
+        .sort({ updatedAt: -1, createdAt: -1 })
+        .lean();
+    const price = Number(common?.petrolPricePerKm || 0);
+    return Number.isFinite(price) && price > 0 ? price : 0;
+}
+
+function computePetrolAmountWithPrice(km, pricePerKm) {
+    const n = Number(km);
+    const p = Number(pricePerKm);
+    if (!Number.isFinite(n) || n <= 0) return 0;
+    if (!Number.isFinite(p) || p <= 0) return 0;
+    return n * p;
+}
 
 // Create a new activity log
 export const createActivityLogController = async (req, res) => {
@@ -18,6 +46,7 @@ export const createActivityLogController = async (req, res) => {
             km,
             inTime,
             outTime,
+            petrolAmount: petrolAmountFromClient,
             status,
             callType,
             assignedTo,
@@ -84,6 +113,10 @@ export const createActivityLogController = async (req, res) => {
             toAddressLine: toAddressLine || null,
             toPincode: toPincode || null,
             km: km || 0,
+            petrolAmount:
+                Number.isFinite(Number(petrolAmountFromClient)) && Number(petrolAmountFromClient) >= 0
+                    ? Number(petrolAmountFromClient)
+                    : await computePetrolAmount(km),
             inTime: inTime || null,
             outTime: outTime || null,
             status: status === "PAID" || status === "UNPAID" ? status : undefined,
@@ -148,7 +181,27 @@ export const getActivityLogsController = async (req, res) => {
             .populate("assignedTo", "name email")
             .sort({ date: -1, createdAt: -1 })
             .skip(skip)
-            .limit(parseInt(limit));
+            .limit(parseInt(limit))
+            .lean();
+
+        // Backfill petrolAmount for old records missing it
+        const pricePerKm = await getLatestPetrolPricePerKm();
+        const ops = [];
+        for (const log of activityLogs) {
+            if (log?.petrolAmount == null) {
+                const petrolAmount = computePetrolAmountWithPrice(log?.km, pricePerKm);
+                log.petrolAmount = petrolAmount;
+                ops.push({
+                    updateOne: {
+                        filter: { _id: log._id },
+                        update: { $set: { petrolAmount } },
+                    },
+                });
+            }
+        }
+        if (ops.length) {
+            await EmployeeActivityLog.bulkWrite(ops, { ordered: false });
+        }
 
         const totalCount = await EmployeeActivityLog.countDocuments(query);
 
@@ -191,13 +244,25 @@ export const getActivityLogByIdController = async (req, res) => {
         })
             .populate("fromCompany", "companyName")
             .populate("toCompany", "companyName")
-            .populate("assignedTo", "name email");
+            .populate("assignedTo", "name email")
+            .lean();
 
         if (!activityLog) {
             return res.status(404).send({
                 success: false,
                 message: "Activity log not found",
             });
+        }
+
+        // Backfill petrolAmount for old records missing it
+        if (activityLog?.petrolAmount == null) {
+            const pricePerKm = await getLatestPetrolPricePerKm();
+            const petrolAmount = computePetrolAmountWithPrice(activityLog?.km, pricePerKm);
+            activityLog.petrolAmount = petrolAmount;
+            await EmployeeActivityLog.updateOne(
+                { _id: activityLog._id },
+                { $set: { petrolAmount } }
+            );
         }
 
         res.status(200).send({
@@ -246,6 +311,7 @@ export const updateActivityLogController = async (req, res) => {
             callType,
             assignedTo,
             remarks,
+            petrolAmount: petrolAmountFromClient,
         } = req.body;
 
         // Validate company references if provided (must be existing companies; no creation from this flow)
@@ -268,6 +334,10 @@ export const updateActivityLogController = async (req, res) => {
             }
         }
 
+        const petrolAmount =
+            Number.isFinite(Number(petrolAmountFromClient)) && Number(petrolAmountFromClient) >= 0
+                ? Number(petrolAmountFromClient)
+                : await computePetrolAmount(km);
         const activityLog = await EmployeeActivityLog.findOneAndUpdate(
             { _id: id, employeeId: employee._id },
             {
@@ -281,6 +351,7 @@ export const updateActivityLogController = async (req, res) => {
                 toAddressLine: toAddressLine || null,
                 toPincode: toPincode || null,
                 km: km || 0,
+                petrolAmount,
                 inTime: inTime || null,
                 outTime: outTime || null,
                 callType: callType || null,
@@ -376,6 +447,17 @@ export const getActivityLogByIdAdminController = async (req, res) => {
             });
         }
 
+        // Backfill petrolAmount for old records missing it
+        if (activityLog?.petrolAmount == null) {
+            const pricePerKm = await getLatestPetrolPricePerKm();
+            const petrolAmount = computePetrolAmountWithPrice(activityLog?.km, pricePerKm);
+            activityLog.petrolAmount = petrolAmount;
+            await EmployeeActivityLog.updateOne(
+                { _id: activityLog._id },
+                { $set: { petrolAmount } }
+            );
+        }
+
         return res.status(200).send({
             success: true,
             message: "Activity log fetched successfully",
@@ -413,6 +495,7 @@ export const updateActivityLogAdminController = async (req, res) => {
             assignedTo,
             remarks,
             status,
+            petrolAmount: petrolAmountFromClient,
         } = req.body;
 
         // Validate company references if provided
@@ -435,6 +518,10 @@ export const updateActivityLogAdminController = async (req, res) => {
             }
         }
 
+        const petrolAmount =
+            Number.isFinite(Number(petrolAmountFromClient)) && Number(petrolAmountFromClient) >= 0
+                ? Number(petrolAmountFromClient)
+                : await computePetrolAmount(km);
         const activityLog = await EmployeeActivityLog.findByIdAndUpdate(
             id,
             {
@@ -448,6 +535,7 @@ export const updateActivityLogAdminController = async (req, res) => {
                 toAddressLine: toAddressLine || null,
                 toPincode: toPincode || null,
                 km: km || 0,
+                petrolAmount,
                 inTime: inTime || null,
                 outTime: outTime || null,
                 callType: callType || null,
@@ -524,7 +612,27 @@ export const getAllActivityLogsController = async (req, res) => {
             .populate("assignedTo", "name email")
             .sort({ date: -1, createdAt: -1 })
             .skip(skip)
-            .limit(parseInt(limit));
+            .limit(parseInt(limit))
+            .lean();
+
+        // Backfill petrolAmount for old records missing it (so reports show amount)
+        const pricePerKm = await getLatestPetrolPricePerKm();
+        const ops = [];
+        for (const log of activityLogs) {
+            if (log?.petrolAmount == null) {
+                const petrolAmount = computePetrolAmountWithPrice(log?.km, pricePerKm);
+                log.petrolAmount = petrolAmount;
+                ops.push({
+                    updateOne: {
+                        filter: { _id: log._id },
+                        update: { $set: { petrolAmount } },
+                    },
+                });
+            }
+        }
+        if (ops.length) {
+            await EmployeeActivityLog.bulkWrite(ops, { ordered: false });
+        }
 
         const totalCount = await EmployeeActivityLog.countDocuments(query);
 
