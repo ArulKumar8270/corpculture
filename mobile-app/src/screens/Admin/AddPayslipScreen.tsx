@@ -82,6 +82,7 @@ const AddPayslipScreen = () => {
   const [ratings, setRatings] = useState({ ...defaultRatings });
   const [totalKm, setTotalKm] = useState(0);
   const [kmLoading, setKmLoading] = useState(false);
+  const [petrolPricePerKm, setPetrolPricePerKm] = useState(0);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [initializingEdit, setInitializingEdit] = useState(!!payslipId);
   const prevEmployeeIdRef = useRef<string>('');
@@ -234,6 +235,35 @@ const AddPayslipScreen = () => {
     };
   }, [auth, apiBase, employeeId, payPeriodDate, payDate]);
 
+  useEffect(() => {
+    const fetchPetrolPrice = async () => {
+      if (!auth) return;
+      try {
+        const { data } = await axios.get(`${apiBase}/common-details`, {
+          headers: { Authorization: auth },
+        });
+        if (data?.success) {
+          const v = Number(data?.commonDetails?.petrolPricePerKm || 0);
+          setPetrolPricePerKm(Number.isFinite(v) ? v : 0);
+        } else {
+          setPetrolPricePerKm(0);
+        }
+      } catch {
+        setPetrolPricePerKm(0);
+      }
+    };
+    fetchPetrolPrice();
+  }, [auth, apiBase]);
+
+  useEffect(() => {
+    if (kmLoading) return;
+    const km = Number(totalKm || 0);
+    const price = Number(petrolPricePerKm || 0);
+    const amount =
+      Number.isFinite(km) && Number.isFinite(price) && km > 0 && price > 0 ? km * price : 0;
+    setEarnings((p) => ({ ...p, petrolAllowance: amount }));
+  }, [totalKm, petrolPricePerKm, kmLoading]);
+
   const grossEarnings = useMemo(
     () => Object.values(earnings).reduce((a, b) => a + b, 0),
     [earnings]
@@ -356,7 +386,14 @@ const AddPayslipScreen = () => {
               setEarnings((p) => ({ ...p, [key]: Number(v) || 0 }))
             }
             keyboard="decimal-pad"
-            helper={key === 'petrolAllowance' ? `Total KM: ${Number(totalKm).toLocaleString('en-IN')}` : undefined}
+            editable={key !== 'petrolAllowance'}
+            helper={
+              key === 'petrolAllowance'
+                ? petrolPricePerKm > 0
+                  ? `Auto: ${Number(totalKm).toLocaleString('en-IN')} km × ₹${petrolPricePerKm}/KM`
+                  : `Total KM: ${Number(totalKm).toLocaleString('en-IN')} km (set Petrol Price ₹/KM in Settings)`
+                : undefined
+            }
           />
         ))}
 
@@ -414,21 +451,24 @@ function Field({
   onChangeText,
   keyboard,
   helper,
+  editable = true,
 }: {
   label: string;
   value: string;
   onChangeText: (t: string) => void;
   keyboard?: 'numeric' | 'decimal-pad';
   helper?: string;
+  editable?: boolean;
 }) {
   return (
     <View style={{ marginBottom: 10 }}>
       <Text style={styles.label}>{label}</Text>
       <TextInput
-        style={styles.input}
+        style={[styles.input, !editable && styles.inputDisabled]}
         value={value}
         onChangeText={onChangeText}
         keyboardType={keyboard || 'default'}
+        editable={editable}
       />
       {helper ? <Text style={styles.helper}>{helper}</Text> : null}
     </View>
@@ -489,6 +529,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     fontSize: 15,
   },
+  inputDisabled: { backgroundColor: '#f0f0f0', color: '#555' },
   helper: { fontSize: 11, color: '#888', marginTop: 2 },
   selectBtn: {
     flexDirection: 'row',

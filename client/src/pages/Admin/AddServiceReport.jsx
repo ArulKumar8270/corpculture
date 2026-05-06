@@ -10,6 +10,8 @@ import {
     MenuItem,
     FormControl,
     InputLabel,
+    Autocomplete,
+    Chip,
     Table,
     TableBody,
     TableCell,
@@ -44,6 +46,8 @@ const AddServiceReport = (props) => {
         reportType: reportFor || 'Service_Report', // Default to 'Service_Report'
         reportFor: reportFor,
         company: companyId, // This will store the company _id
+        sendDetailsTo: [],
+        assignedTo: employeeName || '',
         problemReport: '',
         remarksPendingWorks: '',
         branch: '', // This will store the branch name
@@ -94,6 +98,11 @@ const AddServiceReport = (props) => {
                             reportType: fetchedReport.reportType || 'Service_Report',
                             reportFor: fetchedReport.reportFor || 'service',
                             company: fetchedReport.company?._id || '', // Assuming company is populated
+                            sendDetailsTo: Array.isArray(fetchedReport.sendDetailsTo) ? fetchedReport.sendDetailsTo : [],
+                            assignedTo:
+                                (typeof fetchedReport.assignedTo === 'object' && fetchedReport.assignedTo?._id)
+                                    ? fetchedReport.assignedTo._id
+                                    : (fetchedReport.assignedTo || employeeName || ''),
                             problemReport: fetchedReport.problemReport || '',
                             remarksPendingWorks: fetchedReport.remarksPendingWorks || '',
                             branch: fetchedReport.branch || '',
@@ -151,6 +160,7 @@ const AddServiceReport = (props) => {
                 ...prevData,
                 branch: '', // Clear selected branch
                 materialProductName: '', // Clear selected material product
+                sendDetailsTo: [],
             }));
             setMaterialGroups([]); // Clear all material groups when company changes
             setSelectedGroupIndex(null); // Deselect any active group
@@ -434,11 +444,12 @@ const AddServiceReport = (props) => {
             serviceId: serviceId,
             reportType: reportData.reportType,
             company: reportData.company, // This is the company _id
+            sendDetailsTo: reportData.sendDetailsTo,
             problemReport: reportData.problemReport,
             remarksPendingWorks: reportData.remarksPendingWorks,
             branch: reportData.branch, // This is the branch name string
             reference: reportData.reference,
-            assignedTo: employeeName,
+            assignedTo: reportData.assignedTo || employeeName,
             reportFor: reportFor,
             // Send materialGroups as array of objects, without temporary 'id' field from products
             // Ensure productName is always a string, not an object
@@ -506,6 +517,8 @@ const AddServiceReport = (props) => {
             reportNumber: '',
             reportType: 'Service_Report',
             company: '',
+            sendDetailsTo: [],
+            assignedTo: employeeName || '',
             problemReport: '',
             remarksPendingWorks: '',
             branch: '',
@@ -563,6 +576,56 @@ const AddServiceReport = (props) => {
                                 disabled={true}
                             />
                         </FormControl>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                        <Autocomplete
+                            multiple
+                            options={(companies?.[0]?.contactPersons || [])
+                                .map((cp) => ({
+                                    name: cp?.name || '',
+                                    email: cp?.email || '',
+                                    mobile: cp?.mobile || '',
+                                }))
+                                .filter((x) => x.name && (x.email || x.mobile))}
+                            value={Array.isArray(reportData.sendDetailsTo) ? reportData.sendDetailsTo : []}
+                            onChange={(event, newValue) => {
+                                setReportData((prev) => ({ ...prev, sendDetailsTo: newValue || [] }));
+                            }}
+                            getOptionLabel={(opt) => {
+                                const email = opt?.email ? ` (${opt.email})` : '';
+                                const mobile = !opt?.email && opt?.mobile ? ` (${opt.mobile})` : '';
+                                return `${opt?.name || ''}${email || mobile}`.trim();
+                            }}
+                            isOptionEqualToValue={(a, b) => {
+                                const ae = String(a?.email || '').trim().toLowerCase();
+                                const be = String(b?.email || '').trim().toLowerCase();
+                                if (ae && be) return ae === be;
+                                const am = String(a?.mobile || '').trim();
+                                const bm = String(b?.mobile || '').trim();
+                                if (am && bm) return am === bm;
+                                return String(a?.name || '').trim().toLowerCase() === String(b?.name || '').trim().toLowerCase();
+                            }}
+                            renderTags={(value, getTagProps) =>
+                                value.map((option, index) => (
+                                    <Chip
+                                        variant="outlined"
+                                        label={`${option?.name || ''}${option?.email ? ` (${option.email})` : ''}`}
+                                        {...getTagProps({ index })}
+                                        key={`${option?.email || option?.mobile || option?.name}-${index}`}
+                                    />
+                                ))
+                            }
+                            renderInput={(params) => (
+                                <TextField
+                                    {...params}
+                                    label="Send To"
+                                    placeholder="Select contact persons"
+                                    helperText="Emails will be stored in DB."
+                                    margin="normal"
+                                    size="small"
+                                />
+                            )}
+                        />
                     </Grid>
                     <Grid item xs={12} sm={6}>
                         <TextField

@@ -52,6 +52,28 @@ const AddPayslip = () => {
     const [ratings, setRatings] = useState(defaultRatings);
     const [totalKm, setTotalKm] = useState(0);
     const [kmLoading, setKmLoading] = useState(false);
+    const [petrolPricePerKm, setPetrolPricePerKm] = useState(0);
+
+    useEffect(() => {
+        const fetchPetrolPrice = async () => {
+            if (!auth?.token) return;
+            try {
+                const { data } = await axios.get(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/common-details`,
+                    { headers: { Authorization: auth?.token } }
+                );
+                if (data?.success) {
+                    const v = Number(data?.commonDetails?.petrolPricePerKm || 0);
+                    setPetrolPricePerKm(Number.isFinite(v) ? v : 0);
+                } else {
+                    setPetrolPricePerKm(0);
+                }
+            } catch {
+                setPetrolPricePerKm(0);
+            }
+        };
+        fetchPetrolPrice();
+    }, [auth?.token]);
 
     useEffect(() => {
         const fetchEmployees = async () => {
@@ -193,6 +215,17 @@ const AddPayslip = () => {
             cancelled = true;
         };
     }, [auth?.token, employeeId, payPeriodDate, payDate]);
+
+    useEffect(() => {
+        if (kmLoading) return;
+        const km = Number(totalKm || 0);
+        const price = Number(petrolPricePerKm || 0);
+        const amount =
+            Number.isFinite(km) && Number.isFinite(price) && km > 0 && price > 0
+                ? km * price
+                : 0;
+        setEarnings((prev) => ({ ...prev, petrolAllowance: amount }));
+    }, [totalKm, petrolPricePerKm, kmLoading]);
 
     const handleEarningChange = (field, value) => setEarnings((p) => ({ ...p, [field]: Number(value) || 0 }));
     const handleDeductionChange = (field, value) => setDeductions((p) => ({ ...p, [field]: Number(value) || 0 }));
@@ -337,9 +370,12 @@ const AddPayslip = () => {
                                         value={earnings[key]}
                                         onChange={(e) => handleEarningChange(key, e.target.value)}
                                         inputProps={{ min: 0, step: 0.01 }}
+                                        disabled={key === "petrolAllowance"}
                                         helperText={
                                             key === "petrolAllowance"
-                                                ? `Total KM in period: ${Number(totalKm || 0).toLocaleString("en-IN")} km`
+                                                ? petrolPricePerKm > 0
+                                                    ? `Auto: ${Number(totalKm || 0).toLocaleString("en-IN")} km × ₹${petrolPricePerKm}/KM`
+                                                    : `Total KM in period: ${Number(totalKm || 0).toLocaleString("en-IN")} km (set Petrol Price ₹/KM in Settings)`
                                                 : undefined
                                         }
                                     />

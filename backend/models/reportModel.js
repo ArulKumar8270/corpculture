@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { normalizeSendDetailsTo } from "../utils/normalizeSendDetailsTo.js";
 
 // Schema for individual material items within a report
 const materialSchema = new mongoose.Schema({
@@ -120,9 +121,35 @@ const reportSchema = new mongoose.Schema({
         ref: 'User', // Reference to the User model
         trim: true,
     },
+    // Recipients to send report/invoice to (stored as normalized { name, email, mobile }[])
+    // Mixed keeps legacy string / string[] documents readable until re-saved.
+    sendDetailsTo: {
+        type: mongoose.Schema.Types.Mixed,
+        default: [],
+    },
     // Note: You had 'reportType' defined twice. I'm assuming the first one is correct.
     // If the second 'reportType' was intended for something else, please clarify.
     materialGroups: [materialGroupSchema], // Array of embedded material group documents
 }, { timestamps: true }); // Adds createdAt and updatedAt timestamps
+
+function coerceSendDetailsToOnDoc(doc) {
+    if (doc == null || doc.sendDetailsTo === undefined) return;
+    doc.sendDetailsTo = normalizeSendDetailsTo(doc.sendDetailsTo);
+}
+
+reportSchema.pre("save", function (next) {
+    if (this.sendDetailsTo === undefined) return next();
+    this.sendDetailsTo = normalizeSendDetailsTo(this.sendDetailsTo);
+    next();
+});
+
+reportSchema.post("find", function (docs) {
+    if (!Array.isArray(docs)) return;
+    for (const d of docs) coerceSendDetailsToOnDoc(d);
+});
+
+reportSchema.post("findOne", function (doc) {
+    coerceSendDetailsToOnDoc(doc);
+});
 
 export default mongoose.model('Report', reportSchema);

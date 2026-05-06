@@ -694,6 +694,10 @@ export const updateServiceInvoice = async (req, res) => {
                 serviceInvoice.quotationDate = serviceInvoice.invoiceDate;
             }
             serviceInvoice.movedToInvoiceDate = new Date();
+            // Reset previous quotation send state so the new invoice can be sent/stored
+            serviceInvoice.invoiceSendStatus = "NotSent";
+            serviceInvoice.invoiceSentAt = null;
+            serviceInvoice.invoiceLink = [];
         }
 
         await serviceInvoice.save();

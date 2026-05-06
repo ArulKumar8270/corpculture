@@ -1068,7 +1068,7 @@ export const updateRentalPaymentEntry = async (req, res) => {
         if (paymentAmountType) entry.paymentAmountType = paymentAmountType;
         if (paymentAmount) entry.paymentAmount = paymentAmount;
         if (companyId) entry.companyId = companyId;
-        if (invoiceLink) entry.invoiceLink = invoiceLink;
+        if (invoiceLink !== undefined) entry.invoiceLink = invoiceLink;
         if (invoiceType) entry.invoiceType = invoiceType;
         if (invoiceSendStatus !== undefined) entry.invoiceSendStatus = invoiceSendStatus;
         if (invoiceSentAt !== undefined) {
@@ -1094,6 +1094,13 @@ export const updateRentalPaymentEntry = async (req, res) => {
         }
         if (otherPaymentMode !== undefined) entry.otherPaymentMode = otherPaymentMode;
         if (assignedTo) entry.assignedTo = assignedTo;
+
+        if (isMovingToInvoice) {
+            // Reset previous quotation send state so the new invoice can be sent/stored
+            entry.invoiceSendStatus = "NotSent";
+            entry.invoiceSentAt = null;
+            entry.invoiceLink = [];
+        }
 
         await entry.save();
 

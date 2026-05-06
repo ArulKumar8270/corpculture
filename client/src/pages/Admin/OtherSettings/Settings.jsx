@@ -18,6 +18,7 @@ import {
     FormLabel
 } from '@mui/material';
 import { useAuth } from '../../../context/auth';
+import { QRCodeCanvas } from 'qrcode.react';
 
 const Settings = () => {
     const { auth, userPermissions } = useAuth();
@@ -31,6 +32,28 @@ const Settings = () => {
         petrolPricePerKm: '',
     });
     const [mailInputType, setMailInputType] = useState('select'); // 'select' or 'custom'
+    const qrUrl = `${window.location.origin}/qr`;
+
+    const handleDownloadQr = () => {
+        const canvas = document.getElementById('cc-global-settings-qr');
+        if (!canvas) {
+            toast.error('QR not ready');
+            return;
+        }
+
+        try {
+            const pngUrl = canvas.toDataURL('image/png');
+            const link = document.createElement('a');
+            link.href = pngUrl;
+            link.download = 'corpculture-qr.png';
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        } catch (e) {
+            console.error('QR download failed', e);
+            toast.error('Download failed');
+        }
+    };
 
     const hasPermission = (key) => {
         return userPermissions.some(p => p.key === key && p.actions.includes('edit')) || auth?.user?.role === 1;
@@ -322,6 +345,55 @@ const Settings = () => {
                         )}
                     </Box>
                 </form>
+            </Paper>
+
+            <Paper elevation={3} sx={{ p: 3, borderRadius: '8px', maxWidth: 800, mt: 3 }}>
+                <Typography variant="h6" gutterBottom sx={{ mb: 2, color: '#019ee3' }}>
+                    QR Code
+                </Typography>
+                <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
+                    Scan to open the options page (Create Enquire / View Demo).
+                </Typography>
+
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3, alignItems: 'center' }}>
+                    <Box sx={{ p: 1, bgcolor: '#fff', borderRadius: 2, border: '1px solid #eee' }}>
+                        <QRCodeCanvas id="cc-global-settings-qr" value={qrUrl} size={180} includeMargin />
+                    </Box>
+                    <Box sx={{ minWidth: 260, flex: 1 }}>
+                        <TextField
+                            fullWidth
+                            size="small"
+                            label="QR Page URL"
+                            value={qrUrl}
+                            InputProps={{ readOnly: true }}
+                        />
+                        <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+                            <Button
+                                variant="outlined"
+                                onClick={async () => {
+                                    try {
+                                        await navigator.clipboard.writeText(qrUrl);
+                                        toast.success('Copied');
+                                    } catch {
+                                        toast.error('Copy failed');
+                                    }
+                                }}
+                            >
+                                Copy URL
+                            </Button>
+                            <Button variant="outlined" onClick={handleDownloadQr}>
+                                Download QR
+                            </Button>
+                            <Button
+                                variant="contained"
+                                color="primary"
+                                onClick={() => window.open(qrUrl, '_blank', 'noopener,noreferrer')}
+                            >
+                                Open Page
+                            </Button>
+                        </Box>
+                    </Box>
+                </Box>
             </Paper>
         </Box>
     );

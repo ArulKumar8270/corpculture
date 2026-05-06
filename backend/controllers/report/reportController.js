@@ -2,6 +2,7 @@ import Report from "../../models/reportModel.js";
 import Company from "../../models/companyModel.js"; // Assuming Company model path
 import Counter from "../../models/counterModel.js";
 import mongoose from "mongoose";
+import { normalizeSendDetailsTo } from "../../utils/normalizeSendDetailsTo.js";
 
 // Create Report
 export const createReport = async (req, res) => {
@@ -11,6 +12,7 @@ export const createReport = async (req, res) => {
             reportType,
             reportFor,
             company, // This should be the company's ObjectId
+            sendDetailsTo,
             problemReport,
             remarksPendingWorks,
             accessService,
@@ -72,6 +74,7 @@ export const createReport = async (req, res) => {
             serviceId,
             reportFor,
             company,
+            sendDetailsTo: normalizeSendDetailsTo(sendDetailsTo),
             problemReport,
             remarksPendingWorks,
             accessService,
@@ -213,6 +216,7 @@ export const updateReport = async (req, res) => {
             reportType,
             reportFor,
             company,
+            sendDetailsTo,
             problemReport,
             remarksPendingWorks,
             accessService,
@@ -268,6 +272,7 @@ export const updateReport = async (req, res) => {
                 reportType,
                 reportFor,
                 company,
+                ...(sendDetailsTo !== undefined ? { sendDetailsTo: normalizeSendDetailsTo(sendDetailsTo) } : {}),
                 problemReport,
                 remarksPendingWorks,
                 accessService,

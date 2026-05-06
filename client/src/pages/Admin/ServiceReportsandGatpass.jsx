@@ -140,41 +140,16 @@ const ServiceReportsandGatpass = (props) => {
 
     const fetchUsers = async () => {
         try {
-            // First, fetch employees
-            const employeeRes = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/employee/all`, {
-                headers: {
-                    Authorization: auth.token,
-                },
+            const userRes = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/auth/all-users`, {
+                headers: { Authorization: auth.token },
             });
-            
-            if (employeeRes.data?.success) {
-                // Filter employees by employeeType (Service or Sales)
-                const serviceAndSalesEmployees = employeeRes.data.employees.filter(
-                    emp => emp.employeeType === 'Service' || emp.employeeType === 'Sales'
-                );
-                
-                // Extract userIds from filtered employees
-                const userIds = serviceAndSalesEmployees.map(emp => emp.userId).filter(Boolean);
-                
-                if (userIds.length > 0) {
-                    // Fetch users for those userIds
-                    const userRes = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/auth/all-users`, {
-                        headers: {
-                            Authorization: auth.token,
-                        },
-                    });
-                    
-                    // Filter users to only include those with matching userIds
-                    const filteredUsers = (userRes.data.users || []).filter(user => 
-                        userIds.includes(user._id)
-                    );
-                    setUsers(filteredUsers);
-                } else {
-                    setUsers([]);
-                }
-            } else {
-                setUsers([]);
-            }
+
+            const allUsers = userRes.data?.users || [];
+            const employees = allUsers
+                .filter((u) => u?.role === 3)
+                .sort((a, b) => String(a?.name || '').localeCompare(String(b?.name || '')));
+
+            setUsers(employees);
         } catch (error) {
             console.error("Error fetching users:", error);
             toast.error("Failed to fetch users.");
@@ -509,7 +484,7 @@ const ServiceReportsandGatpass = (props) => {
                                                         {onSendn8n ? <CircularProgress size={24} /> : <SendIcon />}
                                                     </IconButton>
                                                 </Tooltip>
-                                                {auth?.user?.role === 3 && (report?.company?._id || report?.company) ? (
+                                                {(report?.company?._id || report?.company) ? (
                                                     <Tooltip title="Petrol Form">
                                                         <IconButton onClick={() => goToPetrolForm(report)} color="primary">
                                                             <LocalGasStationIcon />

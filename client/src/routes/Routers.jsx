@@ -26,6 +26,8 @@ import EmployeeDetails from "../pages/Admin/EmployeeDetails";
 import UpdateOrders from "../pages/Admin/UpdateOrders";
 import DeleteAllOrder from "../pages/DeleteAllOrder.jsx";
 import CreditManagement from "../pages/Admin/CreditManagement";
+import QrEntryPage from "../pages/Public/QrEntryPage";
+import QrDemoPage from "../pages/Public/QrDemoPage";
 
 const Routers = () => {
     return (
@@ -37,6 +39,8 @@ const Routers = () => {
             <Route path="/products" element={<Products />} />
             <Route path="/search" element={<Products />} />
             <Route path="/cart" element={<Cart />} />
+            <Route path="/qr" element={<QrEntryPage />} />
+            <Route path="/qr-demo" element={<QrDemoPage />} />
             <Route path="/shipping" element={<PrivateRoute />}>
                 <Route path="" element={<Shipping />} />
                 <Route path="confirm" element={<OrderSuccess />} />
