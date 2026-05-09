@@ -39,7 +39,23 @@ import SearchIcon from '@mui/icons-material/Search'; // Import SearchIcon
 import InputAdornment from '@mui/material/InputAdornment'; // Import InputAdornment
 import DeleteIcon from '@mui/icons-material/Delete';
 import DownloadIcon from '@mui/icons-material/Download';
-import { formatSendDetailsToDisplay } from '../../utils/functions';
+import {
+    formatSendDetailsToDisplay,
+    getTotalRentalInvoicePayment,
+    getRentalProductLineDisplayTotal,
+} from '../../utils/functions';
+
+/** Grand total aligned with PDF: uses frozen meter readings on the invoice when present (see sumRentalProductPreTax). */
+function rentalInvoiceDisplayGrandTotal(entry) {
+    try {
+        const c = getTotalRentalInvoicePayment(entry);
+        const v = parseFloat(c.totalWithCommission);
+        if (Number.isFinite(v)) return v;
+    } catch (e) {
+        /* ignore */
+    }
+    return parseFloat(entry?.grandTotal) || 0;
+}
 
 const RENTAL_INVOICE_DOWNLOAD_BASE_URL = 'https://pub-bcab85dac0c64221ba6b6a756f991c46.r2.dev';
 const PAYMENT_COPY_DOWNLOAD_BASE_URL = 'https://pub-982db31d50054adebd29fa1792b12fb8.r2.dev';
@@ -173,41 +189,39 @@ function RentalInvoiceList(props) {
 
     const fetchUsers = async () => {
         try {
-            // First, fetch employees
             const employeeRes = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/employee/all`, {
                 headers: {
                     Authorization: auth.token,
                 },
             });
-            
-            if (employeeRes.data?.success) {
-                // Filter employees by employeeType (Service or Sales)
-                const serviceAndSalesEmployees = employeeRes.data.employees.filter(
-                    emp => emp.employeeType === 'Service' || emp.employeeType === 'Sales'
-                );
-                
-                // Extract userIds from filtered employees
-                const userIds = serviceAndSalesEmployees.map(emp => emp.userId).filter(Boolean);
-                
-                if (userIds.length > 0) {
-                    // Fetch users for those userIds
-                    const userRes = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/auth/all-users`, {
-                        headers: {
-                            Authorization: auth.token,
-                        },
-                    });
-                    
-                    // Filter users to only include those with matching userIds
-                    const filteredUsers = (userRes.data.users || []).filter(user => 
-                        userIds.includes(user._id)
-                    );
-                    setUsers(filteredUsers);
-                } else {
-                    setUsers([]);
-                }
-            } else {
+
+            if (!employeeRes.data?.success) {
                 setUsers([]);
+                return;
             }
+
+            const employees = employeeRes.data.employees || [];
+            const userIdSet = new Set(
+                employees
+                    .map((emp) => emp?.userId)
+                    .filter(Boolean)
+                    .map((id) => String(id))
+            );
+
+            if (userIdSet.size === 0) {
+                setUsers([]);
+                return;
+            }
+
+            const userRes = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/auth/all-users`, {
+                headers: {
+                    Authorization: auth.token,
+                },
+            });
+
+            const allUsers = userRes.data?.users || [];
+            const filteredUsers = allUsers.filter((user) => userIdSet.has(String(user._id)));
+            setUsers(filteredUsers);
         } catch (error) {
             console.error("Error fetching users:", error);
             toast.error("Failed to fetch users.");
@@ -559,7 +573,7 @@ function RentalInvoiceList(props) {
             invoiceId: invoice?._id,
             paymentAmount: invoice?.paymentAmount ? invoice?.paymentAmount : initialPaymentAmount,
             paymentAmountType: initialPaymentAmountType,
-            grandTotal: invoice?.grandTotal,
+            grandTotal: rentalInvoiceDisplayGrandTotal(invoice),
             companyId: invoice?.companyId
         });
         setOpenPaymentModal(true);
@@ -574,17 +588,17 @@ function RentalInvoiceList(props) {
 
     const selectedAllocatedTotal = companyPendingInvoice
         ?.filter((inv) => selectedInvoiceIds.includes(inv._id))
-        .reduce((sum, inv) => sum + Number(inv?.grandTotal || 0), 0) || 0;
+        .reduce((sum, inv) => sum + rentalInvoiceDisplayGrandTotal(inv), 0) || 0;
     const remainingToAllocate = Math.max(0, (balanceAmount || 0) - selectedAllocatedTotal);
 
     const togglePendingInvoiceSelection = (pendingInv) => {
         const id = pendingInv._id;
-        const amount = Number(pendingInv?.grandTotal || 0);
+        const amount = rentalInvoiceDisplayGrandTotal(pendingInv);
         setSelectedInvoiceIds((prev) => {
             if (prev.includes(id)) return prev.filter((x) => x !== id);
             const currentTotal = companyPendingInvoice
                 ?.filter((inv) => prev.includes(inv._id))
-                .reduce((s, inv) => s + Number(inv?.grandTotal || 0), 0) || 0;
+                .reduce((s, inv) => s + rentalInvoiceDisplayGrandTotal(inv), 0) || 0;
             if (currentTotal + amount <= (balanceAmount || 0)) return [...prev, id];
             return prev;
         });
@@ -595,12 +609,13 @@ function RentalInvoiceList(props) {
         setPaymentForm(prev => ({ ...prev, [name]: value }));
         if (name === "paymentAmount") {
             setSelectedInvoiceIds([]);
-            if (value < currentInvoice?.grandTotal) {
-                let balanceAmount = currentInvoice?.grandTotal - value;
+            const cap = rentalInvoiceDisplayGrandTotal(currentInvoice);
+            if (value < cap) {
+                let balanceAmount = cap - value;
                 setPendingAmount(balanceAmount);
                 setBalanceAmount(0);
             } else {
-                let balanceAmount = value - currentInvoice?.grandTotal;
+                let balanceAmount = value - cap;
                 setBalanceAmount(balanceAmount);
                 setPendingAmount(0);
                 try {
@@ -647,7 +662,11 @@ function RentalInvoiceList(props) {
         const isMultiSave = typeof targetInvoiceIdArg === 'string' && amountArg != null;
         try {
             if (isMultiSave) {
-                const payload = buildPaymentPayload(amountArg, amountArg >= (companyPendingInvoice?.find((i) => i._id === targetInvoiceIdArg)?.grandTotal || 0));
+                const targetInv = companyPendingInvoice?.find((i) => i._id === targetInvoiceIdArg);
+                const payload = buildPaymentPayload(
+                    amountArg,
+                    amountArg >= (targetInv ? rentalInvoiceDisplayGrandTotal(targetInv) : 0)
+                );
                 await axios.put(
                     `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/${targetInvoiceIdArg}`,
                     payload,
@@ -656,12 +675,13 @@ function RentalInvoiceList(props) {
                 return;
             }
 
-            const currentInvoicePayment = Number(paymentForm?.paymentAmount) >= Number(paymentForm?.grandTotal)
-                ? Number(paymentForm?.grandTotal)
+            const formCap = Number(paymentForm?.grandTotal);
+            const currentInvoicePayment = Number(paymentForm?.paymentAmount) >= formCap
+                ? formCap
                 : Number(paymentForm?.paymentAmount);
             const currentPayload = buildPaymentPayload(
                 currentInvoicePayment,
-                Number(paymentForm?.paymentAmount) >= Number(paymentForm?.grandTotal) || paymentForm.paymentAmountType === 'TDS'
+                Number(paymentForm?.paymentAmount) >= formCap || paymentForm.paymentAmountType === 'TDS'
             );
 
             await axios.put(
@@ -672,7 +692,7 @@ function RentalInvoiceList(props) {
 
             for (const invId of selectedInvoiceIds) {
                 const pendingInv = companyPendingInvoice?.find((i) => i._id === invId);
-                const amt = Number(pendingInv?.grandTotal || 0);
+                const amt = rentalInvoiceDisplayGrandTotal(pendingInv);
                 if (amt <= 0) continue;
                 await handleSavePaymentDetails(invId, amt);
             }
@@ -682,14 +702,21 @@ function RentalInvoiceList(props) {
 
             const allocatedInvoices = (selectedInvoiceIds || []).map((invId) => {
                 const inv = companyPendingInvoice?.find((i) => i._id === invId);
-                return inv ? { invoiceId: inv._id, amount: Number(inv?.grandTotal || 0), invoiceDate: inv?.invoiceDate || inv?.entryDate || inv?.createdAt, grandTotal: inv?.grandTotal } : null;
+                return inv
+                    ? {
+                          invoiceId: inv._id,
+                          amount: rentalInvoiceDisplayGrandTotal(inv),
+                          invoiceDate: inv?.invoiceDate || inv?.entryDate || inv?.createdAt,
+                          grandTotal: rentalInvoiceDisplayGrandTotal(inv),
+                      }
+                    : null;
             }).filter(Boolean);
 
             const n8nPayload = {
                 invoiceId: currentInvoice?._id,
                 invoice: {
                     _id: currentInvoice?._id,
-                    grandTotal: currentInvoice?.grandTotal,
+                    grandTotal: rentalInvoiceDisplayGrandTotal(currentInvoice),
                     invoiceDate: currentInvoice?.invoiceDate || currentInvoice?.entryDate || currentInvoice?.createdAt,
                     companyId: currentInvoice?.companyId,
                     invoiceNumber: currentInvoice?.invoiceNumber,
@@ -1123,7 +1150,20 @@ function RentalInvoiceList(props) {
                                     const hasMultipleProducts = entry.products && Array.isArray(entry.products) && entry.products.length > 0;
                                     const hasProducts = hasMultipleProducts || entry.machineId;
                                     const expanded = isExpanded(entry._id);
-                                    const productsToShow = hasMultipleProducts ? entry.products : (entry.machineId ? [{ machineId: entry.machineId, serialNo: entry.machineId?.serialNo, countImageUpload: entry.countImageUpload }] : []);
+                                    const productsToShow = hasMultipleProducts
+                                        ? entry.products
+                                        : entry.machineId
+                                          ? [
+                                                {
+                                                    machineId: entry.machineId,
+                                                    serialNo: entry.machineId?.serialNo,
+                                                    countImageUpload: entry.countImageUpload,
+                                                    a3Config: entry.a3Config,
+                                                    a4Config: entry.a4Config,
+                                                    a5Config: entry.a5Config,
+                                                },
+                                            ]
+                                          : [];
 
                                     // Get first product for main row display (for backward compatibility)
                                     const firstProduct = hasMultipleProducts ? entry.products[0] : null;
@@ -1178,7 +1218,7 @@ function RentalInvoiceList(props) {
                                                 </TableCell>
                                                 <TableCell>
                                                     <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#1976d2' }}>
-                                                        ₹{entry.grandTotal ? parseFloat(entry.grandTotal).toFixed(2) : '0.00'}
+                                                        ₹{rentalInvoiceDisplayGrandTotal(entry).toFixed(2)}
                                                     </Typography>
                                                 </TableCell>
                                                 <TableCell>
@@ -1352,6 +1392,9 @@ function RentalInvoiceList(props) {
                                                                     <TableBody>
                                                                         {productsToShow.map((product, index) => {
                                                                             const machine = product.machineId || entry.machineId;
+                                                                            const lineDisplay = machine
+                                                                                ? getRentalProductLineDisplayTotal(machine, product)
+                                                                                : parseFloat(product.productTotal) || 0;
                                                                             return (
                                                                                 <TableRow key={product._id || index}>
                                                                                     <TableCell>{index + 1}</TableCell>
@@ -1366,7 +1409,7 @@ function RentalInvoiceList(props) {
                                                                                     </TableCell>
                                                                                     <TableCell align="right">
                                                                                         <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
-                                                                                            ₹{product.productTotal ? parseFloat(product.productTotal).toFixed(2) : '0.00'}
+                                                                                            ₹{Number.isFinite(lineDisplay) ? lineDisplay.toFixed(2) : '0.00'}
                                                                                         </Typography>
                                                                                     </TableCell>
                                                                                 </TableRow>
@@ -1377,7 +1420,7 @@ function RentalInvoiceList(props) {
                                                                                 Grand Total:
                                                                             </TableCell>
                                                                             <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: '1.1rem', color: '#1976d2' }}>
-                                                                                ₹{entry.grandTotal ? parseFloat(entry.grandTotal).toFixed(2) : '0.00'}
+                                                                                ₹{rentalInvoiceDisplayGrandTotal(entry).toFixed(2)}
                                                                             </TableCell>
                                                                         </TableRow>
                                                                     </TableBody>
@@ -1666,7 +1709,7 @@ function RentalInvoiceList(props) {
                                     {companyPendingInvoice
                                         ?.filter((pendingInv) => pendingInv._id !== currentInvoice?._id)
                                         .map((pendingInv) => {
-                                            const invAmount = Number(pendingInv?.grandTotal || 0);
+                                            const invAmount = rentalInvoiceDisplayGrandTotal(pendingInv);
                                             const canSelect = invAmount <= remainingToAllocate || selectedInvoiceIds.includes(pendingInv._id);
                                             const dateStr = pendingInv.invoiceDate || pendingInv.entryDate || pendingInv.createdAt;
                                             return (
@@ -1690,7 +1733,7 @@ function RentalInvoiceList(props) {
                                                         onChange={() => {}}
                                                         disabled={!canSelect}
                                                     />
-                                                    <span>{dateStr ? new Date(dateStr).toLocaleDateString() : 'N/A'} - Rs {pendingInv?.grandTotal}</span>
+                                                    <span>{dateStr ? new Date(dateStr).toLocaleDateString() : 'N/A'} - Rs {invAmount.toFixed(2)}</span>
                                                 </Box>
                                             );
                                         })}

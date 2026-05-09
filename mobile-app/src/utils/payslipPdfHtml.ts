@@ -30,10 +30,11 @@ function formatMoney(n: any): string {
 export function buildPayslipHtml(payslip: any): string {
   const emp = payslip.employeeId;
   const gross = Number(payslip.grossEarnings) || 0;
-  const ded =
-    Number(payslip.totalDeductions) ||
-    Number(payslip.deductions?.taxPayable) ||
-    0;
+  const taxD = Number(payslip.deductions?.taxPayable) || 0;
+  const advD = Number(payslip.deductions?.advanceAmount) || 0;
+  const dedSum = taxD + advD;
+  const dedRaw = Number(payslip.totalDeductions);
+  const ded = Number.isFinite(dedRaw) ? dedRaw : dedSum;
   let net = Number(payslip.netPay);
   if (Number.isNaN(net)) net = gross - ded;
   const earnings = payslip.earnings || {};
@@ -62,8 +63,9 @@ export function buildPayslipHtml(payslip: any): string {
 
   let tableRows = '';
   earningsRows.forEach(([label, val], i) => {
-    const dedLabel = i === 0 ? 'Tax Payable' : '';
-    const dedVal = i === 0 ? formatMoney(payslip.deductions?.taxPayable ?? 0) : '';
+    const dedLabel = i === 0 ? 'Tax Payable' : i === 1 ? 'Advance Amount' : '';
+    const dedVal =
+      i === 0 ? formatMoney(taxD) : i === 1 ? formatMoney(advD) : '';
     tableRows += `<tr>
       <td>${esc(label)}</td><td class="r">${esc(formatMoney(val))}</td><td class="c">-</td>
       <td>${esc(dedLabel)}</td><td class="r">${esc(dedVal)}</td><td class="c">-</td>

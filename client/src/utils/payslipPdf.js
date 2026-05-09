@@ -112,7 +112,9 @@ export function generatePayslipPdf(payslip, logoDataUrl = null) {
     let netPay = payslip.netPay;
     if (netPay == null || Number.isNaN(Number(netPay))) {
         const g = payslip.grossEarnings ?? 0;
-        const d = payslip.totalDeductions ?? (payslip.deductions?.taxPayable ?? 0);
+        const d =
+            payslip.totalDeductions ??
+            (Number(payslip.deductions?.taxPayable) || 0) + (Number(payslip.deductions?.advanceAmount) || 0);
         netPay = Number(g) - Number(d);
     }
     netPay = Number(netPay);
@@ -154,9 +156,10 @@ export function generatePayslipPdf(payslip, logoDataUrl = null) {
         : eRows.reduce((s, [, v]) => s + (Number(v) || 0), 0);
     const rawDeductions = payslip.deductions || {};
     const tax = Number(rawDeductions.taxPayable) || 0;
+    const advanceAmt = Number(rawDeductions.advanceAmount) || 0;
     const totalDed = (payslip.totalDeductions != null && !Number.isNaN(Number(payslip.totalDeductions)))
         ? Number(payslip.totalDeductions)
-        : tax;
+        : tax + advanceAmt;
 
     const tableLeft = 14;
     const tableRight = pageW - 14;
@@ -207,6 +210,12 @@ export function generatePayslipPdf(payslip, logoDataUrl = null) {
     y += rowH + 4;
     doc.text("Tax Payable", tableLeft + 4, y + 4);
     doc.text(formatMoneyPdf(tax), amountColRight, y + 4, { align: "right" });
+    doc.text("-", ytdColRight, y + 4, { align: "right" });
+    drawLine(doc, tableLeft, y + rowH, tableRight, y + rowH);
+    y += rowH;
+    doc.setFont(undefined, "normal");
+    doc.text("Advance Amount", tableLeft + 4, y + 4);
+    doc.text(formatMoneyPdf(advanceAmt), amountColRight, y + 4, { align: "right" });
     doc.text("-", ytdColRight, y + 4, { align: "right" });
     drawLine(doc, tableLeft, y + rowH, tableRight, y + rowH);
     y += rowH;

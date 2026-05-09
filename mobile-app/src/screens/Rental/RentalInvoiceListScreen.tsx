@@ -25,9 +25,25 @@ import Toast from 'react-native-toast-message';
 import * as ImagePicker from 'expo-image-picker';
 import { PaymentContactEmailsField } from '../../components/PaymentContactEmailsField';
 import { invoicePaymentEmailsFromRecord, normalizePaymentContactPayload } from '../../utils/invoicePaymentEmails';
-import { formatSendDetailsToDetail } from '../../utils/functions';
+import {
+  formatSendDetailsToDetail,
+  getTotalRentalInvoicePayment,
+  getRentalProductLineDisplayTotal,
+} from '../../utils/functions';
+import { fetchAssignableUsers } from '../../utils/fetchAssignableUsers';
 
 const RENTAL_INVOICE_DOWNLOAD_BASE_URL = 'https://pub-bcab85dac0c64221ba6b6a756f991c46.r2.dev';
+
+function rentalInvoiceDisplayGrandTotal(entry: any): number {
+  try {
+    const c = getTotalRentalInvoicePayment(entry);
+    const v = parseFloat(c.totalWithCommission);
+    if (Number.isFinite(v)) return v;
+  } catch {
+    /* ignore */
+  }
+  return parseFloat(String(entry?.grandTotal)) || 0;
+}
 
 const RentalInvoiceListScreen = () => {
   const navigation = useNavigation();
@@ -133,6 +149,11 @@ const RentalInvoiceListScreen = () => {
   const [filterEmployeeVisible, setFilterEmployeeVisible] = useState(false);
   const [filterCompanyVisible, setFilterCompanyVisible] = useState(false);
   const [filterStatusVisible, setFilterStatusVisible] = useState(false);
+  const [assignableUsers, setAssignableUsers] = useState<any[]>([]);
+  const [reassignModalVisible, setReassignModalVisible] = useState(false);
+  const [reassignEntry, setReassignEntry] = useState<any | null>(null);
+  const [selectedReassignUserId, setSelectedReassignUserId] = useState('');
+  const [reassigning, setReassigning] = useState(false);
 
   const rentalTypes = React.useMemo(() => {
     const types = (rentalEntries || [])
@@ -192,6 +213,70 @@ const RentalInvoiceListScreen = () => {
   useEffect(() => {
     setPage(0);
   }, [searchTerm, rentalTypeFilter, rentalTitleFilter, employeeFilter, companyFilter, statusFilter]);
+
+  useEffect(() => {
+    if (!token) {
+      setAssignableUsers([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const list = await fetchAssignableUsers(token);
+        if (!cancelled) setAssignableUsers(list);
+      } catch {
+        if (!cancelled) setAssignableUsers([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
+  const openReassignModal = (entry: any) => {
+    setReassignEntry(entry);
+    setSelectedReassignUserId(entry?.assignedTo?._id != null ? String(entry.assignedTo._id) : '');
+    setReassignModalVisible(true);
+  };
+
+  const closeReassignModal = () => {
+    setReassignModalVisible(false);
+    setReassignEntry(null);
+    setSelectedReassignUserId('');
+  };
+
+  const handleConfirmReassign = async () => {
+    if (!reassignEntry?._id) {
+      Toast.show({ type: 'error', text1: 'Missing entry' });
+      return;
+    }
+    if (!selectedReassignUserId) {
+      Toast.show({ type: 'error', text1: 'Select a user to assign' });
+      return;
+    }
+    setReassigning(true);
+    try {
+      const res = await axios.put(
+        `${getApiBaseUrl()}/rental-payment/${reassignEntry._id}`,
+        { assignedTo: selectedReassignUserId },
+        { headers: { Authorization: token || '' } }
+      );
+      if (res.data?.success) {
+        Toast.show({ type: 'success', text1: 'Invoice reassigned' });
+        closeReassignModal();
+        fetchRentalEntries();
+      } else {
+        Toast.show({ type: 'error', text1: res.data?.message || 'Reassign failed' });
+      }
+    } catch (e: any) {
+      Toast.show({
+        type: 'error',
+        text1: e?.response?.data?.message || 'Reassign failed',
+      });
+    } finally {
+      setReassigning(false);
+    }
+  };
 
   const fetchRentalEntries = async () => {
     try {
@@ -482,7 +567,7 @@ const RentalInvoiceListScreen = () => {
       otherPaymentMode: entry.otherPaymentMode || '',
       paymentAmount: initialPaymentAmount.toString(),
       paymentAmountType: initialPaymentAmountType,
-      grandTotal: entry.grandTotal || 0,
+      grandTotal: rentalInvoiceDisplayGrandTotal(entry),
       paymentContactEmails: invoicePaymentEmailsFromRecord(entry),
     });
     setBalanceAmount(0);
@@ -496,12 +581,13 @@ const RentalInvoiceListScreen = () => {
     setPaymentForm({ ...paymentForm, paymentAmount: value });
     const amount = parseFloat(value) || 0;
 
-    if (amount < selectedEntry?.grandTotal) {
-      const pending = selectedEntry?.grandTotal - amount;
+    const cap = rentalInvoiceDisplayGrandTotal(selectedEntry);
+    if (amount < cap) {
+      const pending = cap - amount;
       setPendingAmount(pending);
       setBalanceAmount(0);
     } else {
-      const balance = amount - selectedEntry?.grandTotal;
+      const balance = amount - cap;
       setBalanceAmount(balance);
       setPendingAmount(0);
 
@@ -560,7 +646,10 @@ const RentalInvoiceListScreen = () => {
 
     try {
       const paymentAmount = parseFloat(paymentForm.paymentAmount) || 0;
-      const grandTotal = parseFloat(String(selectedEntry?.grandTotal || paymentForm.grandTotal)) || 0;
+      const grandTotal =
+        parseFloat(String(paymentForm.grandTotal)) ||
+        rentalInvoiceDisplayGrandTotal(selectedEntry) ||
+        0;
       
       // Calculate status based on payment amount and balance
       let status = 'Paid';
@@ -892,11 +981,11 @@ const RentalInvoiceListScreen = () => {
               </Text>
             </View>
           )}
-          {item.grandTotal && (
+          {(Number(item.grandTotal) > 0 || rentalInvoiceDisplayGrandTotal(item) > 0) && (
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Grand Total:</Text>
               <Text style={[styles.detailValue, { fontWeight: 'bold', color: '#1976d2' }]}>
-                ₹{parseFloat(String(item.grandTotal)).toFixed(2)}
+                ₹{rentalInvoiceDisplayGrandTotal(item).toFixed(2)}
               </Text>
             </View>
           )}
@@ -935,6 +1024,15 @@ const RentalInvoiceListScreen = () => {
             >
               <Icon name="edit" size={18} color="#007AFF" />
               <Text style={styles.actionButtonText}>Edit</Text>
+            </TouchableOpacity>
+          )}
+          {hasPermission('rentalInvoice', 'edit') && (
+            <TouchableOpacity
+              style={[styles.actionButton, styles.reassignButton]}
+              onPress={() => openReassignModal(item)}
+            >
+              <Icon name="swap-horiz" size={18} color="#6a1b9a" />
+              <Text style={[styles.actionButtonText, styles.reassignButtonText]}>Assign To</Text>
             </TouchableOpacity>
           )}
           <TouchableOpacity
@@ -1086,14 +1184,21 @@ const RentalInvoiceListScreen = () => {
                     <Text style={styles.productLabel}>Model:</Text>
                     <Text style={styles.productValue}>{machineObj?.modelName || 'N/A'}</Text>
                   </View>
-                  {product.productTotal && (
+                  {machineObj ? (
+                    <View style={styles.productRow}>
+                      <Text style={styles.productLabel}>Product Total:</Text>
+                      <Text style={[styles.productValue, { fontWeight: 'bold' }]}>
+                        ₹{getRentalProductLineDisplayTotal(machineObj, product).toFixed(2)}
+                      </Text>
+                    </View>
+                  ) : product.productTotal ? (
                     <View style={styles.productRow}>
                       <Text style={styles.productLabel}>Product Total:</Text>
                       <Text style={[styles.productValue, { fontWeight: 'bold' }]}>
                         ₹{parseFloat(String(product.productTotal)).toFixed(2)}
                       </Text>
                     </View>
-                  )}
+                  ) : null}
                   
                   {/* Configurations */}
                   {product.a3Config && (
@@ -1130,11 +1235,11 @@ const RentalInvoiceListScreen = () => {
             })}
             
             {/* Grand Total */}
-            {item.grandTotal && (
+            {(Number(item.grandTotal) > 0 || rentalInvoiceDisplayGrandTotal(item) > 0) && (
               <View style={styles.grandTotalSection}>
                 <Text style={styles.grandTotalLabel}>Grand Total:</Text>
                 <Text style={styles.grandTotalValue}>
-                  ₹{parseFloat(String(item.grandTotal)).toFixed(2)}
+                  ₹{rentalInvoiceDisplayGrandTotal(item).toFixed(2)}
                 </Text>
               </View>
             )}
@@ -1344,7 +1449,10 @@ const RentalInvoiceListScreen = () => {
             onStartShouldSetResponder={() => true}
           >
             <Text style={styles.modalTitle}>
-              Payment Details (RS: {paymentForm?.grandTotal || selectedEntry?.grandTotal || '0.00'})
+              Payment Details (RS:{' '}
+              {paymentForm?.grandTotal ||
+                (selectedEntry ? rentalInvoiceDisplayGrandTotal(selectedEntry) : 0) ||
+                '0.00'}
             </Text>
 
             {selectedEntry ? (
@@ -1555,7 +1663,7 @@ const RentalInvoiceListScreen = () => {
                               (inv) => inv._id === selectedPendingInvoiceId
                             );
                             return selectedInv
-                              ? `${new Date(selectedInv.createdAt || selectedInv.invoiceDate).toLocaleDateString()} - Rs ${selectedInv.grandTotal?.toFixed(2) || '0.00'}`
+                              ? `${new Date(selectedInv.createdAt || selectedInv.invoiceDate).toLocaleDateString()} - Rs ${rentalInvoiceDisplayGrandTotal(selectedInv).toFixed(2)}`
                               : 'Select Invoice';
                           })()
                         : '--select Invoice--'}
@@ -1730,7 +1838,7 @@ const RentalInvoiceListScreen = () => {
                 >
                   <Text style={styles.pickerOptionText}>
                     {new Date(item.createdAt || item.invoiceDate).toLocaleDateString()} - Rs{' '}
-                    {item.grandTotal?.toFixed(2) || '0.00'}
+                    {rentalInvoiceDisplayGrandTotal(item).toFixed(2)}
                   </Text>
                 </TouchableOpacity>
               )}
@@ -1881,6 +1989,66 @@ const RentalInvoiceListScreen = () => {
             <TouchableOpacity style={[styles.modalButton, styles.modalCancelButton]} onPress={() => setFilterStatusVisible(false)}>
               <Text style={styles.modalCancelButtonText}>Cancel</Text>
             </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      <Modal
+        visible={reassignModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={closeReassignModal}
+      >
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={closeReassignModal}>
+          <View style={styles.pickerModalContent} onStartShouldSetResponder={() => true}>
+            <Text style={styles.pickerModalTitle}>Assign To</Text>
+            <Text style={styles.reassignHint} numberOfLines={2}>
+              All staff linked to an employee record ({assignableUsers.length} users)
+            </Text>
+            <FlatList
+              data={assignableUsers}
+              keyExtractor={(u) => String(u._id)}
+              style={{ maxHeight: 360 }}
+              ListEmptyComponent={
+                <View style={styles.pickerEmptyContainer}>
+                  <Text style={styles.pickerEmptyText}>No assignable users</Text>
+                </View>
+              }
+              renderItem={({ item: u }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.pickerOption,
+                    String(u._id) === selectedReassignUserId && styles.pickerOptionSelected,
+                  ]}
+                  onPress={() => setSelectedReassignUserId(String(u._id))}
+                >
+                  <Text style={styles.pickerOptionText}>
+                    {u.name || '—'}
+                    {u.email ? ` (${u.email})` : ''}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalCancelButton]}
+                onPress={closeReassignModal}
+                disabled={reassigning}
+              >
+                <Text style={styles.modalCancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalSaveButton, (!selectedReassignUserId || reassigning) && { opacity: 0.5 }]}
+                onPress={handleConfirmReassign}
+                disabled={!selectedReassignUserId || reassigning}
+              >
+                {reassigning ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.modalSaveButtonText}>Save</Text>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
         </TouchableOpacity>
       </Modal>
@@ -2185,6 +2353,21 @@ const styles = StyleSheet.create({
   },
   activityButton: {
     backgroundColor: '#e3f2fd',
+  },
+  reassignButton: {
+    backgroundColor: '#f3e5f5',
+  },
+  reassignButtonText: {
+    color: '#6a1b9a',
+  },
+  reassignHint: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  pickerOptionSelected: {
+    backgroundColor: '#e6f7ff',
   },
   actionButtonText: {
     fontSize: 12,

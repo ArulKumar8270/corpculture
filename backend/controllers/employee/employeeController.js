@@ -72,15 +72,27 @@ export const createEmployeeController = async (req, res) => {
     }
 };
 
+const normalizeEmployeeMoneyFields = (doc) => {
+    if (!doc || typeof doc !== "object") return doc;
+    const salary = Number(doc.salary);
+    const bikeAllowance = Number(doc.bikeAllowance);
+    return {
+        ...doc,
+        salary: Number.isFinite(salary) ? salary : 0,
+        bikeAllowance: Number.isFinite(bikeAllowance) ? bikeAllowance : 0,
+    };
+};
+
 // Get all employees
 export const getAllEmployeesController = async (req, res) => {
     try {
-        const employees = await Employee.find({}).populate('department').select("-password"); // Exclude passwords
+        const employees = await Employee.find({}).populate('department').select("-password").lean();
+        const normalized = employees.map((e) => normalizeEmployeeMoneyFields(e));
         res.status(200).send({
             success: true,
             message: "All employees fetched successfully",
-            count: employees.length,
-            employees,
+            count: normalized.length,
+            employees: normalized,
         });
     } catch (error) {
         console.error("Error in getAllEmployeesController:", error);
@@ -95,7 +107,7 @@ export const getAllEmployeesController = async (req, res) => {
 // Get a single employee by ID
 export const getSingleEmployeeController = async (req, res) => {
     try {
-        const employee = await Employee.findById(req.params.id).select("-password").populate("department"); // Exclude password
+        const employee = await Employee.findById(req.params.id).select("-password").populate("department").lean();
         if (!employee) {
             return res.status(404).send({
                 success: false,
@@ -105,7 +117,7 @@ export const getSingleEmployeeController = async (req, res) => {
         res.status(200).send({
             success: true,
             message: "Single employee fetched successfully",
-            employee,
+            employee: normalizeEmployeeMoneyFields(employee),
         });
     } catch (error) {
         console.error("Error in getSingleEmployeeController:", error);

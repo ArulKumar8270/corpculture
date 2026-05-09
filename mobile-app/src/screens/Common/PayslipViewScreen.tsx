@@ -163,8 +163,13 @@ const PayslipViewScreen = () => {
 
   const emp = payslip.employeeId;
   const gross = Number(payslip.grossEarnings) || 0;
-  const ded = Number(payslip.totalDeductions) ?? Number(payslip.deductions?.taxPayable) ?? 0;
-  const net = Number(payslip.netPay) ?? gross - ded;
+  const taxD = Number(payslip.deductions?.taxPayable) || 0;
+  const advD = Number(payslip.deductions?.advanceAmount) || 0;
+  const dedSum = taxD + advD;
+  const dedRaw = Number(payslip.totalDeductions);
+  const ded = Number.isFinite(dedRaw) ? dedRaw : dedSum;
+  const netRaw = Number(payslip.netPay);
+  const net = Number.isFinite(netRaw) ? netRaw : gross - ded;
   const earnings = payslip.earnings || {};
   const ratings = payslip.ratings || {};
   const empName = (payslip.employeeName ?? emp?.name ?? '').toString().trim() || '-';
@@ -266,9 +271,11 @@ const PayslipViewScreen = () => {
             <Text style={[styles.td, styles.tdLeft]}>{label}</Text>
             <Text style={[styles.td, styles.tdRight]}>{formatMoney(val)}</Text>
             <Text style={[styles.td, styles.tdCenter]}>-</Text>
-            <Text style={[styles.td, styles.tdLeft]}>{i === 0 ? 'Tax Payable' : '\u00A0'}</Text>
+            <Text style={[styles.td, styles.tdLeft]}>
+              {i === 0 ? 'Tax Payable' : i === 1 ? 'Advance Amount' : '\u00A0'}
+            </Text>
             <Text style={[styles.td, styles.tdRight]}>
-              {i === 0 ? formatMoney(payslip.deductions?.taxPayable ?? 0) : '\u00A0'}
+              {i === 0 ? formatMoney(taxD) : i === 1 ? formatMoney(advD) : '\u00A0'}
             </Text>
             <Text style={[styles.td, styles.tdCenter]}>-</Text>
           </View>

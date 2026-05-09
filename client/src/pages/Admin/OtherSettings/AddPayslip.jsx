@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import axios from "axios";
 import { useAuth } from "../../../context/auth";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -26,15 +26,24 @@ const defaultEarnings = {
     foodAllowance: 0,
     incentives: 0,
 };
-const defaultDeductions = { taxPayable: 0 };
+const defaultDeductions = { taxPayable: 0, advanceAmount: 0 };
 const defaultRatings = { timing: 0, leave: 0, workFb: 0, incentive: 0, firmFb: 0 };
+
+/** Normalize salary / allowance from API (string, number, null). */
+const parseMoney = (v) => {
+    if (v == null || v === "") return 0;
+    const n = typeof v === "string" ? parseFloat(v.replace(/,/g, "")) : Number(v);
+    return Number.isFinite(n) ? n : 0;
+};
 
 const AddPayslip = () => {
     const { auth } = useAuth();
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const editId = searchParams.get("id") || "";
-    const prevEmpRef = useRef("");
+    /** Latest in-flight employee compensation sync; avoids Strict Mode / dependency re-runs dropping API results. */
+    const employeeCompSyncSeq = useRef(0);
+    const employeesRef = useRef([]);
     const [employees, setEmployees] = useState([]);
     const [loading, setLoading] = useState(false);
     const [initLoading, setInitLoading] = useState(!!editId);
@@ -90,32 +99,62 @@ const AddPayslip = () => {
         if (auth?.token) fetchEmployees();
     }, [auth?.token]);
 
+    employeesRef.current = employees;
+
+    /** Re-run sync when the selected row in /employee/all updates (same list length, edited allowance). */
+    const selectedEmployeeCompKey = useMemo(() => {
+        const e = employees.find((x) => String(x?._id ?? "") === String(employeeId));
+        if (!e || !employeeId) return "";
+        return `${employeeId}:${parseMoney(e.salary)}:${parseMoney(e.bikeAllowance ?? e.bike_allowance)}`;
+    }, [employees, employeeId]);
+
     useEffect(() => {
-        if (!employeeId) {
-            prevEmpRef.current = "";
-            return;
-        }
-        const emp = employees.find((e) => e._id === employeeId);
-        if (!emp) {
-            prevEmpRef.current = employeeId;
-            return;
-        }
-        const fromUser = prevEmpRef.current !== "" && prevEmpRef.current !== employeeId;
-        if (editId && !fromUser) {
-            prevEmpRef.current = employeeId;
-            return;
-        }
-        setEmployeeName(emp.name || "");
-        setEmployeeIdNo(emp.idCradNo || emp.employeeIdNo || "");
-        setDesignation(Array.isArray(emp.designation) ? emp.designation[0] : emp.designation || "");
-        setDateOfJoining(emp.hireDate ? dayjs(emp.hireDate).format("YYYY-MM-DD") : "");
-        setEarnings((prev) => ({
-            ...prev,
-            basic: Number(emp.salary) || 0,
-            bikeAllowance: Number(emp.bikeAllowance) || 0,
-        }));
-        prevEmpRef.current = employeeId;
-    }, [employeeId, employees, editId]);
+        if (!employeeId) return;
+        const list = employeesRef.current;
+        const empFromList = list.find((e) => String(e?._id ?? "") === String(employeeId));
+
+        const seq = ++employeeCompSyncSeq.current;
+
+        const applyFromEmployee = (emp) => {
+            if (!emp || seq !== employeeCompSyncSeq.current) return;
+            setEmployeeName(emp.name || "");
+            setEmployeeIdNo(emp.idCradNo || emp.employeeIdNo || "");
+            setDesignation(Array.isArray(emp.designation) ? emp.designation[0] : emp.designation || "");
+            setDateOfJoining(emp.hireDate ? dayjs(emp.hireDate).format("YYYY-MM-DD") : "");
+            const basic = parseMoney(emp.salary);
+            const bike = parseMoney(emp.bikeAllowance ?? emp.bike_allowance);
+            setEarnings((prev) => ({
+                ...prev,
+                basic,
+                bikeAllowance: bike,
+            }));
+        };
+
+        (async () => {
+            if (!auth?.token) {
+                if (empFromList) applyFromEmployee(empFromList);
+                return;
+            }
+            try {
+                const { data } = await axios.get(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/employee/get/${encodeURIComponent(employeeId)}`,
+                    {
+                        headers: { Authorization: auth?.token },
+                        params: { _: Date.now() },
+                    }
+                );
+                if (seq !== employeeCompSyncSeq.current) return;
+                if (data?.success && data.employee) {
+                    applyFromEmployee(data.employee);
+                    return;
+                }
+            } catch {
+                /* list fallback */
+            }
+            if (seq !== employeeCompSyncSeq.current) return;
+            if (empFromList) applyFromEmployee(empFromList);
+        })();
+    }, [employeeId, auth?.token, employees.length, selectedEmployeeCompKey]);
 
     useEffect(() => {
         if (!editId) {
@@ -138,7 +177,6 @@ const AddPayslip = () => {
                     return;
                 }
                 const p = data.payslip;
-                prevEmpRef.current = "";
                 const empRef = p.employeeId;
                 const eid =
                     typeof empRef === "object" && empRef?._id != null ? String(empRef._id) : String(empRef || "");
@@ -179,11 +217,13 @@ const AddPayslip = () => {
             if (!auth?.token) return;
             if (!employeeId || !payPeriodDate || !payDate) {
                 setTotalKm(0);
+                setEarnings((p) => ({ ...p, petrolAllowance: 0 }));
                 return;
             }
 
             try {
                 setKmLoading(true);
+                setTotalKm(0);
                 const params = new URLSearchParams({
                     page: "1",
                     limit: "1000",
@@ -216,8 +256,8 @@ const AddPayslip = () => {
         };
     }, [auth?.token, employeeId, payPeriodDate, payDate]);
 
+    // Keep petrol in sync with KM × rate (do not gate on kmLoading — avoids racing employee bike/basic sync).
     useEffect(() => {
-        if (kmLoading) return;
         const km = Number(totalKm || 0);
         const price = Number(petrolPricePerKm || 0);
         const amount =
@@ -225,7 +265,7 @@ const AddPayslip = () => {
                 ? km * price
                 : 0;
         setEarnings((prev) => ({ ...prev, petrolAllowance: amount }));
-    }, [totalKm, petrolPricePerKm, kmLoading]);
+    }, [totalKm, petrolPricePerKm]);
 
     const handleEarningChange = (field, value) => setEarnings((p) => ({ ...p, [field]: Number(value) || 0 }));
     const handleDeductionChange = (field, value) => setDeductions((p) => ({ ...p, [field]: Number(value) || 0 }));
@@ -317,7 +357,9 @@ const AddPayslip = () => {
                                         onChange={(e) => setEmployeeId(e.target.value)}
                                     >
                                         {employees.map((emp) => (
-                                            <MenuItem key={emp._id} value={emp._id}>{emp.name} ({emp.email})</MenuItem>
+                                            <MenuItem key={String(emp._id)} value={String(emp._id)}>
+                                                {emp.name} ({emp.email})
+                                            </MenuItem>
                                         ))}
                                     </Select>
                                 </FormControl>
@@ -370,13 +412,15 @@ const AddPayslip = () => {
                                         value={earnings[key]}
                                         onChange={(e) => handleEarningChange(key, e.target.value)}
                                         inputProps={{ min: 0, step: 0.01 }}
-                                        disabled={key === "petrolAllowance"}
+                                        disabled={key === "petrolAllowance" || key === "bikeAllowance"}
                                         helperText={
-                                            key === "petrolAllowance"
-                                                ? petrolPricePerKm > 0
-                                                    ? `Auto: ${Number(totalKm || 0).toLocaleString("en-IN")} km × ₹${petrolPricePerKm}/KM`
-                                                    : `Total KM in period: ${Number(totalKm || 0).toLocaleString("en-IN")} km (set Petrol Price ₹/KM in Settings)`
-                                                : undefined
+                                            key === "bikeAllowance"
+                                                ? "From employee profile (update Bike Allowance in Add/Edit Employee)"
+                                                : key === "petrolAllowance"
+                                                  ? petrolPricePerKm > 0
+                                                      ? `Auto: ${Number(totalKm || 0).toLocaleString("en-IN")} km × ₹${petrolPricePerKm}/KM`
+                                                      : `Total KM in period: ${Number(totalKm || 0).toLocaleString("en-IN")} km (set Petrol Price ₹/KM in Settings)`
+                                                  : undefined
                                         }
                                     />
                                 </Grid>
@@ -385,6 +429,9 @@ const AddPayslip = () => {
                             <Grid item xs={12}><h3 className="font-semibold text-gray-700">Deductions</h3></Grid>
                             <Grid item xs={12} sm={6}>
                                 <TextField fullWidth size="small" type="number" label="Tax Payable" value={deductions.taxPayable} onChange={(e) => handleDeductionChange("taxPayable", e.target.value)} inputProps={{ min: 0, step: 0.01 }} />
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                                <TextField fullWidth size="small" type="number" label="Advance Amount" value={deductions.advanceAmount} onChange={(e) => handleDeductionChange("advanceAmount", e.target.value)} inputProps={{ min: 0, step: 0.01 }} helperText="Advance recovery / deduction from salary" />
                             </Grid>
 
                             <Grid item xs={12}><h3 className="font-semibold text-gray-700">Ratings (0-5)</h3></Grid>

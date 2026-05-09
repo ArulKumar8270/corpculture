@@ -28,6 +28,7 @@ const payslipSchema = new mongoose.Schema(
         // Deductions
         deductions: {
             taxPayable: { type: Number, default: 0 },
+            advanceAmount: { type: Number, default: 0 },
         },
         // Star/rating metrics (0-5 or value)
         ratings: {
@@ -49,7 +50,7 @@ payslipSchema.virtual("grossEarnings").get(function () {
 
 payslipSchema.virtual("totalDeductions").get(function () {
     const d = this.deductions || {};
-    return d.taxPayable || 0;
+    return (d.taxPayable || 0) + (d.advanceAmount || 0);
 });
 
 payslipSchema.virtual("netPay").get(function () {

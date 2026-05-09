@@ -24,6 +24,7 @@ import Toast from 'react-native-toast-message';
 import * as ImagePicker from 'expo-image-picker';
 import { PaymentContactEmailsField } from '../../components/PaymentContactEmailsField';
 import { invoicePaymentEmailsFromRecord, normalizePaymentContactPayload } from '../../utils/invoicePaymentEmails';
+import { fetchAssignableUsers } from '../../utils/fetchAssignableUsers';
 
 const INVOICE_DOWNLOAD_BASE_URL = 'https://pub-ef65b8bdb5974dd191a466c3120cd6b3.r2.dev';
 
@@ -130,6 +131,11 @@ const ServiceInvoiceListScreen = () => {
   const [filterEmployeeVisible, setFilterEmployeeVisible] = useState(false);
   const [filterCompanyVisible, setFilterCompanyVisible] = useState(false);
   const [filterStatusVisible, setFilterStatusVisible] = useState(false);
+  const [assignableUsers, setAssignableUsers] = useState<any[]>([]);
+  const [reassignModalVisible, setReassignModalVisible] = useState(false);
+  const [reassignInvoice, setReassignInvoice] = useState<any | null>(null);
+  const [selectedReassignUserId, setSelectedReassignUserId] = useState('');
+  const [reassigning, setReassigning] = useState(false);
 
   const serviceTitles = React.useMemo(() => {
     const titles = (invoices || [])
@@ -175,6 +181,70 @@ const ServiceInvoiceListScreen = () => {
   useEffect(() => {
     setPage(0);
   }, [searchTerm, serviceTitleFilter, employeeFilter, companyFilter, statusFilter]);
+
+  useEffect(() => {
+    if (!token) {
+      setAssignableUsers([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const list = await fetchAssignableUsers(token);
+        if (!cancelled) setAssignableUsers(list);
+      } catch {
+        if (!cancelled) setAssignableUsers([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
+  const openReassignModal = (inv: any) => {
+    setReassignInvoice(inv);
+    setSelectedReassignUserId(inv?.assignedTo?._id != null ? String(inv.assignedTo._id) : '');
+    setReassignModalVisible(true);
+  };
+
+  const closeReassignModal = () => {
+    setReassignModalVisible(false);
+    setReassignInvoice(null);
+    setSelectedReassignUserId('');
+  };
+
+  const handleConfirmReassign = async () => {
+    if (!reassignInvoice?._id) {
+      Toast.show({ type: 'error', text1: 'Missing invoice' });
+      return;
+    }
+    if (!selectedReassignUserId) {
+      Toast.show({ type: 'error', text1: 'Select a user to assign' });
+      return;
+    }
+    setReassigning(true);
+    try {
+      const res = await axios.put(
+        `${getApiBaseUrl()}/service-invoice/update/${reassignInvoice._id}`,
+        { assignedTo: selectedReassignUserId },
+        { headers: { Authorization: token || '' } }
+      );
+      if (res.data?.success) {
+        Toast.show({ type: 'success', text1: 'Invoice reassigned' });
+        closeReassignModal();
+        fetchInvoices();
+      } else {
+        Toast.show({ type: 'error', text1: res.data?.message || 'Reassign failed' });
+      }
+    } catch (e: any) {
+      Toast.show({
+        type: 'error',
+        text1: e?.response?.data?.message || 'Reassign failed',
+      });
+    } finally {
+      setReassigning(false);
+    }
+  };
 
   const fetchInvoices = async () => {
     if (!token) {
@@ -892,6 +962,15 @@ const ServiceInvoiceListScreen = () => {
             >
               <Icon name="edit" size={18} color="#007AFF" />
               <Text style={styles.actionButtonText}>Edit</Text>
+            </TouchableOpacity>
+          )}
+          {hasPermission('serviceInvoice', 'edit') && (
+            <TouchableOpacity
+              style={[styles.actionButton, styles.reassignButton]}
+              onPress={() => openReassignModal(item)}
+            >
+              <Icon name="swap-horiz" size={18} color="#6a1b9a" />
+              <Text style={[styles.actionButtonText, styles.reassignButtonText]}>Assign To</Text>
             </TouchableOpacity>
           )}
           <TouchableOpacity
@@ -1766,6 +1845,66 @@ const ServiceInvoiceListScreen = () => {
           </View>
         </TouchableOpacity>
       </Modal>
+
+      <Modal
+        visible={reassignModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={closeReassignModal}
+      >
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={closeReassignModal}>
+          <View style={styles.pickerModalContent} onStartShouldSetResponder={() => true}>
+            <Text style={styles.pickerModalTitle}>Assign To</Text>
+            <Text style={styles.reassignHint} numberOfLines={2}>
+              All staff linked to an employee record ({assignableUsers.length} users)
+            </Text>
+            <FlatList
+              data={assignableUsers}
+              keyExtractor={(u) => String(u._id)}
+              style={{ maxHeight: 360 }}
+              ListEmptyComponent={
+                <View style={styles.pickerEmptyContainer}>
+                  <Text style={styles.pickerEmptyText}>No assignable users</Text>
+                </View>
+              }
+              renderItem={({ item: u }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.pickerOption,
+                    String(u._id) === selectedReassignUserId && styles.pickerOptionSelected,
+                  ]}
+                  onPress={() => setSelectedReassignUserId(String(u._id))}
+                >
+                  <Text style={styles.pickerOptionText}>
+                    {u.name || '—'}
+                    {u.email ? ` (${u.email})` : ''}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalCancelButton]}
+                onPress={closeReassignModal}
+                disabled={reassigning}
+              >
+                <Text style={styles.modalCancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalSaveButton, (!selectedReassignUserId || reassigning) && { opacity: 0.5 }]}
+                onPress={handleConfirmReassign}
+                disabled={!selectedReassignUserId || reassigning}
+              >
+                {reassigning ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.modalSaveButtonText}>Save</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 };
@@ -2083,6 +2222,21 @@ const styles = StyleSheet.create({
   },
   activityButton: {
     backgroundColor: '#e3f2fd',
+  },
+  reassignButton: {
+    backgroundColor: '#f3e5f5',
+  },
+  reassignButtonText: {
+    color: '#6a1b9a',
+  },
+  reassignHint: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  pickerOptionSelected: {
+    backgroundColor: '#e6f7ff',
   },
   actionButtonText: {
     fontSize: 12,

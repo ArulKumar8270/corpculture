@@ -97,14 +97,14 @@ export default function PayslipView() {
   if (!payslip) return <div>Payslip not found</div>;
 
   const gross = Number(payslip.grossEarnings) || 0;
-  const ded =
-    Number(payslip.totalDeductions) ||
-    Number(payslip.deductions?.taxPayable) ||
-    0;
+  const taxOnly = Number(payslip.deductions?.taxPayable) || 0;
+  const advanceOnly = Number(payslip.deductions?.advanceAmount) || 0;
+  const dedSum = taxOnly + advanceOnly;
+  const dedRaw = Number(payslip.totalDeductions);
+  const ded = Number.isFinite(dedRaw) ? dedRaw : dedSum;
 
-  const net =
-    Number(payslip.netPay) ||
-    gross - ded;
+  const netRaw = Number(payslip.netPay);
+  const net = Number.isFinite(netRaw) ? netRaw : gross - ded;
 
   const emp = payslip.employeeId;
 
@@ -255,9 +255,15 @@ export default function PayslipView() {
                     <td className="border p-2">{row[0]}</td>
                     <td className="border p-2 text-right whitespace-nowrap">{formatMoney(row[1])}</td>
                     <td className="border p-2 text-center">-</td>
-                    <td className="border p-2">{i === 0 ? "Tax Payable" : "\u00A0"}</td>
+                    <td className="border p-2">
+                      {i === 0 ? "Tax Payable" : i === 1 ? "Advance Amount" : "\u00A0"}
+                    </td>
                     <td className="border p-2 text-right whitespace-nowrap">
-                      {i === 0 ? formatMoney(payslip.deductions?.taxPayable ?? 0) : "\u00A0"}
+                      {i === 0
+                        ? formatMoney(payslip.deductions?.taxPayable ?? 0)
+                        : i === 1
+                          ? formatMoney(payslip.deductions?.advanceAmount ?? 0)
+                          : "\u00A0"}
                     </td>
                     <td className="border p-2 text-center">-</td>
                   </tr>

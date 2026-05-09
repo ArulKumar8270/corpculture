@@ -1492,41 +1492,39 @@ const ServiceInvoiceList = (props) => {
 
     const fetchUsers = async () => {
         try {
-            // First, fetch employees
             const employeeRes = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/employee/all`, {
                 headers: {
                     Authorization: auth.token,
                 },
             });
-            
-            if (employeeRes.data?.success) {
-                // Filter employees by employeeType (Service or Sales)
-                const serviceAndSalesEmployees = employeeRes.data.employees.filter(
-                    emp => emp.employeeType === 'Service' || emp.employeeType === 'Sales'
-                );
-                
-                // Extract userIds from filtered employees
-                const userIds = serviceAndSalesEmployees.map(emp => emp.userId).filter(Boolean);
-                
-                if (userIds.length > 0) {
-                    // Fetch users for those userIds
-                    const userRes = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/auth/all-users`, {
-                        headers: {
-                            Authorization: auth.token,
-                        },
-                    });
-                    
-                    // Filter users to only include those with matching userIds
-                    const filteredUsers = (userRes.data.users || []).filter(user => 
-                        userIds.includes(user._id)
-                    );
-                    setUsers(filteredUsers);
-                } else {
-                    setUsers([]);
-                }
-            } else {
+
+            if (!employeeRes.data?.success) {
                 setUsers([]);
+                return;
             }
+
+            const employees = employeeRes.data.employees || [];
+            const userIdSet = new Set(
+                employees
+                    .map((emp) => emp?.userId)
+                    .filter(Boolean)
+                    .map((id) => String(id))
+            );
+
+            if (userIdSet.size === 0) {
+                setUsers([]);
+                return;
+            }
+
+            const userRes = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/auth/all-users`, {
+                headers: {
+                    Authorization: auth.token,
+                },
+            });
+
+            const allUsers = userRes.data?.users || [];
+            const filteredUsers = allUsers.filter((user) => userIdSet.has(String(user._id)));
+            setUsers(filteredUsers);
         } catch (error) {
             console.error("Error fetching users:", error);
             toast.error("Failed to fetch users.");

@@ -6,14 +6,23 @@ import CommonDetails from "../../models/commonDetailsModel.js";
 import { normalizeSendDetailsTo } from "../../utils/normalizeSendDetailsTo.js";
 import Counter from "../../models/counterModel.js";
 
-// Helper to calculate counts
-const calculateCountAmount = (machineOld, entryNew, freeC, extraAmt) => {
-    machineOld = parseFloat(machineOld) || 0;
+/** Use opening meter from the invoice line when both old+new readings exist (PDF snapshot); else live machine opening (legacy). */
+const hasInvoiceReadingPair = (entryOld, entryNew) => {
+    if (entryNew === undefined || entryNew === null || entryNew === '') return false;
+    if (entryOld === undefined || entryOld === null || entryOld === '') return false;
+    return true;
+};
+
+// Helper to calculate counts (entryOld = frozen opening on the invoice/PDF)
+const calculateCountAmount = (machineOld, entryOld, entryNew, freeC, extraAmt) => {
+    const openReading = hasInvoiceReadingPair(entryOld, entryNew)
+        ? (parseFloat(entryOld) || 0)
+        : (parseFloat(machineOld) || 0);
     entryNew = parseFloat(entryNew) || 0;
     freeC = parseFloat(freeC) || 0;
     extraAmt = parseFloat(extraAmt) || 0;
 
-    const copiesUsed = entryNew - machineOld;
+    const copiesUsed = entryNew - openReading;
     if (copiesUsed <= 0) return 0;
     const billableCopies = Math.max(0, copiesUsed - freeC);
     return billableCopies * extraAmt;
@@ -26,23 +35,23 @@ const calculateProductTotal = (machine, a3Config, a4Config, a5Config) => {
 
     // A3 calculation
     if (machine.a3Config && a3Config) {
-        totalBillableAmount += calculateCountAmount(machine.a3Config.bwOldCount, a3Config.bwNewCount, machine.a3Config.freeCopiesBw, machine.a3Config.extraAmountBw);
-        totalBillableAmount += calculateCountAmount(machine.a3Config.colorOldCount, a3Config.colorNewCount, machine.a3Config.freeCopiesColor, machine.a3Config.extraAmountColor);
-        totalBillableAmount += calculateCountAmount(machine.a3Config.colorScanningOldCount, a3Config.colorScanningNewCount, machine.a3Config.freeCopiesColorScanning, machine.a3Config.extraAmountColorScanning);
+        totalBillableAmount += calculateCountAmount(machine.a3Config.bwOldCount, a3Config.bwOldCount, a3Config.bwNewCount, machine.a3Config.freeCopiesBw, machine.a3Config.extraAmountBw);
+        totalBillableAmount += calculateCountAmount(machine.a3Config.colorOldCount, a3Config.colorOldCount, a3Config.colorNewCount, machine.a3Config.freeCopiesColor, machine.a3Config.extraAmountColor);
+        totalBillableAmount += calculateCountAmount(machine.a3Config.colorScanningOldCount, a3Config.colorScanningOldCount, a3Config.colorScanningNewCount, machine.a3Config.freeCopiesColorScanning, machine.a3Config.extraAmountColorScanning);
     }
 
     // A4 calculation
     if (machine.a4Config && a4Config) {
-        totalBillableAmount += calculateCountAmount(machine.a4Config.bwOldCount, a4Config.bwNewCount, machine.a4Config.freeCopiesBw, machine.a4Config.extraAmountBw);
-        totalBillableAmount += calculateCountAmount(machine.a4Config.colorOldCount, a4Config.colorNewCount, machine.a4Config.freeCopiesColor, machine.a4Config.extraAmountColor);
-        totalBillableAmount += calculateCountAmount(machine.a4Config.colorScanningOldCount, a4Config.colorScanningNewCount, machine.a4Config.freeCopiesColorScanning, machine.a4Config.extraAmountColorScanning);
+        totalBillableAmount += calculateCountAmount(machine.a4Config.bwOldCount, a4Config.bwOldCount, a4Config.bwNewCount, machine.a4Config.freeCopiesBw, machine.a4Config.extraAmountBw);
+        totalBillableAmount += calculateCountAmount(machine.a4Config.colorOldCount, a4Config.colorOldCount, a4Config.colorNewCount, machine.a4Config.freeCopiesColor, machine.a4Config.extraAmountColor);
+        totalBillableAmount += calculateCountAmount(machine.a4Config.colorScanningOldCount, a4Config.colorScanningOldCount, a4Config.colorScanningNewCount, machine.a4Config.freeCopiesColorScanning, machine.a4Config.extraAmountColorScanning);
     }
 
     // A5 calculation
     if (machine.a5Config && a5Config) {
-        totalBillableAmount += calculateCountAmount(machine.a5Config.bwOldCount, a5Config.bwNewCount, machine.a5Config.freeCopiesBw, machine.a5Config.extraAmountBw);
-        totalBillableAmount += calculateCountAmount(machine.a5Config.colorOldCount, a5Config.colorNewCount, machine.a5Config.freeCopiesColor, machine.a5Config.extraAmountColor);
-        totalBillableAmount += calculateCountAmount(machine.a5Config.colorScanningOldCount, a5Config.colorScanningNewCount, machine.a5Config.freeCopiesColorScanning, machine.a5Config.extraAmountColorScanning);
+        totalBillableAmount += calculateCountAmount(machine.a5Config.bwOldCount, a5Config.bwOldCount, a5Config.bwNewCount, machine.a5Config.freeCopiesBw, machine.a5Config.extraAmountBw);
+        totalBillableAmount += calculateCountAmount(machine.a5Config.colorOldCount, a5Config.colorOldCount, a5Config.colorNewCount, machine.a5Config.freeCopiesColor, machine.a5Config.extraAmountColor);
+        totalBillableAmount += calculateCountAmount(machine.a5Config.colorScanningOldCount, a5Config.colorScanningOldCount, a5Config.colorScanningNewCount, machine.a5Config.freeCopiesColorScanning, machine.a5Config.extraAmountColorScanning);
     }
 
     // Calculate GST

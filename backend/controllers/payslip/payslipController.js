@@ -26,6 +26,7 @@ function buildPayslipFieldsFromBody(body, employee) {
         },
         deductions: {
             taxPayable: Number(deductions.taxPayable) || 0,
+            advanceAmount: Number(deductions.advanceAmount) || 0,
         },
         ratings: {
             timing: Number(ratings.timing) || 0,
@@ -65,7 +66,7 @@ export const createPayslipController = async (req, res) => {
         const payslip = await Payslip.create(payload);
         const doc = await Payslip.findById(payslip._id).lean();
         doc.grossEarnings = (doc.earnings?.basic || 0) + (doc.earnings?.petrolAllowance || 0) + (doc.earnings?.bikeAllowance || 0) + (doc.earnings?.byBenefit || 0) + (doc.earnings?.foodAllowance || 0) + (doc.earnings?.incentives || 0);
-        doc.totalDeductions = doc.deductions?.taxPayable || 0;
+        doc.totalDeductions = (doc.deductions?.taxPayable || 0) + (doc.deductions?.advanceAmount || 0);
         doc.netPay = doc.grossEarnings - doc.totalDeductions;
 
         res.status(201).send({ success: true, payslip: doc });
@@ -179,9 +180,12 @@ function normalizePayslip(p) {
     const earnings = {};
     EARNINGS_KEYS.forEach((k) => { earnings[k] = Number(rawE[k]) || 0; });
     const rawD = p.deductions || {};
-    const deductions = { taxPayable: Number(rawD.taxPayable) || 0 };
+    const deductions = {
+        taxPayable: Number(rawD.taxPayable) || 0,
+        advanceAmount: Number(rawD.advanceAmount) || 0,
+    };
     const gross = EARNINGS_KEYS.reduce((s, k) => s + (earnings[k] || 0), 0);
-    const ded = deductions.taxPayable || 0;
+    const ded = (deductions.taxPayable || 0) + (deductions.advanceAmount || 0);
     return {
         ...p,
         earnings,

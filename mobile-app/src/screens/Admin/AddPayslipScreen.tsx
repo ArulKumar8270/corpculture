@@ -28,8 +28,15 @@ const defaultEarnings = {
   foodAllowance: 0,
   incentives: 0,
 };
-const defaultDeductions = { taxPayable: 0 };
+const defaultDeductions = { taxPayable: 0, advanceAmount: 0 };
 const defaultRatings = { timing: 0, leave: 0, workFb: 0, incentive: 0, firmFb: 0 };
+
+function parseMoney(v: unknown): number {
+  if (v == null || v === '') return 0;
+  const s = typeof v === 'string' ? v.replace(/,/g, '') : String(v);
+  const n = parseFloat(s);
+  return Number.isFinite(n) ? n : 0;
+}
 
 function formatPayPeriod(ymd: string) {
   if (!ymd) return '';
@@ -85,7 +92,8 @@ const AddPayslipScreen = () => {
   const [petrolPricePerKm, setPetrolPricePerKm] = useState(0);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [initializingEdit, setInitializingEdit] = useState(!!payslipId);
-  const prevEmployeeIdRef = useRef<string>('');
+  const employeeCompSyncSeq = useRef(0);
+  const employeesRef = useRef<any[]>([]);
 
   const auth = useMemo(() => cleanAuthHeader(token), [token]);
   const apiBase = useMemo(() => String(getApiBaseUrl() || '').replace(/\/$/, ''), []);
@@ -109,34 +117,59 @@ const AddPayslipScreen = () => {
     run();
   }, [auth, apiBase]);
 
+  employeesRef.current = employees;
+
+  const selectedEmployeeCompKey = useMemo(() => {
+    const e = employees.find((x) => String(x?._id ?? '') === String(employeeId));
+    if (!e || !employeeId) return '';
+    return `${employeeId}:${parseMoney(e.salary)}:${parseMoney(e.bikeAllowance ?? e.bike_allowance)}`;
+  }, [employees, employeeId]);
+
   useEffect(() => {
-    if (!employeeId) {
-      prevEmployeeIdRef.current = '';
-      return;
-    }
-    const emp = employees.find((e) => e._id === employeeId);
-    if (!emp) {
-      prevEmployeeIdRef.current = employeeId;
-      return;
-    }
-    const fromUser =
-      prevEmployeeIdRef.current !== '' && prevEmployeeIdRef.current !== employeeId;
-    if (payslipId && !fromUser) {
-      prevEmployeeIdRef.current = employeeId;
-      return;
-    }
-    setEmployeeName(emp.name || '');
-    setEmployeeIdNo(emp.idCradNo || emp.employeeIdNo || '');
-    const des = Array.isArray(emp.designation) ? emp.designation[0] : emp.designation || '';
-    setDesignation(des || '');
-    setDateOfJoining(emp.hireDate ? new Date(emp.hireDate).toISOString().split('T')[0] : '');
-    setEarnings((prev) => ({
-      ...prev,
-      basic: Number(emp.salary) || 0,
-      bikeAllowance: Number(emp.bikeAllowance) || 0,
-    }));
-    prevEmployeeIdRef.current = employeeId;
-  }, [employeeId, employees, payslipId]);
+    if (!employeeId) return;
+    const list = employeesRef.current;
+    const empFromList = list.find((e) => String(e?._id ?? '') === String(employeeId));
+
+    const seq = ++employeeCompSyncSeq.current;
+
+    const applyFromEmployee = (emp: any) => {
+      if (!emp || seq !== employeeCompSyncSeq.current) return;
+      setEmployeeName(emp.name || '');
+      setEmployeeIdNo(emp.idCradNo || emp.employeeIdNo || '');
+      const des = Array.isArray(emp.designation) ? emp.designation[0] : emp.designation || '';
+      setDesignation(des || '');
+      setDateOfJoining(emp.hireDate ? new Date(emp.hireDate).toISOString().split('T')[0] : '');
+      const basic = parseMoney(emp.salary);
+      const bike = parseMoney(emp.bikeAllowance ?? emp.bike_allowance);
+      setEarnings((prev) => ({
+        ...prev,
+        basic,
+        bikeAllowance: bike,
+      }));
+    };
+
+    (async () => {
+      if (!auth) {
+        if (empFromList) applyFromEmployee(empFromList);
+        return;
+      }
+      try {
+        const { data } = await axios.get(
+          `${apiBase}/employee/get/${encodeURIComponent(employeeId)}`,
+          { headers: { Authorization: auth }, params: { _: Date.now() } }
+        );
+        if (seq !== employeeCompSyncSeq.current) return;
+        if (data?.success && data.employee) {
+          applyFromEmployee(data.employee);
+          return;
+        }
+      } catch {
+        /* fallback */
+      }
+      if (seq !== employeeCompSyncSeq.current) return;
+      if (empFromList) applyFromEmployee(empFromList);
+    })();
+  }, [employeeId, auth, apiBase, employees.length, selectedEmployeeCompKey]);
 
   const hydrateFromPayslip = useCallback((p: any) => {
     const empRef = p?.employeeId;
@@ -146,7 +179,6 @@ const AddPayslipScreen = () => {
         : empRef != null
           ? String(empRef)
           : '';
-    prevEmployeeIdRef.current = '';
     setEmployeeId(empId);
     setEmployeeName(p?.employeeName || '');
     setEmployeeIdNo(p?.employeeIdNo != null ? String(p.employeeIdNo) : '');
@@ -204,10 +236,12 @@ const AddPayslipScreen = () => {
     const fetchKm = async () => {
       if (!auth || !employeeId || !payPeriodDate || !payDate) {
         setTotalKm(0);
+        setEarnings((p) => ({ ...p, petrolAllowance: 0 }));
         return;
       }
       try {
         setKmLoading(true);
+        setTotalKm(0);
         const params = new URLSearchParams({
           page: '1',
           limit: '1000',
@@ -256,13 +290,12 @@ const AddPayslipScreen = () => {
   }, [auth, apiBase]);
 
   useEffect(() => {
-    if (kmLoading) return;
     const km = Number(totalKm || 0);
     const price = Number(petrolPricePerKm || 0);
     const amount =
       Number.isFinite(km) && Number.isFinite(price) && km > 0 && price > 0 ? km * price : 0;
     setEarnings((p) => ({ ...p, petrolAllowance: amount }));
-  }, [totalKm, petrolPricePerKm, kmLoading]);
+  }, [totalKm, petrolPricePerKm]);
 
   const grossEarnings = useMemo(
     () => Object.values(earnings).reduce((a, b) => a + b, 0),
@@ -386,13 +419,15 @@ const AddPayslipScreen = () => {
               setEarnings((p) => ({ ...p, [key]: Number(v) || 0 }))
             }
             keyboard="decimal-pad"
-            editable={key !== 'petrolAllowance'}
+            editable={key !== 'petrolAllowance' && key !== 'bikeAllowance'}
             helper={
-              key === 'petrolAllowance'
-                ? petrolPricePerKm > 0
-                  ? `Auto: ${Number(totalKm).toLocaleString('en-IN')} km × ₹${petrolPricePerKm}/KM`
-                  : `Total KM: ${Number(totalKm).toLocaleString('en-IN')} km (set Petrol Price ₹/KM in Settings)`
-                : undefined
+              key === 'bikeAllowance'
+                ? 'From employee profile (update in Add/Edit Employee)'
+                : key === 'petrolAllowance'
+                  ? petrolPricePerKm > 0
+                    ? `Auto: ${Number(totalKm).toLocaleString('en-IN')} km × ₹${petrolPricePerKm}/KM`
+                    : `Total KM: ${Number(totalKm).toLocaleString('en-IN')} km (set Petrol Price ₹/KM in Settings)`
+                  : undefined
             }
           />
         ))}
@@ -401,8 +436,19 @@ const AddPayslipScreen = () => {
         <Field
           label="Tax payable"
           value={String(deductions.taxPayable)}
-          onChangeText={(v) => setDeductions({ taxPayable: Number(v) || 0 })}
+          onChangeText={(v) =>
+            setDeductions((p) => ({ ...p, taxPayable: Number(v) || 0 }))
+          }
           keyboard="decimal-pad"
+        />
+        <Field
+          label="Advance amount"
+          value={String(deductions.advanceAmount)}
+          onChangeText={(v) =>
+            setDeductions((p) => ({ ...p, advanceAmount: Number(v) || 0 }))
+          }
+          keyboard="decimal-pad"
+          helper="Advance recovery / deduction from salary"
         />
 
         <Text style={styles.section}>Ratings (0–5)</Text>
@@ -496,7 +542,7 @@ function ModalEmployeePicker({
               <TouchableOpacity
                 key={emp._id}
                 style={styles.pickerRow}
-                onPress={() => onSelect(emp._id)}
+                onPress={() => onSelect(String(emp._id))}
               >
                 <Text>
                   {emp.name} ({emp.email})
