@@ -55,6 +55,281 @@ function paymentCoversGrandTotal(paymentAmt, grandTotal) {
     return p + 1e-6 >= g;
 }
 
+/** GST rows from populated RentalProduct (machineId.gstType). */
+function normalizeGstEntries(productOrMachine) {
+    if (!productOrMachine || typeof productOrMachine !== 'object') return [];
+    const raw = productOrMachine.gstType;
+    const arr = Array.isArray(raw) ? raw : raw ? [raw] : [];
+    return arr
+        .map((g) => ({
+            type: String(g?.gstType ?? '').trim(),
+            pct: Number(g?.gstPercentage) || 0,
+        }))
+        .filter((g) => g.type || g.pct > 0);
+}
+
+function resolveGstBracket(totalPct) {
+    const p = Number(totalPct) || 0;
+    if (p <= 0) return null;
+    const candidates = [5, 12, 18];
+    const exact = candidates.find((c) => Math.abs(p - c) < 0.01);
+    if (exact != null) return exact;
+    if (p < 8.5) return 5;
+    if (p < 15) return 12;
+    return 18;
+}
+
+function rentalEntryInvoiceDate(inv) {
+    const d = inv?.invoiceDate || inv?.entryDate || inv?.createdAt;
+    return d ? new Date(d) : null;
+}
+
+/** Same column header as service GSTR export; value = rental type / title when populated. */
+function rentalServiceModeLabel(inv) {
+    const r = inv?.rentalId;
+    if (r && typeof r === 'object') {
+        const type = r.rentalType || '';
+        const title = r.rentalTitle || '';
+        return [type, title].filter(Boolean).join(' — ');
+    }
+    return '';
+}
+
+function deriveInitialPaymentAmountRental(invoice) {
+    const { paymentAmount } = openRentalPaymentFormDefaults(invoice);
+    return Number(paymentAmount) || 0;
+}
+
+/**
+ * Per rental payment entry tax buckets (one Excel row per entry).
+ * Uses products[].machineId + productTotal, or legacy machineId + grandTotal.
+ */
+function aggregateRentalEntryTaxForExport(entry) {
+    const out = {
+        hsns: new Set(),
+        cgst18: 0,
+        sgst18: 0,
+        net18: 0,
+        cgst12: 0,
+        sgst12: 0,
+        net12: 0,
+        cgst5: 0,
+        sgst5: 0,
+        net5: 0,
+        igst18: 0,
+        igst12: 0,
+        igst5: 0,
+        netTotal: 0,
+        totalGst: 0,
+    };
+
+    const processLine = (machineObj, lineTotal) => {
+        const line = Number(lineTotal) || 0;
+        if (line <= 0) return;
+        if (!machineObj || typeof machineObj !== 'object') {
+            out.netTotal += line;
+            return;
+        }
+
+        const hsn = String(machineObj.hsn ?? '').trim();
+        if (hsn) out.hsns.add(hsn);
+
+        const gsts = normalizeGstEntries(machineObj);
+        const sumPct = gsts.reduce((s, g) => s + (Number(g.pct) || 0), 0);
+
+        if (sumPct <= 0) {
+            out.netTotal += line;
+            return;
+        }
+
+        const taxable = line / (1 + sumPct / 100);
+        const lineGst = line - taxable;
+        out.netTotal += taxable;
+        out.totalGst += lineGst;
+
+        const bracket = resolveGstBracket(sumPct);
+        const hasIgst = gsts.some((g) => /IGST/i.test(g.type));
+
+        if (hasIgst) {
+            for (const g of gsts) {
+                if (!/IGST/i.test(g.type)) continue;
+                const amt = taxable * ((Number(g.pct) || 0) / 100);
+                const b = resolveGstBracket(Number(g.pct) || bracket || sumPct);
+                if (b === 5) out.igst5 += amt;
+                else if (b === 12) out.igst12 += amt;
+                else out.igst18 += amt;
+            }
+            if (bracket === 5) out.net5 += taxable;
+            else if (bracket === 12) out.net12 += taxable;
+            else out.net18 += taxable;
+        } else {
+            for (const g of gsts) {
+                const amt = taxable * ((Number(g.pct) || 0) / 100);
+                const t = String(g.type).toUpperCase();
+                if (/CGST/.test(t)) {
+                    if (bracket === 5) out.cgst5 += amt;
+                    else if (bracket === 12) out.cgst12 += amt;
+                    else out.cgst18 += amt;
+                } else if (/SGST|UTGST/.test(t)) {
+                    if (bracket === 5) out.sgst5 += amt;
+                    else if (bracket === 12) out.sgst12 += amt;
+                    else out.sgst18 += amt;
+                }
+            }
+            if (bracket === 5) out.net5 += taxable;
+            else if (bracket === 12) out.net12 += taxable;
+            else out.net18 += taxable;
+        }
+    };
+
+    const products = Array.isArray(entry?.products) ? entry.products : [];
+    if (products.length > 0) {
+        for (const p of products) {
+            processLine(p.machineId, p.productTotal);
+        }
+    } else if (entry.machineId && typeof entry.machineId === 'object') {
+        processLine(entry.machineId, entry.grandTotal);
+    } else {
+        out.netTotal += Number(entry.grandTotal) || 0;
+    }
+
+    const computedGst =
+        out.cgst18 +
+        out.sgst18 +
+        out.cgst12 +
+        out.sgst12 +
+        out.cgst5 +
+        out.sgst5 +
+        out.igst18 +
+        out.igst12 +
+        out.igst5;
+    if (computedGst < out.totalGst - 0.02) {
+        out.igst18 += Math.max(0, out.totalGst - computedGst);
+    }
+
+    return {
+        cgst18: out.cgst18,
+        sgst18: out.sgst18,
+        net18: out.net18,
+        cgst12: out.cgst12,
+        sgst12: out.sgst12,
+        net12: out.net12,
+        cgst5: out.cgst5,
+        sgst5: out.sgst5,
+        net5: out.net5,
+        igst18: out.igst18,
+        igst12: out.igst12,
+        igst5: out.igst5,
+        netTotal: out.netTotal,
+        totalGst: out.totalGst,
+        hsnStr: [...out.hsns].filter(Boolean).join(', ') || '',
+    };
+}
+
+function buildRentalInvoiceGstrWorksheet(entries) {
+    const COLS = 27;
+    const round2 = (n) => {
+        const x = Number(n) || 0;
+        return Math.round(x * 100) / 100;
+    };
+
+    const headerTop = new Array(COLS).fill('');
+    const headerSub = new Array(COLS).fill('');
+    headerTop[0] = 'S No';
+    headerTop[1] = 'Invoice Date';
+    headerTop[2] = 'Invoice Number';
+    headerTop[3] = 'Retailer name';
+    headerTop[4] = 'GST Number';
+    headerTop[5] = 'Service Mode';
+    headerTop[6] = 'HSN';
+    headerTop[7] = 'GST @ 18%';
+    headerTop[9] = '18% Net Amount';
+    headerTop[10] = 'GST @ 12%';
+    headerTop[12] = '12% Net Amount';
+    headerTop[13] = 'GST @ 5%';
+    headerTop[15] = '5% Net Amount';
+    headerTop[16] = 'IGST @ 18%';
+    headerTop[17] = 'IGST @ 12%';
+    headerTop[18] = 'IGST @ 5%';
+    headerTop[19] = 'Net Amount';
+    headerTop[20] = 'Total GST Value';
+    headerTop[21] = 'Total amount';
+    headerTop[22] = 'Invoice Value';
+    headerTop[23] = 'TDS Amount';
+    headerTop[24] = 'Paid Amount';
+    headerTop[25] = 'Balance Amount';
+    headerTop[26] = 'Credit Amount';
+
+    headerSub[7] = 'CGST';
+    headerSub[8] = 'SGST';
+    headerSub[10] = 'CGST';
+    headerSub[11] = 'SGST';
+    headerSub[13] = 'CGST';
+    headerSub[14] = 'SGST';
+
+    const merges = [];
+    for (let c = 0; c <= 6; c += 1) {
+        merges.push({ s: { r: 0, c }, e: { r: 1, c } });
+    }
+    merges.push({ s: { r: 0, c: 7 }, e: { r: 0, c: 8 } });
+    merges.push({ s: { r: 0, c: 9 }, e: { r: 1, c: 9 } });
+    merges.push({ s: { r: 0, c: 10 }, e: { r: 0, c: 11 } });
+    merges.push({ s: { r: 0, c: 12 }, e: { r: 1, c: 12 } });
+    merges.push({ s: { r: 0, c: 13 }, e: { r: 0, c: 14 } });
+    merges.push({ s: { r: 0, c: 15 }, e: { r: 1, c: 15 } });
+    for (let c = 16; c <= 26; c += 1) {
+        merges.push({ s: { r: 0, c }, e: { r: 1, c } });
+    }
+
+    const dataRows = entries.map((inv, idx) => {
+        const t = aggregateRentalEntryTaxForExport(inv);
+        const grand = Number(inv.grandTotal) || 0;
+        const paid = deriveInitialPaymentAmountRental(inv);
+        const tds = Number(inv.tdsAmount) || 0;
+        const balance = Math.max(0, grand - paid - tds);
+        const totalAmountCol = t.netTotal + t.totalGst;
+        const credit = 0;
+
+        return [
+            idx + 1,
+            rentalEntryInvoiceDate(inv),
+            inv.invoiceNumber ?? '',
+            inv.companyId?.companyName ?? '',
+            inv.companyId?.gstNo ?? '',
+            rentalServiceModeLabel(inv),
+            t.hsnStr,
+            round2(t.cgst18),
+            round2(t.sgst18),
+            round2(t.net18),
+            round2(t.cgst12),
+            round2(t.sgst12),
+            round2(t.net12),
+            round2(t.cgst5),
+            round2(t.sgst5),
+            round2(t.net5),
+            round2(t.igst18),
+            round2(t.igst12),
+            round2(t.igst5),
+            round2(t.netTotal),
+            round2(t.totalGst),
+            round2(totalAmountCol),
+            round2(grand),
+            round2(tds),
+            round2(paid),
+            round2(balance),
+            round2(credit),
+        ];
+    });
+
+    const aoa = [headerTop, headerSub, ...dataRows];
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!merges'] = merges;
+    ws['!cols'] = Array.from({ length: COLS }, (_, i) => ({
+        wch: i === 3 ? 28 : i === 6 ? 14 : i <= 2 ? 14 : 12,
+    }));
+    return ws;
+}
+
 /** Align with RentalInvoiceList + default amount to grand total when Paid and paymentAmount missing. */
 function openRentalPaymentFormDefaults(invoice) {
     let initialPaymentAmount = 0;
@@ -613,32 +888,17 @@ const RentalInvoiceReport = (props) => {
                 return;
             }
 
-            const dataToExport = rows.map((invoice) => ({
-                'Invoice No.': invoice.invoiceNumber ?? 'N/A',
-                'Company': invoice.companyId?.companyName || 'N/A',
-                'Machine Model': invoice.machineId?.modelName || 'N/A',
-                'Machine Serial No.': invoice.machineId?.serialNo || 'N/A',
-                'Invoice Date': rentalInvoiceDateStr(invoice),
-                'Grand Total': Number(invoice.grandTotal ?? 0).toFixed(2),
-                'Status': invoice.status ?? 'N/A',
-                'Assigned To': invoice.assignedTo?.name || 'N/A',
-                'Mode of Payment': invoice.modeOfPayment || 'N/A',
-                'Bank Name': invoice.bankName || 'N/A',
-                'Cheque Date': invoice.chequeDate ? new Date(invoice.chequeDate).toLocaleDateString() : 'N/A',
-                'Other Payment Mode': invoice.otherPaymentMode || 'N/A',
-                'Transaction Details': invoice.transactionDetails || 'N/A',
-                'Transfer Date': invoice.transferDate ? new Date(invoice.transferDate).toLocaleDateString() : 'N/A',
-            }));
-
-            const ws = XLSX.utils.json_to_sheet(dataToExport);
+            const ws = buildRentalInvoiceGstrWorksheet(rows);
             const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, 'Rental Invoices');
+            const sheetName = props?.type === 'quotation' ? 'Rental Quotations' : 'Rental Invoices';
+            XLSX.utils.book_append_sheet(wb, ws, sheetName.slice(0, 31));
             const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
             const blob = new Blob([excelBuffer], {
                 type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             });
-            saveAs(blob, `rental_invoices_report_${new Date().toISOString().slice(0, 10)}.xlsx`);
-            toast.success(`Exported ${rows.length} row(s) to Excel.`);
+            const prefix = props?.type === 'quotation' ? 'rental_quotations' : 'rental_invoices';
+            saveAs(blob, `${prefix}_gstr_${new Date().toISOString().slice(0, 10)}.xlsx`);
+            toast.success(`Exported ${rows.length} row(s) to Excel (GSTR layout).`);
         } catch (err) {
             console.error('Export error:', err);
             toast.error(err.response?.data?.message || err.message || 'Export failed.');

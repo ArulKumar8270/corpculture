@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -20,7 +20,8 @@ import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import axios from 'axios';
-import { getApiBaseUrl } from '../../services/api';
+import { getApiBaseUrl, companyAllPickerQuery } from '../../services/api';
+import { normalizeMongoId } from '../../utils/normalizeMongoId';
 import Toast from 'react-native-toast-message';
 
 interface ProductInTable {
@@ -43,20 +44,17 @@ const AddServiceInvoiceScreen = () => {
   const route = useRoute();
   const { user, token } = useSelector((state: RootState) => state.auth);
   const params = route.params as any;
-  const invoiceId = params?.invoiceId;
+  /** Invoice list passes `invoiceId`; quotation list passes `quotationId` (same document, same API). */
+  const invoiceId =
+    normalizeMongoId(params?.invoiceId ?? params?.quotationId) || undefined;
   const invoiceType = params?.invoiceType || 'invoice';
   const employeeName = params?.employeeName;
   const employeeId = params?.employeeId; // Employee ID if passed
   const serviceId = params?.serviceId;
-  // Normalize companyId: API may return populated object { _id, companyName } or string _id
-  const companyIdFromParams =
-    params?.companyId != null
-      ? typeof params.companyId === 'object'
-        ? params.companyId?._id
-        : params.companyId
-      : undefined;
-  const initialCompanyId =
-    companyIdFromParams && companyIdFromParams !== 'null' ? String(companyIdFromParams) : '';
+  const companyIdFromParams = normalizeMongoId(params?.companyId);
+  const paramCompanyName =
+    typeof params?.companyName === 'string' ? params.companyName.trim() : '';
+  const initialCompanyId = companyIdFromParams;
 
   const [invoiceData, setInvoiceData] = useState({
     companyId: initialCompanyId,
@@ -78,10 +76,13 @@ const AddServiceInvoiceScreen = () => {
   const [companies, setCompanies] = useState<any[]>([]);
   const [availableProducts, setAvailableProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingCompaniesList, setLoadingCompaniesList] = useState(() => !!token);
+  const [loadingCompanyProfile, setLoadingCompanyProfile] = useState(false);
   const [invoices, setInvoices] = useState<string | number>(0);
   const [globalInvoiceFormat, setGlobalInvoiceFormat] = useState('');
   const [companyPickerVisible, setCompanyPickerVisible] = useState(false);
   const [productPickerVisible, setProductPickerVisible] = useState(false);
+  const [productSearchQuery, setProductSearchQuery] = useState('');
   const [deliveryAddressPickerVisible, setDeliveryAddressPickerVisible] = useState(false);
   const [sendToPickerVisible, setSendToPickerVisible] = useState(false);
   const [paymentModePickerVisible, setPaymentModePickerVisible] = useState(false);
@@ -94,14 +95,37 @@ const AddServiceInvoiceScreen = () => {
 
   const paymentModes = ['Cash', 'Card', 'Bank Transfer', 'UPI', 'CHEQUE', 'BANK TRANSFER', 'OTHERS'];
 
-  // When navigating from Service Enquiry (or similar) with companyId in params, sync to state so company shows
+  // When navigating from Service Enquiry with companyId in params, sync once params are known
   useEffect(() => {
     if (invoiceId || !initialCompanyId) return;
     setInvoiceData((prev) => {
-      if (prev.companyId === initialCompanyId) return prev;
+      if (String(prev.companyId) === String(initialCompanyId)) return prev;
       return { ...prev, companyId: initialCompanyId, productId: '', sendTo: [], deliveryAddress: '' };
     });
   }, [invoiceId, initialCompanyId]);
+
+  // After companies load, ensure param company is applied when it exists in the list (list was paginated at 10 before fix)
+  useEffect(() => {
+    if (invoiceId || !initialCompanyId || companies.length === 0) return;
+    const exists = companies.some((c) => String(c._id) === String(initialCompanyId));
+    if (!exists) return;
+    setInvoiceData((prev) => {
+      if (String(prev.companyId) === String(initialCompanyId)) return prev;
+      return { ...prev, companyId: initialCompanyId, productId: '', sendTo: [], deliveryAddress: '' };
+    });
+  }, [invoiceId, initialCompanyId, companies]);
+
+  // Enquiry may only have company name on record; match after companies load
+  useEffect(() => {
+    if (invoiceId || companies.length === 0 || initialCompanyId || !paramCompanyName) return;
+    const lower = paramCompanyName.toLowerCase();
+    const m = companies.find((c) => (c.companyName || '').trim().toLowerCase() === lower);
+    if (!m?._id) return;
+    const id = String(m._id);
+    setInvoiceData((prev) =>
+      String(prev.companyId) === id ? prev : { ...prev, companyId: id, productId: '', sendTo: [], deliveryAddress: '' }
+    );
+  }, [invoiceId, companies, initialCompanyId, paramCompanyName]);
 
   // Keyboard show/hide: extra bottom padding so fields can scroll above keyboard
   useEffect(() => {
@@ -144,10 +168,22 @@ const AddServiceInvoiceScreen = () => {
     return (pn?.productName as string) || (pn as unknown as string) || 'N/A';
   };
 
+  const filteredAvailableProducts = useMemo(() => {
+    const q = productSearchQuery.trim().toLowerCase();
+    if (!q) return availableProducts;
+    return availableProducts.filter((p) => {
+      const name = (getProductDisplayName(p) || '').toLowerCase();
+      const sku = String(p.sku ?? '').toLowerCase();
+      const hsn = String(p.hsn ?? '').toLowerCase();
+      return name.includes(q) || sku.includes(q) || hsn.includes(q);
+    });
+  }, [availableProducts, productSearchQuery]);
+
   // Fetch companies and invoice count when token is available (match web: company list needed to select company)
   useEffect(() => {
     if (!token) {
       setLoading(false);
+      setLoadingCompaniesList(false);
       return;
     }
     fetchInvoicesCount();
@@ -155,6 +191,7 @@ const AddServiceInvoiceScreen = () => {
   }, [token]);
 
   useEffect(() => {
+    setProductSearchQuery('');
     if (invoiceData.companyId && invoiceData.companyId !== '') {
       fetchCompanyData();
       fetchProductsByCompany();
@@ -163,7 +200,8 @@ const AddServiceInvoiceScreen = () => {
 
   // Reset form function - clears all form data
   const resetForm = React.useCallback((companyId?: string) => {
-    const companyIdToUse = companyId && companyId !== 'null' ? companyId : (companyIdFromParams && companyIdFromParams !== 'null' ? companyIdFromParams : '');
+    const fromArg = normalizeMongoId(companyId as unknown);
+    const companyIdToUse = fromArg || companyIdFromParams;
     setInvoiceData({
       companyId: companyIdToUse,
       productId: '',
@@ -181,49 +219,20 @@ const AddServiceInvoiceScreen = () => {
     setCompanyData(null);
     setProductsInTable([]);
     setAvailableProducts([]);
+    setProductSearchQuery('');
+    setLoadingCompanyProfile(false);
   }, [companyIdFromParams]);
 
-  // Track previous invoiceId to detect when we switch from edit to create mode
-  const prevInvoiceIdRef = React.useRef<string | undefined>(invoiceId);
+  // Track leaving edit mode (create after edit) — fetch runs on focus when editing
+  const prevInvoiceIdRef = React.useRef<string | undefined>(undefined);
 
   useEffect(() => {
-    const currentInvoiceId = invoiceId;
-    const prevInvoiceId = prevInvoiceIdRef.current;
-
-    if (currentInvoiceId) {
-      // We have an invoiceId, fetch the details
-      fetchInvoiceDetails();
-    } else if (prevInvoiceId && !currentInvoiceId) {
-      // We switched from edit mode (had invoiceId) to create mode (no invoiceId)
-      // This means user navigated to create a new invoice after editing
+    const prev = prevInvoiceIdRef.current;
+    if (prev && !invoiceId) {
       resetForm();
     }
-
-    // Update the ref for next render
-    prevInvoiceIdRef.current = currentInvoiceId;
-  }, [invoiceId]);
-
-  // Reset form when screen is focused and there's no invoiceId but form has old data
-  useFocusEffect(
-    React.useCallback(() => {
-      const currentParams = route.params as any;
-      const currentInvoiceId = currentParams?.invoiceId;
-      
-      // If we're creating a new invoice (no invoiceId), ensure form is reset
-      // The main useEffect handles most cases, but this catches edge cases
-      if (!currentInvoiceId) {
-        // Small delay to check current state
-        const timeoutId = setTimeout(() => {
-          // Check if we need to reset by looking at current state
-          if (productsInTable.length > 0 || invoiceData.deliveryAddress || invoiceData.reference) {
-            resetForm(currentParams?.companyId);
-          }
-        }, 100);
-        
-        return () => clearTimeout(timeoutId);
-      }
-    }, [route.params])
-  );
+    prevInvoiceIdRef.current = invoiceId;
+  }, [invoiceId, resetForm]);
 
   // Helper function to generate invoice number based on format
   const generateInvoiceNumber = (invoiceCount: number, format: string): string => {
@@ -324,8 +333,8 @@ const AddServiceInvoiceScreen = () => {
   const fetchCompanies = async () => {
     if (!token) return;
     try {
-      setLoading(true);
-      const { data } = await axios.get(`${getApiBaseUrl()}/company/all`, {
+      setLoadingCompaniesList(true);
+      const { data } = await axios.get(`${getApiBaseUrl()}/company/all?${companyAllPickerQuery}`, {
         headers: {
           Authorization: token,
         },
@@ -346,12 +355,14 @@ const AddServiceInvoiceScreen = () => {
       });
       setCompanies([]);
     } finally {
+      setLoadingCompaniesList(false);
       setLoading(false);
     }
   };
 
   const fetchCompanyData = async () => {
     if (!invoiceData.companyId || !token) return;
+    setLoadingCompanyProfile(true);
     try {
       const { data } = await axios.get(
         `${getApiBaseUrl()}/company/get/${invoiceData.companyId}`,
@@ -374,6 +385,8 @@ const AddServiceInvoiceScreen = () => {
         text2: error.response?.data?.message || 'Failed to load company details',
       });
       setCompanyData(null);
+    } finally {
+      setLoadingCompanyProfile(false);
     }
   };
 
@@ -408,75 +421,123 @@ const AddServiceInvoiceScreen = () => {
     }
   };
 
-  const fetchInvoiceDetails = async () => {
-    if (!invoiceId) return;
-    try {
-      setLoading(true);
-      const { data } = await axios.get(
-        `${getApiBaseUrl()}/service-invoice/get/${invoiceId}`,
-        {
+  const fetchInvoiceDetails = React.useCallback(
+    async (explicitDocId?: string) => {
+      const docId =
+        explicitDocId ||
+        normalizeMongoId(
+          (route.params as any)?.invoiceId ?? (route.params as any)?.quotationId
+        ) ||
+        undefined;
+      if (!docId || !token) return;
+      try {
+        setLoading(true);
+        setLoadingCompanyProfile(true);
+        const { data } = await axios.get(`${getApiBaseUrl()}/service-invoice/get/${docId}`, {
           headers: {
             Authorization: token || '',
           },
-        }
-      );
-      if (data?.success) {
-        const invoice = data.serviceInvoice;
-        setInvoiceData({
-          companyId: invoice.companyId?._id || invoice.companyId || '',
-          productId: '',
-          quantity: '',
-          modeOfPayment: invoice.modeOfPayment || 'Cash',
-          deliveryAddress:
-            typeof invoice.deliveryAddress === 'object' && invoice.deliveryAddress !== null
-              ? `${invoice.deliveryAddress.address} - ${invoice.deliveryAddress.pincode}`
-              : invoice.deliveryAddress || '',
-          reference: invoice.reference || '',
-          description: invoice.description || '',
-          sendTo: Array.isArray(invoice.sendTo) ? invoice.sendTo : invoice.sendTo ? [invoice.sendTo] : [],
-          reInstall: false,
-          otherProducts: '',
-          benefitQuantity: '',
-          invoiceDate: invoice.invoiceDate ? new Date(invoice.invoiceDate).toISOString() : new Date().toISOString(),
         });
-        setProductsInTable(
-          (invoice.products || []).map((p: any, idx: number) => {
-            const productId = p.productId?._id || p.productId;
-            // Try to find the product in availableProducts to get full structure
-            const originalProduct = availableProducts.find((ap: any) => ap._id === productId);
-            
-            // Use productName from invoice if it's a full object, otherwise use from availableProducts or extract string
-            const productNameForDisplay = p.productId?.productName?.productName?.productName || 
-                                        p.productName || 
-                                        (typeof p.productId?.productName === 'string' ? p.productId.productName : '');
-            
-            // Store the full productName object for payload (from invoice or availableProducts)
-            const fullProductName = p.productId?.productName || originalProduct?.productName;
-            
-            return {
-              id: Date.now().toString() + idx,
-              productId: productId,
-              productName: productNameForDisplay, // String for display
-              sku: p.productId?.sku || '',
-              hsn: p.productId?.hsn || '',
-              quantity: p.quantity,
-              rate: p.rate,
-              totalAmount: p.totalAmount,
-              originalProduct: originalProduct || (fullProductName ? { productName: fullProductName } : null), // Store full product structure
-            };
-          })
-        );
+        if (data?.success) {
+          const invoice = data.serviceInvoice;
+          setInvoiceData({
+            companyId: invoice.companyId?._id || invoice.companyId || '',
+            productId: '',
+            quantity: '',
+            modeOfPayment: invoice.modeOfPayment || 'Cash',
+            deliveryAddress:
+              typeof invoice.deliveryAddress === 'object' && invoice.deliveryAddress !== null
+                ? `${invoice.deliveryAddress.address} - ${invoice.deliveryAddress.pincode}`
+                : invoice.deliveryAddress || '',
+            reference: invoice.reference || '',
+            description: invoice.description || '',
+            sendTo: Array.isArray(invoice.sendTo) ? invoice.sendTo : invoice.sendTo ? [invoice.sendTo] : [],
+            reInstall: false,
+            otherProducts: '',
+            benefitQuantity: '',
+            invoiceDate: invoice.invoiceDate
+              ? new Date(invoice.invoiceDate).toISOString()
+              : new Date().toISOString(),
+          });
+          setProductsInTable(
+            (invoice.products || []).map((p: any, idx: number) => {
+              const productId = p.productId?._id || p.productId;
+              const originalProduct = availableProducts.find((ap: any) => ap._id === productId);
+
+              const productNameForDisplay =
+                p.productId?.productName?.productName?.productName ||
+                p.productName ||
+                (typeof p.productId?.productName === 'string' ? p.productId.productName : '');
+
+              const fullProductName = p.productId?.productName || originalProduct?.productName;
+
+              return {
+                id: Date.now().toString() + idx,
+                productId: productId,
+                productName: productNameForDisplay,
+                sku: p.productId?.sku || '',
+                hsn: p.productId?.hsn || '',
+                quantity: p.quantity,
+                rate: p.rate,
+                totalAmount: p.totalAmount,
+                originalProduct: originalProduct || (fullProductName ? { productName: fullProductName } : null),
+              };
+            })
+          );
+        }
+      } catch (error: any) {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: error.response?.data?.message || 'Failed to fetch invoice details',
+        });
+      } finally {
+        setLoading(false);
+        setLoadingCompanyProfile(false);
       }
-    } catch (error: any) {
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: error.response?.data?.message || 'Failed to fetch invoice details',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+    [token, route.params]
+  );
+
+  // On focus: load edit document; on create, apply company from route / optional reset
+  useFocusEffect(
+    React.useCallback(() => {
+      const currentParams = route.params as any;
+      const editDocId =
+        normalizeMongoId(currentParams?.invoiceId ?? currentParams?.quotationId) || undefined;
+
+      if (editDocId) {
+        fetchInvoiceDetails(editDocId);
+        return undefined;
+      }
+
+      let idToApply = normalizeMongoId(currentParams?.companyId);
+      if (!idToApply && currentParams?.companyName) {
+        const nm = String(currentParams.companyName).trim().toLowerCase();
+        const m = companies.find((c) => (c.companyName || '').trim().toLowerCase() === nm);
+        if (m?._id) idToApply = String(m._id);
+      }
+      if (idToApply) {
+        setInvoiceData((prev) => {
+          if (String(prev.companyId) === idToApply) return prev;
+          return { ...prev, companyId: idToApply, productId: '', sendTo: [], deliveryAddress: '' };
+        });
+      }
+
+      const timeoutId = setTimeout(() => {
+        const p = route.params as any;
+        if (normalizeMongoId(p?.invoiceId ?? p?.quotationId)) return;
+        const hasParamCompany =
+          !!normalizeMongoId(p?.companyId) || !!String(p?.companyName || '').trim();
+        if (hasParamCompany || p?.serviceId) return;
+        if (productsInTable.length > 0 || invoiceData.deliveryAddress || invoiceData.reference) {
+          resetForm();
+        }
+      }, 100);
+
+      return () => clearTimeout(timeoutId);
+    }, [route.params, companies, resetForm, productsInTable.length, fetchInvoiceDetails])
+  );
 
   const handleAddProduct = () => {
     const selectedProduct = availableProducts.find((p) => p._id === invoiceData.productId);
@@ -781,14 +842,7 @@ const AddServiceInvoiceScreen = () => {
   const selectedProduct = availableProducts.find((p) => p._id === invoiceData.productId);
   // Show company name from list, or from fetched companyData (when coming from service enquiry before companies load)
   const companyDisplayName = selectedCompany?.companyName ?? companyData?.companyName ?? '';
-
-  if (loading && !invoiceData.companyId) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
-      </View>
-    );
-  }
+  const showCompanyFieldLoader = loadingCompaniesList || loadingCompanyProfile;
 
   // Determine title based on invoiceType
   const screenTitle = invoiceType === 'quotation' ? 'Add Service Quotation' : 'Add Service Invoice';
@@ -820,15 +874,31 @@ const AddServiceInvoiceScreen = () => {
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Company *</Text>
           <TouchableOpacity
-            style={styles.pickerButton}
+            style={[styles.pickerButton, showCompanyFieldLoader && styles.pickerButtonBusy]}
             onPress={() => setCompanyPickerVisible(true)}
-            disabled={!!invoiceId || !!invoiceData.companyId}
+            disabled={!!invoiceId || !!invoiceData.companyId || loadingCompaniesList}
           >
-            <Text style={[styles.pickerButtonText, !invoiceData.companyId && !companyDisplayName && styles.placeholder]}>
-              {companyDisplayName || 'Select a Company'}
-            </Text>
-            {!invoiceId && !invoiceData.companyId && (
-              <Icon name="arrow-drop-down" size={24} color="#666" />
+            {showCompanyFieldLoader ? (
+              <View style={styles.companyFieldLoaderRow}>
+                <ActivityIndicator size="small" color="#007AFF" />
+                <Text style={styles.companyFieldLoaderText}>
+                  {loadingCompaniesList ? 'Loading companies…' : 'Loading company…'}
+                </Text>
+              </View>
+            ) : (
+              <>
+                <Text
+                  style={[
+                    styles.pickerButtonText,
+                    !invoiceData.companyId && !companyDisplayName && styles.placeholder,
+                  ]}
+                >
+                  {companyDisplayName || 'Select a Company'}
+                </Text>
+                {!invoiceId && !invoiceData.companyId && (
+                  <Icon name="arrow-drop-down" size={24} color="#666" />
+                )}
+              </>
             )}
           </TouchableOpacity>
         </View>
@@ -836,6 +906,26 @@ const AddServiceInvoiceScreen = () => {
         {/* Product Selection */}
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Product Name *</Text>
+          {invoiceData.companyId && availableProducts.length > 0 ? (
+            <View style={styles.productSearchRow}>
+              <Icon name="search" size={20} color="#666" style={styles.productSearchIcon} />
+              <TextInput
+                style={styles.productSearchInput}
+                placeholder="Search by name, SKU, HSN…"
+                placeholderTextColor="#999"
+                value={productSearchQuery}
+                onChangeText={setProductSearchQuery}
+                returnKeyType="search"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              {productSearchQuery.length > 0 ? (
+                <TouchableOpacity onPress={() => setProductSearchQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Icon name="close" size={22} color="#666" />
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          ) : null}
           <TouchableOpacity
             style={styles.pickerButton}
             onPress={() => setProductPickerVisible(true)}
@@ -1106,7 +1196,16 @@ const AddServiceInvoiceScreen = () => {
             <FlatList
               data={companies}
               keyExtractor={(item) => item._id}
-              ListEmptyComponent={<Text style={styles.emptyListText}>No companies found</Text>}
+              ListEmptyComponent={
+                loadingCompaniesList ? (
+                  <View style={styles.modalListLoading}>
+                    <ActivityIndicator size="small" color="#007AFF" />
+                    <Text style={[styles.emptyListText, styles.modalListLoadingCaption]}>Loading companies…</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.emptyListText}>No companies found</Text>
+                )
+              }
               renderItem={({ item }) => (
                 <TouchableOpacity
                   style={styles.modalItem}
@@ -1142,21 +1241,46 @@ const AddServiceInvoiceScreen = () => {
           activeOpacity={1}
           onPress={() => setProductPickerVisible(false)}
         >
-          <View style={styles.modalContent}>
+          <View style={styles.modalContent} onStartShouldSetResponder={() => true}>
             <Text style={styles.modalTitle}>Select Product</Text>
+            <View style={styles.productSearchRow}>
+              <Icon name="search" size={20} color="#666" style={styles.productSearchIcon} />
+              <TextInput
+                style={styles.productSearchInput}
+                placeholder="Search by name, SKU, HSN…"
+                placeholderTextColor="#999"
+                value={productSearchQuery}
+                onChangeText={setProductSearchQuery}
+                returnKeyType="search"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              {productSearchQuery.length > 0 ? (
+                <TouchableOpacity onPress={() => setProductSearchQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Icon name="close" size={22} color="#666" />
+                </TouchableOpacity>
+              ) : null}
+            </View>
             <FlatList
-              data={availableProducts}
+              data={filteredAvailableProducts}
               keyExtractor={(item) => item._id}
-              ListEmptyComponent={<Text style={styles.emptyListText}>No products found for this company</Text>}
+              keyboardShouldPersistTaps="handled"
+              ListEmptyComponent={
+                <Text style={styles.emptyListText}>
+                  {availableProducts.length === 0
+                    ? 'No products found for this company'
+                    : 'No products match your search'}
+                </Text>
+              }
               renderItem={({ item }) => (
                 <TouchableOpacity
-                  style={styles.modalItem}
+                  style={[styles.modalItem, styles.productModalItem]}
                   onPress={() => {
                     setInvoiceData({ ...invoiceData, productId: item._id });
                     setProductPickerVisible(false);
                   }}
                 >
-                  <Text style={styles.modalItemText}>
+                  <Text style={styles.productModalItemTitle}>
                     {getProductDisplayName(item)}
                   </Text>
                 </TouchableOpacity>
@@ -1323,6 +1447,28 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     minHeight: 48,
+  },
+  pickerButtonBusy: {
+    borderColor: '#cce5ff',
+    backgroundColor: '#f7fbff',
+  },
+  companyFieldLoaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  companyFieldLoaderText: {
+    fontSize: 15,
+    color: '#666',
+    marginLeft: 10,
+  },
+  modalListLoading: {
+    paddingVertical: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalListLoadingCaption: {
+    marginTop: 12,
   },
   pickerButtonText: {
     fontSize: 16,
@@ -1491,6 +1637,27 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     textAlign: 'center',
   },
+  productSearchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    paddingHorizontal: 10,
+    marginBottom: 10,
+    minHeight: 44,
+  },
+  productSearchIcon: {
+    marginRight: 6,
+  },
+  productSearchInput: {
+    flex: 1,
+    fontSize: 15,
+    color: '#333',
+    paddingVertical: 10,
+    paddingHorizontal: 4,
+  },
   modalItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1506,6 +1673,22 @@ const styles = StyleSheet.create({
     marginLeft: 10,
     color: '#333',
     flex: 1,
+  },
+  productModalItem: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    alignSelf: 'stretch',
+  },
+  productModalItemTitle: {
+    fontSize: 16,
+    color: '#333',
+    width: '100%',
+  },
+  modalItemSub: {
+    fontSize: 13,
+    color: '#888',
+    marginTop: 4,
+    width: '100%',
   },
   modalCancel: {
     borderBottomWidth: 0,

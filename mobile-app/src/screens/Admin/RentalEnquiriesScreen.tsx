@@ -22,6 +22,7 @@ import { usePermissions } from '../../hooks/usePermissions';
 import axios from 'axios';
 import { getApiBaseUrl } from '../../services/api';
 import Toast from 'react-native-toast-message';
+import { normalizeMongoId } from '../../utils/normalizeMongoId';
 
 const RentalEnquiriesScreen = () => {
   const navigation = useNavigation();
@@ -274,13 +275,14 @@ const RentalEnquiriesScreen = () => {
     const employee = employees.find((emp) => emp.userId === enquiry.employeeId);
     const employeeName = employee?.name || enquiry.employeeId;
     const employeeUserId = employee?.userId || enquiry.employeeId;
-    const companyId = typeof enquiry?.companyId === 'object' ? enquiry?.companyId?._id : enquiry?.companyId;
+    const companyIdStr = normalizeMongoId(enquiry?.companyId);
     (navigation as any).navigate('AddRentalInvoice', {
       employeeName,
       employeeId: employeeUserId,
       invoiceType: 'invoice',
       rentalId: enquiry._id,
-      companyId: companyId ?? (typeof enquiry?.companyId === 'object' ? enquiry?.companyId?._id : enquiry?.companyId),
+      companyId: companyIdStr || undefined,
+      companyName: enquiry?.companyName,
     });
     setActionMenuVisible(null);
   };
@@ -289,13 +291,14 @@ const RentalEnquiriesScreen = () => {
     const employee = employees.find((emp) => emp.userId === enquiry.employeeId);
     const employeeName = employee?.name || enquiry.employeeId;
     const employeeUserId = employee?.userId || enquiry.employeeId;
-    const companyId = typeof enquiry?.companyId === 'object' ? enquiry?.companyId?._id : enquiry?.companyId;
+    const companyIdStr = normalizeMongoId(enquiry?.companyId);
     (navigation as any).navigate('AddRentalInvoice', {
       employeeName,
       employeeId: employeeUserId,
       invoiceType: 'quotation',
       rentalId: enquiry._id,
-      companyId: companyId ?? (typeof enquiry?.companyId === 'object' ? enquiry?.companyId?._id : enquiry?.companyId),
+      companyId: companyIdStr || undefined,
+      companyName: enquiry?.companyName,
     });
     setActionMenuVisible(null);
   };
@@ -304,15 +307,14 @@ const RentalEnquiriesScreen = () => {
     const employee = employees.find((emp) => emp.userId === enquiry.employeeId);
     const employeeName = employee?.name || enquiry.employeeId;
     const employeeUserId = employee?.userId || enquiry.employeeId;
-    // Ensure companyId is passed correctly - handle both string and object formats
-    const companyId = typeof enquiry?.companyId === 'object' ? enquiry?.companyId?._id : enquiry?.companyId;
-    // Navigate to report screen - pass employeeId for assignedTo field
+    const companyIdStr = normalizeMongoId(enquiry?.companyId);
     (navigation as any).navigate('AddRentalReport', {
       employeeName,
       employeeId: employeeUserId, // Pass employee ID for assignedTo
       reportType: 'rental',
       rentalId: enquiry._id,
-      companyId: companyId || enquiry?.companyId,
+      companyId: companyIdStr || undefined,
+      companyName: enquiry?.companyName,
     });
     setActionMenuVisible(null);
   };

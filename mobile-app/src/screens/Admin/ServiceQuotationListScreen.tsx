@@ -21,6 +21,7 @@ import { RootState } from '../../store';
 import { usePermissions } from '../../hooks/usePermissions';
 import axios from 'axios';
 import { getApiBaseUrl } from '../../services/api';
+import { normalizeMongoId } from '../../utils/normalizeMongoId';
 import Toast from 'react-native-toast-message';
 import * as ImagePicker from 'expo-image-picker';
 
@@ -166,8 +167,10 @@ const ServiceQuotationListScreen = () => {
   };
 
   const handleEdit = (quotation: any) => {
+    const qid = normalizeMongoId(quotation?._id);
     (navigation as any).navigate('AddServiceQuotation', {
-      quotationId: quotation._id,
+      invoiceId: qid || undefined,
+      quotationId: qid || undefined,
       invoiceType: 'quotation',
     });
   };

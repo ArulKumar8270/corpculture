@@ -24,6 +24,7 @@ import { getApiBaseUrl } from '../../services/api';
 import Toast from 'react-native-toast-message';
 import * as ImagePicker from 'expo-image-picker';
 import { formatSendDetailsToDetail } from '../../utils/functions';
+import { normalizeMongoId } from '../../utils/normalizeMongoId';
 
 // RentalQuotationListScreen uses the same implementation as RentalInvoiceListScreen
 // but with invoiceType='quotation' by default
@@ -164,8 +165,10 @@ const RentalQuotationListScreen = () => {
   };
 
   const handleEdit = (entry: any) => {
+    const docId = normalizeMongoId(entry?._id) || String(entry?._id ?? '').trim();
     (navigation as any).navigate('AddRentalInvoice', {
-      id: entry._id,
+      id: docId,
+      entryId: docId,
       invoiceType: 'quotation',
     });
   };

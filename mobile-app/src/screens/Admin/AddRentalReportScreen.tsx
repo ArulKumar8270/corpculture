@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,14 +13,15 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 // @ts-ignore
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import axios from 'axios';
-import { getApiBaseUrl } from '../../services/api';
+import { getApiBaseUrl, companyAllPickerQuery } from '../../services/api';
 import Toast from 'react-native-toast-message';
+import { normalizeMongoId } from '../../utils/normalizeMongoId';
 
 interface MaterialGroup {
   name: string;
@@ -43,7 +44,9 @@ const AddRentalReportScreen = () => {
   const employeeId = params?.employeeId; // Employee ID for assignedTo field
   const reportFor = params?.reportType || 'rental';
   const rentalId = params?.rentalId;
-  const companyIdFromParams = params?.companyId;
+  const paramCompanyId = normalizeMongoId(params?.companyId);
+  const paramCompanyName =
+    typeof params?.companyName === 'string' ? params.companyName.trim() : '';
   const isEditMode = !!reportId;
 
   const [formData, setFormData] = useState({
@@ -79,20 +82,28 @@ const AddRentalReportScreen = () => {
     fetchInitialData();
   }, [token]);
 
-  // Auto-select company when companyIdFromParams is provided and companies are loaded
-  useEffect(() => {
-    if (companyIdFromParams && companies.length > 0 && !formData.company && !reportId) {
-      const companyIdToSet = typeof companyIdFromParams === 'object' 
-        ? companyIdFromParams._id || companyIdFromParams 
-        : companyIdFromParams;
-      if (companyIdToSet) {
-        setFormData((prev) => ({
-          ...prev,
-          company: companyIdToSet,
-        }));
-      }
+  const applyCompanyFromRouteParams = useCallback(() => {
+    if (reportId || companies.length === 0) return;
+    let id = paramCompanyId;
+    if (!id && paramCompanyName) {
+      const lower = paramCompanyName.toLowerCase();
+      const match = companies.find((c) => (c.companyName || '').trim().toLowerCase() === lower);
+      if (match?._id) id = String(match._id);
     }
-  }, [companyIdFromParams, companies, reportId]);
+    if (!id) return;
+    if (!companies.some((c) => String(c._id) === String(id))) return;
+    setFormData((prev) => (String(prev.company) === String(id) ? prev : { ...prev, company: String(id) }));
+  }, [reportId, companies, paramCompanyId, paramCompanyName]);
+
+  useEffect(() => {
+    applyCompanyFromRouteParams();
+  }, [applyCompanyFromRouteParams]);
+
+  useFocusEffect(
+    useCallback(() => {
+      applyCompanyFromRouteParams();
+    }, [applyCompanyFromRouteParams])
+  );
 
   useEffect(() => {
     if (formData.company) {
@@ -106,11 +117,12 @@ const AddRentalReportScreen = () => {
   const fetchInitialData = async () => {
     try {
       setLoading(true);
-      const { data } = await axios.get(`${getApiBaseUrl()}/company/all`, {
+      const { data } = await axios.get(`${getApiBaseUrl()}/company/all?${companyAllPickerQuery}`, {
         headers: { Authorization: token || '' },
       });
       if (data?.success) {
-        setCompanies(data.companies || []);
+        const list = data.companies ?? data.data?.companies ?? [];
+        setCompanies(Array.isArray(list) ? list : []);
       }
 
       if (reportId) {

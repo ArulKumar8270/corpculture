@@ -360,7 +360,7 @@ const ProductCreateScreen = () => {
           // Try using expo-file-system first (React Native compatible)
           try {
             // @ts-ignore - expo-file-system types may not be available
-            const FileSystem = require('expo-file-system');
+            const FileSystem = require('expo-file-system/legacy');
             const base64 = await FileSystem.readAsStringAsync(uri, {
               encoding: FileSystem.EncodingType.Base64,
             });

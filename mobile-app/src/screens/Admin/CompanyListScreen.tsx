@@ -33,13 +33,6 @@ const CompanyListScreen = () => {
   const [totalCount, setTotalCount] = useState(0);
 
   useEffect(() => {
-    const t = setTimeout(() => {
-      setAppliedSearch(searchQuery.trim());
-    }, 350);
-    return () => clearTimeout(t);
-  }, [searchQuery]);
-
-  useEffect(() => {
     setPage(0);
   }, [appliedSearch]);
 
@@ -98,6 +91,11 @@ const CompanyListScreen = () => {
   const handleChangeRowsPerPage = (newRowsPerPage: number) => {
     setRowsPerPage(newRowsPerPage);
     setPage(0); // Reset to first page when changing rows per page
+  };
+
+  const handleApplySearch = () => {
+    setAppliedSearch(searchQuery.trim());
+    setPage(0);
   };
 
   const handleClearFilter = () => {
@@ -196,27 +194,34 @@ const CompanyListScreen = () => {
         )}
       </View>
 
-      {/* Search — debounced; matches server fields (name, GST, address, city, contacts, etc.) */}
+      {/* Search runs only after tapping Search (or keyboard search) — server matches name, GST, address, city, contacts, etc. */}
       <View style={styles.filterSection}>
         <Text style={styles.filterTitle}>Search companies</Text>
-        <View style={styles.filterInputContainer}>
-          <Icon name="search" size={20} color="#999" style={styles.searchIcon} />
-          <TextInput
-            style={styles.filterInput}
-            placeholder="Name, GST, pincode, city, address, contact…"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholderTextColor="#999"
-            returnKeyType="search"
-            clearButtonMode="while-editing"
-          />
-          {searchQuery.length > 0 ? (
-            <TouchableOpacity onPress={handleClearFilter} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Icon name="close" size={22} color="#666" />
-            </TouchableOpacity>
-          ) : null}
+        <View style={styles.searchRow}>
+          <View style={styles.filterInputContainer}>
+            <Icon name="search" size={20} color="#999" style={styles.searchIcon} />
+            <TextInput
+              style={styles.filterInput}
+              placeholder="Name, GST, pincode, city, address, contact…"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholderTextColor="#999"
+              returnKeyType="search"
+              onSubmitEditing={handleApplySearch}
+              clearButtonMode="while-editing"
+            />
+            {searchQuery.length > 0 ? (
+              <TouchableOpacity onPress={handleClearFilter} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Icon name="close" size={22} color="#666" />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+          <TouchableOpacity style={styles.searchSubmitButton} onPress={handleApplySearch} activeOpacity={0.8}>
+            <Icon name="search" size={20} color="#fff" />
+            <Text style={styles.searchSubmitButtonText}>Search</Text>
+          </TouchableOpacity>
         </View>
-        <Text style={styles.searchHint}>Results update as you type.</Text>
+        <Text style={styles.searchHint}>Tap Search to filter the list. Clear the field and search again to show all.</Text>
       </View>
 
       <FlatList
@@ -367,17 +372,39 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: '#019ee3',
-    marginBottom: 15,
+    marginBottom: 12,
+  },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 10,
   },
   filterInputContainer: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#f5f5f5',
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#ddd',
-    paddingHorizontal: 15,
-    marginBottom: 15,
+    paddingHorizontal: 12,
+    minWidth: 0,
+  },
+  searchSubmitButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#019ee3',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 8,
+    gap: 6,
+  },
+  searchSubmitButtonText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
   },
   searchIcon: {
     marginRight: 10,
@@ -391,7 +418,7 @@ const styles = StyleSheet.create({
   searchHint: {
     fontSize: 12,
     color: '#888',
-    marginTop: 4,
+    lineHeight: 16,
   },
   list: {
     flex: 1,

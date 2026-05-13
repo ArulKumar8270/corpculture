@@ -19,7 +19,7 @@ import { RootState } from '../../../store';
 import axios from 'axios';
 import { getApiBaseUrl } from '../../../services/api';
 import Toast from 'react-native-toast-message';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 // @ts-ignore - xlsx may need to be installed: npm install xlsx
 let XLSX: any;

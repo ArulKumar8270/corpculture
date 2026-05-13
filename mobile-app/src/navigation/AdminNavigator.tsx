@@ -640,6 +640,11 @@ const AdminNavigator = () => {
         component={RentalReportsScreen}
         options={{ headerShown: true }}
       />
+      <Drawer.Screen
+        name="AddRentalReport"
+        component={AddRentalReportScreen}
+        options={{ headerShown: true, title: 'Add/Edit Rental Report' }}
+      />
       <Drawer.Screen 
         name="RentalPartners" 
         component={CommissionScreen}

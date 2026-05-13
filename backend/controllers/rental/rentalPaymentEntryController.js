@@ -638,6 +638,7 @@ export const getAllRentalPaymentEntries = async (req, res) => {
             })
             .populate('companyId') // Populate company name
             .populate('assignedTo') // Populate assigned user
+            .populate('rentalId', 'rentalTitle rentalType') // For reports / GSTR-style export labels
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(limit);

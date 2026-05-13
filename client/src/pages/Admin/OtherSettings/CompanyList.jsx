@@ -60,13 +60,6 @@ const CompanyList = () => {
     }, [auth?.token, page, rowsPerPage, appliedSearch]);
 
     useEffect(() => {
-        const t = setTimeout(() => {
-            setAppliedSearch(searchQuery.trim());
-        }, 350);
-        return () => clearTimeout(t);
-    }, [searchQuery]);
-
-    useEffect(() => {
         setPage(0);
     }, [appliedSearch]);
 
@@ -106,6 +99,11 @@ const CompanyList = () => {
 
     const handleSearchChange = (e) => {
         setSearchQuery(e.target.value);
+    };
+
+    const handleApplySearch = () => {
+        setAppliedSearch(searchQuery.trim());
+        setPage(0);
     };
 
     const handleClearFilter = () => {
@@ -151,7 +149,7 @@ const CompanyList = () => {
                     Search companies
                 </Typography>
                 <Typography variant="body2" className="text-gray-500 mb-3">
-                    Results update as you type (name, GST, pincode, city, address, contacts).
+                    Click Search or press Enter to filter (name, GST, pincode, city, address, contacts). Clear the field and search again to show all.
                 </Typography>
                 <div className="flex gap-4 items-end flex-wrap">
                     <TextField
@@ -160,9 +158,22 @@ const CompanyList = () => {
                         size="small"
                         value={searchQuery}
                         onChange={handleSearchChange}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleApplySearch();
+                            }
+                        }}
                         className="flex-1 min-w-[200px]"
                         placeholder="Name, GST, pincode, city…"
                     />
+                    <Button
+                        variant="contained"
+                        onClick={handleApplySearch}
+                        className="bg-[#019ee3] hover:bg-[#017bb3] text-white px-6 py-2 rounded normal-case"
+                    >
+                        Search
+                    </Button>
                     <Button
                         variant="outlined"
                         color="secondary"

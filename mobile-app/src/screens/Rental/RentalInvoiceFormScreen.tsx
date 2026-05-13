@@ -21,13 +21,14 @@ import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import axios from 'axios';
-import { getApiBaseUrl } from '../../services/api';
+import { getApiBaseUrl, companyAllPickerQuery } from '../../services/api';
 import Toast from 'react-native-toast-message';
 import * as ImagePicker from 'expo-image-picker';
 import {
   getTotalRentalInvoicePayment,
   formatSendDetailsRecipientsButtonSummary,
 } from '../../utils/functions';
+import { normalizeMongoId } from '../../utils/normalizeMongoId';
 
 interface ProductConfig {
   bwOldCount: number | string;
@@ -164,20 +165,16 @@ const RentalInvoiceFormScreen = () => {
   const { user, token } = useSelector((state: RootState) => state.auth);
   const isEmployeeUser = user?.role === 3;
   const params = route.params as any;
-  const entryId = params?.id;
+  /** Lists pass `id`; accept `entryId` as alias. Always normalize for API URLs. */
+  const entryId = normalizeMongoId(params?.id ?? params?.entryId) || undefined;
   const invoiceType = params?.invoiceType || 'invoice';
   const employeeName = params?.employeeName;
   const employeeId = params?.employeeId;
   const rentalId = params?.rentalId;
-  // Normalize companyId: API may return populated object { _id, companyName } or string _id
-  const companyIdFromParams =
-    params?.companyId != null
-      ? typeof params.companyId === 'object'
-        ? params.companyId?._id
-        : params.companyId
-      : undefined;
-  const initialCompanyId =
-    companyIdFromParams && companyIdFromParams !== 'null' ? String(companyIdFromParams) : '';
+  const companyIdFromParams = normalizeMongoId(params?.companyId);
+  const paramCompanyName =
+    typeof params?.companyName === 'string' ? params.companyName.trim() : '';
+  const initialCompanyId = companyIdFromParams;
 
   const [loading, setLoading] = useState(true);
   const [loadingCompanies, setLoadingCompanies] = useState(false);
@@ -195,6 +192,7 @@ const RentalInvoiceFormScreen = () => {
   const scrollViewRef = useRef<ScrollView>(null);
   const invoiceDateSectionY = useRef(0);
   const remarksSectionY = useRef(0);
+  const prevEntryIdRef = useRef<string | undefined>(undefined);
 
   const [formData, setFormData] = useState({
     companyId: initialCompanyId,
@@ -252,14 +250,6 @@ const RentalInvoiceFormScreen = () => {
     if (token) fetchCompanies();
   }, [token]);
 
-  useEffect(() => {
-    if (entryId) {
-      fetchRentalEntry();
-    } else {
-      setLoading(false);
-    }
-  }, [entryId]);
-
   // Sync companyId from params when navigating from rental enquiries (e.g. screen reused in stack)
   useEffect(() => {
     if (entryId || !initialCompanyId) return;
@@ -281,6 +271,18 @@ const RentalInvoiceFormScreen = () => {
       }
     }
   }, [initialCompanyId, companies, entryId]);
+
+  // Rental enquiry may only have companyName in DB; resolve after companies load
+  useEffect(() => {
+    if (entryId || companies.length === 0 || initialCompanyId || !paramCompanyName) return;
+    const lower = paramCompanyName.toLowerCase();
+    const m = companies.find((c) => (c.companyName || '').trim().toLowerCase() === lower);
+    if (!m?._id) return;
+    const id = String(m._id);
+    setFormData((prev) =>
+      String(prev.companyId) === id ? prev : { ...prev, companyId: id, sendDetailsTo: [] }
+    );
+  }, [entryId, companies, initialCompanyId, paramCompanyName]);
 
   useEffect(() => {
     if (formData.companyId && formData.companyId !== '') {
@@ -447,13 +449,14 @@ const RentalInvoiceFormScreen = () => {
     try {
       setLoadingCompanies(true);
       setLoading(true);
-      const { data } = await axios.get(`${getApiBaseUrl()}/company/all`, {
+      const { data } = await axios.get(`${getApiBaseUrl()}/company/all?${companyAllPickerQuery}`, {
         headers: {
           Authorization: token || '',
         },
       });
       if (data?.success) {
-        setCompanies(data.companies || []);
+        const list = data.companies ?? data.data?.companies ?? [];
+        setCompanies(Array.isArray(list) ? list : []);
       }
     } catch (error) {
       console.error('Error fetching companies:', error);
@@ -532,151 +535,155 @@ const RentalInvoiceFormScreen = () => {
     }
   };
 
-  const fetchRentalEntry = async () => {
-    if (!entryId) return;
-    try {
-      setLoading(true);
-      const { data } = await axios.get(
-        `${getApiBaseUrl()}/rental-payment/${entryId}`,
-        {
+  const fetchRentalEntry = useCallback(
+    async (explicitDocId?: string) => {
+      const docId =
+        explicitDocId ||
+        normalizeMongoId((route.params as any)?.id ?? (route.params as any)?.entryId) ||
+        undefined;
+      if (!docId || !token) return;
+      try {
+        setLoading(true);
+        const { data } = await axios.get(`${getApiBaseUrl()}/rental-payment/${docId}`, {
           headers: {
             Authorization: token || '',
           },
-        }
-      );
-      if (data?.success) {
-        const entry = data.entry;
-        
-        setFormData({
-          companyId: entry.companyId?._id || entry.companyId || '',
-          machineId: entry.machineId?._id || entry.machineId || '',
-          sendDetailsTo: parseSendDetailsToForForm(entry?.sendDetailsTo),
-          countImageFile: null,
-          remarks: entry.remarks || '',
-          invoiceDate: entry.invoiceDate ? new Date(entry.invoiceDate).toISOString() : new Date().toISOString(),
-          a3Config: {
-            bwOldCount: entry.a3Config?.bwOldCount ?? 0,
-            bwNewCount: entry.a3Config?.bwNewCount ?? 0,
-            colorOldCount: entry.a3Config?.colorOldCount ?? 0,
-            colorNewCount: entry.a3Config?.colorNewCount ?? 0,
-            colorScanningOldCount: entry.a3Config?.colorScanningOldCount ?? 0,
-            colorScanningNewCount: entry.a3Config?.colorScanningNewCount ?? 0,
-          },
-          a4Config: {
-            bwOldCount: entry.a4Config?.bwOldCount ?? 0,
-            bwNewCount: entry.a4Config?.bwNewCount ?? 0,
-            colorOldCount: entry.a4Config?.colorOldCount ?? 0,
-            colorNewCount: entry.a4Config?.colorNewCount ?? 0,
-            colorScanningOldCount: entry.a4Config?.colorScanningOldCount ?? 0,
-            colorScanningNewCount: entry.a4Config?.colorScanningNewCount ?? 0,
-          },
-          a5Config: {
-            bwOldCount: entry.a5Config?.bwOldCount ?? 0,
-            bwNewCount: entry.a5Config?.bwNewCount ?? 0,
-            colorOldCount: entry.a5Config?.colorOldCount ?? 0,
-            colorNewCount: entry.a5Config?.colorNewCount ?? 0,
-            colorScanningOldCount: entry.a5Config?.colorScanningOldCount ?? 0,
-            colorScanningNewCount: entry.a5Config?.colorScanningNewCount ?? 0,
-          },
         });
+        if (data?.success) {
+          const entry = data.entry;
 
-        if (entry.products && Array.isArray(entry.products) && entry.products.length > 0) {
-          const productsData = entry.products.map((product: any, index: number) => {
-            const machineIdValue =
-              typeof product.machineId === 'object' && product.machineId?._id
-                ? product.machineId._id
-                : product.machineId || '';
-            const machineObject = typeof product.machineId === 'object' ? product.machineId : null;
-
-            return {
-              id: Date.now() + index,
-              machineId: machineIdValue,
-              serialNo: product.serialNo || machineObject?.serialNo || '',
-              selectedProduct: machineObject,
-              countImageFile: null,
-              imagePreview: product.countImageUpload?.url || '',
-              basePrice: product.basePrice || '',
-              a3Config: {
-                bwOldCount: product.a3Config?.bwOldCount ?? 0,
-                bwNewCount: product.a3Config?.bwNewCount ?? 0,
-                colorOldCount: product.a3Config?.colorOldCount ?? 0,
-                colorNewCount: product.a3Config?.colorNewCount ?? 0,
-                colorScanningOldCount: product.a3Config?.colorScanningOldCount ?? 0,
-                colorScanningNewCount: product.a3Config?.colorScanningNewCount ?? 0,
-              },
-              a4Config: {
-                bwOldCount: product.a4Config?.bwOldCount ?? 0,
-                bwNewCount: product.a4Config?.bwNewCount ?? 0,
-                colorOldCount: product.a4Config?.colorOldCount ?? 0,
-                colorNewCount: product.a4Config?.colorNewCount ?? 0,
-                colorScanningOldCount: product.a4Config?.colorScanningOldCount ?? 0,
-                colorScanningNewCount: product.a4Config?.colorScanningNewCount ?? 0,
-              },
-              a5Config: {
-                bwOldCount: product.a5Config?.bwOldCount ?? 0,
-                bwNewCount: product.a5Config?.bwNewCount ?? 0,
-                colorOldCount: product.a5Config?.colorOldCount ?? 0,
-                colorNewCount: product.a5Config?.colorNewCount ?? 0,
-                colorScanningOldCount: product.a5Config?.colorScanningOldCount ?? 0,
-                colorScanningNewCount: product.a5Config?.colorScanningNewCount ?? 0,
-              },
-            };
-          });
-          setProducts(productsData);
-        } else if (entry.machineId) {
-          const machineIdValue =
-            typeof entry.machineId === 'object' && entry.machineId?._id
-              ? entry.machineId._id
-              : entry.machineId || '';
-          const machineObject = typeof entry.machineId === 'object' ? entry.machineId : null;
-
-          setProducts([
-            {
-              id: Date.now(),
-              machineId: machineIdValue,
-              serialNo: machineObject?.serialNo || '',
-              selectedProduct: machineObject,
-              countImageFile: null,
-              imagePreview: entry.countImageUpload?.url || '',
-              basePrice: '',
-              a3Config: {
-                bwOldCount: entry.a3Config?.bwOldCount ?? 0,
-                bwNewCount: entry.a3Config?.bwNewCount ?? 0,
-                colorOldCount: entry.a3Config?.colorOldCount ?? 0,
-                colorNewCount: entry.a3Config?.colorNewCount ?? 0,
-                colorScanningOldCount: entry.a3Config?.colorScanningOldCount ?? 0,
-                colorScanningNewCount: entry.a3Config?.colorScanningNewCount ?? 0,
-              },
-              a4Config: {
-                bwOldCount: entry.a4Config?.bwOldCount ?? 0,
-                bwNewCount: entry.a4Config?.bwNewCount ?? 0,
-                colorOldCount: entry.a4Config?.colorOldCount ?? 0,
-                colorNewCount: entry.a4Config?.colorNewCount ?? 0,
-                colorScanningOldCount: entry.a4Config?.colorScanningOldCount ?? 0,
-                colorScanningNewCount: entry.a4Config?.colorScanningNewCount ?? 0,
-              },
-              a5Config: {
-                bwOldCount: entry.a5Config?.bwOldCount ?? 0,
-                bwNewCount: entry.a5Config?.bwNewCount ?? 0,
-                colorOldCount: entry.a5Config?.colorOldCount ?? 0,
-                colorNewCount: entry.a5Config?.colorNewCount ?? 0,
-                colorScanningOldCount: entry.a5Config?.colorScanningOldCount ?? 0,
-                colorScanningNewCount: entry.a5Config?.colorScanningNewCount ?? 0,
-              },
+          setFormData({
+            companyId: entry.companyId?._id || entry.companyId || '',
+            machineId: entry.machineId?._id || entry.machineId || '',
+            sendDetailsTo: parseSendDetailsToForForm(entry?.sendDetailsTo),
+            countImageFile: null,
+            remarks: entry.remarks || '',
+            invoiceDate: entry.invoiceDate ? new Date(entry.invoiceDate).toISOString() : new Date().toISOString(),
+            a3Config: {
+              bwOldCount: entry.a3Config?.bwOldCount ?? 0,
+              bwNewCount: entry.a3Config?.bwNewCount ?? 0,
+              colorOldCount: entry.a3Config?.colorOldCount ?? 0,
+              colorNewCount: entry.a3Config?.colorNewCount ?? 0,
+              colorScanningOldCount: entry.a3Config?.colorScanningOldCount ?? 0,
+              colorScanningNewCount: entry.a3Config?.colorScanningNewCount ?? 0,
             },
-          ]);
+            a4Config: {
+              bwOldCount: entry.a4Config?.bwOldCount ?? 0,
+              bwNewCount: entry.a4Config?.bwNewCount ?? 0,
+              colorOldCount: entry.a4Config?.colorOldCount ?? 0,
+              colorNewCount: entry.a4Config?.colorNewCount ?? 0,
+              colorScanningOldCount: entry.a4Config?.colorScanningOldCount ?? 0,
+              colorScanningNewCount: entry.a4Config?.colorScanningNewCount ?? 0,
+            },
+            a5Config: {
+              bwOldCount: entry.a5Config?.bwOldCount ?? 0,
+              bwNewCount: entry.a5Config?.bwNewCount ?? 0,
+              colorOldCount: entry.a5Config?.colorOldCount ?? 0,
+              colorNewCount: entry.a5Config?.colorNewCount ?? 0,
+              colorScanningOldCount: entry.a5Config?.colorScanningOldCount ?? 0,
+              colorScanningNewCount: entry.a5Config?.colorScanningNewCount ?? 0,
+            },
+          });
+
+          if (entry.products && Array.isArray(entry.products) && entry.products.length > 0) {
+            const productsData = entry.products.map((product: any, index: number) => {
+              const machineIdValue =
+                typeof product.machineId === 'object' && product.machineId?._id
+                  ? product.machineId._id
+                  : product.machineId || '';
+              const machineObject = typeof product.machineId === 'object' ? product.machineId : null;
+
+              return {
+                id: Date.now() + index,
+                machineId: machineIdValue,
+                serialNo: product.serialNo || machineObject?.serialNo || '',
+                selectedProduct: machineObject,
+                countImageFile: null,
+                imagePreview: product.countImageUpload?.url || '',
+                basePrice: product.basePrice || '',
+                a3Config: {
+                  bwOldCount: product.a3Config?.bwOldCount ?? 0,
+                  bwNewCount: product.a3Config?.bwNewCount ?? 0,
+                  colorOldCount: product.a3Config?.colorOldCount ?? 0,
+                  colorNewCount: product.a3Config?.colorNewCount ?? 0,
+                  colorScanningOldCount: product.a3Config?.colorScanningOldCount ?? 0,
+                  colorScanningNewCount: product.a3Config?.colorScanningNewCount ?? 0,
+                },
+                a4Config: {
+                  bwOldCount: product.a4Config?.bwOldCount ?? 0,
+                  bwNewCount: product.a4Config?.bwNewCount ?? 0,
+                  colorOldCount: product.a4Config?.colorOldCount ?? 0,
+                  colorNewCount: product.a4Config?.colorNewCount ?? 0,
+                  colorScanningOldCount: product.a4Config?.colorScanningOldCount ?? 0,
+                  colorScanningNewCount: product.a4Config?.colorScanningNewCount ?? 0,
+                },
+                a5Config: {
+                  bwOldCount: product.a5Config?.bwOldCount ?? 0,
+                  bwNewCount: product.a5Config?.bwNewCount ?? 0,
+                  colorOldCount: product.a5Config?.colorOldCount ?? 0,
+                  colorNewCount: product.a5Config?.colorNewCount ?? 0,
+                  colorScanningOldCount: product.a5Config?.colorScanningOldCount ?? 0,
+                  colorScanningNewCount: product.a5Config?.colorScanningNewCount ?? 0,
+                },
+              };
+            });
+            setProducts(productsData);
+          } else if (entry.machineId) {
+            const machineIdValue =
+              typeof entry.machineId === 'object' && entry.machineId?._id
+                ? entry.machineId._id
+                : entry.machineId || '';
+            const machineObject = typeof entry.machineId === 'object' ? entry.machineId : null;
+
+            setProducts([
+              {
+                id: Date.now(),
+                machineId: machineIdValue,
+                serialNo: machineObject?.serialNo || '',
+                selectedProduct: machineObject,
+                countImageFile: null,
+                imagePreview: entry.countImageUpload?.url || '',
+                basePrice: '',
+                a3Config: {
+                  bwOldCount: entry.a3Config?.bwOldCount ?? 0,
+                  bwNewCount: entry.a3Config?.bwNewCount ?? 0,
+                  colorOldCount: entry.a3Config?.colorOldCount ?? 0,
+                  colorNewCount: entry.a3Config?.colorNewCount ?? 0,
+                  colorScanningOldCount: entry.a3Config?.colorScanningOldCount ?? 0,
+                  colorScanningNewCount: entry.a3Config?.colorScanningNewCount ?? 0,
+                },
+                a4Config: {
+                  bwOldCount: entry.a4Config?.bwOldCount ?? 0,
+                  bwNewCount: entry.a4Config?.bwNewCount ?? 0,
+                  colorOldCount: entry.a4Config?.colorOldCount ?? 0,
+                  colorNewCount: entry.a4Config?.colorNewCount ?? 0,
+                  colorScanningOldCount: entry.a4Config?.colorScanningOldCount ?? 0,
+                  colorScanningNewCount: entry.a4Config?.colorScanningNewCount ?? 0,
+                },
+                a5Config: {
+                  bwOldCount: entry.a5Config?.bwOldCount ?? 0,
+                  bwNewCount: entry.a5Config?.bwNewCount ?? 0,
+                  colorOldCount: entry.a5Config?.colorOldCount ?? 0,
+                  colorNewCount: entry.a5Config?.colorNewCount ?? 0,
+                  colorScanningOldCount: entry.a5Config?.colorScanningOldCount ?? 0,
+                  colorScanningNewCount: entry.a5Config?.colorScanningNewCount ?? 0,
+                },
+              },
+            ]);
+          }
         }
+      } catch (error: any) {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: error.response?.data?.message || 'Failed to fetch rental entry',
+        });
+      } finally {
+        setLoading(false);
       }
-    } catch (error: any) {
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: error.response?.data?.message || 'Failed to fetch rental entry',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+    [token, route.params]
+  );
 
   const resetForm = useCallback(() => {
     setFormData({
@@ -727,36 +734,52 @@ const RentalInvoiceFormScreen = () => {
     ]);
   }, [initialCompanyId]);
 
+  useEffect(() => {
+    const prev = prevEntryIdRef.current;
+    if (prev && !entryId) {
+      resetForm();
+    }
+    prevEntryIdRef.current = entryId;
+  }, [entryId, resetForm]);
+
   useFocusEffect(
     useCallback(() => {
       const currentParams = route.params as any;
-      const currentEntryId = currentParams?.id;
-      const rawCompanyId = currentParams?.companyId;
-      const currentCompanyId =
-        rawCompanyId != null
-          ? typeof rawCompanyId === 'object'
-            ? rawCompanyId?._id
-            : rawCompanyId
-          : undefined;
-      const normalizedId = currentCompanyId && currentCompanyId !== 'null' ? String(currentCompanyId) : '';
+      const editDocId =
+        normalizeMongoId(currentParams?.id ?? currentParams?.entryId) || undefined;
 
-      // If companyId is provided in params and not in edit mode, set it
-      if (!currentEntryId && normalizedId) {
+      if (editDocId) {
+        fetchRentalEntry(editDocId);
+        return undefined;
+      }
+
+      const normalizedId = normalizeMongoId(currentParams?.companyId);
+      let idToApply = normalizedId;
+      if (!idToApply && currentParams?.companyName) {
+        const nm = String(currentParams.companyName).trim().toLowerCase();
+        const m = companies.find((c) => (c.companyName || '').trim().toLowerCase() === nm);
+        if (m?._id) idToApply = String(m._id);
+      }
+
+      if (idToApply) {
         setFormData((prev) => {
-          if (String(prev.companyId) === normalizedId) return prev;
-          return { ...prev, companyId: normalizedId, sendDetailsTo: [] };
+          if (String(prev.companyId) === idToApply) return prev;
+          return { ...prev, companyId: idToApply, sendDetailsTo: [] };
         });
       }
 
-      if (!currentEntryId) {
-        const timeoutId = setTimeout(() => {
-          if (!normalizedId && (products.length > 0 || formData.companyId || formData.remarks)) {
-            resetForm();
-          }
-        }, 100);
-        return () => clearTimeout(timeoutId);
-      }
-    }, [route.params, resetForm, formData.companyId])
+      const timeoutId = setTimeout(() => {
+        const p = route.params as any;
+        if (normalizeMongoId(p?.id ?? p?.entryId)) return;
+        const hasParamCompany =
+          !!normalizeMongoId(p?.companyId) || !!String(p?.companyName || '').trim();
+        if (hasParamCompany || p?.rentalId) return;
+        if (products.length > 0 || formData.companyId || formData.remarks) {
+          resetForm();
+        }
+      }, 100);
+      return () => clearTimeout(timeoutId);
+    }, [route.params, resetForm, formData.companyId, companies, products.length, fetchRentalEntry])
   );
 
   const handleProductSelect = (productId: number, selectedProduct: any) => {
@@ -1026,7 +1049,7 @@ const RentalInvoiceFormScreen = () => {
       // Try using expo-file-system first (React Native compatible)
       try {
         // @ts-ignore - expo-file-system types may not be available
-        const FileSystem = require('expo-file-system');
+        const FileSystem = require('expo-file-system/legacy');
         // @ts-ignore
         const base64 = await FileSystem.readAsStringAsync(uri, {
           // @ts-ignore

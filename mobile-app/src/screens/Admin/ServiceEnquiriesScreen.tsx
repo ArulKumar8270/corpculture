@@ -25,6 +25,7 @@ import { usePermissions } from '../../hooks/usePermissions';
 import axios from 'axios';
 import { getApiBaseUrl } from '../../services/api';
 import Toast from 'react-native-toast-message';
+import { normalizeMongoId } from '../../utils/normalizeMongoId';
 // Using custom picker modal instead of @react-native-picker/picker
 
 /** Encode path segments so spaces and special chars in filenames (e.g. R2 URLs) load in <Image />. */
@@ -289,38 +290,41 @@ const ServiceEnquiriesScreen = () => {
 
     switch (action) {
       case 'invoice': {
-        const companyId = typeof service?.companyId === 'object' ? service?.companyId?._id : service?.companyId;
+        const companyIdStr = normalizeMongoId(service?.companyId);
         (navigation as any).navigate('AddServiceInvoice', {
           employeeName,
           employeeId, // Pass employee ID for the payload
           invoiceType: 'invoice',
           serviceId: service._id,
-          companyId: companyId || service?.companyId,
+          companyId: companyIdStr || undefined,
+          companyName: service?.companyName,
         });
         break;
       }
       case 'quotation': {
-        const companyId = typeof service?.companyId === 'object' ? service?.companyId?._id : service?.companyId;
+        const companyIdStr = normalizeMongoId(service?.companyId);
         (navigation as any).navigate('AddServiceInvoice', {
           employeeName,
           employeeId, // Pass employee ID for the payload
           invoiceType: 'quotation',
           serviceId: service._id,
-          companyId: companyId || service?.companyId,
+          companyId: companyIdStr || undefined,
+          companyName: service?.companyName,
         });
         break;
       }
-      case 'report':
-        // Ensure companyId is passed correctly - handle both string and object formats
-        const companyId = typeof service?.companyId === 'object' ? service?.companyId?._id : service?.companyId;
+      case 'report': {
+        const companyIdStr = normalizeMongoId(service?.companyId);
         (navigation as any).navigate('AddServiceReport', {
           employeeName,
           employeeId, // Pass employee ID for the payload
           reportType: 'service',
           serviceId: service._id,
-          companyId: companyId || service?.companyId,
+          companyId: companyIdStr || undefined,
+          companyName: service?.companyName,
         });
         break;
+      }
       case 'moveToUnwanted':
         Alert.alert(
           'Move to Unwanted',

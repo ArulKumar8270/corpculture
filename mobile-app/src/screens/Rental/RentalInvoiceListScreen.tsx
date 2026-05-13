@@ -31,8 +31,54 @@ import {
   getRentalProductLineDisplayTotal,
 } from '../../utils/functions';
 import { fetchAssignableUsers } from '../../utils/fetchAssignableUsers';
+import { normalizeMongoId } from '../../utils/normalizeMongoId';
 
 const RENTAL_INVOICE_DOWNLOAD_BASE_URL = 'https://pub-bcab85dac0c64221ba6b6a756f991c46.r2.dev';
+
+/** Stable row id for per-row loading state (Mongo id / populated ref). */
+function rentalEntryRowId(entry: any): string {
+  return normalizeMongoId(entry?._id) || String(entry?._id ?? '').trim();
+}
+
+/** Signed uploads are usually images; generated invoices are PDF or R2 URL — never treat photos as "Download invoice". */
+function isLikelyImageInvoiceLink(url: string): boolean {
+  const path = String(url || '').split(/[?#]/)[0].toLowerCase();
+  return /\.(jpe?g|png|gif|webp|bmp|heic|heif)(\/)?$/i.test(path);
+}
+
+/**
+ * Ordered candidates for the official invoice/quotation file only (excludes signed photo uploads in invoiceLink).
+ * 1) R2 hosted file for this entry (primary rental PDF)
+ * 2) Non-image links from invoiceLink (e.g. PDF from n8n)
+ */
+function collectRentalOfficialInvoiceDownloadCandidates(entry: any): string[] {
+  const id = rentalEntryRowId(entry);
+  const r2 = id ? `${RENTAL_INVOICE_DOWNLOAD_BASE_URL}/${id}` : '';
+  const links: string[] = Array.isArray(entry?.invoiceLink)
+    ? (entry.invoiceLink as unknown[])
+        .map((x) => String(x || '').trim())
+        .filter((s): s is string => s.length > 0)
+    : [];
+
+  const ordered: string[] = [];
+  const push = (u: string) => {
+    const t = String(u || '').trim();
+    if (!t || ordered.includes(t)) return;
+    ordered.push(t);
+  };
+
+  push(r2);
+
+  const docLinks = links.filter((l) => !isLikelyImageInvoiceLink(l));
+  for (const l of docLinks) {
+    if (/\.pdf(\?|#|$)/i.test(l)) push(l);
+  }
+  for (const l of docLinks) {
+    push(l);
+  }
+
+  return ordered;
+}
 
 function rentalInvoiceDisplayGrandTotal(entry: any): number {
   try {
@@ -70,6 +116,8 @@ const RentalInvoiceListScreen = () => {
   const [uploading, setUploading] = useState<string | null>(null);
   const [deletingLink, setDeletingLink] = useState<string | null>(null);
   const [sendingInvoice, setSendingInvoice] = useState<string | null>(null);
+  const [pullRefreshing, setPullRefreshing] = useState(false);
+  const [downloadingEntryId, setDownloadingEntryId] = useState<string | null>(null);
 
   const [paymentForm, setPaymentForm] = useState({
     modeOfPayment: 'CASH',
@@ -109,36 +157,48 @@ const RentalInvoiceListScreen = () => {
   };
 
   const handleDownloadInvoiceMobile = async (entry: any) => {
-    const candidateUrlRaw =
-      Array.isArray(entry?.invoiceLink) && entry.invoiceLink.length > 0
-        ? entry.invoiceLink[0]
-        : entry?._id
-          ? `${RENTAL_INVOICE_DOWNLOAD_BASE_URL}/${entry._id}`
-          : '';
+    const rowId = rentalEntryRowId(entry);
+    const rawCandidates = collectRentalOfficialInvoiceDownloadCandidates(entry);
+    const candidates = rawCandidates
+      .map((c) => resolveDownloadUrl(String(c || '')))
+      .filter((u) => !!u);
 
-    const candidateUrl = resolveDownloadUrl(String(candidateUrlRaw || ''));
-    if (!candidateUrl) {
-      Toast.show({ type: 'error', text1: 'Invoice id missing' });
+    if (candidates.length === 0) {
+      Toast.show({
+        type: 'error',
+        text1: 'Nothing to download',
+        text2: 'Send the invoice first, or ensure a PDF link is available.',
+      });
       return;
     }
 
+    setDownloadingEntryId(rowId);
     try {
-      const res = await fetch(candidateUrl, { method: 'HEAD' });
-      if (!res.ok) {
-        Toast.show({
-          type: 'error',
-          text1: 'Please send invoice then download',
-        });
-        return;
+      let urlToOpen: string | null = null;
+      for (const url of candidates) {
+        try {
+          const res = await fetch(url, { method: 'HEAD' });
+          if (res.ok) {
+            urlToOpen = url;
+            break;
+          }
+        } catch {
+          /* try next candidate */
+        }
       }
-    } catch {
-      // Ignore HEAD failure; still try to open.
-    }
 
-    try {
-      await Linking.openURL(candidateUrl);
-    } catch {
-      Toast.show({ type: 'error', text1: 'Unable to open download link' });
+      if (!urlToOpen) {
+        // Some hosts return non-2xx to HEAD even when GET/open works — try best candidate anyway.
+        urlToOpen = candidates[0];
+      }
+
+      try {
+        await Linking.openURL(urlToOpen);
+      } catch {
+        Toast.show({ type: 'error', text1: 'Unable to open download link' });
+      }
+    } finally {
+      setDownloadingEntryId((cur) => (cur === rowId ? null : cur));
     }
   };
   const [modeOfPaymentPickerVisible, setModeOfPaymentPickerVisible] = useState(false);
@@ -264,7 +324,7 @@ const RentalInvoiceListScreen = () => {
       if (res.data?.success) {
         Toast.show({ type: 'success', text1: 'Invoice reassigned' });
         closeReassignModal();
-        fetchRentalEntries();
+        fetchRentalEntries({ silent: true });
       } else {
         Toast.show({ type: 'error', text1: res.data?.message || 'Reassign failed' });
       }
@@ -278,9 +338,12 @@ const RentalInvoiceListScreen = () => {
     }
   };
 
-  const fetchRentalEntries = async () => {
+  const fetchRentalEntries = async (opts?: { silent?: boolean; pull?: boolean }) => {
+    const silent = !!opts?.silent;
+    const pull = !!opts?.pull;
     try {
-      setLoading(true);
+      if (pull) setPullRefreshing(true);
+      else if (!silent) setLoading(true);
       let response;
       if (user?.role === 3) {
         // Backend route is POST, not GET
@@ -335,7 +398,8 @@ const RentalInvoiceListScreen = () => {
       });
       setRentalEntries([]);
     } finally {
-      setLoading(false);
+      if (pull) setPullRefreshing(false);
+      else if (!silent) setLoading(false);
     }
   };
 
@@ -365,8 +429,10 @@ const RentalInvoiceListScreen = () => {
   };
 
   const handleEdit = (entry: any) => {
+    const docId = normalizeMongoId(entry?._id) || String(entry?._id ?? '').trim();
     (navigation as any).navigate('AddRentalInvoice', {
-      id: entry._id,
+      id: docId,
+      entryId: docId,
       invoiceType,
     });
   };
@@ -391,7 +457,7 @@ const RentalInvoiceListScreen = () => {
       if (result.canceled || !result.assets || result.assets.length === 0) return;
 
       const asset = result.assets[0];
-      setUploading(entry._id);
+      setUploading(rentalEntryRowId(entry));
       
       const fileExtension = asset.uri.split('.').pop()?.toLowerCase() || 'jpg';
       let mimeType = 'image/jpeg';
@@ -453,7 +519,7 @@ const RentalInvoiceListScreen = () => {
             text1: 'Success',
             text2: 'Signed invoice uploaded successfully!',
           });
-          fetchRentalEntries();
+          fetchRentalEntries({ silent: true });
         } else {
           throw new Error(serviceRes.data?.message || 'Failed to update entry');
         }
@@ -500,7 +566,7 @@ const RentalInvoiceListScreen = () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              setDeletingLink(entry._id);
+              setDeletingLink(rentalEntryRowId(entry));
               const fileName = linkToDelete.split('/').pop();
               await axios.post(
                 `${getApiBaseUrl()}/auth/delete-file/${fileName}`,
@@ -528,7 +594,7 @@ const RentalInvoiceListScreen = () => {
                 text1: 'Success',
                 text2: 'Invoice link deleted successfully!',
               });
-              fetchRentalEntries();
+              fetchRentalEntries({ silent: true });
             } catch (error: any) {
               Toast.show({
                 type: 'error',
@@ -707,7 +773,7 @@ const RentalInvoiceListScreen = () => {
             text2: res.data.message || 'Payment details updated successfully!',
           });
           setPaymentModalVisible(false);
-          fetchRentalEntries();
+          fetchRentalEntries({ silent: true });
         } else {
           Toast.show({
             type: 'error',
@@ -755,7 +821,7 @@ const RentalInvoiceListScreen = () => {
       if (res.data?.success) {
         // Invoice count is now incremented automatically by the backend
         // No need to call increment-invoice endpoint
-        fetchRentalEntries();
+        fetchRentalEntries({ silent: true });
         Toast.show({
           type: 'success',
           text1: 'Success',
@@ -779,7 +845,7 @@ const RentalInvoiceListScreen = () => {
   };
 
   const onSendInvoice = async (entry: any) => {
-    setSendingInvoice(entry._id);
+    setSendingInvoice(rentalEntryRowId(entry));
     try {
       // Always clear old link before generating a new file
       try {
@@ -810,7 +876,7 @@ const RentalInvoiceListScreen = () => {
         text1: 'Success',
         text2: 'Invoice sent successfully!',
       });
-      fetchRentalEntries();
+      fetchRentalEntries({ silent: true });
     } catch (error: any) {
       console.error('Send rental invoice failed:', error?.response?.status, error?.response?.data || error?.message);
       Toast.show({
@@ -839,7 +905,7 @@ const RentalInvoiceListScreen = () => {
               { headers: { Authorization: token || '' }, timeout: 30000 }
             );
             Toast.show({ type: 'success', text1: 'Success', text2: 'Invoice cancelled' });
-            fetchRentalEntries();
+            fetchRentalEntries({ silent: true });
           } catch (e: any) {
             Toast.show({
               type: 'error',
@@ -920,9 +986,11 @@ const RentalInvoiceListScreen = () => {
 
   const renderEntry = ({ item }: { item: any }) => {
     const isExpanded = expandedEntries.has(item._id);
-    const isUploadingThis = uploading === item._id;
-    const isDeletingThis = deletingLink === item._id;
-    const isSendingThis = sendingInvoice === item._id;
+    const rowId = rentalEntryRowId(item);
+    const isUploadingThis = uploading === rowId;
+    const isDeletingThis = deletingLink === rowId;
+    const isSendingThis = sendingInvoice === rowId;
+    const isDownloadingThis = downloadingEntryId === rowId;
 
     // Get first product for display (for backward compatibility with single product)
     const firstProduct = item.products && item.products.length > 0 
@@ -1038,8 +1106,13 @@ const RentalInvoiceListScreen = () => {
           <TouchableOpacity
             style={[styles.actionButton, styles.downloadButton]}
             onPress={() => handleDownloadInvoiceMobile(item)}
+            disabled={isDownloadingThis}
           >
-            <Icon name="download" size={18} color="#007AFF" />
+            {isDownloadingThis ? (
+              <ActivityIndicator size="small" color="#007AFF" />
+            ) : (
+              <Icon name="download" size={18} color="#007AFF" />
+            )}
             <Text style={styles.actionButtonText}>
               Download {invoiceType === 'quotation' ? 'Quotation' : 'Invoice'}
             </Text>
@@ -1367,8 +1440,8 @@ const RentalInvoiceListScreen = () => {
           data={paginatedEntries}
           renderItem={renderEntry}
           keyExtractor={(item) => item._id}
-          refreshing={loading}
-          onRefresh={fetchRentalEntries}
+          refreshing={pullRefreshing}
+          onRefresh={() => fetchRentalEntries({ silent: true, pull: true })}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Icon name="description" size={64} color="#ccc" />

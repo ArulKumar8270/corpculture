@@ -25,6 +25,9 @@ const USE_SAMPLE_DATA = false; // Set to false to use real API, true for sample 
 // Export getApiBaseUrl for use in screens that make direct axios calls
 export { getApiBaseUrl, API_BASE_URL };
 
+/** Use with GET /company/all — API defaults to limit=10, which breaks enquiry flows that pre-select company. */
+export const companyAllPickerQuery = 'page=1&limit=10000';
+
 // Log API URL for debugging
 console.log('API Base URL:', API_BASE_URL);
 
