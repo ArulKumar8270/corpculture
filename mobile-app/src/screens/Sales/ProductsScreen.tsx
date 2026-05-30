@@ -23,10 +23,12 @@ import { getApiBaseUrl } from '../../services/api';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
 import CompanyToggleHeader from '../../components/CompanyToggleHeader';
+import { useFrontHomeSettings } from '../../hooks/useFrontHomeSettings';
 
 const ProductsScreen = () => {
   const navigation = useNavigation();
   const dispatch = useDispatch();
+  const { sales } = useFrontHomeSettings();
   const { token } = useSelector((state: RootState) => state.auth);
   const { isLoading } = useSelector((state: RootState) => state.product);
   
@@ -159,6 +161,11 @@ const ProductsScreen = () => {
         />
         <View style={styles.productInfo}>
           <Text style={styles.productName}>{item.name}</Text>
+          {sales?.showAssuredBadge && (
+            <Text style={styles.assuredBadge}>
+              {sales?.assuredBadgeLabel || 'Corpculture Assured'}
+            </Text>
+          )}
           <Text style={styles.productCategory}>{item.category}</Text>
           <View style={styles.priceContainer}>
             {item.discountPrice ? (
@@ -503,6 +510,12 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 5,
     color: '#333',
+  },
+  assuredBadge: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#019ee3',
+    marginBottom: 4,
   },
   productCategory: {
     fontSize: 12,

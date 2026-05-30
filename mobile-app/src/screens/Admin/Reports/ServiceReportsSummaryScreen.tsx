@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   FlatList,
+  TextInput,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 // @ts-ignore - @expo/vector-icons is available via expo dependency
@@ -23,6 +24,7 @@ interface ReportData {
   count: number;
   screen: string;
   type?: string;
+  supportsSerialFilter?: boolean;
 }
 
 const ServiceReportsSummaryScreen = () => {
@@ -30,15 +32,19 @@ const ServiceReportsSummaryScreen = () => {
   const { token } = useSelector((state: RootState) => state.auth);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [serialNoFilter, setSerialNoFilter] = useState('');
   const [reportData, setReportData] = useState<ReportData[]>([]);
 
-  useFocusEffect(
-    useCallback(() => {
-      fetchSummaryData();
-    }, [token])
-  );
+  const fetchServiceReportsCount = useCallback(async (serialNo = '') => {
+    const params = new URLSearchParams({ page: '1', limit: '1' });
+    if (serialNo.trim()) params.set('serialNo', serialNo.trim());
+    const { data } = await axios.get(`${getApiBaseUrl()}/report/service?${params.toString()}`, {
+      headers: { Authorization: token || '' },
+    });
+    return data?.totalCount ?? 0;
+  }, [token]);
 
-  const fetchSummaryData = async () => {
+  const fetchSummaryData = useCallback(async (serialNo = '') => {
     setLoading(true);
     setError(null);
 
@@ -52,7 +58,6 @@ const ServiceReportsSummaryScreen = () => {
       const [
         serviceInvoicesRes,
         serviceQuotationsRes,
-        serviceReportsRes,
         serviceEnquiriesRes,
       ] = await Promise.allSettled([
         axios.post(
@@ -65,13 +70,12 @@ const ServiceReportsSummaryScreen = () => {
           { invoiceType: 'quotation' },
           { headers: { Authorization: token } }
         ),
-        axios.get(`${getApiBaseUrl()}/report/service`, {
-          headers: { Authorization: token },
-        }),
         axios.get(`${getApiBaseUrl()}/service/all`, {
           headers: { Authorization: token },
         }),
       ]);
+
+      const serviceReportsCount = await fetchServiceReportsCount(serialNo);
 
       const newReportData: ReportData[] = [
         {
@@ -95,10 +99,9 @@ const ServiceReportsSummaryScreen = () => {
         {
           id: 'serviceReports',
           name: 'Service Reports',
-          count: serviceReportsRes.status === 'fulfilled' && serviceReportsRes.value.data.success
-            ? serviceReportsRes.value.data.totalCount ?? 0
-            : 0,
+          count: serviceReportsCount,
           screen: 'ServiceReportsReport',
+          supportsSerialFilter: true,
         },
         {
           id: 'serviceEnquiries',
@@ -123,6 +126,21 @@ const ServiceReportsSummaryScreen = () => {
     } finally {
       setLoading(false);
     }
+  }, [token, fetchServiceReportsCount]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (token) fetchSummaryData('');
+    }, [token, fetchSummaryData])
+  );
+
+  const handleApplySerialFilter = () => {
+    fetchSummaryData(serialNoFilter);
+  };
+
+  const handleClearSerialFilter = () => {
+    setSerialNoFilter('');
+    fetchSummaryData('');
   };
 
   const handleViewDetails = (item: ReportData) => {
@@ -137,7 +155,12 @@ const ServiceReportsSummaryScreen = () => {
 
     (navigation as any).navigate('Reports', {
       screen: item.screen,
-      params: item.type ? { type: item.type } : undefined,
+      params: {
+        ...(item.type ? { type: item.type } : {}),
+        ...(item.supportsSerialFilter && serialNoFilter.trim()
+          ? { serialNo: serialNoFilter.trim() }
+          : {}),
+      },
     });
   };
 
@@ -190,6 +213,26 @@ const ServiceReportsSummaryScreen = () => {
         <Text style={styles.headerTitle}>Service Reports Summary</Text>
       </View>
 
+      <View style={styles.filterSection}>
+        <Text style={styles.filterTitle}>Serial No Filter</Text>
+        <TextInput
+          style={styles.filterInput}
+          value={serialNoFilter}
+          onChangeText={setSerialNoFilter}
+          placeholder="Filter service reports by serial no"
+          placeholderTextColor="#999"
+          autoCapitalize="characters"
+        />
+        <View style={styles.filterActions}>
+          <TouchableOpacity style={styles.applyButton} onPress={handleApplySerialFilter}>
+            <Text style={styles.applyButtonText}>Filter</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.clearButton} onPress={handleClearSerialFilter}>
+            <Text style={styles.clearButtonText}>Clear</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
       <FlatList
         data={reportData}
         renderItem={renderReportItem}
@@ -228,6 +271,60 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: '#019ee3',
+  },
+  filterSection: {
+    backgroundColor: '#fff',
+    marginHorizontal: 15,
+    marginTop: 12,
+    marginBottom: 4,
+    padding: 15,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e8e8e8',
+  },
+  filterTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#019ee3',
+    marginBottom: 10,
+  },
+  filterInput: {
+    backgroundColor: '#f9f9f9',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    color: '#333',
+    marginBottom: 12,
+  },
+  filterActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  applyButton: {
+    flex: 1,
+    backgroundColor: '#019ee3',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  applyButtonText: {
+    color: '#fff',
+    fontWeight: '700',
+  },
+  clearButton: {
+    flex: 1,
+    backgroundColor: '#fff',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#019ee3',
+  },
+  clearButtonText: {
+    color: '#019ee3',
+    fontWeight: '700',
   },
   listContent: {
     padding: 15,

@@ -9,6 +9,8 @@ import ScrollToTopOnRouteChange from "../../utils/ScrollToTopOnRouteChange";
 import { toast } from "react-toastify";
 import axios from "axios";
 import { useAuth } from "../../context/auth";
+import { useFrontHomeSettings } from "../../context/frontHomeSettings";
+import VerifiedUserIcon from "@mui/icons-material/VerifiedUser";
 
 const Product = ({
     _id,
@@ -22,6 +24,7 @@ const Product = ({
     setWishlistItems,
 }) => {
     const { auth, isAdmin } = useAuth();
+    const { sales } = useFrontHomeSettings();
 
     //check if item is present in user wishlist or not
     const itemInWishlist = wishlistItems?.some((itemId) => {
@@ -110,6 +113,12 @@ const Product = ({
                                 ? `${name.substring(0, 25)}...`
                                 : name}
                         </h2>
+                        {sales?.showAssuredBadge && (
+                            <span className="flex items-center gap-1 text-xs font-semibold text-[#019ee3]">
+                                <VerifiedUserIcon sx={{ fontSize: 14 }} />
+                                {sales?.assuredBadgeLabel || "Corpculture Assured"}
+                            </span>
+                        )}
                         {/* <!-- rating badge --> */}
                         <span className="text-sm text-gray-500 font-medium flex gap-2 items-start justify-between">
                             <span className="text-xs px-2 py-1 bg-[#019ee3] rounded-full text-white flex items-center gap-1 font-semibold">

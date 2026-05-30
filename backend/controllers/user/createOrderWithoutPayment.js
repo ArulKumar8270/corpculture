@@ -34,7 +34,7 @@ const computeAmountFromItems = (orderItems) => {
 // Create order without online payment (COD/manual)
 const createOrderWithoutPayment = async (req, res) => {
   try {
-    const { orderItems, shippingInfo, orderReferenceNo } = req.body;
+    const { orderItems, shippingInfo, orderReferenceNo, paymentMethod, companyId } = req.body;
 
     if (!Array.isArray(orderItems) || orderItems.length === 0) {
       return res.status(400).send({
@@ -114,6 +114,10 @@ const createOrderWithoutPayment = async (req, res) => {
       orderReferenceNo: ref,
       shippingInfo,
       amount,
+      paymentMethod: paymentMethod === "credit" ? "credit" : "cash",
+      ...(companyId && mongoose.Types.ObjectId.isValid(companyId)
+        ? { companyId: new mongoose.Types.ObjectId(companyId) }
+        : {}),
     };
 
     const order = new orderModel(combinedOrder);

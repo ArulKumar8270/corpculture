@@ -12,8 +12,10 @@ import { useAuth } from "../../context/auth";
 import SearchBar from "./SearchBar";
 import { useCart } from "../../context/cart";
 import CompanyToggleHeader from './CompanyToggleHeader';
+import { useFrontHomeSettings } from "../../context/frontHomeSettings";
 
 const Header = () => {
+    const { theme, logo: logoSettings, navTabs } = useFrontHomeSettings();
     const [isDropdownOpen, setDropdownOpen] = useState(false);
     const headerRef = useRef(null);
     const [commissions, setCommissions] = useState([]);
@@ -80,16 +82,37 @@ const Header = () => {
     }, []);
 
     return (
-        <header ref={headerRef} className="relative bg-gradient-to-r from-[#0c115d] to-[#1a237e] shadow-lg">
+        <header
+            ref={headerRef}
+            className="relative shadow-lg"
+            style={{
+                background: `linear-gradient(to right, ${theme?.headerGradientFrom || "#0c115d"}, ${theme?.headerGradientTo || "#1a237e"})`,
+            }}
+        >
             <nav className="max-w-8xl mx-auto px-4 py-3 flex flex-col md:flex-row items-center justify-between">
                 {/* Left: Logo */}
                 <div className="flex items-center gap-4 w-full md:w-auto justify-center md:justify-start">
                     <Link to="/" className="transition-transform hover:scale-105">
-                        <img
-                            src={logo}
-                            alt="logo"
-                            className="h-12 md:h-14 object-contain drop-shadow-lg"
-                        />
+                        {logoSettings?.url ? (
+                            <img
+                                src={logoSettings.url}
+                                alt="Corpculture"
+                                className="h-12 md:h-14 object-contain drop-shadow-lg"
+                            />
+                        ) : logoSettings?.useTextLogo !== false ? (
+                            <span className="text-2xl md:text-3xl font-bold text-white tracking-tight">
+                                {logoSettings?.textPrimary || "corp"}{" "}
+                                <span style={{ color: theme?.secondaryColor || "#afcb09" }}>
+                                    {logoSettings?.textAccent || "culture"}
+                                </span>
+                            </span>
+                        ) : (
+                            <img
+                                src={logo}
+                                alt="Corpculture"
+                                className="h-12 md:h-14 object-contain drop-shadow-lg"
+                            />
+                        )}
                     </Link>
                 </div>
                 
@@ -100,23 +123,31 @@ const Header = () => {
                 
                 {/* Right: Navigation/Actions */}
                 <div className="flex items-center gap-2 md:gap-2 w-full md:w-auto justify-center md:justify-end flex-wrap">
-                    {/* Home */}
-                    <NavLink 
-                        to="/" 
-                        className="flex items-center gap-2 px-3 py-2 rounded-lg text-white hover:bg-white/10 hover:text-cyan-300 transition-all duration-200 group"
-                    >
-                        <BiHomeSmile className="text-xl md:text-2xl group-hover:scale-110 transition-transform" />
-                        <span className="text-base md:text-lg hidden md:block font-medium">Home</span>
-                    </NavLink>
-                    
-                    {/* Products */}
-                    <NavLink 
-                        to="/products" 
-                        className="flex items-center gap-2 px-3 py-2 rounded-lg text-white hover:bg-white/10 hover:text-cyan-300 transition-all duration-200 group"
-                    >
-                        <BiLogoProductHunt className="text-xl md:text-2xl group-hover:scale-110 transition-transform" />
-                        <span className="text-base md:text-lg hidden md:block font-medium">Products</span>
-                    </NavLink>
+                    {(navTabs?.length ? navTabs : [
+                        { id: "home", label: "Home", path: "/", visible: true, muted: false },
+                        { id: "products", label: "Products", path: "/products", visible: true, muted: false },
+                    ])
+                        .filter((t) => t.visible !== false)
+                        .map((tab) => (
+                            <NavLink
+                                key={tab.id}
+                                to={tab.path || "/"}
+                                className={({ isActive }) =>
+                                    `flex items-center gap-2 px-3 py-2 rounded-lg text-white transition-all duration-200 group ${
+                                        tab.muted ? "opacity-40 pointer-events-none" : "hover:bg-white/10 hover:text-cyan-300"
+                                    } ${isActive && !tab.muted ? "bg-white/15" : ""}`
+                                }
+                            >
+                                {tab.id === "home" ? (
+                                    <BiHomeSmile className="text-xl md:text-2xl group-hover:scale-110 transition-transform" />
+                                ) : (
+                                    <BiLogoProductHunt className="text-xl md:text-2xl group-hover:scale-110 transition-transform" />
+                                )}
+                                <span className="text-base md:text-lg hidden md:block font-medium">
+                                    {tab.label}
+                                </span>
+                            </NavLink>
+                        ))}
                     
                     {/* Cart */}
                     {auth?.user?.role !== 1 && (

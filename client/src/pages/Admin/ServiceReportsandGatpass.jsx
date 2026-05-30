@@ -42,6 +42,17 @@ import { useAuth } from '../../context/auth';
 
 const REPORT_DOWNLOAD_BASE_URL = 'https://pub-109709bff58d46faa2a7782c9bf60324.r2.dev';
 
+const collectSerialNumbers = (report) => {
+    const serials = new Set();
+    if (report?.serialNo?.trim()) serials.add(report.serialNo.trim());
+    (report?.materialGroups || []).forEach((group) => {
+        (group?.products || []).forEach((product) => {
+            if (product?.serialNo?.trim()) serials.add(product.serialNo.trim());
+        });
+    });
+    return Array.from(serials).join(', ') || '—';
+};
+
 const ServiceReportsandGatpass = (props) => {
     const navigate = useNavigate();
     const { auth, userPermissions } = useAuth();
@@ -54,6 +65,7 @@ const ServiceReportsandGatpass = (props) => {
     const [toDate, setToDate] = useState('');
     const [companyNameFilter, setCompanyNameFilter] = useState('');
     const [assignedToFilter, setAssignedToFilter] = useState('');
+    const [serialNoFilter, setSerialNoFilter] = useState('');
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [totalCount, setTotalCount] = useState(0);
@@ -86,6 +98,7 @@ const ServiceReportsandGatpass = (props) => {
         to = '',
         companyName = '',
         assignedTo = '',
+        serialNo = '',
         currentPage = page,
         currentRowsPerPage = rowsPerPage
     ) => {
@@ -97,6 +110,7 @@ const ServiceReportsandGatpass = (props) => {
                 toDate: to,
                 companyName: companyName,
                 assignedTo: assignedTo,
+                serialNo: serialNo,
                 reportType: props?.reportType || '',
                 page: currentPage + 1, // Backend expects 1-indexed page
                 limit: currentRowsPerPage,
@@ -131,6 +145,7 @@ const ServiceReportsandGatpass = (props) => {
                 toDate,
                 companyNameFilter,
                 assignedToFilter,
+                serialNoFilter,
                 page,
                 rowsPerPage
             );
@@ -176,6 +191,7 @@ const ServiceReportsandGatpass = (props) => {
                         toDate,
                         companyNameFilter,
                         assignedToFilter,
+                        serialNoFilter,
                         page,
                         rowsPerPage
                     );
@@ -243,6 +259,7 @@ const ServiceReportsandGatpass = (props) => {
             toDate,
             companyNameFilter,
             assignedToFilter,
+            serialNoFilter,
             0,
             rowsPerPage
         );
@@ -253,8 +270,9 @@ const ServiceReportsandGatpass = (props) => {
         setToDate('');
         setCompanyNameFilter('');
         setAssignedToFilter('');
+        setSerialNoFilter('');
         setPage(0);
-        fetchReports('', '', '', '', 0, rowsPerPage);
+        fetchReports('', '', '', '', '', 0, rowsPerPage);
     };
 
     const handleOpenReassignModal = (reportId, currentAssignedToId) => {
@@ -301,6 +319,7 @@ const ServiceReportsandGatpass = (props) => {
                     toDate,
                     companyNameFilter,
                     assignedToFilter,
+                    serialNoFilter,
                     page,
                     rowsPerPage
                 );
@@ -328,7 +347,7 @@ const ServiceReportsandGatpass = (props) => {
             <Box sx={{ p: 3, textAlign: 'center', color: 'error.main' }}>
                 <Typography variant="h6">Error: {error}</Typography>
                 <Button 
-                    onClick={() => fetchReports(fromDate, toDate, companyNameFilter, assignedToFilter, page, rowsPerPage)} 
+                    onClick={() => fetchReports(fromDate, toDate, companyNameFilter, assignedToFilter, serialNoFilter, page, rowsPerPage)} 
                     variant="outlined" 
                     sx={{ mt: 2 }}
                 >
@@ -397,6 +416,16 @@ const ServiceReportsandGatpass = (props) => {
                         />
                     </Grid>
                     <Grid item xs={12} sm={6} md={3}>
+                        <TextField
+                            fullWidth
+                            label="Serial No"
+                            variant="outlined"
+                            value={serialNoFilter}
+                            onChange={(e) => setSerialNoFilter(e.target.value)}
+                            placeholder="Search material serial no"
+                        />
+                    </Grid>
+                    <Grid item xs={12} sm={6} md={3}>
                         <Button
                             variant="contained"
                             color="primary"
@@ -425,6 +454,7 @@ const ServiceReportsandGatpass = (props) => {
                                 <TableCell>Company</TableCell>
                                 <TableCell>Problem Report</TableCell>
                                 <TableCell>Branch</TableCell>
+                                <TableCell>Serial No</TableCell>
                                 <TableCell>Submitted At</TableCell>
                                 <TableCell>Assigned To</TableCell>
                                 <TableCell align="center">Actions</TableCell>
@@ -455,6 +485,7 @@ const ServiceReportsandGatpass = (props) => {
                                             <TableCell>{report.company?.companyName || 'N/A'}</TableCell> {/* Assuming company is populated */}
                                             <TableCell>{report.problemReport}</TableCell>
                                             <TableCell>{report.branch}</TableCell>
+                                            <TableCell>{collectSerialNumbers(report)}</TableCell>
                                             <TableCell>{new Date(report.createdAt).toLocaleDateString()}</TableCell>
                                             <TableCell>
                                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -510,7 +541,7 @@ const ServiceReportsandGatpass = (props) => {
                                         </TableRow>
                                         {/* Expanded row for materials */}
                                         <TableRow>
-                                            <TableCell style={{ paddingBottom: 0, paddingTop: 0, width: "100%" }} colSpan={9}> {/* Adjusted colspan */}
+                                            <TableCell style={{ paddingBottom: 0, paddingTop: 0, width: "100%" }} colSpan={10}>
                                                 <Collapse in={expandedReportId === report._id} timeout="auto" unmountOnExit>
                                                     <Box sx={{ margin: 1 }}>
                                                         <Typography variant="h6" gutterBottom component="div">

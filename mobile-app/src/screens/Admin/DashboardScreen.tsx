@@ -77,6 +77,7 @@ const AdminDashboardScreen = () => {
       'OldInvoicesList': 'Settings',
       'MenuSettings': 'Settings',
       'GlobalSettings': 'Settings',
+      'FrontHomeSettings': 'Settings',
       'AdminPayslipList': 'Settings',
       'AddPayslip': 'Settings',
       'AdminPayslipView': 'Settings',
@@ -477,6 +478,14 @@ const AdminDashboardScreen = () => {
       screen: 'GlobalSettings',
       permissionKey: 'otherSettingsSettings',
       color: '#607D8B',
+    },
+    {
+      id: 'frontHomeSettings',
+      title: 'Front Home',
+      icon: 'home',
+      screen: 'FrontHomeSettings',
+      permissionKey: 'otherSettingsFrontHome',
+      color: '#019ee3',
     },
     {
       id: 'category',

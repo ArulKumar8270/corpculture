@@ -8,6 +8,7 @@ import states from "../../../utils/states";
 import { toast } from "react-toastify";
 import { useCart } from "../../../context/cart";
 import { useAuth } from "../../../context/auth";
+import { useFrontHomeSettings } from "../../../context/frontHomeSettings";
 import axios from "axios";
 
 //payment using stripe
@@ -22,8 +23,12 @@ const Shipping = () => {
     const storedOrderRef = localStorage.getItem("orderReferenceNo") || "";
 
     const [cartItems] = useCart();
-    const { auth } = useAuth();
+    const { auth, selectedCompany } = useAuth();
+    const { sales } = useFrontHomeSettings();
     const navigate = useNavigate();
+    const [payOnCredit, setPayOnCredit] = useState(
+        localStorage.getItem("paymentMethod") === "credit"
+    );
 
     const [address, setAddress] = useState(shippingInfo?.address);
     const [city, setCity] = useState(shippingInfo?.city);
@@ -60,6 +65,7 @@ const Shipping = () => {
         };
         localStorage.setItem("shippingInfo", JSON.stringify(data));
         localStorage.setItem("orderReferenceNo", ref);
+        localStorage.setItem("paymentMethod", payOnCredit ? "credit" : "cash");
         return true;
     };
 
@@ -109,12 +115,15 @@ const Shipping = () => {
         try {
             const ref = (localStorage.getItem("orderReferenceNo") || "").trim();
             const ship = JSON.parse(localStorage.getItem("shippingInfo") || "null");
+            const paymentMethod = localStorage.getItem("paymentMethod") || "cash";
             const { data } = await axios.post(
                 `${import.meta.env.VITE_SERVER_URL}/api/v1/user/create-order`,
                 {
                     orderItems: cartItems,
                     shippingInfo: ship,
                     orderReferenceNo: ref,
+                    paymentMethod,
+                    companyId: selectedCompany && selectedCompany !== "new" ? selectedCompany : undefined,
                 },
                 {
                     headers: { Authorization: auth?.token },
@@ -135,7 +144,7 @@ const Shipping = () => {
 
     return (
         <>
-            <SeoData title="Flipkart: Shipping Details" />
+            <SeoData title="Corpculture — Shipping Details" />
             <main className="w-full pt-8 bg-gradient-to-br from-[#e6fbff] to-[#f7fafd] min-h-screen">
                 {/* <!-- row --> */}
 
@@ -282,6 +291,20 @@ const Shipping = () => {
                                         </Select>
                                     </FormControl>
                                 </div>
+
+                                {sales?.creditOptionEnabled && (
+                                    <label className="flex items-center gap-2 mt-4 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={payOnCredit}
+                                            onChange={(e) => setPayOnCredit(e.target.checked)}
+                                            className="w-4 h-4"
+                                        />
+                                        <span className="text-gray-700 font-medium">
+                                            {sales?.creditLabel || "Pay on Company Credit"}
+                                        </span>
+                                    </label>
+                                )}
 
                                 <button
                                     type="submit"

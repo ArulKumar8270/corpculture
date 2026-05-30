@@ -23,6 +23,7 @@ import axios from 'axios';
 import { getApiBaseUrl } from '../../services/api';
 import { normalizeMongoId } from '../../utils/normalizeMongoId';
 import Toast from 'react-native-toast-message';
+import { getInvoiceLineProductDisplayName } from '../../utils/serviceProductDisplayName';
 import * as ImagePicker from 'expo-image-picker';
 
 const ServiceQuotationListScreen = () => {
@@ -530,9 +531,7 @@ const ServiceQuotationListScreen = () => {
                   <View key={index} style={styles.productRow}>
                     <View style={styles.productInfo}>
                       <Text style={styles.productName}>
-                        {product.productId?.productName?.productName?.productName ||
-                          product.productName ||
-                          'N/A'}
+                        {getInvoiceLineProductDisplayName(product)}
                       </Text>
                       <Text style={styles.productDetails}>
                         SKU: {product.productId?.sku || product.sku || 'N/A'} | HSN:{' '}

@@ -22,6 +22,10 @@ import { RootState } from '../../store';
 import axios from 'axios';
 import { getApiBaseUrl } from '../../services/api';
 import Toast from 'react-native-toast-message';
+import {
+  getInvoiceLineProductDisplayName,
+  getServiceProductDisplayName,
+} from '../../utils/serviceProductDisplayName';
 
 interface ProductInTable {
   id: string;
@@ -192,7 +196,7 @@ const AddServiceQuotationScreen = () => {
           (quotation.products || []).map((p: any, idx: number) => ({
             id: Date.now().toString() + idx,
             productId: p.productId?._id || p.productId,
-            productName: p.productId?.productName?.productName?.productName || p.productName,
+            productName: getInvoiceLineProductDisplayName(p),
             sku: p.productId?.sku || '',
             hsn: p.productId?.hsn || '',
             quantity: p.quantity,
@@ -227,7 +231,7 @@ const AddServiceQuotationScreen = () => {
     const newProduct: ProductInTable = {
       id: Date.now().toString() + Math.random(),
       productId: selectedProduct._id,
-      productName: selectedProduct.productName?.productName?.productName || '',
+      productName: getServiceProductDisplayName(selectedProduct),
       sku: selectedProduct.sku || '',
       hsn: selectedProduct.hsn || '',
       quantity: parseInt(quotationData.quantity),
@@ -425,7 +429,7 @@ const AddServiceQuotationScreen = () => {
           >
             <Text style={[styles.pickerButtonText, !quotationData.productId && styles.placeholder]}>
               {selectedProduct
-                ? selectedProduct.productName?.productName?.productName || 'Selected'
+                ? getServiceProductDisplayName(selectedProduct)
                 : 'Select a Product'}
             </Text>
             {quotationData.companyId && availableProducts.length > 0 && (
@@ -677,8 +681,11 @@ const AddServiceQuotationScreen = () => {
                   }}
                 >
                   <Text style={styles.modalItemText}>
-                    {item.productName?.productName?.productName || 'N/A'}
+                    {getServiceProductDisplayName(item)}
                   </Text>
+                  {item.sku ? (
+                    <Text style={styles.modalItemSubtext}>SKU: {item.sku}</Text>
+                  ) : null}
                 </TouchableOpacity>
               )}
             />
@@ -992,6 +999,12 @@ const styles = StyleSheet.create({
     marginLeft: 10,
     color: '#333',
     flex: 1,
+  },
+  modalItemSubtext: {
+    fontSize: 13,
+    marginLeft: 10,
+    color: '#888',
+    marginTop: 2,
   },
   modalCancel: {
     borderBottomWidth: 0,

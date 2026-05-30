@@ -23,6 +23,11 @@ import axios from 'axios';
 import { getApiBaseUrl, companyAllPickerQuery } from '../../services/api';
 import { normalizeMongoId } from '../../utils/normalizeMongoId';
 import Toast from 'react-native-toast-message';
+import {
+  getInvoiceLineProductDisplayName,
+  getServiceProductDisplayName,
+  getServiceProductSearchText,
+} from '../../utils/serviceProductDisplayName';
 
 interface ProductInTable {
   id: string;
@@ -156,27 +161,13 @@ const AddServiceInvoiceScreen = () => {
     }, 100);
   };
 
-  // Helper to get product display name (match web Autocomplete getOptionLabel - all nested structures)
-  const getProductDisplayName = (option: any): string => {
-    if (!option?.productName) return '';
-    const pn = option.productName;
-    if (typeof pn === 'string') return pn;
-    if (pn?.name) return pn.name;
-    if (pn?.productName?.name) return pn.productName.name;
-    if (pn?.productName?.productName?.name) return pn.productName.productName.name;
-    if (pn?.productName?.productName?.productName) return pn.productName.productName.productName;
-    return (pn?.productName as string) || (pn as unknown as string) || 'N/A';
-  };
+  // Helper to get product display name (Material.name from populated service product)
+  const getProductDisplayName = (option: any): string => getServiceProductDisplayName(option);
 
   const filteredAvailableProducts = useMemo(() => {
     const q = productSearchQuery.trim().toLowerCase();
     if (!q) return availableProducts;
-    return availableProducts.filter((p) => {
-      const name = (getProductDisplayName(p) || '').toLowerCase();
-      const sku = String(p.sku ?? '').toLowerCase();
-      const hsn = String(p.hsn ?? '').toLowerCase();
-      return name.includes(q) || sku.includes(q) || hsn.includes(q);
-    });
+    return availableProducts.filter((p) => getServiceProductSearchText(p).includes(q));
   }, [availableProducts, productSearchQuery]);
 
   // Fetch companies and invoice count when token is available (match web: company list needed to select company)
@@ -464,10 +455,7 @@ const AddServiceInvoiceScreen = () => {
               const productId = p.productId?._id || p.productId;
               const originalProduct = availableProducts.find((ap: any) => ap._id === productId);
 
-              const productNameForDisplay =
-                p.productId?.productName?.productName?.productName ||
-                p.productName ||
-                (typeof p.productId?.productName === 'string' ? p.productId.productName : '');
+              const productNameForDisplay = getInvoiceLineProductDisplayName(p);
 
               const fullProductName = p.productId?.productName || originalProduct?.productName;
 
@@ -554,7 +542,7 @@ const AddServiceInvoiceScreen = () => {
     const newProduct: ProductInTable = {
       id: Date.now().toString() + Math.random(),
       productId: selectedProduct._id,
-      productName: getProductDisplayName(selectedProduct) || (selectedProduct.productName as any), // String for display
+      productName: getProductDisplayName(selectedProduct),
       sku: selectedProduct.sku || '',
       hsn: selectedProduct.hsn || '',
       quantity: parseInt(invoiceData.quantity),
@@ -1126,7 +1114,9 @@ const AddServiceInvoiceScreen = () => {
               <View key={product.id} style={styles.tableRow}>
                 <Text style={styles.tableCell}>{index + 1}</Text>
                 <Text style={[styles.tableCell, styles.productNameCell]}>
-                  {typeof product.productName === 'string' ? product.productName : getProductDisplayName({ productName: product.productName })}
+                  {typeof product.productName === 'string'
+                    ? product.productName
+                    : getProductDisplayName({ productName: product.productName })}
                 </Text>
                 {/* <Text style={styles.tableCell}>{product.sku}</Text> */}
                 <Text style={styles.tableCell}>{product.hsn}</Text>
@@ -1283,6 +1273,9 @@ const AddServiceInvoiceScreen = () => {
                   <Text style={styles.productModalItemTitle}>
                     {getProductDisplayName(item)}
                   </Text>
+                  {item.sku ? (
+                    <Text style={styles.modalItemSub}>SKU: {item.sku}</Text>
+                  ) : null}
                 </TouchableOpacity>
               )}
             />

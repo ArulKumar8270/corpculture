@@ -34,6 +34,9 @@ import { fetchAssignableUsers } from '../../utils/fetchAssignableUsers';
 import { normalizeMongoId } from '../../utils/normalizeMongoId';
 
 const RENTAL_INVOICE_DOWNLOAD_BASE_URL = 'https://pub-bcab85dac0c64221ba6b6a756f991c46.r2.dev';
+/** n8n: rental payment saved (payload aligned with web RentalInvoiceList). */
+const RENTAL_PAYMENT_UPDATE_N8N_WEBHOOK =
+  'https://n8n.nicknameinfo.net/webhook/fe3a3151-06b0-4de1-8e58-7f734697940b';
 
 /** Stable row id for per-row loading state (Mongo id / populated ref). */
 function rentalEntryRowId(entry: any): string {
@@ -774,6 +777,44 @@ const RentalInvoiceListScreen = () => {
           });
           setPaymentModalVisible(false);
           fetchRentalEntries({ silent: true });
+
+          if (!balanceAmountParam && selectedEntry) {
+            try {
+              const inv = selectedEntry;
+              const formCap =
+                Number(paymentForm?.grandTotal) || rentalInvoiceDisplayGrandTotal(inv) || 0;
+              const payNum = parseFloat(String(paymentForm.paymentAmount)) || 0;
+              const currentInvoicePayment = payNum >= formCap ? formCap : payNum;
+              const invDate = inv.invoiceDate || inv.entryDate || inv.createdAt;
+              const n8nPayload = {
+                invoiceId: inv._id,
+                invoice: {
+                  _id: inv._id,
+                  grandTotal: rentalInvoiceDisplayGrandTotal(inv),
+                  invoiceDate: invDate,
+                  companyId: inv.companyId,
+                  invoiceNumber: inv.invoiceNumber,
+                },
+                payment: {
+                  modeOfPayment: paymentForm.modeOfPayment,
+                  paymentAmount: payNum,
+                  bankName: paymentForm.bankName,
+                  transactionDetails: paymentForm.transactionDetails,
+                  chequeDate: paymentForm.chequeDate,
+                  transferDate: paymentForm.transferDate,
+                  companyNamePayment: paymentForm.companyNamePayment,
+                  paymentContactEmails: payEmails.paymentContactEmails,
+                  otherPaymentMode: paymentForm.otherPaymentMode,
+                  paymentAmountType: paymentForm.paymentAmountType,
+                  currentInvoicePayment,
+                },
+                allocatedToInvoices: [] as { invoiceId: string; amount: number; invoiceDate?: string; grandTotal?: number }[],
+              };
+              await axios.post(RENTAL_PAYMENT_UPDATE_N8N_WEBHOOK, n8nPayload, { timeout: 30000 });
+            } catch (webhookErr: any) {
+              console.error('Rental payment n8n webhook:', webhookErr?.response?.data || webhookErr?.message);
+            }
+          }
         } else {
           Toast.show({
             type: 'error',
@@ -1511,15 +1552,18 @@ const RentalInvoiceListScreen = () => {
         animationType="slide"
         onRequestClose={() => setPaymentModalVisible(false)}
       >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setPaymentModalVisible(false)}
-        >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFillObject}
+            activeOpacity={1}
+            onPress={() => setPaymentModalVisible(false)}
+            accessibilityLabel="Dismiss payment sheet"
+          />
           <ScrollView
             style={styles.modalContent}
             contentContainerStyle={styles.modalContentContainer}
             onStartShouldSetResponder={() => true}
+            keyboardShouldPersistTaps="handled"
           >
             <Text style={styles.modalTitle}>
               Payment Details (RS:{' '}
@@ -1786,7 +1830,7 @@ const RentalInvoiceListScreen = () => {
               </TouchableOpacity>
             </View>
           </ScrollView>
-        </TouchableOpacity>
+        </View>
       </Modal>
 
       {/* Mode Of Payment Picker Modal */}
@@ -1801,7 +1845,7 @@ const RentalInvoiceListScreen = () => {
           activeOpacity={1}
           onPress={() => setModeOfPaymentPickerVisible(false)}
         >
-          <View style={styles.pickerModalContent}>
+          <View style={styles.pickerModalContent} onStartShouldSetResponder={() => true}>
             <Text style={styles.pickerModalTitle}>Select Payment Mode</Text>
             <FlatList
               data={[
@@ -1813,12 +1857,13 @@ const RentalInvoiceListScreen = () => {
                 { value: 'OTHERS', label: 'OTHERS' },
               ]}
               keyExtractor={(item) => item.value}
+              keyboardShouldPersistTaps="handled"
               renderItem={({ item }) => (
                 <TouchableOpacity
                   style={styles.pickerOption}
                   onPress={() => {
                     if (item.value) {
-                      setPaymentForm({ ...paymentForm, modeOfPayment: item.value });
+                      setPaymentForm((prev) => ({ ...prev, modeOfPayment: item.value }));
                     }
                     setModeOfPaymentPickerVisible(false);
                   }}
@@ -1849,7 +1894,7 @@ const RentalInvoiceListScreen = () => {
           activeOpacity={1}
           onPress={() => setAmountTypePickerVisible(false)}
         >
-          <View style={styles.pickerModalContent}>
+          <View style={styles.pickerModalContent} onStartShouldSetResponder={() => true}>
             <Text style={styles.pickerModalTitle}>Select Amount Type</Text>
             <FlatList
               data={[
@@ -1858,12 +1903,13 @@ const RentalInvoiceListScreen = () => {
                 { value: 'Pending', label: 'Pending Amount' },
               ]}
               keyExtractor={(item) => item.value}
+              keyboardShouldPersistTaps="handled"
               renderItem={({ item }) => (
                 <TouchableOpacity
                   style={styles.pickerOption}
                   onPress={() => {
                     if (item.value) {
-                      setPaymentForm({ ...paymentForm, paymentAmountType: item.value });
+                      setPaymentForm((prev) => ({ ...prev, paymentAmountType: item.value }));
                     }
                     setAmountTypePickerVisible(false);
                   }}
@@ -1894,13 +1940,14 @@ const RentalInvoiceListScreen = () => {
           activeOpacity={1}
           onPress={() => setPendingInvoicePickerVisible(false)}
         >
-          <View style={styles.pickerModalContent}>
+          <View style={styles.pickerModalContent} onStartShouldSetResponder={() => true}>
             <Text style={styles.pickerModalTitle}>Select Pending Invoice</Text>
             <FlatList
               data={companyPendingInvoices.filter(
                 (inv) => inv._id !== selectedEntry?._id
               )}
               keyExtractor={(item) => item._id}
+              keyboardShouldPersistTaps="handled"
               renderItem={({ item }) => (
                 <TouchableOpacity
                   style={styles.pickerOption}

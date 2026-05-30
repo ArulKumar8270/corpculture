@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import axios from "axios";
 import { useAuth } from '../context/auth';
+import { useFrontHomeSettings } from '../context/frontHomeSettings';
 
 const ServiceSection = ({ services }) => {
+  const { serviceSettings, serviceDefaultImage } = useFrontHomeSettings();
   const [showModal, setShowModal] = useState(false);
   const [selectedService, setSelectedService] = useState(null);
   const [isFetchingServices, setIsFetchingServices] = useState(false); // Loading state for phone lookup
@@ -75,7 +77,8 @@ const ServiceSection = ({ services }) => {
     oldServiceId: "", // Initialize oldServiceId
     serviceType: selectedService?.id,
     serviceTitle: selectedService?.title, // Set the serviceType based on the selected service
-    serviceImage: null, // Initialize serviceImage to null
+    serviceImage: null,
+    paymentMethod: "cash",
   });
   const [errors, setErrors] = useState({});
   const [submitStatus, setSubmitStatus] = useState(null);
@@ -252,7 +255,8 @@ const ServiceSection = ({ services }) => {
       await axios.post(`${import.meta.env.VITE_SERVER_URL}/api/v1/service/create`, {
         ...form,
         companyId : form.companyId !== '' ? form.companyId : null,
-        serviceImage: imageUrl // Use the uploaded image URL
+        serviceImage: imageUrl || serviceDefaultImage || undefined,
+        paymentMethod: form.paymentMethod,
       });
       setSubmitStatus(true);
       setForm({
@@ -503,13 +507,32 @@ const ServiceSection = ({ services }) => {
                     <input
                       type="file"
                       name="serviceImage"
-                      // Removed value={form.serviceImage}
                       onChange={handleChange}
                       accept='image/*'
-                      className={`w-full rounded-lg px-3 py-2 border ${errors.serviceImage ? "border-red-400" : "border-gray-300"} focus:border-sky-500 focus:ring-2 focus:ring-sky-200 transition bg-white`}
+                      className="w-full rounded-lg px-3 py-2 border border-gray-300 focus:border-sky-500 focus:ring-2 focus:ring-sky-200 transition bg-white"
                     />
-                    {errors.serviceImage && <span className="text-red-500 text-xs">{errors.serviceImage}</span>}
+                    {serviceDefaultImage && (
+                      <p className="text-xs text-gray-500 mt-1">Admin default image used if none uploaded.</p>
+                    )}
                   </div>
+                  {serviceSettings?.creditOptionEnabled && (
+                    <div className="col-span-1 md:col-span-2 flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="service-credit"
+                        checked={form.paymentMethod === "credit"}
+                        onChange={(e) =>
+                          setForm((prev) => ({
+                            ...prev,
+                            paymentMethod: e.target.checked ? "credit" : "cash",
+                          }))
+                        }
+                      />
+                      <label htmlFor="service-credit" className="text-gray-700 text-sm font-medium">
+                        {serviceSettings?.creditLabel || "Request service on credit"}
+                      </label>
+                    </div>
+                  )}
                   <div className="col-span-1 md:col-span-2 flex gap-4 mt-4">
                     <button type="submit" className="flex-1 bg-sky-500 hover:bg-sky-600 text-white py-3 rounded-xl font-bold shadow transition text-lg">Submit</button>
                     <button type="button" className="flex-1 bg-lime-500 hover:bg-lime-600 text-white py-3 rounded-xl font-bold shadow transition text-lg">Calls us</button>

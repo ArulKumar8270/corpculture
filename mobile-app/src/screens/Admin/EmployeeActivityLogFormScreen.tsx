@@ -20,7 +20,8 @@ import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import axios from 'axios';
 import Toast from 'react-native-toast-message';
-import { getApiBaseUrl } from '../../services/api';
+import { getApiBaseUrl, companyAllPickerQuery } from '../../services/api';
+import { normalizeMongoId } from '../../utils/normalizeMongoId';
 
 const CALL_TYPES = [
   'NEW SERVICE CALLS',
@@ -32,7 +33,8 @@ const CALL_TYPES = [
 ];
 
 const EmployeeActivityLogFormScreen = () => {
-  const { token } = useSelector((state: RootState) => state.auth);
+  const { token, user } = useSelector((state: RootState) => state.auth);
+  const isAdmin = user?.role === 1 || Number(user?.role) === 1;
   const route = useRoute();
   const editLogId = (route.params as any)?.editLogId as string | undefined;
   const preselectedFromCompanyId = (route.params as any)?.preselectedFromCompanyId as string | undefined;
@@ -157,9 +159,14 @@ const EmployeeActivityLogFormScreen = () => {
     if (!token || !editLogId) return;
     try {
       setLoading(true);
-      const { data } = await axios.get(`${getApiBaseUrl()}/employee-activity-log/admin/${editLogId}`, {
-        headers: { Authorization: token || '' },
-      });
+      const { data } = await axios.get(
+        isAdmin
+          ? `${getApiBaseUrl()}/employee-activity-log/admin/${editLogId}`
+          : `${getApiBaseUrl()}/employee-activity-log/${editLogId}`,
+        {
+          headers: { Authorization: token || '' },
+        }
+      );
       if (!data?.success || !data?.activityLog) {
         Toast.show({ type: 'error', text1: data?.message || 'Failed to load petrol form' });
         return;
@@ -200,7 +207,7 @@ const EmployeeActivityLogFormScreen = () => {
     } finally {
       setLoading(false);
     }
-  }, [token, editLogId, companiesById]);
+  }, [token, editLogId, companiesById, isAdmin]);
 
   useEffect(() => {
     if (isEdit && companies.length > 0) {
@@ -220,7 +227,7 @@ const EmployeeActivityLogFormScreen = () => {
   const fetchCompanies = async () => {
     try {
       setLoadingCompanies(true);
-      const { data } = await axios.get(`${getApiBaseUrl()}/company/all?limit=500`, {
+      const { data } = await axios.get(`${getApiBaseUrl()}/company/all?${companyAllPickerQuery}`, {
         headers: { Authorization: token || '' },
       });
       if (data?.success) {
@@ -246,15 +253,25 @@ const EmployeeActivityLogFormScreen = () => {
       Toast.show({ type: 'error', text1: 'Please select both From Company and To Company' });
       return;
     }
+    const fromCompanyId = normalizeMongoId(fromCompany._id);
+    const toCompanyId = normalizeMongoId(toCompany._id);
+    if (!fromCompanyId || !toCompanyId) {
+      Toast.show({ type: 'error', text1: 'Please select valid companies from the list' });
+      return;
+    }
+    if (fromCompanyId === toCompanyId) {
+      Toast.show({ type: 'error', text1: 'From and To company cannot be the same' });
+      return;
+    }
     try {
       setLoading(true);
       const payload = {
         date: form.date,
-        fromCompany: fromCompany._id,
+        fromCompany: fromCompanyId,
         fromCompanyName: fromCompany.companyName || '',
         fromAddressLine: (fromCompany.billingAddress || '').trim() || undefined,
         fromPincode: fromCompany.pincode ? String(fromCompany.pincode) : undefined,
-        toCompany: toCompany._id,
+        toCompany: toCompanyId,
         toCompanyName: toCompany.companyName || '',
         toAddressLine: (toCompany.billingAddress || '').trim() || undefined,
         toPincode: toCompany.pincode ? String(toCompany.pincode) : undefined,
@@ -268,7 +285,9 @@ const EmployeeActivityLogFormScreen = () => {
       };
 
       const url = isEdit
-        ? `${getApiBaseUrl()}/employee-activity-log/admin/update/${editLogId}`
+        ? isAdmin
+          ? `${getApiBaseUrl()}/employee-activity-log/admin/update/${editLogId}`
+          : `${getApiBaseUrl()}/employee-activity-log/update/${editLogId}`
         : `${getApiBaseUrl()}/employee-activity-log/create`;
 
       const { data } = isEdit

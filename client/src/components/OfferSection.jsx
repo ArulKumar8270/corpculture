@@ -2,32 +2,10 @@ import React, { useState } from 'react';
 import { ShoppingCart } from 'lucide-react';
 import axios from "axios";
 import { useAuth } from '../context/auth';
+import { useFrontHomeSettings } from '../context/frontHomeSettings';
 
-const books = [
-  {
-    id: 1,
-    category: "Rental",
-    description: "Sed ac arcu sed felis vulputate molestie. Nullam at urna",
-    discount: "25% OFF",
-    image: "https://images.pexels.com/photos/5834/nature-grass-leaf-green.jpg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2"
-  },
-  {
-    id: 2,
-    category: "Credit",
-    description: "Sed ac arcu sed felis vulputate molestie. Nullam at urna",
-    discount: "25% OFF",
-    image: "https://images.pexels.com/photos/3747139/pexels-photo-3747139.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2"
-  },
-  {
-    id: 3,
-    category: "AMC / AMLC",
-    description: "Sed ac arcu sed felis vulputate molestie. Nullam at urna",
-    discount: "25% OFF",
-    image: "https://images.pexels.com/photos/5834/nature-grass-leaf-green.jpg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2"
-  }
-];
-
-const BookShowcase = () => {
+const BookShowcase = ({ books: booksProp = [], categoryBanners = [] }) => {
+  const { sales, rentalDefaultImage } = useFrontHomeSettings();
   const [showModal, setShowModal] = useState(false);
   const [selectedService, setSelectedService] = useState(null);
   const [isFetchingServices, setIsFetchingServices] = useState(false); // Loading state for phone lookup
@@ -97,13 +75,20 @@ const BookShowcase = () => {
     complaint: "",
     contactPerson: "",
     email: "",
-    address: "", // Initialize address
-    location: "", // Initialize location
-    oldServiceId: "", // Initialize oldServiceId
+    address: "",
+    location: "",
+    oldServiceId: "",
     rentalType: selectedService?.id,
-    serviceTitle: selectedService?.title, // Set the serviceType based on the selected service
-    serviceImage: null, // Initialize serviceImage to null
-    // rentalType
+    serviceTitle: selectedService?.title,
+    serviceImage: null,
+    paymentMethod: "cash",
+  });
+
+  const displayBooks = (booksProp || []).filter((book) => {
+    if (book.category?.toLowerCase() === "credit" && !sales?.creditOptionEnabled) {
+      return false;
+    }
+    return book.visible !== false;
   });
   const [errors, setErrors] = useState({});
   const [submitStatus, setSubmitStatus] = useState(null);
@@ -282,7 +267,8 @@ const BookShowcase = () => {
       await axios.post(`${import.meta.env.VITE_SERVER_URL}/api/v1/rental/create`, {
         ...form,
         companyId : form.companyId !== '' ? form.companyId : null,
-        serviceImage: imageUrl // Use the uploaded image URL
+        serviceImage: imageUrl || rentalDefaultImage || undefined,
+        paymentMethod: form.paymentMethod,
       });
       setSubmitStatus(true);
       setForm({
@@ -315,8 +301,30 @@ const BookShowcase = () => {
   return (
     <section className="py-16 px-4 md:px-8 w-full bg-white rounded-3xl">
       <div className="max-w-7xl mx-auto">
+        {categoryBanners?.length > 0 && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            {categoryBanners
+              .filter((b) => b.visible !== false)
+              .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+              .map((b) => (
+                <a
+                  key={b.id}
+                  href={b.link || "#"}
+                  className="block rounded-xl overflow-hidden shadow-md h-28 relative"
+                  style={{ borderBottom: `4px solid ${b.themeColor || "#019ee3"}` }}
+                >
+                  {b.image && (
+                    <img src={b.image} alt={b.title} className="w-full h-full object-cover" />
+                  )}
+                  <span className="absolute bottom-2 left-2 text-white font-bold text-sm drop-shadow">
+                    {b.title}
+                  </span>
+                </a>
+              ))}
+          </div>
+        )}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {books?.map((book) => (
+          {displayBooks?.map((book) => (
             <div
               key={book.id}
               className="relative rounded-3xl overflow-hidden group cursor-pointer"
@@ -533,17 +541,36 @@ const BookShowcase = () => {
                     {errors.location && <span className="text-red-500 text-xs">{errors.location}</span>}
                   </div>
                   <div>
-                    <label className="block font-semibold mb-1 text-gray-700">Service Image</label>
+                    <label className="block font-semibold mb-1 text-gray-700">Rental / enquiry image</label>
                     <input
                       type="file"
                       name="serviceImage"
-                      // Removed value={form.serviceImage}
                       onChange={handleChange}
                       accept='image/*'
-                      className={`w-full rounded-lg px-3 py-2 border ${errors.serviceImage ? "border-red-400" : "border-gray-300"} focus:border-sky-500 focus:ring-2 focus:ring-sky-200 transition bg-white`}
+                      className={`w-full rounded-lg px-3 py-2 border border-gray-300 focus:border-sky-500 focus:ring-2 focus:ring-sky-200 transition bg-white`}
                     />
-                    {errors.serviceImage && <span className="text-red-500 text-xs">{errors.serviceImage}</span>}
+                    {rentalDefaultImage && (
+                      <p className="text-xs text-gray-500 mt-1">Default image will be used if none uploaded.</p>
+                    )}
                   </div>
+                  {sales?.creditOptionEnabled && selectedService?.category?.toLowerCase() === "credit" && (
+                    <div className="col-span-1 md:col-span-2 flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="rental-credit"
+                        checked={form.paymentMethod === "credit"}
+                        onChange={(e) =>
+                          setForm((prev) => ({
+                            ...prev,
+                            paymentMethod: e.target.checked ? "credit" : "cash",
+                          }))
+                        }
+                      />
+                      <label htmlFor="rental-credit" className="text-gray-700 text-sm font-medium">
+                        {sales?.creditLabel || "Request on company credit"}
+                      </label>
+                    </div>
+                  )}
                   <div className="col-span-1 md:col-span-2 flex gap-4 mt-4">
                     <button type="submit" className="flex-1 bg-sky-500 hover:bg-sky-600 text-white py-3 rounded-xl font-bold shadow transition text-lg">Submit</button>
                     <button type="button" className="flex-1 bg-lime-500 hover:bg-lime-600 text-white py-3 rounded-xl font-bold shadow transition text-lg">Calls us</button>

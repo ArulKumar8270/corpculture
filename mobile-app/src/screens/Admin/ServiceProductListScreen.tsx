@@ -17,6 +17,7 @@ import { RootState } from '../../store';
 import { usePermissions } from '../../hooks/usePermissions';
 import axios from 'axios';
 import { getApiBaseUrl } from '../../services/api';
+import { getServiceProductDisplayName, getServiceProductSearchText } from '../../utils/serviceProductDisplayName';
 import Toast from 'react-native-toast-message';
 
 const ServiceProductListScreen = () => {
@@ -120,7 +121,7 @@ const ServiceProductListScreen = () => {
 
   const filteredProducts = products.filter(product => {
     const companyName = product.company?.companyName?.toLowerCase() || '';
-    const productName = product.productName?.productName?.productName?.toLowerCase() || '';
+    const productName = getServiceProductSearchText(product);
     const lowerCaseSearchTerm = searchTerm.toLowerCase();
     return companyName.includes(lowerCaseSearchTerm) || productName.includes(lowerCaseSearchTerm);
   });
@@ -145,7 +146,7 @@ const ServiceProductListScreen = () => {
         <View style={styles.productDetails}>
           <Text style={styles.companyName}>{item.company?.companyName || 'N/A'}</Text>
           <Text style={styles.productName}>
-            {item.productName?.productName?.productName || 'N/A'}
+            {getServiceProductDisplayName(item)}
           </Text>
           <View style={styles.productSpecs}>
             {/* <Text style={styles.specText}>SKU: {item.sku || 'N/A'}</Text> */}

@@ -22,6 +22,7 @@ import axios from 'axios';
 import { getApiBaseUrl, companyAllPickerQuery } from '../../services/api';
 import Toast from 'react-native-toast-message';
 import { normalizeMongoId } from '../../utils/normalizeMongoId';
+import { getServiceProductDisplayName } from '../../utils/serviceProductDisplayName';
 
 interface MaterialGroup {
   name: string;
@@ -247,52 +248,7 @@ const AddServiceReportScreen = () => {
     }
   };
 
-  // Helper function to safely extract productName from various structures
-  const extractProductName = (product: any): string => {
-    if (!product) return 'Unknown Product';
-    
-    // If productName is a string, return it directly
-    if (typeof product.productName === 'string') {
-      return product.productName;
-    }
-    
-    // If productName is an object, try to extract the actual name
-    if (typeof product.productName === 'object' && product.productName !== null) {
-      const productNameObj = product.productName as any;
-      
-      // Try productName.productName (nested structure - could be Purchase -> VendorProduct)
-      if (productNameObj.productName) {
-        // If productName.productName is a string, return it
-        if (typeof productNameObj.productName === 'string') {
-          return productNameObj.productName;
-        }
-        // If it's still an object, go one level deeper (Purchase -> VendorProduct -> productName)
-        if (typeof productNameObj.productName === 'object' && productNameObj.productName !== null) {
-          const nested = productNameObj.productName as any;
-          // Check if nested.productName is a string (the actual product name)
-          if (typeof nested.productName === 'string') {
-            return nested.productName;
-          }
-          // Fallback to nested.name
-          if (typeof nested.name === 'string') {
-            return nested.name;
-          }
-        }
-      }
-      
-      // Try productName.name
-      if (productNameObj.name && typeof productNameObj.name === 'string') {
-        return productNameObj.name;
-      }
-    }
-    
-    // Fallback to product.name
-    if (product.name && typeof product.name === 'string') {
-      return product.name;
-    }
-    
-    return 'Unknown Product';
-  };
+  const extractProductName = (product: any): string => getServiceProductDisplayName(product);
 
   const handleAddGroup = () => {
     const newGroupName = `Materials${materialGroups.length + 1}`;
@@ -411,9 +367,7 @@ const AddServiceReportScreen = () => {
     setEditingProductId(product.id || null);
     // Find product by matching productName (handle both string and object cases)
     const productToEdit = availableProducts.find((p) => {
-      const pName = typeof p.productName === 'string' 
-        ? p.productName 
-        : (p.productName?.productName || p.productName?.name || '');
+      const pName = getServiceProductDisplayName(p);
       return pName === product.productName;
     });
     setFormData((prev) => ({
@@ -476,6 +430,22 @@ const AddServiceReportScreen = () => {
         type: 'error',
         text1: 'Error',
         text2: 'Please select a company',
+      });
+      return;
+    }
+    if (!formData.problemReport?.trim()) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Please enter a problem report',
+      });
+      return;
+    }
+    if (!formData.branch?.trim()) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Please select a branch',
       });
       return;
     }

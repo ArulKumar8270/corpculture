@@ -27,6 +27,13 @@ const SettingsScreen = () => {
       permissionKey: 'otherSettingsSettings',
     },
     {
+      id: 'frontHomeSettings',
+      title: 'Front Home Settings',
+      icon: 'home',
+      screen: 'FrontHomeSettings' as never,
+      permissionKey: 'otherSettingsFrontHome',
+    },
+    {
       id: 'company',
       title: 'Company Management',
       icon: 'business',

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     Box,
     Typography,
@@ -11,85 +11,91 @@ import {
     TableRow,
     CircularProgress,
     Button,
-    Tooltip,
-    IconButton
+    TextField,
 } from '@mui/material';
-import VisibilityIcon from '@mui/icons-material/Visibility';
 import { useNavigate } from 'react-router-dom';
-import toast from 'react-hot-toast';
-import axios from 'axios'; // Uncomment if you fetch real data
-import { useAuth } from '../../../context/auth'; // Uncomment if you need auth context
+import axios from 'axios';
+import { useAuth } from '../../../context/auth';
 
 const RentalReportsSummary = () => {
     const navigate = useNavigate();
-    const { auth } = useAuth(); // Uncomment if you need auth context
+    const { auth } = useAuth();
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-
-    // Sample data for demonstration
-    // In a real application, these counts would be fetched from your backend API
+    const [serialNoFilter, setSerialNoFilter] = useState('');
     const [reportData, setReportData] = useState([]);
 
-    useEffect(() => {
-        const fetchData = async () => {
-            setLoading(true);
-            setError(null);
-            try {
-                // Use Promise.allSettled to fetch all data concurrently
-                // This allows individual requests to fail without stopping others
-                const [
-                    rentalInvoicesRes,
-                    rentalQuotationsRes,
-                    rentalReportsRes,
-                    rentalEnquiriesRes
-                ] = await Promise.allSettled([
-                    // rental Invoices API call
-                    axios.post(
-                        `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/all`,
-                        { invoiceType: "invoice" },
-                        { headers: { Authorization: auth.token } }
-                    ),
-                    // rental Quotations API call
-                    axios.post(
-                        `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/all`,
-                        { invoiceType: "quotation" },
-                        { headers: { Authorization: auth.token } }
-                    ),
-                    // rental Reports API call
-                    axios.get(
-                        `${import.meta.env.VITE_SERVER_URL}/api/v1/report/rental`,
-                        { headers: { Authorization: auth.token } }
-                    ),
-                    // rental Enquiries API call
-                    axios.get(
-                        `${import.meta.env.VITE_SERVER_URL}/api/v1/rental/all`,
-                        { headers: { Authorization: auth.token } }
-                    )
-                ]);
-
-                // Removed setTimeout
-                const data = [
-                    { id: 'rentalInvoices', name: 'Rental Invoices', count: rentalInvoicesRes?.value?.data?.totalCount ?? 0, path: '../rantalInvoicesReport' },
-                    { id: 'rentalQuotations', name: 'Rental Quotations', count: rentalQuotationsRes?.value?.data?.totalCount ?? 0, path: '../rentalQuotationsReport' },
-                    { id: 'rentalReports', name: 'Rental Reports', count: rentalReportsRes?.value?.data?.totalCount ?? 0, path: '../rentalReportsReport' },
-                    // { id: 'productsUsed', name: 'Products Used in Rental', count: 500, path: '/admin/reports/rental/products' },
-                    { id: 'rentalEnquiries', name: 'Rental Enquiries', count: rentalEnquiriesRes?.value?.data?.totalCount ?? 0, path: '../rentalEnquiriesReport' },
-                ];
-                setReportData(data);
-            } catch (err) {
-                console.error('Error loading rental overview data:', err);
-                setError('Failed to load rental overview data.');
-            } finally {
-                setLoading(false); // Ensure loading state is always reset
-            }
-        };
-
-        fetchData();
-
+    const fetchRentalReportsCount = useCallback(async (serialNo = '') => {
+        const params = new URLSearchParams({ page: '1', limit: '1' });
+        if (serialNo.trim()) params.set('serialNo', serialNo.trim());
+        const { data } = await axios.get(
+            `${import.meta.env.VITE_SERVER_URL}/api/v1/report/rental?${params.toString()}`,
+            { headers: { Authorization: auth.token } }
+        );
+        return data?.totalCount ?? 0;
     }, [auth.token]);
 
-    const handleViewDetails = (path, categoryName) => {
-        navigate(path);
+    const fetchData = useCallback(async (serialNo = '') => {
+        setLoading(true);
+        setError(null);
+        try {
+            const [
+                rentalInvoicesRes,
+                rentalQuotationsRes,
+                rentalReportsCount,
+                rentalEnquiriesRes
+            ] = await Promise.allSettled([
+                axios.post(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/all`,
+                    { invoiceType: "invoice" },
+                    { headers: { Authorization: auth.token } }
+                ),
+                axios.post(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/all`,
+                    { invoiceType: "quotation" },
+                    { headers: { Authorization: auth.token } }
+                ),
+                fetchRentalReportsCount(serialNo),
+                axios.get(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/rental/all`,
+                    { headers: { Authorization: auth.token } }
+                )
+            ]);
+
+            const data = [
+                { id: 'rentalInvoices', name: 'Rental Invoices', count: rentalInvoicesRes?.value?.data?.totalCount ?? 0, path: '../rantalInvoicesReport' },
+                { id: 'rentalQuotations', name: 'Rental Quotations', count: rentalQuotationsRes?.value?.data?.totalCount ?? 0, path: '../rentalQuotationsReport' },
+                { id: 'rentalReports', name: 'Rental Reports', count: typeof rentalReportsCount?.value === 'number' ? rentalReportsCount.value : 0, path: '../rentalReportsReport', supportsSerialFilter: true },
+                { id: 'rentalEnquiries', name: 'Rental Enquiries', count: rentalEnquiriesRes?.value?.data?.totalCount ?? 0, path: '../rentalEnquiriesReport' },
+            ];
+            setReportData(data);
+        } catch (err) {
+            console.error('Error loading rental overview data:', err);
+            setError('Failed to load rental overview data.');
+        } finally {
+            setLoading(false);
+        }
+    }, [auth.token, fetchRentalReportsCount]);
+
+    useEffect(() => {
+        if (auth?.token) fetchData('');
+    }, [auth?.token, fetchData]);
+
+    const handleApplySerialFilter = () => {
+        fetchData(serialNoFilter);
+    };
+
+    const handleClearSerialFilter = () => {
+        setSerialNoFilter('');
+        fetchData('');
+    };
+
+    const handleViewDetails = (item) => {
+        if (item.supportsSerialFilter && serialNoFilter.trim()) {
+            navigate(`${item.path}?serialNo=${encodeURIComponent(serialNoFilter.trim())}`);
+            return;
+        }
+        navigate(item.path);
     };
 
     if (loading) {
@@ -104,7 +110,7 @@ const RentalReportsSummary = () => {
         return (
             <Box sx={{ p: 3, textAlign: 'center', color: 'error.main' }}>
                 <Typography variant="h6">Error: {error}</Typography>
-                <Button onClick={() => window.location.reload()} variant="outlined" sx={{ mt: 2 }}>Retry</Button>
+                <Button onClick={() => fetchData()} variant="outlined" sx={{ mt: 2 }}>Retry</Button>
             </Box>
         );
     }
@@ -114,6 +120,28 @@ const RentalReportsSummary = () => {
             <Typography variant="h5" component="h1" gutterBottom sx={{ mb: 3, color: '#019ee3', fontWeight: 'bold' }}>
                 Rental Reports Summary
             </Typography>
+            <Paper elevation={3} sx={{ p: 2, borderRadius: '8px', mb: 2 }}>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center' }}>
+                    <TextField
+                        label="Serial No"
+                        value={serialNoFilter}
+                        onChange={(e) => setSerialNoFilter(e.target.value)}
+                        placeholder="Filter rental reports by serial no"
+                        sx={{ minWidth: 260 }}
+                    />
+                    <Button variant="contained" onClick={handleApplySerialFilter} sx={{ height: '56px' }}>
+                        Filter
+                    </Button>
+                    <Button variant="outlined" onClick={handleClearSerialFilter} sx={{ height: '56px' }}>
+                        Clear
+                    </Button>
+                </Box>
+                {serialNoFilter.trim() ? (
+                    <Typography variant="body2" sx={{ mt: 1.5, color: 'text.secondary' }}>
+                        Rental Reports count reflects serial no &quot;{serialNoFilter.trim()}&quot;. Open Rental Reports to see matching entries.
+                    </Typography>
+                ) : null}
+            </Paper>
             <Paper elevation={3} sx={{ p: 2, borderRadius: '8px' }}>
                 <TableContainer>
                     <Table sx={{ minWidth: 650 }} aria-label="reantal reports summary table">
@@ -138,7 +166,7 @@ const RentalReportsSummary = () => {
                                             <Button
                                                 variant="text"
                                                 color="primary"
-                                                onClick={() => handleViewDetails(item.path, item.name)}
+                                                onClick={() => handleViewDetails(item)}
                                                 disabled={item.count === 0}
                                                 sx={{ minWidth: 'unset', padding: '4px 8px' }}
                                             >

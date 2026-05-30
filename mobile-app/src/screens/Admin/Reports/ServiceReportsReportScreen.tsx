@@ -11,7 +11,7 @@ import {
   FlatList,
   Alert,
 } from 'react-native';
-import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
+import { useRoute, useFocusEffect } from '@react-navigation/native';
 // @ts-ignore - @expo/vector-icons is available via expo dependency
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
@@ -19,6 +19,7 @@ import { RootState } from '../../../store';
 import axios from 'axios';
 import { getApiBaseUrl } from '../../../services/api';
 import Toast from 'react-native-toast-message';
+import { collectReportSerialNumbers } from '../../../utils/reportSerialNumbers';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 // @ts-ignore - xlsx may need to be installed: npm install xlsx
@@ -30,9 +31,11 @@ try {
 }
 
 const ServiceReportsReportScreen = () => {
-  const navigation = useNavigation();
   const route = useRoute();
   const { user, token } = useSelector((state: RootState) => state.auth);
+  const routeParams = (route.params as { type?: string; serialNo?: string; companyId?: string }) || {};
+  const reportScope = routeParams.type === 'rental' ? 'rental' : 'service';
+  const pageTitle = reportScope === 'rental' ? 'Rental Reports' : 'Service Reports';
 
   const [reports, setReports] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,18 +44,22 @@ const ServiceReportsReportScreen = () => {
   const [toDate, setToDate] = useState('');
   const [companyNameFilter, setCompanyNameFilter] = useState('');
   const [assignedToFilter, setAssignedToFilter] = useState('');
-  const [reportTypeFilter, setReportTypeFilter] = useState('');
+  const [serialNoFilter, setSerialNoFilter] = useState(routeParams.serialNo || '');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [totalCount, setTotalCount] = useState(0);
-  const [filterModalVisible, setFilterModalVisible] = useState(false);
-  const [reportTypePickerVisible, setReportTypePickerVisible] = useState(false);
   const [exporting, setExporting] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
-      fetchServiceReports();
-    }, [token, page, rowsPerPage])
+      const initialSerial = routeParams.serialNo || '';
+      if (initialSerial && initialSerial !== serialNoFilter) {
+        setSerialNoFilter(initialSerial);
+        fetchServiceReports(fromDate, toDate, companyNameFilter, assignedToFilter, initialSerial, page, rowsPerPage);
+      } else {
+        fetchServiceReports();
+      }
+    }, [token, page, rowsPerPage, reportScope])
   );
 
   const fetchServiceReports = async (
@@ -60,7 +67,7 @@ const ServiceReportsReportScreen = () => {
     to = toDate,
     companyName = companyNameFilter,
     assignedTo = assignedToFilter,
-    reportType = reportTypeFilter,
+    serialNo = serialNoFilter,
     currentPage = page,
     currentRowsPerPage = rowsPerPage
   ) => {
@@ -72,13 +79,13 @@ const ServiceReportsReportScreen = () => {
         toDate: to,
         companyName: companyName,
         assignedTo: assignedTo,
-        reportType: reportType,
+        serialNo: serialNo,
         page: (currentPage + 1).toString(),
         limit: currentRowsPerPage.toString(),
       }).toString();
 
       const response = await axios.get(
-        `${getApiBaseUrl()}/report/service?${queryParams}`,
+        `${getApiBaseUrl()}/report/${reportScope}?${queryParams}`,
         {
           headers: { Authorization: token || '' },
         }
@@ -88,20 +95,20 @@ const ServiceReportsReportScreen = () => {
         setReports(response.data.reports || []);
         setTotalCount(response.data.totalCount || 0);
       } else {
-        setError(response.data.message || 'Failed to fetch service reports.');
+        setError(response.data.message || `Failed to fetch ${pageTitle.toLowerCase()}.`);
         Toast.show({
           type: 'error',
           text1: 'Error',
-          text2: response.data.message || 'Failed to fetch service reports.',
+          text2: response.data.message || `Failed to fetch ${pageTitle.toLowerCase()}.`,
         });
       }
     } catch (err: any) {
-      console.error('Error fetching service reports:', err);
-      setError(err.response?.data?.message || 'Error fetching service reports.');
+      console.error(`Error fetching ${pageTitle.toLowerCase()}:`, err);
+      setError(err.response?.data?.message || `Error fetching ${pageTitle.toLowerCase()}.`);
       Toast.show({
         type: 'error',
         text1: 'Error',
-        text2: err.response?.data?.message || 'Error fetching service reports.',
+        text2: err.response?.data?.message || `Error fetching ${pageTitle.toLowerCase()}.`,
       });
     } finally {
       setLoading(false);
@@ -110,8 +117,7 @@ const ServiceReportsReportScreen = () => {
 
   const handleFilter = () => {
     setPage(0);
-    setFilterModalVisible(false);
-    fetchServiceReports(fromDate, toDate, companyNameFilter, assignedToFilter, reportTypeFilter, 0, rowsPerPage);
+    fetchServiceReports(fromDate, toDate, companyNameFilter, assignedToFilter, serialNoFilter, 0, rowsPerPage);
   };
 
   const handleClearFilter = () => {
@@ -119,11 +125,10 @@ const ServiceReportsReportScreen = () => {
     setToDate('');
     setCompanyNameFilter('');
     setAssignedToFilter('');
-    setReportTypeFilter('');
+    setSerialNoFilter('');
     setPage(0);
     setRowsPerPage(10);
     fetchServiceReports('', '', '', '', '', 0, 10);
-    setFilterModalVisible(false);
   };
 
   const handleExportExcel = async () => {
@@ -155,7 +160,7 @@ const ServiceReportsReportScreen = () => {
         'Assigned To': report.assignedTo?.name || 'N/A',
         'Created Date': new Date(report.createdAt).toLocaleDateString(),
         'Model No': report.modelNo || 'N/A',
-        'Serial No': report.serialNo || 'N/A',
+        'Serial No': collectReportSerialNumbers(report),
         'Branch': report.branch || 'N/A',
         'Reference': report.reference || 'N/A',
         'Usage Data': report.usageData || 'N/A',
@@ -240,12 +245,10 @@ const ServiceReportsReportScreen = () => {
               <Text style={styles.detailValue}>{item.modelNo}</Text>
             </View>
           )}
-          {item.serialNo && (
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Serial No:</Text>
-              <Text style={styles.detailValue}>{item.serialNo}</Text>
-            </View>
-          )}
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Serial No:</Text>
+            <Text style={styles.detailValue}>{collectReportSerialNumbers(item)}</Text>
+          </View>
           {item.branch && (
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Branch:</Text>
@@ -351,18 +354,79 @@ const ServiceReportsReportScreen = () => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Service Reports</Text>
+        <Text style={styles.headerTitle}>{pageTitle}</Text>
       </View>
 
-      {/* Filter and Export Buttons */}
+      <ScrollView style={styles.filterSection} nestedScrollEnabled>
+        <Text style={styles.filterTitle}>Filters</Text>
+
+        <View style={styles.filterRow}>
+          <Text style={styles.filterLabel}>From Date</Text>
+          <TextInput
+            style={styles.filterTextInput}
+            value={fromDate}
+            onChangeText={setFromDate}
+            placeholder="YYYY-MM-DD"
+            placeholderTextColor="#999"
+          />
+        </View>
+
+        <View style={styles.filterRow}>
+          <Text style={styles.filterLabel}>To Date</Text>
+          <TextInput
+            style={styles.filterTextInput}
+            value={toDate}
+            onChangeText={setToDate}
+            placeholder="YYYY-MM-DD"
+            placeholderTextColor="#999"
+          />
+        </View>
+
+        <View style={styles.filterRow}>
+          <Text style={styles.filterLabel}>Company Name</Text>
+          <TextInput
+            style={styles.filterTextInput}
+            value={companyNameFilter}
+            onChangeText={setCompanyNameFilter}
+            placeholder="Company Name"
+            placeholderTextColor="#999"
+          />
+        </View>
+
+        <View style={styles.filterRow}>
+          <Text style={styles.filterLabel}>Assigned To</Text>
+          <TextInput
+            style={styles.filterTextInput}
+            value={assignedToFilter}
+            onChangeText={setAssignedToFilter}
+            placeholder="Assigned To"
+            placeholderTextColor="#999"
+          />
+        </View>
+
+        <View style={styles.filterRow}>
+          <Text style={styles.filterLabel}>Serial No</Text>
+          <TextInput
+            style={styles.filterTextInput}
+            value={serialNoFilter}
+            onChangeText={setSerialNoFilter}
+            placeholder="Search by serial no"
+            placeholderTextColor="#999"
+            autoCapitalize="characters"
+          />
+        </View>
+
+        <View style={styles.filterActions}>
+          <TouchableOpacity style={styles.applyButton} onPress={handleFilter}>
+            <Text style={styles.applyButtonText}>Apply Filters</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.clearButton} onPress={handleClearFilter}>
+            <Text style={styles.clearButtonText}>Clear</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+
       <View style={styles.actionBar}>
-        <TouchableOpacity
-          style={styles.filterButton}
-          onPress={() => setFilterModalVisible(true)}
-        >
-          <Icon name="filter-list" size={20} color="#007AFF" />
-          <Text style={styles.filterButtonText}>Filters</Text>
-        </TouchableOpacity>
         <TouchableOpacity
           style={[styles.exportButton, exporting && styles.exportButtonDisabled]}
           onPress={handleExportExcel}
@@ -388,6 +452,7 @@ const ServiceReportsReportScreen = () => {
 
       {/* Reports List */}
       <FlatList
+        style={styles.list}
         data={reports}
         renderItem={({ item, index }) => renderReport({ item, index })}
         keyExtractor={(item) => item._id}
@@ -396,7 +461,7 @@ const ServiceReportsReportScreen = () => {
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Icon name="description" size={64} color="#ccc" />
-            <Text style={styles.emptyText}>No service reports found</Text>
+            <Text style={styles.emptyText}>No {pageTitle.toLowerCase()} found</Text>
           </View>
         }
         contentContainerStyle={reports.length === 0 ? styles.emptyListContent : undefined}
@@ -404,142 +469,6 @@ const ServiceReportsReportScreen = () => {
 
       {/* Pagination */}
       {totalCount > 0 && renderPagination()}
-
-      {/* Filter Modal */}
-      <Modal
-        visible={filterModalVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setFilterModalVisible(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setFilterModalVisible(false)}
-        >
-          <ScrollView
-            style={styles.modalContent}
-            contentContainerStyle={styles.modalContentContainer}
-            onStartShouldSetResponder={() => true}
-          >
-            <Text style={styles.modalTitle}>Filter Options</Text>
-
-            <View style={styles.filterInputGroup}>
-              <Text style={styles.filterLabel}>From Date</Text>
-              <TextInput
-                style={styles.filterInput}
-                value={fromDate}
-                onChangeText={setFromDate}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor="#999"
-              />
-            </View>
-
-            <View style={styles.filterInputGroup}>
-              <Text style={styles.filterLabel}>To Date</Text>
-              <TextInput
-                style={styles.filterInput}
-                value={toDate}
-                onChangeText={setToDate}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor="#999"
-              />
-            </View>
-
-            <View style={styles.filterInputGroup}>
-              <Text style={styles.filterLabel}>Company Name</Text>
-              <TextInput
-                style={styles.filterInput}
-                value={companyNameFilter}
-                onChangeText={setCompanyNameFilter}
-                placeholder="Enter company name"
-                placeholderTextColor="#999"
-              />
-            </View>
-
-            <View style={styles.filterInputGroup}>
-              <Text style={styles.filterLabel}>Assigned To</Text>
-              <TextInput
-                style={styles.filterInput}
-                value={assignedToFilter}
-                onChangeText={setAssignedToFilter}
-                placeholder="Enter assigned to"
-                placeholderTextColor="#999"
-              />
-            </View>
-
-            <View style={styles.filterInputGroup}>
-              <Text style={styles.filterLabel}>Report Type</Text>
-              <TouchableOpacity
-                style={styles.pickerButton}
-                onPress={() => setReportTypePickerVisible(true)}
-              >
-                <Text style={styles.pickerButtonText}>
-                  {reportTypeFilter || '--select Report Type--'}
-                </Text>
-                <Icon name="arrow-drop-down" size={24} color="#666" />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.modalClearButton]}
-                onPress={handleClearFilter}
-              >
-                <Text style={styles.modalClearButtonText}>Clear</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.modalApplyButton]}
-                onPress={handleFilter}
-              >
-                <Text style={styles.modalApplyButtonText}>Apply Filter</Text>
-              </TouchableOpacity>
-            </View>
-          </ScrollView>
-        </TouchableOpacity>
-      </Modal>
-
-      {/* Report Type Picker Modal */}
-      <Modal
-        visible={reportTypePickerVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setReportTypePickerVisible(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setReportTypePickerVisible(false)}
-        >
-          <View style={styles.pickerModalContent}>
-            <Text style={styles.pickerModalTitle}>Select Report Type</Text>
-            <FlatList
-              data={[
-                { value: '', label: 'All' },
-                { value: 'Service Report', label: 'Service Report' },
-              ]}
-              keyExtractor={(item) => item.value}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.pickerOption}
-                  onPress={() => {
-                    setReportTypeFilter(item.value);
-                    setReportTypePickerVisible(false);
-                  }}
-                >
-                  <Text style={styles.pickerOptionText}>{item.label}</Text>
-                </TouchableOpacity>
-              )}
-            />
-            <TouchableOpacity
-              style={styles.modalButton}
-              onPress={() => setReportTypePickerVisible(false)}
-            >
-              <Text style={styles.modalButtonText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      </Modal>
     </View>
   );
 };
@@ -566,6 +495,70 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#019ee3',
   },
+  filterSection: {
+    backgroundColor: '#fff',
+    padding: 15,
+    marginHorizontal: 15,
+    marginTop: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e8e8e8',
+  },
+  filterTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#019ee3',
+    marginBottom: 12,
+  },
+  filterRow: {
+    marginBottom: 12,
+  },
+  filterLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 6,
+  },
+  filterTextInput: {
+    backgroundColor: '#f9f9f9',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    color: '#333',
+  },
+  filterActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 4,
+  },
+  applyButton: {
+    flex: 1,
+    backgroundColor: '#019ee3',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  applyButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  clearButton: {
+    flex: 1,
+    backgroundColor: '#fff',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#019ee3',
+  },
+  clearButtonText: {
+    color: '#019ee3',
+    fontSize: 14,
+    fontWeight: '700',
+  },
   actionBar: {
     flexDirection: 'row',
     padding: 15,
@@ -573,6 +566,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
     gap: 10,
+  },
+  list: {
+    flex: 1,
   },
   filterButton: {
     flexDirection: 'row',

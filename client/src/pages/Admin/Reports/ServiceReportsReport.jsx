@@ -12,8 +12,6 @@ import {
     CircularProgress,
     Button,
     Chip,
-    Tooltip,
-    IconButton,
     TextField,
     FormControl,
     InputLabel,
@@ -21,27 +19,40 @@ import {
     MenuItem,
     TablePagination
 } from '@mui/material';
-import VisibilityIcon from '@mui/icons-material/Visibility';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
-import { useNavigate } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import axios from 'axios';
 import { useAuth } from '../../../context/auth';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 
-const ServiceReportsReport = () => {
-    const navigate = useNavigate();
+const collectSerialNumbers = (report) => {
+    const serials = new Set();
+    if (report?.serialNo?.trim()) serials.add(report.serialNo.trim());
+    (report?.materialGroups || []).forEach((group) => {
+        (group?.products || []).forEach((product) => {
+            if (product?.serialNo?.trim()) serials.add(product.serialNo.trim());
+        });
+    });
+    return Array.from(serials).join(', ') || 'N/A';
+};
+
+const ServiceReportsReport = ({ type = 'service' }) => {
     const { auth } = useAuth();
+    const [searchParams] = useSearchParams();
+    const isRental = type === 'rental';
+    const pageTitle = isRental ? 'Rental Reports' : 'Service Reports';
+    const exportFileName = isRental ? 'rental_reports_report.xlsx' : 'service_reports_report.xlsx';
+
     const [reports, setReports] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [fromDate, setFromDate] = useState('');
     const [toDate, setToDate] = useState('');
     const [companyNameFilter, setCompanyNameFilter] = useState('');
-    const [assignedToFilter, setAssignedToFilter] = useState(''); // New filter for assignedTo
-    const [reportTypeFilter, setReportTypeFilter] = useState(''); // New filter for reportType
+    const [assignedToFilter, setAssignedToFilter] = useState('');
+    const [reportTypeFilter, setReportTypeFilter] = useState('');
+    const [serialNoFilter, setSerialNoFilter] = useState(searchParams.get('serialNo') || '');
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [totalCount, setTotalCount] = useState(0);
@@ -52,6 +63,7 @@ const ServiceReportsReport = () => {
         companyName = '',
         assignedTo = '',
         reportType = '',
+        serialNo = '',
         currentPage = page,
         currentRowsPerPage = rowsPerPage
     ) => {
@@ -64,12 +76,13 @@ const ServiceReportsReport = () => {
                 companyName: companyName,
                 assignedTo: assignedTo,
                 reportType: reportType,
-                page: currentPage + 1, // Backend usually expects 1-indexed page
+                serialNo: serialNo,
+                page: currentPage + 1,
                 limit: currentRowsPerPage,
             }).toString();
 
             const response = await axios.get(
-                `${import.meta.env.VITE_SERVER_URL}/api/v1/report/service?${queryParams}`,
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/report/${type}?${queryParams}`,
                 {
                     headers: { Authorization: auth?.token }
                 }
@@ -79,16 +92,21 @@ const ServiceReportsReport = () => {
                 setReports(response.data.reports);
                 setTotalCount(response.data.totalCount || 0);
             } else {
-                toast.error(response.data.message || 'Failed to fetch service reports.');
-                setError(response.data.message || 'Failed to fetch service reports.');
+                toast.error(response.data.message || `Failed to fetch ${pageTitle.toLowerCase()}.`);
+                setError(response.data.message || `Failed to fetch ${pageTitle.toLowerCase()}.`);
             }
         } catch (err) {
-            console.error('Error fetching service reports:', err);
-            setError(err.response?.data?.message || 'Error fetching service reports.');
+            console.error(`Error fetching ${pageTitle.toLowerCase()}:`, err);
+            setError(err.response?.data?.message || `Error fetching ${pageTitle.toLowerCase()}.`);
         } finally {
             setLoading(false);
         }
     };
+
+    useEffect(() => {
+        const initialSerial = searchParams.get('serialNo') || '';
+        if (initialSerial) setSerialNoFilter(initialSerial);
+    }, [searchParams]);
 
     useEffect(() => {
         if (auth?.token) {
@@ -98,57 +116,22 @@ const ServiceReportsReport = () => {
                 companyNameFilter,
                 assignedToFilter,
                 reportTypeFilter,
+                serialNoFilter,
                 page,
                 rowsPerPage
             );
         }
-    }, [auth?.token, page, rowsPerPage]);
-
-    const handleView = (reportId) => {
-        // Assuming a route for viewing a single service report
-        navigate(`/admin/service-report-details/${reportId}`);
-    };
-
-    const handleEdit = (reportId) => {
-        // Assuming a route for editing a service report
-        navigate(`/admin/edit-service-report/${reportId}`);
-    };
-
-    const handleDelete = async (reportId) => {
-        if (window.confirm('Are you sure you want to delete this report?')) {
-            try {
-                const response = await axios.delete(`${import.meta.env.VITE_SERVER_URL}/api/v1/report/${reportId}`, {
-                    headers: { Authorization: auth?.token }
-                });
-                if (response.data.success) {
-                    toast.success(response.data.message);
-                    fetchServiceReports(
-                        fromDate,
-                        toDate,
-                        companyNameFilter,
-                        assignedToFilter,
-                        reportTypeFilter,
-                        page,
-                        rowsPerPage
-                    );
-                } else {
-                    toast.error(response.data.message || 'Failed to delete report.');
-                }
-            } catch (err) {
-                console.error('Error deleting report:', err);
-                toast.error(err.response?.data?.message || 'Something went wrong while deleting report.');
-            }
-        }
-    };
+    }, [auth?.token, page, rowsPerPage, type]);
 
     const handleFilter = () => {
-        setPage(0); // Reset to first page when applying new filters
+        setPage(0);
         fetchServiceReports(
             fromDate,
             toDate,
             companyNameFilter,
             assignedToFilter,
             reportTypeFilter,
+            serialNoFilter,
             0,
             rowsPerPage
         );
@@ -160,9 +143,10 @@ const ServiceReportsReport = () => {
         setCompanyNameFilter('');
         setAssignedToFilter('');
         setReportTypeFilter('');
+        setSerialNoFilter('');
         setPage(0);
         setRowsPerPage(10);
-        fetchServiceReports('', '', '', '', '', 0, 10);
+        fetchServiceReports('', '', '', '', '', '', 0, 10);
     };
 
     const handleExportExcel = () => {
@@ -179,7 +163,7 @@ const ServiceReportsReport = () => {
             'Assigned To': report.assignedTo?.name || 'N/A',
             'Created Date': new Date(report.createdAt).toLocaleDateString(),
             'Model No': report.modelNo || 'N/A',
-            'Serial No': report.serialNo || 'N/A',
+            'Serial No': collectSerialNumbers(report),
             'Branch': report.branch || 'N/A',
             'Reference': report.reference || 'N/A',
             'Usage Data': report.usageData || 'N/A',
@@ -188,10 +172,10 @@ const ServiceReportsReport = () => {
 
         const ws = XLSX.utils.json_to_sheet(dataToExport);
         const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Service Reports");
+        XLSX.utils.book_append_sheet(wb, ws, pageTitle);
         const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
         const data = new Blob([excelBuffer], { type: 'application/octet-stream' });
-        saveAs(data, 'service_reports_report.xlsx');
+        saveAs(data, exportFileName);
         toast.success("Exported to Excel successfully!");
     };
 
@@ -216,7 +200,24 @@ const ServiceReportsReport = () => {
         return (
             <Box sx={{ p: 3, textAlign: 'center', color: 'error.main' }}>
                 <Typography variant="h6">Error: {error}</Typography>
-                <Button onClick={() => fetchServiceReports(fromDate, toDate, companyNameFilter, assignedToFilter, reportTypeFilter, page, rowsPerPage)} variant="outlined" sx={{ mt: 2 }}>Retry</Button>
+                <Button
+                    onClick={() =>
+                        fetchServiceReports(
+                            fromDate,
+                            toDate,
+                            companyNameFilter,
+                            assignedToFilter,
+                            reportTypeFilter,
+                            serialNoFilter,
+                            page,
+                            rowsPerPage
+                        )
+                    }
+                    variant="outlined"
+                    sx={{ mt: 2 }}
+                >
+                    Retry
+                </Button>
             </Box>
         );
     }
@@ -224,10 +225,9 @@ const ServiceReportsReport = () => {
     return (
         <Box sx={{ p: 3, bgcolor: 'background.default', minHeight: '100vh' }}>
             <Typography variant="h5" component="h1" gutterBottom sx={{ mb: 3, color: '#019ee3', fontWeight: 'bold' }}>
-                Service Reports
+                {pageTitle}
             </Typography>
             <Paper elevation={3} sx={{ p: 2, borderRadius: '8px' }}>
-                {/* Filter Options */}
                 <Box sx={{ mb: 3 }}>
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 2, alignItems: 'center' }}>
                         <TextField
@@ -258,6 +258,13 @@ const ServiceReportsReport = () => {
                             onChange={(e) => setAssignedToFilter(e.target.value)}
                             sx={{ width: 200 }}
                         />
+                        <TextField
+                            label="Serial No"
+                            value={serialNoFilter}
+                            onChange={(e) => setSerialNoFilter(e.target.value)}
+                            placeholder="Search material serial no"
+                            sx={{ width: 200 }}
+                        />
                         <FormControl sx={{ width: 200 }}>
                             <InputLabel>Report Type</InputLabel>
                             <Select
@@ -267,7 +274,6 @@ const ServiceReportsReport = () => {
                             >
                                 <MenuItem value="">All</MenuItem>
                                 <MenuItem value="Service Report">Service Report</MenuItem>
-                                {/* Add other report types as needed */}
                             </Select>
                         </FormControl>
                     </Box>
@@ -286,23 +292,23 @@ const ServiceReportsReport = () => {
                 </Box>
 
                 <TableContainer>
-                    <Table sx={{ minWidth: 650 }} aria-label="service reports table">
+                    <Table sx={{ minWidth: 650 }} aria-label={`${type} reports table`}>
                         <TableHead>
                             <TableRow sx={{ bgcolor: '#f0f0f0' }}>
                                 <TableCell>S.No</TableCell>
                                 <TableCell>Company Name</TableCell>
                                 <TableCell>Report Type</TableCell>
                                 <TableCell>Problem Report</TableCell>
+                                <TableCell>Serial No</TableCell>
                                 <TableCell>Assigned To</TableCell>
                                 <TableCell>Created Date</TableCell>
-                                {/* <TableCell>Actions</TableCell> */}
                             </TableRow>
                         </TableHead>
                         <TableBody>
                             {reports.length === 0 && !loading ? (
                                 <TableRow>
                                     <TableCell colSpan={7} align="center" sx={{ py: 3, color: 'text.secondary' }}>
-                                        No service reports found.
+                                        No {pageTitle.toLowerCase()} found.
                                     </TableCell>
                                 </TableRow>
                             ) : (
@@ -312,6 +318,7 @@ const ServiceReportsReport = () => {
                                         <TableCell>{report.company?.companyName || 'N/A'}</TableCell>
                                         <TableCell>{report.reportType || 'N/A'}</TableCell>
                                         <TableCell>{report.problemReport || 'N/A'}</TableCell>
+                                        <TableCell>{collectSerialNumbers(report)}</TableCell>
                                         <TableCell>
                                             {report.assignedTo ? (
                                                 <Chip label={report.assignedTo?.name} size="small" color="primary" variant="outlined" />
@@ -320,23 +327,6 @@ const ServiceReportsReport = () => {
                                             )}
                                         </TableCell>
                                         <TableCell>{new Date(report.createdAt).toLocaleDateString()}</TableCell>
-                                        {/* <TableCell>
-                                            <Tooltip title="View Details">
-                                                <IconButton onClick={() => handleView(report._id)} color="info">
-                                                    <VisibilityIcon />
-                                                </IconButton>
-                                            </Tooltip>
-                                            <Tooltip title="Edit Report">
-                                                <IconButton onClick={() => handleEdit(report._id)} color="primary">
-                                                    <EditIcon />
-                                                </IconButton>
-                                            </Tooltip>
-                                            <Tooltip title="Delete Report">
-                                                <IconButton onClick={() => handleDelete(report._id)} color="error">
-                                                    <DeleteIcon />
-                                                </IconButton>
-                                            </Tooltip>
-                                        </TableCell> */}
                                     </TableRow>
                                 ))
                             )}

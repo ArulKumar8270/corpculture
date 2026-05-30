@@ -18,6 +18,9 @@ import { setSelectedProduct, setLoading } from '../../store/slices/productSlice'
 import { addToCart } from '../../store/slices/cartSlice';
 import { productService } from '../../services/api';
 import Toast from 'react-native-toast-message';
+import { useFrontHomeSettings } from '../../hooks/useFrontHomeSettings';
+// @ts-ignore
+import { MaterialIcons as Icon } from '@expo/vector-icons';
 
 const { width } = Dimensions.get('window');
 
@@ -28,6 +31,7 @@ const getDeliveryDate = () => {
 };
 
 const ProductDetailScreen = () => {
+  const { sales } = useFrontHomeSettings();
   const route = useRoute();
   const navigation = useNavigation();
   const { productId } = route.params as { productId: string };
@@ -168,6 +172,14 @@ const ProductDetailScreen = () => {
         </View>
         <View style={styles.content}>
           <Text style={styles.productName}>{product.name}</Text>
+          {sales?.showAssuredBadge && (
+            <View style={styles.assuredBadge}>
+              <Icon name="verified-user" size={18} color="#019ee3" />
+              <Text style={styles.assuredText}>
+                {sales?.assuredBadgeLabel || 'Corpculture Assured'}
+              </Text>
+            </View>
+          )}
           <Text style={styles.category}>{product.category}</Text>
 
           <Text style={styles.specialPriceLabel}>Special Price</Text>
@@ -417,6 +429,22 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 5,
     color: '#333',
+  },
+  assuredBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: '#e6fbff',
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+  },
+  assuredText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#019ee3',
   },
   category: {
     fontSize: 14,

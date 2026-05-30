@@ -59,6 +59,9 @@ function rentalInvoiceDisplayGrandTotal(entry) {
 
 const RENTAL_INVOICE_DOWNLOAD_BASE_URL = 'https://pub-bcab85dac0c64221ba6b6a756f991c46.r2.dev';
 const PAYMENT_COPY_DOWNLOAD_BASE_URL = 'https://pub-982db31d50054adebd29fa1792b12fb8.r2.dev';
+/** n8n: rental payment saved (not service invoice). */
+const RENTAL_PAYMENT_UPDATE_N8N_WEBHOOK =
+    'https://n8n.nicknameinfo.net/webhook/fe3a3151-06b0-4de1-8e58-7f734697940b';
 
 function invoicePaymentEmailsFromRecord(inv) {
     if (Array.isArray(inv?.paymentContactEmails) && inv.paymentContactEmails.length) {
@@ -738,7 +741,7 @@ function RentalInvoiceList(props) {
             };
 
             try {
-                await axios.post('https://n8n.nicknameinfo.net/webhook/fb83e945-2e49-4a73-acce-fd08632ef1a8', n8nPayload);
+                await axios.post(RENTAL_PAYMENT_UPDATE_N8N_WEBHOOK, n8nPayload);
                 toast.success('Payment updated (ack sent).');
             } catch (webhookError) {
                 console.error('n8n webhook error:', webhookError);

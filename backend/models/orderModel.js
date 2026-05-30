@@ -105,6 +105,15 @@ const orderSchema = new mongoose.Schema({
         type: Number,
         default: 0,
     },
+    paymentMethod: {
+        type: String,
+        enum: ["cash", "credit", "online"],
+        default: "cash",
+    },
+    companyId: {
+        type: mongoose.Schema.ObjectId,
+        ref: "Company",
+    },
     deliveredAt: Date,
     shippedAt: Date,
     createdAt: {

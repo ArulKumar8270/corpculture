@@ -7,9 +7,11 @@ import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { AuthProvider } from "./context/auth.jsx";
 import { CartProvider } from "./context/cart.jsx";
+import { FrontHomeSettingsProvider } from "./context/frontHomeSettings.jsx";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
     <AuthProvider>
+        <FrontHomeSettingsProvider>
         <CartProvider>
             <BrowserRouter>
                 <App />
@@ -22,5 +24,6 @@ ReactDOM.createRoot(document.getElementById("root")).render(
                 autoClose={2000}
             />
         </CartProvider>
+        </FrontHomeSettingsProvider>
     </AuthProvider>
 );

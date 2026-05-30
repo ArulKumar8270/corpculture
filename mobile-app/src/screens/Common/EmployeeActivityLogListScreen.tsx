@@ -115,7 +115,19 @@ const EmployeeActivityLogListScreen = () => {
           >
             <Text style={styles.editBtnText}>Edit (admin)</Text>
           </TouchableOpacity>
-        ) : null}
+        ) : (
+          <TouchableOpacity
+            style={styles.editBtn}
+            onPress={() =>
+              (navigation as any).navigate('Profile', {
+                screen: 'ActivityLogForm',
+                params: { editLogId: item._id },
+              })
+            }
+          >
+            <Text style={styles.editBtnText}>Edit</Text>
+          </TouchableOpacity>
+        )}
       </View>
     );
   };

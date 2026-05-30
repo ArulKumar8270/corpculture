@@ -3,7 +3,7 @@ import Pagination from "@mui/material/Pagination";
 import { useState, useEffect } from "react";
 import MinCategory from "../../components/MinCategory";
 import Product from "../../components/ProductListing/Product";
-import { useLocation } from "react-router-dom";
+import { useLocation, Link } from "react-router-dom";
 import { toast } from "react-toastify";
 import Spinner from "./../../components/Spinner";
 import axios from "axios";
@@ -18,9 +18,13 @@ const Products = () => {
 
     const [price, setPrice] = useState([0, 200000]);
     // console.log(location.search);
-    const [category, setCategory] = useState(
-        location.search ? location.search.split("=")[1] : ""
-    );
+    const getCategoryFromSearch = (search) => {
+        const params = new URLSearchParams(search);
+        const raw = params.get("category");
+        return raw ? decodeURIComponent(raw.replace(/\+/g, " ")) : "";
+    };
+
+    const [category, setCategory] = useState(() => getCategoryFromSearch(location.search));
     const [ratings, setRatings] = useState(0);
     const [products, setProducts] = useState([]);
     const [wishlistItems, setWishlistItems] = useState([]);
@@ -43,6 +47,12 @@ const Products = () => {
     };
 
     
+    useEffect(() => {
+        const fromUrl = getCategoryFromSearch(location.search);
+        setCategory(fromUrl);
+        setCurrentPage(1);
+    }, [location.search]);
+
     useEffect(() => {
         fetchCategories();
     }, []);
@@ -71,11 +81,6 @@ const Products = () => {
     };
 
     useEffect(() => {
-        toast(
-            "The backend is starting up, please wait for a minute if the loader is visible."
-        );
-
-        //fetching filtered products from sever
         const fetchFilteredData = async () => {
             try {
                 setLoading(true);
@@ -151,10 +156,24 @@ const Products = () => {
 
     return (
         <>
-            <SeoData title="All Products | Flipkart" />
+            <SeoData title="All Products | Corpculture" />
 
             {/* <MinCategory categories={categories} /> */}
             <main className="w-full pt-2 pb-5 sm:mt-0 min-h-screen bg-gradient-to-br from-[#e6fbff] to-[#f7fafd]">
+                {category && (
+                    <div className="mx-3 mt-2 sm:mx-3 bg-white rounded-xl shadow border border-[#e6fbff] px-4 py-3 flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-gray-700">
+                            Showing products in{" "}
+                            <span className="font-semibold text-[#019ee3]">{category}</span>
+                        </p>
+                        <Link
+                            to="/products"
+                            className="text-sm font-medium text-[#019ee3] hover:underline"
+                        >
+                            Clear category filter
+                        </Link>
+                    </div>
+                )}
                 {/* <!-- row --> */}
                 <div className="flex gap-3 mt-2 sm:mt-2 sm:mx-3 m-auto ">
                     {/* <!-- sidebar column  --> */}

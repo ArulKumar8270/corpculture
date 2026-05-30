@@ -27,6 +27,8 @@ import * as ImagePicker from 'expo-image-picker';
 import axios from 'axios';
 import { getApiBaseUrl } from '../../services/api';
 import CompanyToggleHeader from '../../components/CompanyToggleHeader';
+import { useFrontHomeSettings } from '../../hooks/useFrontHomeSettings';
+import HomeCategorySearch from '../../components/HomeCategorySearch';
 
 const { width } = Dimensions.get('window');
 
@@ -82,168 +84,41 @@ const HomeScreen = () => {
     location: '',
     oldServiceId: '',
     serviceImage: null as any,
+    paymentMethod: 'cash',
   });
   const [formErrors, setFormErrors] = useState<any>({});
+  const [payOnCredit, setPayOnCredit] = useState(false);
+  const [productCategories, setProductCategories] = useState<any[]>([]);
 
-  // Banner carousel data (matching client)
-  const bannerData = [
-    {
-      id: '1',
-      image: 'https://images.pexels.com/photos/788946/pexels-photo-788946.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2',
-    },
-    {
-      id: '2',
-      image: 'https://images.pexels.com/photos/1779487/pexels-photo-1779487.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2',
-    },
-    {
-      id: '3',
-      image: 'https://images.pexels.com/photos/163117/airplane-flight-sky-clouds-163117.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2',
-    },
-    {
-      id: '4',
-      image: 'https://images.pexels.com/photos/788946/pexels-photo-788946.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2',
-    },
-    {
-      id: '5',
-      image: 'https://images.pexels.com/photos/163117/airplane-flight-sky-clouds-163117.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2',
-    },
-    {
-      id: '6',
-      image: 'https://images.pexels.com/photos/788946/pexels-photo-788946.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2',
-    },
-    {
-      id: '7',
-      image: 'https://images.pexels.com/photos/163117/airplane-flight-sky-clouds-163117.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2',
-    },
-    {
-      id: '8',
-      image: 'https://images.pexels.com/photos/788946/pexels-photo-788946.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2',
-    },
-  ];
+  const {
+    theme,
+    logo,
+    bannerData,
+    bannerHeight,
+    serviceCategories,
+    services,
+    products,
+    categoryBanners,
+    serviceDefaultImage,
+    rentalDefaultImage,
+    sales,
+    serviceSettings,
+    categorySearch,
+  } = useFrontHomeSettings();
 
-  // Service categories (OfferSection)
-  const serviceCategories = [
-    {
-      id: '1',
-      title: 'Rental',
-      description: 'Sed ac arcu sed felis vulputate molestie. Nullam at urna',
-      image: 'https://images.pexels.com/photos/5834/nature-grass-leaf-green.jpg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2',
-      color: '#34C759',
-      discount: '25% OFF',
-      type: 'rental',
-    },
-    {
-      id: '2',
-      title: 'Credit',
-      description: 'Sed ac arcu sed felis vulputate molestie. Nullam at urna',
-      image: 'https://images.pexels.com/photos/3747139/pexels-photo-3747139.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2',
-      color: '#FF3B30',
-      discount: '25% OFF',
-      type: 'credit',
-    },
-    {
-      id: '3',
-      title: 'AMC / AMLC',
-      description: 'Sed ac arcu sed felis vulputate molestie. Nullam at urna',
-      image: 'https://images.pexels.com/photos/5834/nature-grass-leaf-green.jpg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2',
-      color: '#34C759',
-      discount: '25% OFF',
-      type: 'amc',
-    },
-  ];
-
-  // Services list (matching client colors)
-  const services = [
-    {
-      id: '1',
-      title: 'AC Service',
-      description: 'Professional AC installation, repair and maintenance services',
-      icon: 'ac-unit',
-      color: '#EF4444', // red-500
-    },
-    {
-      id: '2',
-      title: 'Printer Service',
-      description: 'Expert printer repair, maintenance and troubleshooting',
-      icon: 'print',
-      color: '#A855F7', // fuchsia-500
-    },
-    {
-      id: '3',
-      title: 'Toner & Cartridge',
-      description: 'Quality toner and cartridge refill for all printer models',
-      icon: 'inventory',
-      color: '#F59E0B', // amber-500
-    },
-    {
-      id: '4',
-      title: 'Waterproof & Paint',
-      description: 'Professional waterproofing and painting solutions',
-      icon: 'format-paint',
-      color: '#84CC16', // lime-500
-    },
-    {
-      id: '5',
-      title: 'Mobile Service',
-      description: 'Complete mobile repair and maintenance services',
-      icon: 'phone-android',
-      color: '#06B6D4', // cyan-500
-    },
-    {
-      id: '6',
-      title: 'Computer Service',
-      description: 'Comprehensive computer repair and support services',
-      icon: 'computer',
-      color: '#9333EA', // purple-500
-    },
-    {
-      id: '7',
-      title: 'CCTV/Camera Fixing',
-      description: 'Professional CCTV installation and maintenance services',
-      icon: 'videocam',
-      color: '#8B5CF6', // violet-500
-    },
-  ];
-
-  // Products (Coming Soon) - matching client images
-  const products = [
-    {
-      id: '1',
-      title: 'Foods',
-      image: 'https://images.pexels.com/photos/1640777/pexels-photo-1640777.jpeg?auto=compress&cs=tinysrgb&w=800',
-      badgeColor: '#EF4444', // red-600
-    },
-    {
-      id: '2',
-      title: 'Events Management',
-      image: 'https://images.pexels.com/photos/2747449/pexels-photo-2747449.jpeg?auto=compress&cs=tinysrgb&w=800',
-      badgeColor: '#9333EA', // purple-600
-    },
-    {
-      id: '3',
-      title: 'Printer & Toner',
-      image: 'https://images.pexels.com/photos/3843284/pexels-photo-3843284.jpeg?auto=compress&cs=tinysrgb&w=800',
-      badgeColor: '#84CC16', // lime-600
-    },
-    {
-      id: '4',
-      title: 'CCTV Camera Fixing',
-      image: 'https://images.pexels.com/photos/430208/pexels-photo-430208.jpeg?auto=compress&cs=tinysrgb&w=800',
-      badgeColor: '#8B5CF6', // violet-600
-    },
-    {
-      id: '5',
-      title: 'Computer Service',
-      image: 'https://images.pexels.com/photos/1779487/pexels-photo-1779487.jpeg?auto=compress&cs=tinysrgb&w=800',
-      badgeColor: '#2563EB', // blue-600
-    },
-    {
-      id: '6',
-      title: 'Stationery',
-      image: 'https://images.pexels.com/photos/6446709/pexels-photo-6446709.jpeg?auto=compress&cs=tinysrgb&w=800',
-      badgeColor: '#6B7280', // gray-600
-    },
-  ];
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const res = await axios.get(`${getApiBaseUrl()}/category/all`);
+        if (res.status === 200) {
+          setProductCategories(res.data.categories || []);
+        }
+      } catch (e) {
+        console.warn('Categories fetch failed', e);
+      }
+    };
+    fetchCategories();
+  }, []);
 
   const quickActions = [
     {
@@ -390,7 +265,9 @@ const HomeScreen = () => {
       location: '',
       oldServiceId: '',
       serviceImage: null,
+      paymentMethod: 'cash',
     });
+    setPayOnCredit(false);
     setFormErrors({});
     setFetchedServices([]);
     setFetchedCompanies([]);
@@ -527,7 +404,9 @@ const HomeScreen = () => {
         }
       }
 
-      payload.serviceImage = imageUrl;
+      const defaultImage =
+        selectedOffer ? rentalDefaultImage : selectedService ? serviceDefaultImage : '';
+      payload.serviceImage = imageUrl || defaultImage || '';
 
       if (selectedOffer) {
         // For rental/credit/amc - make direct API call without auth
@@ -544,7 +423,8 @@ const HomeScreen = () => {
           location: formData.location || '',
           rentalType: selectedOffer.id, // Use offer id as rentalType
           rentalTitle: selectedOffer.title, // Use offer title as rentalTitle
-          serviceImage: imageUrl || '',
+          serviceImage: imageUrl || rentalDefaultImage || '',
+          paymentMethod: payOnCredit ? 'credit' : 'cash',
         };
         
         const response = await axios.post(`${API_BASE_URL}/rental/create`, rentalPayload);
@@ -573,7 +453,8 @@ const HomeScreen = () => {
           serviceType: selectedService.id, // Use service id as serviceType
           serviceTitle: selectedService.title, // Use service title as serviceTitle
           oldServiceId: formData.oldServiceId || '',
-          serviceImage: imageUrl || '',
+          serviceImage: imageUrl || serviceDefaultImage || '',
+          paymentMethod: payOnCredit ? 'credit' : 'cash',
         };
         
         const response = await axios.post(`${API_BASE_URL}/service/create`, servicePayload);
@@ -739,8 +620,8 @@ const HomeScreen = () => {
   };
 
   const renderBannerItem = ({ item }: { item: typeof bannerData[0] }) => (
-    <View style={styles.bannerItem}>
-      <Image source={{ uri: item.image }} style={styles.bannerImage} resizeMode="cover" />
+    <View style={[styles.bannerItem, { height: bannerHeight }]}>
+      <Image source={{ uri: item.image }} style={[styles.bannerImage, { height: bannerHeight }]} resizeMode="cover" />
     </View>
   );
 
@@ -768,7 +649,11 @@ const HomeScreen = () => {
   const renderService = ({ item }: { item: typeof services[0] }) => (
     <TouchableOpacity style={styles.serviceCard} onPress={() => handleServiceClick(item)}>
       <View style={[styles.serviceIconContainer, { backgroundColor: item.color }]}>
-        <Icon name={item.icon} size={30} color="#fff" />
+        {(item as any).imageUrl ? (
+          <Image source={{ uri: (item as any).imageUrl }} style={{ width: 40, height: 40 }} resizeMode="contain" />
+        ) : (
+          <Icon name={item.icon} size={30} color="#fff" />
+        )}
       </View>
       <Text style={styles.serviceTitle}>{item.title}</Text>
       <Text style={styles.serviceDescription}>{item.description}</Text>
@@ -776,10 +661,18 @@ const HomeScreen = () => {
   );
 
   const renderProduct = ({ item }: { item: typeof products[0] }) => (
-    <TouchableOpacity style={styles.productCard}>
+    <TouchableOpacity
+      style={styles.productCard}
+      onPress={() => {
+        const slug = (item as { categorySlug?: string }).categorySlug;
+        if (slug) {
+          (navigation as any).navigate('Products', { category: slug });
+        }
+      }}
+    >
       <Image source={{ uri: item.image }} style={styles.productImage} />
       <View style={[styles.comingSoonBadge, { backgroundColor: item.badgeColor }]}>
-        <Text style={styles.comingSoonText}>COMING SOON</Text>
+        <Text style={styles.comingSoonText}>{(item as any).status || 'COMING SOON'}</Text>
       </View>
       <Text style={styles.productTitle}>{item.title}</Text>
     </TouchableOpacity>
@@ -793,11 +686,25 @@ const HomeScreen = () => {
         contentContainerStyle={styles.scrollContent}
       >
       {/* Header */}
-      <View style={styles.header}>
+      <View
+        style={[
+          styles.header,
+          {
+            backgroundColor: theme?.headerGradientFrom || '#1a237e',
+          },
+        ]}
+      >
         <View style={styles.headerTop}>
-          <Text style={styles.logo}>
-            corp <Text style={styles.logoAccent}>culture</Text>
-          </Text>
+          {logo?.url ? (
+            <Image source={{ uri: logo.url }} style={styles.logoImage} resizeMode="contain" />
+          ) : (
+            <Text style={styles.logo}>
+              {logo?.textPrimary || 'corp'}{' '}
+              <Text style={[styles.logoAccent, { color: theme?.secondaryColor || '#4CAF50' }]}>
+                {logo?.textAccent || 'culture'}
+              </Text>
+            </Text>
+          )}
           <View style={styles.headerIcons}>
             {isAuthenticated && (
               <View style={styles.companyToggleWrapper}>
@@ -885,7 +792,7 @@ const HomeScreen = () => {
       </Modal>
 
       {/* Banner Carousel */}
-      <View style={styles.bannerContainer}>
+      <View style={[styles.bannerContainer, { height: bannerHeight }]}>
         <FlatList
           data={bannerData}
           renderItem={renderBannerItem}
@@ -910,6 +817,30 @@ const HomeScreen = () => {
           ))}
         </View>
       </View>
+
+      <HomeCategorySearch
+        categories={productCategories}
+        enabled={categorySearch?.enabled}
+        showOnHome={categorySearch?.showOnHome}
+        placeholder={categorySearch?.placeholder}
+        primaryColor={theme?.primaryColor}
+      />
+
+      {categoryBanners.length > 0 && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryBannerRow}>
+          {categoryBanners.map((b) => (
+            <View
+              key={b.id}
+              style={[styles.categoryBannerCard, { borderBottomColor: b.themeColor || '#019ee3' }]}
+            >
+              {b.image ? (
+                <Image source={{ uri: b.image }} style={styles.categoryBannerImg} />
+              ) : null}
+              <Text style={styles.categoryBannerTitle}>{b.title}</Text>
+            </View>
+          ))}
+        </ScrollView>
+      )}
 
       {/* Service Categories */}
       <View style={styles.section}>
@@ -1271,13 +1202,23 @@ const HomeScreen = () => {
                 </>
               )}
 
-              <Text style={styles.formLabel}>Service Image</Text>
+              <Text style={styles.formLabel}>Enquiry Image</Text>
               <TouchableOpacity style={styles.imagePickerButton} onPress={pickImage}>
                 <Icon name="camera-alt" size={20} color="#007AFF" />
                 <Text style={styles.imagePickerText}>
                   {formData.serviceImage ? 'Image Selected' : 'Pick Image'}
                 </Text>
               </TouchableOpacity>
+
+              {sales?.creditOptionEnabled && selectedOffer?.title?.toLowerCase() === 'credit' && (
+                <TouchableOpacity
+                  style={styles.creditRow}
+                  onPress={() => setPayOnCredit(!payOnCredit)}
+                >
+                  <Icon name={payOnCredit ? 'check-box' : 'check-box-outline-blank'} size={22} color="#019ee3" />
+                  <Text style={styles.creditLabel}>{sales?.creditLabel || 'Request on company credit'}</Text>
+                </TouchableOpacity>
+              )}
 
               <View style={styles.modalButtons}>
                 <TouchableOpacity
@@ -1525,6 +1466,18 @@ const HomeScreen = () => {
                   {formData.serviceImage ? 'Image Selected' : 'Pick Image'}
                 </Text>
               </TouchableOpacity>
+
+              {serviceSettings?.creditOptionEnabled && (
+                <TouchableOpacity
+                  style={styles.creditRow}
+                  onPress={() => setPayOnCredit(!payOnCredit)}
+                >
+                  <Icon name={payOnCredit ? 'check-box' : 'check-box-outline-blank'} size={22} color="#019ee3" />
+                  <Text style={styles.creditLabel}>
+                    {serviceSettings?.creditLabel || 'Request service on credit'}
+                  </Text>
+                </TouchableOpacity>
+              )}
 
               <View style={styles.modalButtons}>
                 <TouchableOpacity
@@ -1790,6 +1743,44 @@ const styles = StyleSheet.create({
   },
   logoAccent: {
     color: '#4CAF50',
+  },
+  logoImage: {
+    height: 40,
+    width: 160,
+  },
+  categoryBannerRow: {
+    marginTop: 10,
+    paddingHorizontal: 10,
+  },
+  categoryBannerCard: {
+    width: 120,
+    height: 80,
+    marginRight: 10,
+    borderRadius: 10,
+    overflow: 'hidden',
+    backgroundColor: '#fff',
+    borderBottomWidth: 3,
+  },
+  categoryBannerImg: {
+    width: '100%',
+    height: 50,
+  },
+  categoryBannerTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    padding: 6,
+    color: '#333',
+  },
+  creditRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginVertical: 12,
+  },
+  creditLabel: {
+    fontSize: 14,
+    color: '#333',
+    flex: 1,
   },
   headerIcons: {
     flexDirection: 'row',

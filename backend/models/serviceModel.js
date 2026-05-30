@@ -57,6 +57,11 @@ const serviceSchema = new mongoose.Schema({
         type: String,
         required: false
     },
+    paymentMethod: {
+        type: String,
+        enum: ["cash", "credit"],
+        default: "cash",
+    },
     status: {
         type: String,
         enum: ["Pending", "In Progress", "Completed", "Cancelled"],

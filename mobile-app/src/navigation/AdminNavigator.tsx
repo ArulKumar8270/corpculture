@@ -48,6 +48,7 @@ import PurchaseRegisterScreen from '../screens/Admin/PurchaseRegisterScreen';
 // Settings
 import SettingsScreen from '../screens/Admin/SettingsScreen';
 import GlobalSettingsScreen from '../screens/Admin/GlobalSettingsScreen';
+import FrontHomeSettingsScreen from '../screens/Admin/FrontHomeSettingsScreen';
 import CategoryManagementScreen from '../screens/Admin/CategoryManagementScreen';
 import UserManagementScreen from '../screens/Admin/UserManagementScreen';
 import GSTManagementScreen from '../screens/Admin/GSTManagementScreen';
@@ -283,6 +284,7 @@ const SettingsStack = () => (
   >
     <Stack.Screen name="SettingsMain" component={SettingsScreen} options={{ headerShown: false }} />
     <Stack.Screen name="GlobalSettings" component={GlobalSettingsScreen} options={{ title: 'Global Settings' }} />
+    <Stack.Screen name="FrontHomeSettings" component={FrontHomeSettingsScreen} options={{ title: 'Front Home Settings' }} />
     <Stack.Screen name="CategoryManagement" component={CategoryManagementScreen} options={{ title: 'Categories' }} />
     <Stack.Screen name="UserManagement" component={UserManagementScreen} options={{ title: 'Users' }} />
     <Stack.Screen name="GSTManagement" component={GSTManagementScreen} options={{ title: 'GST Management' }} />

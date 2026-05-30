@@ -1,8 +1,9 @@
 /* eslint-disable react/prop-types */
 import VerifiedUserIcon from "@mui/icons-material/VerifiedUser";
-import { useEffect, useState } from "react";
+import { useFrontHomeSettings } from "../../../context/frontHomeSettings";
 
 const PriceCard = ({ cartItems }) => {
+    const { sales } = useFrontHomeSettings();
 
     // Helper function to get the correct price for an item based on quantity
     const getPrice = (item) => {
@@ -87,7 +88,9 @@ const PriceCard = ({ cartItems }) => {
             <div className="flex gap-3 items-center my-4 p-3 bg-white rounded-xl shadow">
                 <VerifiedUserIcon className="text-[#019ee3]" sx={{ fontSize: 28 }} />
                 <p className="text-gray-600 w-full text-[15px] font-semibold">
-                    Safe and Secure Payments. Easy returns. 100% Authentic products.
+                    {sales?.showAssuredBadge
+                        ? `${sales?.assuredBadgeLabel || "Corpculture Assured"} — Safe payments, easy returns, authentic products.`
+                        : "Safe and Secure Payments. Easy returns. 100% Authentic products."}
                 </p>
             </div>
         </div>

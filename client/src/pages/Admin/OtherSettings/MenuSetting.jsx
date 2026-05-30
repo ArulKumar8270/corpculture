@@ -92,6 +92,7 @@ const menuStructure = [
             { name: "GST", key: "otherSettingsGst", permissions: ['view', 'add', 'edit', 'delete'] },
             { name: "Menu setting", key: "otherSettingsMenuSetting", permissions: ['view', 'edit'] }, // This page itself
             { name: "Settings", key: "otherSettingsSettings", permissions: ['view', 'edit'] },
+            { name: "Front Home Settings", key: "otherSettingsFrontHome", permissions: ['view', 'edit'] },
             { name: "Payslip", key: "otherSettingsPayslip", permissions: ['view', 'add', 'edit', 'delete'] },
             { name: "Credit", key: "otherSettingsCredit", permissions: ['view', 'add', 'edit', 'delete'] },
             { name: "Gift", key: "otherSettingsGift", permissions: ['view', 'add', 'edit', 'delete'] },

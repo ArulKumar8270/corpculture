@@ -25,6 +25,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { PaymentContactEmailsField } from '../../components/PaymentContactEmailsField';
 import { invoicePaymentEmailsFromRecord, normalizePaymentContactPayload } from '../../utils/invoicePaymentEmails';
 import { fetchAssignableUsers } from '../../utils/fetchAssignableUsers';
+import { getInvoiceLineProductDisplayName } from '../../utils/serviceProductDisplayName';
 
 const INVOICE_DOWNLOAD_BASE_URL = 'https://pub-ef65b8bdb5974dd191a466c3120cd6b3.r2.dev';
 
@@ -1114,15 +1115,7 @@ const ServiceInvoiceListScreen = () => {
                   <View key={index} style={styles.productRow}>
                     <View style={styles.productInfo}>
                       <Text style={styles.productName}>
-                        {(() => {
-                          const p = product.productId;
-                          const nameFromMaterial = p?.productName?.name;
-                          const nameAsString = typeof p?.productName === 'string' ? p.productName : null;
-                          const lineItemName = typeof product.productName === 'string'
-                            ? product.productName
-                            : product.productName?.name;
-                          return nameFromMaterial || nameAsString || lineItemName || 'N/A';
-                        })()}
+                        {getInvoiceLineProductDisplayName(product)}
                       </Text>
                       <Text style={styles.productDetails}>
                         {/* SKU: {product.productId?.sku || product.sku || 'N/A'} | HSN:{' '} */}
@@ -1323,15 +1316,18 @@ const ServiceInvoiceListScreen = () => {
         animationType="slide"
         onRequestClose={() => setPaymentModalVisible(false)}
       >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setPaymentModalVisible(false)}
-        >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFillObject}
+            activeOpacity={1}
+            onPress={() => setPaymentModalVisible(false)}
+            accessibilityLabel="Dismiss payment sheet"
+          />
           <ScrollView
             style={styles.modalContent}
             contentContainerStyle={styles.modalContentContainer}
             onStartShouldSetResponder={() => true}
+            keyboardShouldPersistTaps="handled"
           >
             <Text style={styles.modalTitle}>Payment Details</Text>
 
@@ -1558,12 +1554,15 @@ const ServiceInvoiceListScreen = () => {
             {pendingAmount > 0 && (
               <View style={styles.modalInputGroup}>
                 <Text style={styles.modalLabel}>Amount Type</Text>
-                <View style={styles.pickerButton}>
+                <TouchableOpacity
+                  style={styles.pickerButton}
+                  onPress={() => setAmountTypePickerVisible(true)}
+                >
                   <Text style={styles.pickerButtonText}>
                     {paymentForm.paymentAmountType || '--select Amount Type--'}
                   </Text>
                   <Icon name="arrow-drop-down" size={24} color="#666" />
-                </View>
+                </TouchableOpacity>
               </View>
             )}
 
@@ -1590,7 +1589,7 @@ const ServiceInvoiceListScreen = () => {
               </TouchableOpacity>
             </View>
           </ScrollView>
-        </TouchableOpacity>
+        </View>
       </Modal>
 
       {/* Pending Invoice Picker Modal */}
@@ -1605,13 +1604,14 @@ const ServiceInvoiceListScreen = () => {
           activeOpacity={1}
           onPress={() => setPendingInvoicePickerVisible(false)}
         >
-          <View style={styles.pickerModalContent}>
+          <View style={styles.pickerModalContent} onStartShouldSetResponder={() => true}>
             <Text style={styles.pickerModalTitle}>Select Pending Invoice</Text>
             <FlatList
               data={companyPendingInvoices.filter(
                 (inv) => inv._id !== selectedInvoice?._id
               )}
               keyExtractor={(item) => item._id}
+              keyboardShouldPersistTaps="handled"
               renderItem={({ item }) => (
                 <TouchableOpacity
                   style={styles.pickerOption}
@@ -1654,7 +1654,7 @@ const ServiceInvoiceListScreen = () => {
           activeOpacity={1}
           onPress={() => setModeOfPaymentPickerVisible(false)}
         >
-          <View style={styles.pickerModalContent}>
+          <View style={styles.pickerModalContent} onStartShouldSetResponder={() => true}>
             <Text style={styles.pickerModalTitle}>Select Payment Mode</Text>
             <FlatList
               data={[
@@ -1666,12 +1666,13 @@ const ServiceInvoiceListScreen = () => {
                 { value: 'OTHERS', label: 'OTHERS' },
               ]}
               keyExtractor={(item) => item.value}
+              keyboardShouldPersistTaps="handled"
               renderItem={({ item }) => (
                 <TouchableOpacity
                   style={styles.pickerOption}
                   onPress={() => {
                     if (item.value) {
-                      setPaymentForm({ ...paymentForm, modeOfPayment: item.value });
+                      setPaymentForm((prev) => ({ ...prev, modeOfPayment: item.value }));
                     }
                     setModeOfPaymentPickerVisible(false);
                   }}
@@ -1683,6 +1684,52 @@ const ServiceInvoiceListScreen = () => {
             <TouchableOpacity
               style={[styles.modalButton, styles.modalCancelButton]}
               onPress={() => setModeOfPaymentPickerVisible(false)}
+            >
+              <Text style={styles.modalCancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Amount Type Picker Modal (TDS / Pending) */}
+      <Modal
+        visible={amountTypePickerVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setAmountTypePickerVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setAmountTypePickerVisible(false)}
+        >
+          <View style={styles.pickerModalContent} onStartShouldSetResponder={() => true}>
+            <Text style={styles.pickerModalTitle}>Select Amount Type</Text>
+            <FlatList
+              data={[
+                { value: '', label: '--select Amount Type--' },
+                { value: 'TDS', label: 'TDS Amount' },
+                { value: 'Pending', label: 'Pending Amount' },
+              ]}
+              keyExtractor={(item) => item.value}
+              keyboardShouldPersistTaps="handled"
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.pickerOption}
+                  onPress={() => {
+                    if (item.value) {
+                      setPaymentForm((prev) => ({ ...prev, paymentAmountType: item.value }));
+                    }
+                    setAmountTypePickerVisible(false);
+                  }}
+                >
+                  <Text style={styles.pickerOptionText}>{item.label}</Text>
+                </TouchableOpacity>
+              )}
+            />
+            <TouchableOpacity
+              style={[styles.modalButton, styles.modalCancelButton]}
+              onPress={() => setAmountTypePickerVisible(false)}
             >
               <Text style={styles.modalCancelButtonText}>Cancel</Text>
             </TouchableOpacity>

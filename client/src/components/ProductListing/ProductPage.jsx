@@ -25,6 +25,7 @@ import { getDeliveryDate, getDiscount } from "../../utils/functions";
 import MinCategory from "../../components/MinCategory";
 import axios from "axios";
 import { useAuth } from "../../context/auth";
+import { useFrontHomeSettings } from "../../context/frontHomeSettings";
 import { fashionProducts } from "../../utils/fashion";
 import MUISlider from '@mui/material/Slider';
 import ScrollToTopOnRouteChange from "../../utils/ScrollToTopOnRouteChange";
@@ -34,6 +35,7 @@ import SeoData from "../../SEO/SeoData";
 const ProductDetails = () => {
     const navigate = useNavigate();
     const { auth, setAuth, LogOut, isAdmin, isContextLoading } = useAuth();
+    const { sales } = useFrontHomeSettings();
     const [cartItems, setCartItems, addItems] = useCart();
     // reviews toggle
     const [open, setOpen] = useState(false);
@@ -345,6 +347,12 @@ const ProductDetails = () => {
                                     <h2 className="text-2xl sm:text-3xl font-bold text-gray-800 tracking-tight">
                                         {product?.name}
                                     </h2>
+                                    {sales?.showAssuredBadge && (
+                                        <span className="inline-flex items-center gap-1 text-sm font-semibold text-[#019ee3] w-fit px-2 py-1 bg-[#e6fbff] rounded-lg">
+                                            <VerifiedUserIcon sx={{ fontSize: 18 }} />
+                                            {sales?.assuredBadgeLabel || "Corpculture Assured"}
+                                        </span>
+                                    )}
                                     {/* <!-- rating badge --> */}
                                     <span className="text-md text-gray-600 font-medium flex gap-3 items-center">
                                         <span className="text-xs px-2 py-1 bg-[#019ee3] rounded-full text-white flex items-center gap-1 font-semibold shadow">

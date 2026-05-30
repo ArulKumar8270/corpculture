@@ -124,20 +124,30 @@ export const getAllReports = async (req, res) => {
             companyName,
             assignedTo,
             reportType,
+            reportFor: reportForQuery,
+            serialNo,
             page = 1, // Default to page 1
             limit = 10 // Default to 10 items per page
         } = req.query; // Get parameters from query string
 
-        let findQuery = {};
+        const urlScope = req.params?.reportType;
+        const andConditions = [];
 
-        // Filter by reportType
+        // /report/service and /report/rental scope by reportFor
+        if (urlScope === "service" || urlScope === "rental") {
+            andConditions.push({ reportFor: urlScope });
+        } else if (reportForQuery) {
+            andConditions.push({ reportFor: reportForQuery });
+        }
+
+        // Filter by reportType label (e.g. "Service Report")
         if (reportType) {
-            findQuery.reportType = reportType;
+            andConditions.push({ reportType });
         }
 
         // Filter by assignedTo
         if (assignedTo) {
-            findQuery.assignedTo = assignedTo;
+            andConditions.push({ assignedTo });
         }
 
         // Filter by companyName
@@ -149,7 +159,7 @@ export const getAllReports = async (req, res) => {
             const companyIds = matchingCompanies.map(company => company._id);
 
             if (companyIds.length > 0) {
-                findQuery.company = { $in: companyIds };
+                andConditions.push({ company: { $in: companyIds } });
             } else {
                 // If no companies match the name, no reports will match, so return empty
                 return res.status(200).send({ success: true, message: 'No Reports found for the given company name', reports: [], totalCount: 0 });
@@ -158,17 +168,32 @@ export const getAllReports = async (req, res) => {
 
         // Filter by date range (createdAt)
         if (fromDate || toDate) {
-            findQuery.createdAt = {};
+            const createdAt = {};
             if (fromDate) {
-                findQuery.createdAt.$gte = new Date(fromDate);
+                createdAt.$gte = new Date(fromDate);
             }
             if (toDate) {
                 // Set to the end of the day for the toDate
                 const endOfDay = new Date(toDate);
                 endOfDay.setHours(23, 59, 59, 999);
-                findQuery.createdAt.$lte = endOfDay;
+                createdAt.$lte = endOfDay;
             }
+            andConditions.push({ createdAt });
         }
+
+        // Filter by serial number (report-level or material line items)
+        const serialTerm = String(serialNo || "").trim();
+        if (serialTerm) {
+            const serialRegex = { $regex: serialTerm, $options: "i" };
+            andConditions.push({
+                $or: [
+                    { serialNo: serialRegex },
+                    { "materialGroups.products.serialNo": serialRegex },
+                ],
+            });
+        }
+
+        const findQuery = andConditions.length > 0 ? { $and: andConditions } : {};
 
         // Calculate skip for pagination
         const skip = (parseInt(page) - 1) * parseInt(limit);

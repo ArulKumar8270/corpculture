@@ -17,6 +17,7 @@ import Toast from 'react-native-toast-message';
 // @ts-ignore - @expo/vector-icons is available via expo dependency
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFrontHomeSettings } from '../../hooks/useFrontHomeSettings';
 
 // States data
 const states = [
@@ -62,6 +63,9 @@ const ShippingScreen = () => {
   const navigation = useNavigation();
   const { user, token } = useSelector((state: RootState) => state.auth);
   const { items: cartItems } = useSelector((state: RootState) => state.cart);
+  const { selectedCompany } = useSelector((state: RootState) => state.company);
+  const { sales } = useFrontHomeSettings();
+  const [payOnCredit, setPayOnCredit] = useState(false);
 
   const [address, setAddress] = useState('');
   const [city, setCity] = useState('');
@@ -181,6 +185,12 @@ const ShippingScreen = () => {
     setLoading(true);
     try {
       await saveShippingInfo();
+      await AsyncStorage.setItem('paymentMethod', payOnCredit ? 'credit' : 'cash');
+      if (payOnCredit && selectedCompany && selectedCompany !== 'new') {
+        await AsyncStorage.setItem('checkoutCompanyId', selectedCompany);
+      } else {
+        await AsyncStorage.removeItem('checkoutCompanyId');
+      }
       
       // Set sessionId similar to client's placeOrderHandler
       await AsyncStorage.setItem('sessionId', 'sdfas09df8as7');
@@ -317,6 +327,31 @@ const ShippingScreen = () => {
             </View>
           )}
         </View>
+
+        {sales?.creditOptionEnabled && (
+          <TouchableOpacity
+            style={styles.creditRow}
+            onPress={() => setPayOnCredit(!payOnCredit)}
+          >
+            <Icon
+              name={payOnCredit ? 'check-box' : 'check-box-outline-blank'}
+              size={22}
+              color="#019ee3"
+            />
+            <Text style={styles.creditLabel}>
+              {sales?.creditLabel || 'Pay on Company Credit'}
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {sales?.showAssuredBadge && (
+          <View style={styles.assuredRow}>
+            <Icon name="verified-user" size={20} color="#019ee3" />
+            <Text style={styles.assuredText}>
+              {sales?.assuredBadgeLabel || 'Corpculture Assured'}
+            </Text>
+          </View>
+        )}
 
         <TouchableOpacity
           style={[styles.paymentButton, loading && styles.paymentButtonDisabled]}
@@ -487,6 +522,35 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#4caf50',
+  },
+  creditRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 12,
+    padding: 12,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+  },
+  creditLabel: {
+    fontSize: 14,
+    color: '#333',
+    flex: 1,
+  },
+  assuredRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+    padding: 10,
+    backgroundColor: '#e6fbff',
+    borderRadius: 8,
+  },
+  assuredText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#019ee3',
+    flex: 1,
   },
   paymentButton: {
     backgroundColor: '#007AFF',

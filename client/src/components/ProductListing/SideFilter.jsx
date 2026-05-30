@@ -7,7 +7,9 @@ import Slider from "@mui/material/Slider";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import StarIcon from "@mui/icons-material/Star";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
+import TextField from "@mui/material/TextField";
+import { useFrontHomeSettings } from "../../context/frontHomeSettings";
 
 const SideFilter = ({
     price,
@@ -20,8 +22,16 @@ const SideFilter = ({
 }) => {
     const [categoryToggle, setCategoryToggle] = useState(true);
     const [ratingsToggle, setRatingsToggle] = useState(true);
+    const [categoryQuery, setCategoryQuery] = useState("");
+    const { categorySearch } = useFrontHomeSettings();
 
     const debounceTimeout = useRef(null);
+
+    const filteredCategories = useMemo(() => {
+        if (!categoryQuery.trim()) return categories;
+        const q = categoryQuery.toLowerCase();
+        return categories.filter((c) => c.name?.toLowerCase().includes(q));
+    }, [categories, categoryQuery]);
 
 
 
@@ -110,6 +120,16 @@ const SideFilter = ({
                         </div>
                         {categoryToggle && (
                             <div className="flex flex-col pb-1">
+                                {categorySearch?.enabled && (
+                                    <TextField
+                                        size="small"
+                                        fullWidth
+                                        margin="dense"
+                                        placeholder={categorySearch?.placeholder || "Search categories..."}
+                                        value={categoryQuery}
+                                        onChange={(e) => setCategoryQuery(e.target.value)}
+                                    />
+                                )}
                                 <FormControl>
                                     <RadioGroup
                                         aria-labelledby="category-radio-buttons-group"
@@ -119,7 +139,7 @@ const SideFilter = ({
                                         name="category-radio-buttons"
                                         value={category}
                                     >
-                                        {categories.map((el, i) => (
+                                        {filteredCategories.map((el, i) => (
                                             <FormControlLabel
                                                 value={el.name}
                                                 key={i}
