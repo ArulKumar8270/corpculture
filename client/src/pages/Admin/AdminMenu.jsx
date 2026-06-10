@@ -104,10 +104,19 @@ const AdminMenu = ({ toggleMenu }) => {
                 }
                 const quotationInvoiceCount = quotationInvoiceRes.data?.serviceInvoices?.length;
 
-                // Fetch Service Reports count
-                const serviceReportUrl = `${import.meta.env.VITE_SERVER_URL}/api/v1/report/${auth?.user?.role === 3 ? `${auth?.user?._id}/service` : "service"}`;
+                // Fetch Service Reports count (match serviceReportlist: reportType Service_Report)
+                const serviceReportQuery = new URLSearchParams({
+                    reportType: 'Service_Report',
+                    page: '1',
+                    limit: '1',
+                }).toString();
+                const serviceReportUrl =
+                    auth?.user?.role === 3
+                        ? `${import.meta.env.VITE_SERVER_URL}/api/v1/report/getByassigned/${auth?.user?._id}/Service_Report?${serviceReportQuery}`
+                        : `${import.meta.env.VITE_SERVER_URL}/api/v1/report/Service_Report?${serviceReportQuery}`;
                 const serviceReportRes = await axios.get(serviceReportUrl, config);
-                const serviceReportCount = serviceReportRes.data?.reports?.length;
+                const serviceReportCount =
+                    serviceReportRes.data?.totalCount ?? serviceReportRes.data?.reports?.length ?? 0;
 
                 // Fetch Rental Enquiries count
                 const rentalEnquiriesUrl = `${import.meta.env.VITE_SERVER_URL}/api/v1/rental/${auth?.user?.role === 3 ? `assignedTo/${auth?.user?._id}` : "all"}`;
@@ -143,10 +152,19 @@ const AdminMenu = ({ toggleMenu }) => {
                 }
                 const rentalQuotationCount = rentalQuotationRes.data?.entries?.length;
 
-                // Fetch Rental Reports count
-                const rentalReportUrl = `${import.meta.env.VITE_SERVER_URL}/api/v1/report/${auth?.user?.role === 3 ? `${auth?.user?._id}/rental` : "rental"}`;
+                // Fetch Rental Reports count (match rentalReportlist: reportType Rental_Report)
+                const rentalReportQuery = new URLSearchParams({
+                    reportType: 'Rental_Report',
+                    page: '1',
+                    limit: '1',
+                }).toString();
+                const rentalReportUrl =
+                    auth?.user?.role === 3
+                        ? `${import.meta.env.VITE_SERVER_URL}/api/v1/report/getByassigned/${auth?.user?._id}/Rental_Report?${rentalReportQuery}`
+                        : `${import.meta.env.VITE_SERVER_URL}/api/v1/report/Rental_Report?${rentalReportQuery}`;
                 const rentalReportRes = await axios.get(rentalReportUrl, config);
-                const rentalReportCount = rentalReportRes.data?.reports?.length;
+                const rentalReportCount =
+                    rentalReportRes.data?.totalCount ?? rentalReportRes.data?.reports?.length ?? 0;
 
 
                 setRecordCounts(prevCounts => ({

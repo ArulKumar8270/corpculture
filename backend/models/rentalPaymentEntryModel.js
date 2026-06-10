@@ -179,6 +179,11 @@ const rentalPaymentEntrySchema = new mongoose.Schema({
         type: [String],
         trim: true,
     },
+    signedInvoiceLink: {
+        type: [String],
+        trim: true,
+        default: [],
+    },
     invoiceSendStatus: {
         type: String,
         enum: ["NotSent", "Sent"],

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,8 +8,10 @@ import {
   ActivityIndicator,
   TextInput,
   Alert,
+  Linking,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import * as ImagePicker from 'expo-image-picker';
 // @ts-ignore - @expo/vector-icons is available via expo dependency
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
@@ -18,6 +20,16 @@ import { usePermissions } from '../../hooks/usePermissions';
 import axios from 'axios';
 import Toast from 'react-native-toast-message';
 import { getApiBaseUrl } from '../../services/api';
+import ReportListFilters from '../../components/ReportListFilters';
+import {
+  SERVICE_REPORT_TYPE,
+  buildReportListQueryParams,
+  getReportsListUrl,
+  ReportListFilterValues,
+  REPORT_SEND_N8N_WEBHOOK,
+} from '../../utils/reportListApi';
+import { collectReportSerialNumbers } from '../../utils/reportSerialNumbers';
+import { openReportDownload } from '../../utils/reportDownload';
 
 function companyIdFromReport(report: any): string | undefined {
   const c = report?.company;
@@ -40,93 +52,84 @@ const ServiceReportsScreen = () => {
   const [expandedReports, setExpandedReports] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [totalCount, setTotalCount] = useState(0);
+  const [uploadingReportId, setUploadingReportId] = useState<string | null>(null);
+  const [downloadingReportId, setDownloadingReportId] = useState<string | null>(null);
+  const [filters, setFilters] = useState<ReportListFilterValues>({
+    fromDate: '',
+    toDate: '',
+    companyName: '',
+    assignedTo: '',
+    serialNo: '',
+  });
   const ROWS_PER_PAGE_OPTIONS = [5, 10, 25, 50, 100];
-  // ServiceReportsScreen only shows Service Report type
-  const [reportType] = useState('Service Report');
 
-  useEffect(() => {
-    if (token) {
-      fetchReports();
-    }
-  }, [token, reportType]);
+  const fetchReports = useCallback(
+    async (filterValues = filters, currentPage = page, currentRowsPerPage = rowsPerPage) => {
+      if (!token) return;
+      try {
+        setLoading(true);
+        const query = buildReportListQueryParams(
+          filterValues,
+          SERVICE_REPORT_TYPE,
+          currentPage,
+          currentRowsPerPage
+        );
+        const url = getReportsListUrl(
+          getApiBaseUrl(),
+          SERVICE_REPORT_TYPE,
+          user?.role,
+          user?._id,
+          query
+        );
 
-  useEffect(() => {
-    filterReports();
-  }, [searchTerm]);
-
-  const fetchReports = async () => {
-    try {
-      setLoading(true);
-      // Backend routes:
-      // - /getByassigned/:assignedTo?/:reportType? - for employees
-      // - /:reportType? - for admins
-      // The client uses /report/${userId}/${reportType} but that doesn't match any route correctly
-      // We should use /getByassigned for employees to match the backend route
-      let url: string;
-      const API_BASE_URL = getApiBaseUrl();
-      if (user?.role === 3) {
-        // Employee: use getByassigned route to match backend
-        url = `${API_BASE_URL}/report/getByassigned/${user?._id}/${reportType}`;
-      } else {
-        // Admin: use reportType route
-        url = `${API_BASE_URL}/report/${reportType}`;
-      }
-
-      console.log('Fetching reports from:', url);
-      console.log('User role:', user?.role);
-      console.log('User ID:', user?._id);
-      console.log('Report type:', reportType);
-
-      const response = await axios.get(url, {
-        headers: {
-          Authorization: token || '',
-        },
-        timeout: 30000,
-      });
-
-      console.log('Reports response:', response.data);
-      console.log('Reports count:', response.data?.reports?.length || 0);
-
-      if (response.data?.success) {
-        const allReports = response.data.reports || [];
-        // Filter to only show Service Report type (client-side filtering as backup)
-        const fetchedReports = allReports.filter((report: any) => {
-          // Check both reportType and reportFor fields
-          const isServiceReport = 
-            report.reportType === 'Service Report' || 
-            report.reportFor === 'service' ||
-            (report.reportType && report.reportType.toLowerCase().includes('service') && !report.reportType.toLowerCase().includes('rental'));
-          return isServiceReport;
+        const response = await axios.get(url, {
+          headers: { Authorization: token || '' },
+          timeout: 30000,
         });
-        setReports(fetchedReports);
-        console.log('Total reports received:', allReports.length);
-        console.log('Service reports filtered:', fetchedReports.length);
-        if (fetchedReports.length === 0) {
-          console.log('No service reports found for the given criteria');
+
+        if (response.data?.success) {
+          setReports(response.data.reports || []);
+          setTotalCount(response.data.totalCount || 0);
+        } else {
+          setReports([]);
+          setTotalCount(0);
         }
-      } else {
-        console.warn('Response not successful:', response.data);
+      } catch (error: any) {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: error.response?.data?.message || error.message || 'Failed to load reports',
+        });
         setReports([]);
+        setTotalCount(0);
+      } finally {
+        setLoading(false);
       }
-    } catch (error: any) {
-      console.error('Error fetching reports:', error);
-      console.error('Error response:', error.response?.data);
-      console.error('Error status:', error.response?.status);
-      console.error('Request URL:', error.config?.url);
-      
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: error.response?.data?.message || error.message || 'Failed to load reports',
-      });
-      setReports([]);
-    } finally {
-      setLoading(false);
-    }
+    },
+    [token, user?.role, user?._id]
+  );
+
+  useEffect(() => {
+    if (token) fetchReports(filters, page, rowsPerPage);
+  }, [token, page, rowsPerPage]);
+
+  const handleApplyFilters = () => {
+    setPage(0);
+    fetchReports(filters, 0, rowsPerPage);
   };
 
-  const filterReports = () => {
-    // Filtering is handled in renderReport
+  const handleClearFilters = () => {
+    const cleared: ReportListFilterValues = {
+      fromDate: '',
+      toDate: '',
+      companyName: '',
+      assignedTo: '',
+      serialNo: '',
+    };
+    setFilters(cleared);
+    setPage(0);
+    fetchReports(cleared, 0, rowsPerPage);
   };
 
   const toggleExpand = (reportId: string) => {
@@ -214,7 +217,7 @@ const ServiceReportsScreen = () => {
 
   const handleSendReport = async (report: any) => {
     try {
-      await axios.post('https://n8n.nicknameinfo.net/webhook/f8d3ad37-a38e-4a38-a06e-09c74fdc3b91', {
+      await axios.post(REPORT_SEND_N8N_WEBHOOK, {
         reportId: report._id,
       });
       Toast.show({
@@ -231,36 +234,102 @@ const ServiceReportsScreen = () => {
     }
   };
 
+  const handleUploadReport = async (report: any) => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Please grant permission to access your media library');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: (ImagePicker as any).MediaType?.All
+          || [(ImagePicker as any).MediaType?.Images, (ImagePicker as any).MediaType?.Videos].filter(Boolean)
+          || 'images',
+        allowsEditing: false,
+        quality: 0.8,
+        allowsMultipleSelection: false,
+      });
+
+      if (result.canceled || !result.assets?.length) return;
+
+      const asset = result.assets[0];
+      setUploadingReportId(report._id);
+
+      const fileExtension = asset.uri.split('.').pop()?.toLowerCase() || 'jpg';
+      let mimeType = asset.mimeType || 'image/jpeg';
+      if (!asset.mimeType && fileExtension === 'pdf') mimeType = 'application/pdf';
+      if (!asset.mimeType && fileExtension === 'png') mimeType = 'image/png';
+
+      const formData = new FormData();
+      formData.append('file', {
+        uri: asset.uri,
+        type: mimeType,
+        name: `report_${report._id}_${Date.now()}.${fileExtension}`,
+      } as any);
+
+      const uploadRes = await axios.post(`${getApiBaseUrl()}/auth/upload-file`, formData, {
+        headers: {
+          Authorization: token || '',
+          'Content-Type': 'multipart/form-data',
+        },
+        timeout: 30000,
+      });
+
+      if (!uploadRes.data?.fileUrl) {
+        throw new Error('File upload failed');
+      }
+
+      await axios.put(
+        `${getApiBaseUrl()}/report/${report._id}`,
+        { reportLink: [...(report.reportLink || []), uploadRes.data.fileUrl] },
+        { headers: { Authorization: token || '' } }
+      );
+
+      Toast.show({ type: 'success', text1: 'Success', text2: 'Report uploaded successfully!' });
+      fetchReports();
+    } catch (error: any) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: error.response?.data?.message || error.message || 'Failed to upload report',
+      });
+    } finally {
+      setUploadingReportId(null);
+    }
+  };
+
+  const handleDownloadReport = async (report: any) => {
+    setDownloadingReportId(report._id);
+    try {
+      const url = await openReportDownload(report);
+      if (!url) {
+        Toast.show({ type: 'error', text1: 'Error', text2: 'Report id missing' });
+        return;
+      }
+      await Linking.openURL(url);
+    } catch {
+      Toast.show({ type: 'error', text1: 'Error', text2: 'Unable to open download link' });
+    } finally {
+      setDownloadingReportId(null);
+    }
+  };
+
   const filteredReports = reports.filter((report) => {
-    // First ensure it's a service report (double check)
-    const isServiceReport = 
-      report.reportType === 'Service Report' || 
-      report.reportFor === 'service' ||
-      (report.reportType && report.reportType.toLowerCase().includes('service') && !report.reportType.toLowerCase().includes('rental'));
-    
-    if (!isServiceReport) {
-      return false;
-    }
-
-    // Then apply search filter
-    if (!searchTerm) {
-      return true;
-    }
-
-    const lowerCaseSearchTerm = searchTerm.toLowerCase();
+    if (!searchTerm) return true;
+    const q = searchTerm.toLowerCase();
     return (
-      report.company?.companyName?.toLowerCase().includes(lowerCaseSearchTerm) ||
-      report.problemReport?.toLowerCase().includes(lowerCaseSearchTerm) ||
-      report.reportType?.toLowerCase().includes(lowerCaseSearchTerm) ||
-      report.assignedTo?.name?.toLowerCase().includes(lowerCaseSearchTerm) ||
-      new Date(report.createdAt).toLocaleDateString().toLowerCase().includes(lowerCaseSearchTerm)
+      report.company?.companyName?.toLowerCase().includes(q) ||
+      report.problemReport?.toLowerCase().includes(q) ||
+      report.reportType?.toLowerCase().includes(q) ||
+      report.assignedTo?.name?.toLowerCase().includes(q) ||
+      report.branch?.toLowerCase().includes(q) ||
+      collectReportSerialNumbers(report).toLowerCase().includes(q) ||
+      new Date(report.createdAt).toLocaleDateString().toLowerCase().includes(q)
     );
   });
 
-  const paginatedReports = useMemo(() => {
-    const start = page * rowsPerPage;
-    return filteredReports.slice(start, start + rowsPerPage);
-  }, [filteredReports, page, rowsPerPage]);
+  const totalPages = Math.max(1, Math.ceil(totalCount / rowsPerPage));
 
   useEffect(() => {
     setPage(0);
@@ -272,6 +341,8 @@ const ServiceReportsScreen = () => {
 
   const renderReport = ({ item }: { item: any }) => {
     const isExpanded = expandedReports.has(item._id);
+    const isUploadingThis = uploadingReportId === item._id;
+    const isDownloadingThis = downloadingReportId === item._id;
 
     return (
       <View style={styles.reportCard}>
@@ -299,6 +370,16 @@ const ServiceReportsScreen = () => {
             <Text style={styles.detailValue} numberOfLines={2}>
               {item.problemReport || 'N/A'}
             </Text>
+          </View>
+          {item.branch ? (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Branch:</Text>
+              <Text style={styles.detailValue}>{item.branch}</Text>
+            </View>
+          ) : null}
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Serial No:</Text>
+            <Text style={styles.detailValue}>{collectReportSerialNumbers(item)}</Text>
           </View>
           {item.assignedTo && (
             <View style={styles.detailRow}>
@@ -336,6 +417,34 @@ const ServiceReportsScreen = () => {
           >
             <Icon name="send" size={18} color="#fff" />
             <Text style={[styles.actionButtonText, styles.sendButtonText]}>Send Report</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.uploadButton]}
+            onPress={() => handleUploadReport(item)}
+            disabled={isUploadingThis}
+          >
+            {isUploadingThis ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <>
+                <Icon name="upload-file" size={18} color="#fff" />
+                <Text style={[styles.actionButtonText, styles.uploadButtonText]}>Upload</Text>
+              </>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.downloadButton]}
+            onPress={() => handleDownloadReport(item)}
+            disabled={isDownloadingThis}
+          >
+            {isDownloadingThis ? (
+              <ActivityIndicator size="small" color="#007AFF" />
+            ) : (
+              <>
+                <Icon name="download" size={18} color="#007AFF" />
+                <Text style={styles.actionButtonText}>Download</Text>
+              </>
+            )}
           </TouchableOpacity>
           {(user?.role === 1 || user?.role === 3) && companyIdFromReport(item) ? (
             <TouchableOpacity
@@ -474,14 +583,18 @@ const ServiceReportsScreen = () => {
         )}
       </View>
 
-      {/* Service Reports Screen - Only shows Service Report type */}
+      <ReportListFilters
+        values={filters}
+        onChange={(patch) => setFilters((prev) => ({ ...prev, ...patch }))}
+        onApply={handleApplyFilters}
+        onClear={handleClearFilters}
+      />
 
-      {/* Search Input */}
       <View style={styles.searchContainer}>
         <Icon name="search" size={20} color="#666" style={styles.searchIcon} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search Reports (Company, Problem, Type, Assigned To, Date)"
+          placeholder="Quick search loaded reports…"
           value={searchTerm}
           onChangeText={setSearchTerm}
         />
@@ -491,11 +604,11 @@ const ServiceReportsScreen = () => {
         <ActivityIndicator size="large" color="#007AFF" style={styles.loader} />
       ) : (
         <FlatList
-          data={paginatedReports}
+          data={filteredReports}
           renderItem={renderReport}
           keyExtractor={(item) => item._id}
           refreshing={loading}
-          onRefresh={fetchReports}
+          onRefresh={() => fetchReports()}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Icon name="description" size={64} color="#ccc" />
@@ -504,7 +617,7 @@ const ServiceReportsScreen = () => {
           }
           ListFooterComponent={
             <View style={styles.paginationWrapper}>
-              {filteredReports.length > 0 && (
+              {totalCount > 0 && (
                 <View style={styles.rowsPerPageRow}>
                   <Text style={styles.rowsPerPageLabel}>Rows per page:</Text>
                   <View style={styles.rowsPerPageOptions}>
@@ -520,7 +633,7 @@ const ServiceReportsScreen = () => {
                   </View>
                 </View>
               )}
-              {filteredReports.length > rowsPerPage ? (
+              {totalCount > rowsPerPage ? (
                 <View style={styles.pagination}>
                   <TouchableOpacity
                     style={[styles.pageBtn, page === 0 && styles.pageBtnDisabled]}
@@ -530,12 +643,12 @@ const ServiceReportsScreen = () => {
                     <Text style={styles.pageBtnText}>Previous</Text>
                   </TouchableOpacity>
                   <Text style={styles.pageInfo}>
-                    Page {page + 1} of {Math.max(1, Math.ceil(filteredReports.length / rowsPerPage))}
+                    Page {page + 1} of {totalPages} ({totalCount} total)
                   </Text>
                   <TouchableOpacity
-                    style={[styles.pageBtn, page >= Math.ceil(filteredReports.length / rowsPerPage) - 1 && styles.pageBtnDisabled]}
+                    style={[styles.pageBtn, page >= totalPages - 1 && styles.pageBtnDisabled]}
                     onPress={() => setPage((p) => p + 1)}
-                    disabled={page >= Math.ceil(filteredReports.length / rowsPerPage) - 1}
+                    disabled={page >= totalPages - 1}
                   >
                     <Text style={styles.pageBtnText}>Next</Text>
                   </TouchableOpacity>
@@ -714,6 +827,15 @@ const styles = StyleSheet.create({
   },
   sendButtonText: {
     color: '#fff',
+  },
+  uploadButton: {
+    backgroundColor: '#28a745',
+  },
+  uploadButtonText: {
+    color: '#fff',
+  },
+  downloadButton: {
+    backgroundColor: '#e3f2fd',
   },
   expandedContent: {
     padding: 15,

@@ -40,6 +40,7 @@ import Chip from '@mui/material/Chip'; // Import Chip for assignedTo UI
 import DeleteIcon from '@mui/icons-material/Delete'; // Import DeleteIcon
 import EditIcon from '@mui/icons-material/Edit'; // Import EditIcon for reassign
 import DownloadIcon from '@mui/icons-material/Download';
+import { compareInvoiceNumbers } from '../../utils/functions';
 
 const INVOICE_DOWNLOAD_BASE_URL = 'https://pub-ef65b8bdb5974dd191a466c3120cd6b3.r2.dev';
 const PAYMENT_COPY_DOWNLOAD_BASE_URL = 'https://pub-982db31d50054adebd29fa1792b12fb8.r2.dev';
@@ -1538,25 +1539,33 @@ const ServiceInvoiceList = (props) => {
     }, [auth.token, props?.invoice]);
 
     // Filter invoices based on filters + search term
-    const filteredInvoices = invoices?.filter(invoice => {
-        // Apply dropdown filters first
-        const invServiceTitle = typeof invoice.serviceId === 'object' && invoice.serviceId?.serviceTitle ? invoice.serviceId.serviceTitle : null;
-        if (serviceTitleFilter && invServiceTitle !== serviceTitleFilter) return false;
-        if (employeeFilter && invoice.assignedTo?.name !== employeeFilter) return false;
-        if (companyFilter && invoice.companyId?.companyName !== companyFilter) return false;
-        if (statusFilter && invoice.status !== statusFilter) return false;
+    const filteredInvoices = useMemo(() => {
+        const filtered = (invoices || []).filter((invoice) => {
+            // Apply dropdown filters first
+            const invServiceTitle = typeof invoice.serviceId === 'object' && invoice.serviceId?.serviceTitle ? invoice.serviceId.serviceTitle : null;
+            if (serviceTitleFilter && invServiceTitle !== serviceTitleFilter) return false;
+            if (employeeFilter && invoice.assignedTo?.name !== employeeFilter) return false;
+            if (companyFilter && invoice.companyId?.companyName !== companyFilter) return false;
+            if (statusFilter && invoice.status !== statusFilter) return false;
 
-        const lowerCaseSearchTerm = searchTerm.toLowerCase();
-        if (!lowerCaseSearchTerm) return true;
+            const lowerCaseSearchTerm = searchTerm.toLowerCase();
+            if (!lowerCaseSearchTerm) return true;
 
-        return (
-            invoice?.invoiceNumber?.toLowerCase()?.includes(lowerCaseSearchTerm) ||
-            invoice.companyId?.companyName.toLowerCase().includes(lowerCaseSearchTerm) ||
-            invoice.modeOfPayment.toLowerCase().includes(lowerCaseSearchTerm) ||
-            invoice?.status?.toLowerCase().includes(lowerCaseSearchTerm) ||
-            new Date(invoice.invoiceDate).toLocaleDateString().toLowerCase().includes(lowerCaseSearchTerm)
-        );
-    });
+            return (
+                invoice?.invoiceNumber?.toLowerCase()?.includes(lowerCaseSearchTerm) ||
+                invoice.companyId?.companyName.toLowerCase().includes(lowerCaseSearchTerm) ||
+                invoice.modeOfPayment.toLowerCase().includes(lowerCaseSearchTerm) ||
+                invoice?.status?.toLowerCase().includes(lowerCaseSearchTerm) ||
+                new Date(invoice.invoiceDate).toLocaleDateString().toLowerCase().includes(lowerCaseSearchTerm)
+            );
+        });
+
+        if (props?.invoice === 'invoice') {
+            return filtered.sort((a, b) => compareInvoiceNumbers(a.invoiceNumber, b.invoiceNumber));
+        }
+
+        return filtered;
+    }, [invoices, serviceTitleFilter, employeeFilter, companyFilter, statusFilter, searchTerm, props?.invoice]);
 
     const activeInvoices = useMemo(
         () => (filteredInvoices || []).filter((inv) => inv?.status !== "Cancelled"),

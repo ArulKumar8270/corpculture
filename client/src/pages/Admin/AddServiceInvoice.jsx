@@ -32,6 +32,7 @@ import toast from 'react-hot-toast';
 import axios from 'axios'; // Import axios
 import { useAuth } from '../../context/auth';
 import { cache } from 'react';
+import { parseSendToEmails } from '../../utils/functions';
 
 const AddServiceInvoice = () => {
     const navigate = useNavigate();
@@ -310,8 +311,7 @@ const AddServiceInvoice = () => {
                             reference: invoice.reference || '',
                             description: invoice.description || '',
                             // status: invoice.status || '', // Removed Invoice Status
-                            // Ensure sendTo is always an array
-                            sendTo: Array.isArray(invoice.sendTo) ? invoice.sendTo : (invoice.sendTo ? [invoice.sendTo] : []),
+                            sendTo: parseSendToEmails(invoice.sendTo),
                             invoiceDate: invoice.invoiceDate ? dayjs(invoice.invoiceDate) : dayjs(), // Set invoice date if exists, otherwise default to today
                         });
                         // Map products to table format with unique id
@@ -897,9 +897,15 @@ const AddServiceInvoice = () => {
                                 onChange={handleChange}
                                 label="Send To"
                                 disabled={!invoiceData.companyId || !companyData?.contactPersons?.length}
-                                renderValue={(selected) => { // Render selected values
-                                    const selectedNames = selected.map(email => {
-                                        const person = companyData?.contactPersons?.find(p => p.email === email);
+                                renderValue={(selected) => {
+                                    const selectedNames = selected.map((item) => {
+                                        const email =
+                                            typeof item === 'object' && item !== null
+                                                ? item.email
+                                                : item;
+                                        const person = companyData?.contactPersons?.find(
+                                            (p) => p.email === email
+                                        );
                                         return person ? person.name : email;
                                     });
                                     return selectedNames.join(', ');

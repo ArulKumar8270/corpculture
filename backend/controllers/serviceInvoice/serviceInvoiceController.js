@@ -5,6 +5,7 @@ import Material from "../../models/materialModel.js"; // Import Material model f
 import cloudinary from "cloudinary";
 import CommonDetails from "../../models/commonDetailsModel.js";
 import Counter from "../../models/counterModel.js";
+import { enrichSendTo } from "../../utils/enrichSendTo.js";
 // Helper function to calculate totals
 const calculateInvoiceTotals = (products) => {
     let subtotal = 0;
@@ -486,7 +487,14 @@ export const getServiceInvoiceById = async (req, res) => {
         if (!serviceInvoice) {
             return res.status(404).send({ success: false, message: 'Service Invoice not found.' });
         }
-        res.status(200).send({ success: true, message: 'Service Invoice fetched', serviceInvoice });
+
+        const invoicePayload = serviceInvoice.toObject();
+        invoicePayload.sendTo = enrichSendTo(
+            invoicePayload.sendTo,
+            invoicePayload.companyId?.contactPersons
+        );
+
+        res.status(200).send({ success: true, message: 'Service Invoice fetched', serviceInvoice: invoicePayload });
     } catch (error) {
         console.error("Error in getServiceInvoiceById:", error);
         res.status(500).send({ success: false, message: 'Error in getting service invoice', error });

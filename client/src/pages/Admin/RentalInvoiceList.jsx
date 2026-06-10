@@ -43,6 +43,8 @@ import {
     formatSendDetailsToDisplay,
     getTotalRentalInvoicePayment,
     getRentalProductLineDisplayTotal,
+    compareInvoiceNumbers,
+    collectRentalOfficialInvoiceDownloadCandidates,
 } from '../../utils/functions';
 
 /** Grand total aligned with PDF: uses frozen meter readings on the invoice when present (see sumRentalProductPreTax). */
@@ -136,31 +138,34 @@ function RentalInvoiceList(props) {
     }, [contactsWithEmail, paymentForm.paymentContactEmails]);
 
     const handleDownloadInvoice = async (entry) => {
-        const candidateUrl =
-            Array.isArray(entry?.invoiceLink) && entry.invoiceLink.length > 0
-                ? entry.invoiceLink[0]
-                : entry?._id
-                    ? `${RENTAL_INVOICE_DOWNLOAD_BASE_URL}/${entry._id}`
-                    : null;
+        const candidates = collectRentalOfficialInvoiceDownloadCandidates(
+            entry,
+            RENTAL_INVOICE_DOWNLOAD_BASE_URL
+        );
 
-        if (!candidateUrl) {
+        if (candidates.length === 0) {
             toast.error('Invoice id missing');
             return;
         }
 
-        try {
-            const res = await fetch(candidateUrl, { method: 'HEAD' });
-            if (!res.ok) {
-                const msg = 'Already invoice not send please send invoice and download';
-                toast.error(msg);
-                window.alert(msg);
-                return;
+        let urlToOpen = null;
+        for (const url of candidates) {
+            try {
+                const res = await fetch(url, { method: 'HEAD' });
+                if (res.ok) {
+                    urlToOpen = url;
+                    break;
+                }
+            } catch {
+                // try next candidate
             }
-            window.open(candidateUrl, '_blank', 'noopener,noreferrer');
-        } catch (e) {
-            // If HEAD fails (network/CORS), fall back to opening the URL.
-            window.open(candidateUrl, '_blank', 'noopener,noreferrer');
         }
+
+        if (!urlToOpen) {
+            urlToOpen = candidates[0];
+        }
+
+        window.open(urlToOpen, '_blank', 'noopener,noreferrer');
     };
 
     const handleDownloadPaymentCopy = async (entry) => {
@@ -275,6 +280,12 @@ function RentalInvoiceList(props) {
 
                     return invoiceNumberMatch || companyNameMatch || dateMatch || statusMatch;
                 });
+            }
+
+            if (props.invoice === 'invoice') {
+                filtered = [...filtered].sort((a, b) =>
+                    compareInvoiceNumbers(a.invoiceNumber, b.invoiceNumber)
+                );
             }
 
             setFilteredRentalEntries(filtered);
@@ -483,7 +494,7 @@ function RentalInvoiceList(props) {
         }
     };
 
-    const handleUploadSignedInvoice = async (invoiceId, oldInvoicLink) => {
+    const handleUploadSignedInvoice = async (invoiceId, oldSignedLinks) => {
         const input = document.createElement('input');
         input.type = 'file';
         input.accept = '.pdf,.jpg,.jpeg,.png';
@@ -505,11 +516,10 @@ function RentalInvoiceList(props) {
                     }
                 );
                 try {
-                    const serviceRes = await axios.put(
+                    await axios.put(
                         `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/${invoiceId}`,
                         {
-                            invoiceLink: [...oldInvoicLink, res.data?.fileUrl],
-                            status: "InvoiceSent"
+                            signedInvoiceLink: [...(oldSignedLinks || []), res.data?.fileUrl],
                         },
                         {
                             headers: {
@@ -1346,7 +1356,7 @@ function RentalInvoiceList(props) {
                                                             color="success"
                                                             size="small"
                                                             startIcon={<UploadFileIcon />}
-                                                            onClick={() => handleUploadSignedInvoice(entry._id, entry?.invoiceLink)}
+                                                            onClick={() => handleUploadSignedInvoice(entry._id, entry?.signedInvoiceLink)}
                                                         >
                                                             Upload Signed {props?.invoice === "invoice" ? "Invoices" : "Quotations"}
                                                         </Button>

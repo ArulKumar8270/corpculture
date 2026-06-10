@@ -131,6 +131,7 @@ export const getAllReports = async (req, res) => {
         } = req.query; // Get parameters from query string
 
         const urlScope = req.params?.reportType;
+        const assignedToParam = req.params?.assignedTo;
         const andConditions = [];
 
         // /report/service and /report/rental scope by reportFor
@@ -145,9 +146,11 @@ export const getAllReports = async (req, res) => {
             andConditions.push({ reportType });
         }
 
-        // Filter by assignedTo
+        // Filter by assignedTo (query param or /getByassigned/:assignedTo/... path)
         if (assignedTo) {
             andConditions.push({ assignedTo });
+        } else if (assignedToParam && mongoose.Types.ObjectId.isValid(assignedToParam)) {
+            andConditions.push({ assignedTo: assignedToParam });
         }
 
         // Filter by companyName
@@ -252,7 +255,8 @@ export const updateReport = async (req, res) => {
             assignedTo,
             usageData,
             description,
-            materialGroups // Changed from 'materials' to 'materialGroups'
+            materialGroups, // Changed from 'materials' to 'materialGroups'
+            reportLink,
         } = req.body;
 
         const report = await Report.findById(id);
@@ -309,6 +313,7 @@ export const updateReport = async (req, res) => {
                 usageData,
                 description,
                 materialGroups: validatedMaterialGroups, // Changed from 'materials'
+                ...(reportLink !== undefined ? { reportLink } : {}),
             },
             { new: true, runValidators: true } // Return the updated document and run schema validators
         ).populate('company');

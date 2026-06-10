@@ -130,6 +130,11 @@ const reportSchema = new mongoose.Schema({
     // Note: You had 'reportType' defined twice. I'm assuming the first one is correct.
     // If the second 'reportType' was intended for something else, please clarify.
     materialGroups: [materialGroupSchema], // Array of embedded material group documents
+    reportLink: {
+        type: [String],
+        trim: true,
+        default: [],
+    },
 }, { timestamps: true }); // Adds createdAt and updatedAt timestamps
 
 function coerceSendDetailsToOnDoc(doc) {

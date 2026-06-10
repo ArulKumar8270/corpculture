@@ -1,3 +1,97 @@
+/** Normalize sendTo from API (email strings or contact objects) to email strings for form selects. */
+export const parseSendToEmails = (sendTo) => {
+    const raw = Array.isArray(sendTo) ? sendTo : sendTo != null && sendTo !== '' ? [sendTo] : [];
+    const emails = [];
+    const seen = new Set();
+    for (const item of raw) {
+        const email =
+            typeof item === 'object' && item !== null && !Array.isArray(item)
+                ? String(item.email || '').trim()
+                : String(item ?? '').trim();
+        if (!email || seen.has(email.toLowerCase())) continue;
+        seen.add(email.toLowerCase());
+        emails.push(email);
+    }
+    return emails;
+};
+
+export const compareInvoiceNumbers = (a, b) => {
+    const numA = a != null ? String(a) : '';
+    const numB = b != null ? String(b) : '';
+    if (!numA && !numB) return 0;
+    if (!numA) return 1;
+    if (!numB) return -1;
+    return numA.localeCompare(numB, undefined, { numeric: true, sensitivity: 'base' });
+};
+
+/** Signed uploads are usually images; generated rental invoices are PDF or R2-hosted files. */
+export const isLikelyImageInvoiceLink = (url) => {
+    const path = String(url || '').split(/[?#]/)[0].toLowerCase();
+    return /\.(jpe?g|png|gif|webp|bmp|heic|heif)(\/)?$/i.test(path);
+};
+
+/** Cloudflare R2 public base for generated service/rental reports: `/{reportId}`. */
+export const REPORT_DOWNLOAD_BASE_URL =
+    'https://pub-109709bff58d46faa2a7782c9bf60324.r2.dev';
+
+/** Official service/rental report PDF download URLs (R2 by report id, then stored links). */
+export const collectReportDownloadCandidates = (report, downloadBaseUrl = REPORT_DOWNLOAD_BASE_URL) => {
+    const id = report?._id;
+    const ordered = [];
+    const push = (url) => {
+        const trimmed = String(url || '').trim();
+        if (!trimmed || ordered.includes(trimmed)) return;
+        ordered.push(trimmed);
+    };
+
+    if (id) {
+        push(`${downloadBaseUrl}/${id}`);
+        push(`${downloadBaseUrl}/${id}.pdf`);
+    }
+
+    const links = Array.isArray(report?.reportLink)
+        ? report.reportLink.map((x) => String(x || '').trim()).filter(Boolean)
+        : [];
+
+    const docLinks = links.filter((link) => !isLikelyImageInvoiceLink(link));
+    for (const link of docLinks) {
+        if (/\.pdf(\?|#|$)/i.test(link)) push(link);
+    }
+    for (const link of docLinks) {
+        push(link);
+    }
+
+    return ordered;
+};
+
+/** Official rental invoice/quotation download URLs only (never signed-copy uploads). */
+export const collectRentalOfficialInvoiceDownloadCandidates = (entry, downloadBaseUrl) => {
+    const id = entry?._id;
+    const r2 = id ? `${downloadBaseUrl}/${id}` : '';
+    const links = Array.isArray(entry?.invoiceLink)
+        ? entry.invoiceLink.map((x) => String(x || '').trim()).filter(Boolean)
+        : [];
+
+    const ordered = [];
+    const push = (url) => {
+        const trimmed = String(url || '').trim();
+        if (!trimmed || ordered.includes(trimmed)) return;
+        ordered.push(trimmed);
+    };
+
+    push(r2);
+
+    const docLinks = links.filter((link) => !isLikelyImageInvoiceLink(link));
+    for (const link of docLinks) {
+        if (/\.pdf(\?|#|$)/i.test(link)) push(link);
+    }
+    for (const link of docLinks) {
+        push(link);
+    }
+
+    return ordered;
+};
+
 export const getDiscount = (price, discountPrice) => {
     return (((price - discountPrice) / price) * 100).toFixed();
 };

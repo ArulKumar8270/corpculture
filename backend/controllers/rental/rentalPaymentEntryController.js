@@ -784,6 +784,7 @@ export const updateRentalPaymentEntry = async (req, res) => {
             otherPaymentMode,
             paymentAmount,
             invoiceLink,
+            signedInvoiceLink,
             invoiceType,
             invoiceDate, // Add invoiceDate
             status,
@@ -1079,6 +1080,7 @@ export const updateRentalPaymentEntry = async (req, res) => {
         if (paymentAmount) entry.paymentAmount = paymentAmount;
         if (companyId) entry.companyId = companyId;
         if (invoiceLink !== undefined) entry.invoiceLink = invoiceLink;
+        if (signedInvoiceLink !== undefined) entry.signedInvoiceLink = signedInvoiceLink;
         if (invoiceType) entry.invoiceType = invoiceType;
         if (invoiceSendStatus !== undefined) entry.invoiceSendStatus = invoiceSendStatus;
         if (invoiceSentAt !== undefined) {

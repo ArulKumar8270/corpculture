@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,8 +8,10 @@ import {
   ActivityIndicator,
   TextInput,
   Alert,
+  Linking,
 } from 'react-native';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
+import * as ImagePicker from 'expo-image-picker';
 // @ts-ignore
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
@@ -18,6 +20,16 @@ import { usePermissions } from '../../hooks/usePermissions';
 import axios from 'axios';
 import { getApiBaseUrl } from '../../services/api';
 import Toast from 'react-native-toast-message';
+import ReportListFilters from '../../components/ReportListFilters';
+import {
+  RENTAL_REPORT_TYPE,
+  buildReportListQueryParams,
+  getReportsListUrl,
+  ReportListFilterValues,
+  REPORT_SEND_N8N_WEBHOOK,
+} from '../../utils/reportListApi';
+import { collectReportSerialNumbers } from '../../utils/reportSerialNumbers';
+import { openReportDownload } from '../../utils/reportDownload';
 
 function companyIdFromReport(report: any): string | undefined {
   const c = report?.company;
@@ -38,94 +50,86 @@ const RentalReportsScreen = () => {
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedReports, setExpandedReports] = useState<Set<string>>(new Set());
-  const [reportType, setReportType] = useState('Rental_Report');
   const [sendingReport, setSendingReport] = useState<string | null>(null);
+  const [uploadingReportId, setUploadingReportId] = useState<string | null>(null);
+  const [downloadingReportId, setDownloadingReportId] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [totalCount, setTotalCount] = useState(0);
+  const [filters, setFilters] = useState<ReportListFilterValues>({
+    fromDate: '',
+    toDate: '',
+    companyName: '',
+    assignedTo: '',
+    serialNo: '',
+  });
   const ROWS_PER_PAGE_OPTIONS = [5, 10, 25, 50, 100];
 
-  useFocusEffect(
-    useCallback(() => {
-      if (token) {
-        fetchReports();
+  const fetchReports = useCallback(
+    async (filterValues = filters, currentPage = page, currentRowsPerPage = rowsPerPage) => {
+      if (!token) return;
+      try {
+        setLoading(true);
+        const query = buildReportListQueryParams(
+          filterValues,
+          RENTAL_REPORT_TYPE,
+          currentPage,
+          currentRowsPerPage
+        );
+        const url = getReportsListUrl(
+          getApiBaseUrl(),
+          RENTAL_REPORT_TYPE,
+          user?.role,
+          user?._id,
+          query
+        );
+
+        const response = await axios.get(url, {
+          headers: { Authorization: token || '' },
+        });
+
+        if (response.data?.success) {
+          setReports(response.data.reports || []);
+          setTotalCount(response.data.totalCount || 0);
+        } else {
+          setReports([]);
+          setTotalCount(0);
+        }
+      } catch (error: any) {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: error.response?.data?.message || error.message || 'Failed to load reports',
+        });
+        setReports([]);
+        setTotalCount(0);
+      } finally {
+        setLoading(false);
       }
-    }, [token, reportType])
+    },
+    [token, user?.role, user?._id]
   );
 
   useEffect(() => {
-    filterReports();
-  }, [searchTerm]);
+    if (token) fetchReports(filters, page, rowsPerPage);
+  }, [token, page, rowsPerPage]);
 
-  const fetchReports = async () => {
-    try {
-      setLoading(true);
-      // Backend routes:
-      // - /getByassigned/:assignedTo?/:reportType? - for employees
-      // - /:reportType? - for admins
-      // Use getByassigned for employees to match the backend route
-      let url: string;
-      if (user?.role === 3) {
-        // Employee: use getByassigned route to match backend
-        url = `${getApiBaseUrl()}/report/getByassigned/${user?._id}/${reportType}`;
-      } else {
-        // Admin: use reportType route
-        url = `${getApiBaseUrl()}/report/${reportType}`;
-      }
-
-      console.log('Fetching Rental_Reports from:', url);
-      console.log('User role:', user?.role);
-      console.log('User ID:', user?._id);
-      console.log('Report type:', reportType);
-
-      const response = await axios.get(url, {
-        headers: {
-          Authorization: token || '',
-        },
-      });
-
-      console.log('Rental_Reports response:', response.data);
-      console.log('Rental_Reports count:', response.data?.reports?.length || 0);
-
-      if (response.data?.success) {
-        const allReports = response.data.reports || [];
-        // Filter to only show Rental_Report type (client-side filtering as backup)
-        const fetchedReports = allReports.filter((report: any) => {
-          // Check both reportType and reportFor fields
-          const isRentalReport = 
-            report.reportType === 'Rental_Report' || 
-            report.reportFor === 'rental' ||
-            (report.reportType && report.reportType.toLowerCase().includes('rental'));
-          return isRentalReport;
-        });
-        setReports(fetchedReports);
-        console.log('Total reports received:', allReports.length);
-        console.log('Rental_Reports filtered:', fetchedReports.length);
-        if (fetchedReports.length === 0) {
-          console.log('No Rental_Reports found for the given criteria');
-        }
-      } else {
-        console.warn('Response not successful:', response.data);
-        setReports([]);
-      }
-    } catch (error: any) {
-      console.error('Error fetching Rental_Reports:', error);
-      console.error('Error response:', error.response?.data);
-      console.error('Error status:', error.response?.status);
-      console.error('Request URL:', error.config?.url);
-      
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: error.response?.data?.message || error.message || 'Failed to load reports',
-      });
-      setReports([]);
-    } finally {
-      setLoading(false);
-    }
+  const handleApplyFilters = () => {
+    setPage(0);
+    fetchReports(filters, 0, rowsPerPage);
   };
 
-  const filterReports = () => {
-    // Filtering is handled in renderReport
+  const handleClearFilters = () => {
+    const cleared: ReportListFilterValues = {
+      fromDate: '',
+      toDate: '',
+      companyName: '',
+      assignedTo: '',
+      serialNo: '',
+    };
+    setFilters(cleared);
+    setPage(0);
+    fetchReports(cleared, 0, rowsPerPage);
   };
 
   const toggleExpand = (reportId: string) => {
@@ -202,10 +206,10 @@ const RentalReportsScreen = () => {
     }
   };
 
-  const handleSendReport = async (reportId: string, companyId: string) => {
+  const handleSendReport = async (reportId: string, _companyId?: string) => {
     setSendingReport(reportId);
     try {
-      await axios.post('https://n8n.nicknameinfo.net/webhook/88ed0a9b-ee21-43e0-9684-f5c5859f9734', {
+      await axios.post(REPORT_SEND_N8N_WEBHOOK, {
         reportId: reportId,
       });
       Toast.show({
@@ -224,40 +228,101 @@ const RentalReportsScreen = () => {
     }
   };
 
+  const handleUploadReport = async (report: any) => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Please grant permission to access your media library');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: (ImagePicker as any).MediaType?.All
+          || [(ImagePicker as any).MediaType?.Images, (ImagePicker as any).MediaType?.Videos].filter(Boolean)
+          || 'images',
+        allowsEditing: false,
+        quality: 0.8,
+        allowsMultipleSelection: false,
+      });
+
+      if (result.canceled || !result.assets?.length) return;
+
+      const asset = result.assets[0];
+      setUploadingReportId(report._id);
+
+      const fileExtension = asset.uri.split('.').pop()?.toLowerCase() || 'jpg';
+      let mimeType = asset.mimeType || 'image/jpeg';
+      if (!asset.mimeType && fileExtension === 'pdf') mimeType = 'application/pdf';
+      if (!asset.mimeType && fileExtension === 'png') mimeType = 'image/png';
+
+      const formData = new FormData();
+      formData.append('file', {
+        uri: asset.uri,
+        type: mimeType,
+        name: `report_${report._id}_${Date.now()}.${fileExtension}`,
+      } as any);
+
+      const uploadRes = await axios.post(`${getApiBaseUrl()}/auth/upload-file`, formData, {
+        headers: {
+          Authorization: token || '',
+          'Content-Type': 'multipart/form-data',
+        },
+        timeout: 30000,
+      });
+
+      if (!uploadRes.data?.fileUrl) {
+        throw new Error('File upload failed');
+      }
+
+      await axios.put(
+        `${getApiBaseUrl()}/report/${report._id}`,
+        { reportLink: [...(report.reportLink || []), uploadRes.data.fileUrl] },
+        { headers: { Authorization: token || '' } }
+      );
+
+      Toast.show({ type: 'success', text1: 'Success', text2: 'Report uploaded successfully!' });
+      fetchReports();
+    } catch (error: any) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: error.response?.data?.message || error.message || 'Failed to upload report',
+      });
+    } finally {
+      setUploadingReportId(null);
+    }
+  };
+
+  const handleDownloadReport = async (report: any) => {
+    setDownloadingReportId(report._id);
+    try {
+      const url = await openReportDownload(report);
+      if (!url) {
+        Toast.show({ type: 'error', text1: 'Error', text2: 'Report id missing' });
+        return;
+      }
+      await Linking.openURL(url);
+    } catch {
+      Toast.show({ type: 'error', text1: 'Error', text2: 'Unable to open download link' });
+    } finally {
+      setDownloadingReportId(null);
+    }
+  };
+
   const filteredReports = reports.filter((report) => {
-    // First ensure it's a Rental_Report (double check)
-    const isRentalReport = 
-      report.reportType === 'Rental_Report' || 
-      report.reportFor === 'rental' ||
-      (report.reportType && report.reportType.toLowerCase().includes('rental'));
-    
-    if (!isRentalReport) {
-      return false;
-    }
-
-    // Then apply search filter
-    if (!searchTerm) {
-      return true;
-    }
-
-    const lowerCaseSearchTerm = searchTerm.toLowerCase();
-    const companyName = report.company?.companyName?.toLowerCase() || '';
-    const modelNo = report.modelNo?.toLowerCase() || '';
-    const branch = report.branch?.toLowerCase() || '';
-    const assignedToName = report.assignedTo?.name?.toLowerCase() || '';
-
+    if (!searchTerm) return true;
+    const q = searchTerm.toLowerCase();
     return (
-      companyName.includes(lowerCaseSearchTerm) ||
-      modelNo.includes(lowerCaseSearchTerm) ||
-      branch.includes(lowerCaseSearchTerm) ||
-      assignedToName.includes(lowerCaseSearchTerm)
+      report.company?.companyName?.toLowerCase().includes(q) ||
+      report.problemReport?.toLowerCase().includes(q) ||
+      report.modelNo?.toLowerCase().includes(q) ||
+      report.branch?.toLowerCase().includes(q) ||
+      report.assignedTo?.name?.toLowerCase().includes(q) ||
+      collectReportSerialNumbers(report).toLowerCase().includes(q)
     );
   });
 
-  const paginatedReports = useMemo(() => {
-    const start = page * rowsPerPage;
-    return filteredReports.slice(start, start + rowsPerPage);
-  }, [filteredReports, page, rowsPerPage]);
+  const totalPages = Math.max(1, Math.ceil(totalCount / rowsPerPage));
 
   useEffect(() => {
     setPage(0);
@@ -270,6 +335,8 @@ const RentalReportsScreen = () => {
   const renderReport = ({ item }: { item: any }) => {
     const isExpanded = expandedReports.has(item._id);
     const isSendingThis = sendingReport === item._id;
+    const isUploadingThis = uploadingReportId === item._id;
+    const isDownloadingThis = downloadingReportId === item._id;
 
     return (
       <View style={styles.reportCard}>
@@ -304,6 +371,10 @@ const RentalReportsScreen = () => {
               {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : 'N/A'}
             </Text>
           </View>
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Serial No:</Text>
+            <Text style={styles.detailValue}>{collectReportSerialNumbers(item)}</Text>
+          </View>
           {item.assignedTo && (
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Assigned To:</Text>
@@ -324,6 +395,34 @@ const RentalReportsScreen = () => {
               <>
                 <Icon name="send" size={18} color="#fff" />
                 <Text style={[styles.actionButtonText, styles.sendButtonText]}>Send</Text>
+              </>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.uploadButton]}
+            onPress={() => handleUploadReport(item)}
+            disabled={isUploadingThis}
+          >
+            {isUploadingThis ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <>
+                <Icon name="upload-file" size={18} color="#fff" />
+                <Text style={[styles.actionButtonText, styles.uploadButtonText]}>Upload</Text>
+              </>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.downloadButton]}
+            onPress={() => handleDownloadReport(item)}
+            disabled={isDownloadingThis}
+          >
+            {isDownloadingThis ? (
+              <ActivityIndicator size="small" color="#007AFF" />
+            ) : (
+              <>
+                <Icon name="download" size={18} color="#007AFF" />
+                <Text style={styles.actionButtonText}>Download</Text>
               </>
             )}
           </TouchableOpacity>
@@ -436,11 +535,18 @@ const RentalReportsScreen = () => {
         )}
       </View>
 
+      <ReportListFilters
+        values={filters}
+        onChange={(patch) => setFilters((prev) => ({ ...prev, ...patch }))}
+        onApply={handleApplyFilters}
+        onClear={handleClearFilters}
+      />
+
       <View style={styles.searchContainer}>
         <Icon name="search" size={20} color="#666" style={styles.searchIcon} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search by Company, Model No, Branch, or Assigned To"
+          placeholder="Quick search loaded reports…"
           value={searchTerm}
           onChangeText={setSearchTerm}
         />
@@ -450,11 +556,11 @@ const RentalReportsScreen = () => {
         <ActivityIndicator size="large" color="#019ee3" style={styles.loader} />
       ) : (
         <FlatList
-          data={paginatedReports}
+          data={filteredReports}
           renderItem={renderReport}
           keyExtractor={(item) => item._id}
           refreshing={loading}
-          onRefresh={fetchReports}
+          onRefresh={() => fetchReports()}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Icon name="description" size={64} color="#ccc" />
@@ -463,7 +569,7 @@ const RentalReportsScreen = () => {
           }
           ListFooterComponent={
             <View style={styles.paginationWrapper}>
-              {filteredReports.length > 0 && (
+              {totalCount > 0 && (
                 <View style={styles.rowsPerPageRow}>
                   <Text style={styles.rowsPerPageLabel}>Rows per page:</Text>
                   <View style={styles.rowsPerPageOptions}>
@@ -479,7 +585,7 @@ const RentalReportsScreen = () => {
                   </View>
                 </View>
               )}
-              {filteredReports.length > rowsPerPage ? (
+              {totalCount > rowsPerPage ? (
                 <View style={styles.pagination}>
                   <TouchableOpacity
                     style={[styles.pageBtn, page === 0 && styles.pageBtnDisabled]}
@@ -489,12 +595,12 @@ const RentalReportsScreen = () => {
                     <Text style={styles.pageBtnText}>Previous</Text>
                   </TouchableOpacity>
                   <Text style={styles.pageInfo}>
-                    Page {page + 1} of {Math.max(1, Math.ceil(filteredReports.length / rowsPerPage))}
+                    Page {page + 1} of {totalPages} ({totalCount} total)
                   </Text>
                   <TouchableOpacity
-                    style={[styles.pageBtn, page >= Math.ceil(filteredReports.length / rowsPerPage) - 1 && styles.pageBtnDisabled]}
+                    style={[styles.pageBtn, page >= totalPages - 1 && styles.pageBtnDisabled]}
                     onPress={() => setPage((p) => p + 1)}
-                    disabled={page >= Math.ceil(filteredReports.length / rowsPerPage) - 1}
+                    disabled={page >= totalPages - 1}
                   >
                     <Text style={styles.pageBtnText}>Next</Text>
                   </TouchableOpacity>
@@ -648,6 +754,15 @@ const styles = StyleSheet.create({
   },
   sendButtonText: {
     color: '#fff',
+  },
+  uploadButton: {
+    backgroundColor: '#28a745',
+  },
+  uploadButtonText: {
+    color: '#fff',
+  },
+  downloadButton: {
+    backgroundColor: '#e3f2fd',
   },
   deleteButtonText: {
     color: '#FF3B30',

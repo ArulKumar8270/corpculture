@@ -34,13 +34,16 @@ import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown'; // Im
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';   // Import up arrow icon
 import SendIcon from '@mui/icons-material/Send'; // Import SendIcon
 import DownloadIcon from '@mui/icons-material/Download';
+import UploadFileIcon from '@mui/icons-material/UploadFile';
 import LocalGasStationIcon from '@mui/icons-material/LocalGasStation';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import axios from 'axios';
 import { useAuth } from '../../context/auth';
-
-const REPORT_DOWNLOAD_BASE_URL = 'https://pub-109709bff58d46faa2a7782c9bf60324.r2.dev';
+import {
+    collectReportDownloadCandidates,
+    REPORT_DOWNLOAD_BASE_URL,
+} from '../../utils/functions';
 
 const collectSerialNumbers = (report) => {
     const serials = new Set();
@@ -59,7 +62,8 @@ const ServiceReportsandGatpass = (props) => {
     const [reports, setReports] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [onSendn8n, setOnSendn8n] = useState(false)
+    const [onSendn8n, setOnSendn8n] = useState(false);
+    const [uploadingReportId, setUploadingReportId] = useState(null);
     const [expandedReportId, setExpandedReportId] = useState(null); // State to manage expanded row
     const [fromDate, setFromDate] = useState('');
     const [toDate, setToDate] = useState('');
@@ -222,25 +226,84 @@ const ServiceReportsandGatpass = (props) => {
         }
     };
 
-    const handleDownloadReport = async (reportId) => {
-        if (!reportId) {
+    const handleUploadReport = async (reportId, existingLinks) => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.pdf,.jpg,.jpeg,.png';
+
+        input.onchange = async (e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                setUploadingReportId(reportId);
+                const res = await axios.post(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/auth/upload-file`,
+                    formData,
+                    { headers: { Authorization: auth?.token } }
+                );
+
+                if (!res.data?.fileUrl) {
+                    toast.error('File upload failed');
+                    return;
+                }
+
+                await axios.put(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/report/${reportId}`,
+                    { reportLink: [...(existingLinks || []), res.data.fileUrl] },
+                    { headers: { Authorization: auth.token } }
+                );
+
+                toast.success('Report uploaded successfully');
+                fetchReports(
+                    fromDate,
+                    toDate,
+                    companyNameFilter,
+                    assignedToFilter,
+                    serialNoFilter,
+                    page,
+                    rowsPerPage
+                );
+            } catch (error) {
+                console.error('Report upload failed:', error);
+                toast.error('Failed to upload report');
+            } finally {
+                setUploadingReportId(null);
+            }
+        };
+
+        input.click();
+    };
+
+    const handleDownloadReport = async (report) => {
+        const candidates = collectReportDownloadCandidates(report, REPORT_DOWNLOAD_BASE_URL);
+
+        if (candidates.length === 0) {
             toast.error('Report id missing');
             return;
         }
 
-        const candidateUrl = `${REPORT_DOWNLOAD_BASE_URL}/${reportId}`;
-        try {
-            const res = await fetch(candidateUrl, { method: 'HEAD' });
-            if (!res.ok) {
-                const msg = 'Report not uploaded';
-                toast.error(msg);
-                window.alert(msg);
-                return;
+        let urlToOpen = null;
+        for (const url of candidates) {
+            try {
+                const res = await fetch(url, { method: 'HEAD' });
+                if (res.ok) {
+                    urlToOpen = url;
+                    break;
+                }
+            } catch {
+                // try next candidate
             }
-            window.open(candidateUrl, '_blank', 'noopener,noreferrer');
-        } catch (e) {
-            window.open(candidateUrl, '_blank', 'noopener,noreferrer');
         }
+
+        if (!urlToOpen) {
+            urlToOpen = candidates[0];
+        }
+
+        window.open(urlToOpen, '_blank', 'noopener,noreferrer');
     };
 
     const handleChangePage = (event, newPage) => {
@@ -522,8 +585,21 @@ const ServiceReportsandGatpass = (props) => {
                                                         </IconButton>
                                                     </Tooltip>
                                                 ) : null}
+                                                <Tooltip title="Upload Report">
+                                                    <IconButton
+                                                        onClick={() => handleUploadReport(report._id, report?.reportLink)}
+                                                        color="success"
+                                                        disabled={uploadingReportId === report._id}
+                                                    >
+                                                        {uploadingReportId === report._id ? (
+                                                            <CircularProgress size={24} />
+                                                        ) : (
+                                                            <UploadFileIcon />
+                                                        )}
+                                                    </IconButton>
+                                                </Tooltip>
                                                 <Tooltip title="Download Report">
-                                                    <IconButton onClick={() => handleDownloadReport(report._id)} color="primary">
+                                                    <IconButton onClick={() => handleDownloadReport(report)} color="primary">
                                                         <DownloadIcon />
                                                     </IconButton>
                                                 </Tooltip>
