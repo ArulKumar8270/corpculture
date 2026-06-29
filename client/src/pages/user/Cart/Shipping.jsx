@@ -3,7 +3,7 @@ import InputLabel from "@mui/material/InputLabel";
 import Select from "@mui/material/Select";
 import TextField from "@mui/material/TextField";
 import MenuItem from "@mui/material/MenuItem";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import states from "../../../utils/states";
 import { toast } from "react-toastify";
 import { useCart } from "../../../context/cart";
@@ -23,7 +23,7 @@ const Shipping = () => {
     const storedOrderRef = localStorage.getItem("orderReferenceNo") || "";
 
     const [cartItems] = useCart();
-    const { auth, selectedCompany } = useAuth();
+    const { auth, selectedCompany, companyDetails } = useAuth();
     const { sales } = useFrontHomeSettings();
     const navigate = useNavigate();
     const [payOnCredit, setPayOnCredit] = useState(
@@ -38,6 +38,20 @@ const Shipping = () => {
     const [pincode, setPincode] = useState(shippingInfo?.pincode);
     const [phoneNo, setPhoneNo] = useState(shippingInfo?.phoneNo);
     const [orderReferenceNo, setOrderReferenceNo] = useState(storedOrderRef);
+
+    useEffect(() => {
+        if (!Array.isArray(companyDetails) || companyDetails.length === 0) return;
+        const company = selectedCompany
+            ? companyDetails.find((c) => String(c._id) === String(selectedCompany))
+            : companyDetails[0];
+        if (!company) return;
+
+        setAddress((prev) => prev || company.billingAddress || company.addressDetail || '');
+        setCity((prev) => prev || company.city || '');
+        setState((prev) => prev || company.state || '');
+        setPincode((prev) => prev || company.pincode || '');
+        setPhoneNo((prev) => prev || company.phone || company.mobileNumber || auth?.user?.phone || '');
+    }, [companyDetails, selectedCompany, auth?.user?.phone]);
 
     //stripe details
     const publishKey = import.meta.env.VITE_STRIPE_PUBLISH_KEY;

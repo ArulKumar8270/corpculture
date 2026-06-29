@@ -41,6 +41,7 @@ const AddServiceProductScreen = () => {
   const [gstTypeIds, setGstTypeIds] = useState<string[]>([]);
   const [totalAmount, setTotalAmount] = useState('0');
   const [commission, setCommission] = useState('');
+  const [employeeCommission, setEmployeeCommission] = useState('');
   const [loading, setLoading] = useState(false);
 
   const [companies, setCompanies] = useState<any[]>([]);
@@ -84,6 +85,7 @@ const AddServiceProductScreen = () => {
     setGstTypeIds([]);
     setTotalAmount('0');
     setCommission('');
+    setEmployeeCommission('');
   };
 
   useEffect(() => {
@@ -228,6 +230,7 @@ const AddServiceProductScreen = () => {
         setQuantity(product.quantity?.toString() || '1');
         setRate(product.rate?.toString() || '');
         setCommission(product.commission?.toString() || '');
+        setEmployeeCommission(product.employeeCommission?.toString() || '');
         setGstTypeIds(
           Array.isArray(product.gstType)
             ? product.gstType.map((g: any) => (typeof g === 'object' ? g._id : g))
@@ -265,8 +268,7 @@ const AddServiceProductScreen = () => {
   };
 
   const handleSubmit = async () => {
-    // Commission is only required for admin users
-    if (!company || !productName || !sku || !hsn || !quantity || !rate || gstTypeIds.length === 0 || (isAdmin && !commission)) {
+    if (!company || !productName || !hsn || !quantity || !rate || gstTypeIds.length === 0 || !commission) {
       Toast.show({
         type: 'error',
         text1: 'Validation Error',
@@ -277,16 +279,19 @@ const AddServiceProductScreen = () => {
 
     setLoading(true);
     try {
+      const timestamp = Date.now();
+      const generatedSku = `${productName}-${hsn}-${quantity}-${rate}-${gstTypeIds.join('-')}-${commission}-${timestamp}`;
       const productData = {
         company,
         productName,
-        sku,
+        sku: generatedSku,
         hsn,
-        quantity: parseInt(quantity),
+        quantity: parseInt(quantity, 10),
         rate: parseFloat(rate),
         gstType: gstTypeIds,
         totalAmount: parseFloat(totalAmount),
-        ...(isAdmin && { commission: parseFloat(commission) }), // Add commission to payload only for admin
+        commission: parseFloat(commission),
+        employeeCommission: employeeCommission !== '' ? parseFloat(employeeCommission) : undefined,
       };
 
       let response;
@@ -379,17 +384,6 @@ const AddServiceProductScreen = () => {
           </TouchableOpacity>
         </View>
 
-        {/* SKU */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>SKU *</Text>
-          <TextInput
-            style={styles.input}
-            value={sku}
-            onChangeText={setSku}
-            placeholder="Enter SKU"
-          />
-        </View>
-
         {/* HSN */}
         <View style={styles.inputGroup}>
           <Text style={styles.label}>HSN *</Text>
@@ -441,19 +435,27 @@ const AddServiceProductScreen = () => {
           </TouchableOpacity>
         </View>
 
-        {/* Commission - Only for Admin */}
-        {isAdmin && (
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Commission *</Text>
-            <TextInput
-              style={styles.input}
-              value={commission}
-              onChangeText={setCommission}
-              placeholder="Enter Commission"
-              keyboardType="decimal-pad"
-            />
-          </View>
-        )}
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Partner Profit *</Text>
+          <TextInput
+            style={styles.input}
+            value={commission}
+            onChangeText={setCommission}
+            placeholder="Enter Partner Profit"
+            keyboardType="decimal-pad"
+          />
+        </View>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Employee Commission</Text>
+          <TextInput
+            style={styles.input}
+            value={employeeCommission}
+            onChangeText={setEmployeeCommission}
+            placeholder="Enter Employee Commission"
+            keyboardType="decimal-pad"
+          />
+        </View>
 
         {/* Total Amount (Read-only) */}
         <View style={styles.inputGroup}>

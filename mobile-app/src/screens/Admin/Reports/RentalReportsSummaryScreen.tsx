@@ -36,9 +36,9 @@ const RentalReportsSummaryScreen = () => {
   const [reportData, setReportData] = useState<ReportData[]>([]);
 
   const fetchRentalReportsCount = useCallback(async (serialNo = '') => {
-    const params = new URLSearchParams({ page: '1', limit: '1' });
+    const params = new URLSearchParams({ page: '1', limit: '1', reportType: 'Rental_Report' });
     if (serialNo.trim()) params.set('serialNo', serialNo.trim());
-    const { data } = await axios.get(`${getApiBaseUrl()}/report/rental?${params.toString()}`, {
+    const { data } = await axios.get(`${getApiBaseUrl()}/report/Rental_Report?${params.toString()}`, {
       headers: { Authorization: token || '' },
     });
     return data?.totalCount ?? 0;

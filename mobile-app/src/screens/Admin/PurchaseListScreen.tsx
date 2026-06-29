@@ -175,14 +175,32 @@ const PurchaseListScreen = () => {
   );
 
   const sortedProductGroups = useMemo(() => {
-    return materials
-      .map((material) => ({
-        name: material.name,
-        count: 1,
-        totalQuantity: material.unit,
-      }))
-      .sort((a, b) => b.totalQuantity - a.totalQuantity);
-  }, [materials]);
+    const map = new Map<string, {
+      name: string;
+      totalQuantity: number;
+      lastRate: number;
+      lastPrice: number;
+      totalGross: number;
+    }>();
+
+    purchases.forEach((purchase) => {
+      const name = purchase?.productName?.productName || 'Unknown';
+      const existing = map.get(name) || {
+        name,
+        totalQuantity: 0,
+        lastRate: 0,
+        lastPrice: 0,
+        totalGross: 0,
+      };
+      existing.totalQuantity += Number(purchase.quantity) || 0;
+      existing.totalGross += Number(purchase.grossTotal) || 0;
+      if (purchase.rate != null) existing.lastRate = Number(purchase.rate) || 0;
+      if (purchase.price != null) existing.lastPrice = Number(purchase.price) || 0;
+      map.set(name, existing);
+    });
+
+    return [...map.values()].sort((a, b) => b.totalQuantity - a.totalQuantity);
+  }, [purchases]);
 
   const canEdit = hasPermission('vendorPurchaseList', 'edit') || user?.role === 1;
 
@@ -376,7 +394,7 @@ const PurchaseListScreen = () => {
                   styles.chipText,
                   isNegative && styles.chipTextNegative
                 ]}>
-                  {group.name}: {group.totalQuantity}
+                  {group.name}: Qty {group.totalQuantity} | Rate ₹{group.lastRate?.toFixed?.(2) ?? '0.00'} | Gross ₹{group.totalGross?.toFixed?.(2) ?? '0.00'}
                 </Text>
               </View>
             );

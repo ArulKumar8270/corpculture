@@ -25,17 +25,7 @@ import axios from 'axios';
 import { useAuth } from '../../../context/auth';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
-
-const collectSerialNumbers = (report) => {
-    const serials = new Set();
-    if (report?.serialNo?.trim()) serials.add(report.serialNo.trim());
-    (report?.materialGroups || []).forEach((group) => {
-        (group?.products || []).forEach((product) => {
-            if (product?.serialNo?.trim()) serials.add(product.serialNo.trim());
-        });
-    });
-    return Array.from(serials).join(', ') || 'N/A';
-};
+import { collectReportSerialNumbers, formatReportTypeLabel } from '../../../utils/reportSerialNumbers';
 
 const ServiceReportsReport = ({ type = 'service' }) => {
     const { auth } = useAuth();
@@ -163,7 +153,7 @@ const ServiceReportsReport = ({ type = 'service' }) => {
             'Assigned To': report.assignedTo?.name || 'N/A',
             'Created Date': new Date(report.createdAt).toLocaleDateString(),
             'Model No': report.modelNo || 'N/A',
-            'Serial No': collectSerialNumbers(report),
+            'Serial No': collectReportSerialNumbers(report),
             'Branch': report.branch || 'N/A',
             'Reference': report.reference || 'N/A',
             'Usage Data': report.usageData || 'N/A',
@@ -291,17 +281,17 @@ const ServiceReportsReport = ({ type = 'service' }) => {
                     </Box>
                 </Box>
 
-                <TableContainer>
-                    <Table sx={{ minWidth: 650 }} aria-label={`${type} reports table`}>
+                <TableContainer sx={{ maxHeight: '70vh' }}>
+                    <Table stickyHeader sx={{ minWidth: 1000 }} aria-label={`${type} reports table`} size="small">
                         <TableHead>
-                            <TableRow sx={{ bgcolor: '#f0f0f0' }}>
-                                <TableCell>S.No</TableCell>
-                                <TableCell>Company Name</TableCell>
-                                <TableCell>Report Type</TableCell>
-                                <TableCell>Problem Report</TableCell>
-                                <TableCell>Serial No</TableCell>
-                                <TableCell>Assigned To</TableCell>
-                                <TableCell>Created Date</TableCell>
+                            <TableRow>
+                                <TableCell sx={{ fontWeight: 700, bgcolor: '#f5f7fa' }}>S.No</TableCell>
+                                <TableCell sx={{ fontWeight: 700, bgcolor: '#f5f7fa' }}>Company Name</TableCell>
+                                <TableCell sx={{ fontWeight: 700, bgcolor: '#f5f7fa' }}>Report Type</TableCell>
+                                <TableCell sx={{ fontWeight: 700, bgcolor: '#f5f7fa', maxWidth: 280 }}>Problem Report</TableCell>
+                                <TableCell sx={{ fontWeight: 700, bgcolor: '#f5f7fa', minWidth: 140 }}>Serial No</TableCell>
+                                <TableCell sx={{ fontWeight: 700, bgcolor: '#f5f7fa' }}>Assigned To</TableCell>
+                                <TableCell sx={{ fontWeight: 700, bgcolor: '#f5f7fa' }}>Created Date</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
@@ -313,12 +303,27 @@ const ServiceReportsReport = ({ type = 'service' }) => {
                                 </TableRow>
                             ) : (
                                 reports.map((report, index) => (
-                                    <TableRow key={report._id}>
+                                    <TableRow key={report._id} hover>
                                         <TableCell>{page * rowsPerPage + index + 1}</TableCell>
-                                        <TableCell>{report.company?.companyName || 'N/A'}</TableCell>
-                                        <TableCell>{report.reportType || 'N/A'}</TableCell>
-                                        <TableCell>{report.problemReport || 'N/A'}</TableCell>
-                                        <TableCell>{collectSerialNumbers(report)}</TableCell>
+                                        <TableCell sx={{ maxWidth: 200, wordBreak: 'break-word' }}>
+                                            {report.company?.companyName || 'N/A'}
+                                        </TableCell>
+                                        <TableCell>{formatReportTypeLabel(report.reportType)}</TableCell>
+                                        <TableCell sx={{ maxWidth: 280, wordBreak: 'break-word', whiteSpace: 'normal' }}>
+                                            {report.problemReport || 'N/A'}
+                                        </TableCell>
+                                        <TableCell
+                                            sx={{
+                                                minWidth: 140,
+                                                maxWidth: 220,
+                                                fontWeight: 600,
+                                                color: '#019ee3',
+                                                wordBreak: 'break-word',
+                                                whiteSpace: 'normal',
+                                            }}
+                                        >
+                                            {collectReportSerialNumbers(report)}
+                                        </TableCell>
                                         <TableCell>
                                             {report.assignedTo ? (
                                                 <Chip label={report.assignedTo?.name} size="small" color="primary" variant="outlined" />

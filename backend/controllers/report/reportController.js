@@ -4,6 +4,31 @@ import Counter from "../../models/counterModel.js";
 import mongoose from "mongoose";
 import { normalizeSendDetailsTo } from "../../utils/normalizeSendDetailsTo.js";
 
+/** Match service/rental reports regardless of legacy reportFor vs reportType values. */
+const buildReportScopeFilter = (urlScope) => {
+    if (!urlScope) return null;
+    const scope = String(urlScope);
+    const lower = scope.toLowerCase();
+
+    if (lower === "service" || scope === "Service_Report") {
+        return {
+            $or: [
+                { reportFor: { $in: ["service", "Service_Report"] } },
+                { reportType: "Service_Report" },
+            ],
+        };
+    }
+    if (lower === "rental" || scope === "Rental_Report") {
+        return {
+            $or: [
+                { reportFor: { $in: ["rental", "Rental_Report"] } },
+                { reportType: "Rental_Report" },
+            ],
+        };
+    }
+    return null;
+};
+
 // Create Report
 export const createReport = async (req, res) => {
     try {
@@ -134,15 +159,15 @@ export const getAllReports = async (req, res) => {
         const assignedToParam = req.params?.assignedTo;
         const andConditions = [];
 
-        // /report/service and /report/rental scope by reportFor
-        if (urlScope === "service" || urlScope === "rental") {
-            andConditions.push({ reportFor: urlScope });
+        const scopeFilter = buildReportScopeFilter(urlScope);
+        if (scopeFilter) {
+            andConditions.push(scopeFilter);
         } else if (reportForQuery) {
             andConditions.push({ reportFor: reportForQuery });
         }
 
-        // Filter by reportType label (e.g. "Service Report")
-        if (reportType) {
+        // Filter by reportType label when not already covered by URL scope
+        if (reportType && !scopeFilter) {
             andConditions.push({ reportType });
         }
 
@@ -191,6 +216,7 @@ export const getAllReports = async (req, res) => {
             andConditions.push({
                 $or: [
                     { serialNo: serialRegex },
+                    { "materialGroups.serialNo": serialRegex },
                     { "materialGroups.products.serialNo": serialRegex },
                 ],
             });

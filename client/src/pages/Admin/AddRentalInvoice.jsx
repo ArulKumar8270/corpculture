@@ -392,12 +392,12 @@ const RentalInvoiceForm = () => {
                         }
                     } else {
                         toast.error(data?.message || 'Failed to fetch rental entry details.');
-                        navigate('/admin/rental-invoices');
+                        navigate('../rentalInvoiceList');
                     }
                 } catch (error) {
                     console.error("Error fetching rental entry:", error);
                     toast.error('Failed to fetch rental entry details.');
-                    navigate('/admin/rental-invoices');
+                    navigate('../rentalInvoiceList');
                 } finally {
                     setLoading(false);
                 }

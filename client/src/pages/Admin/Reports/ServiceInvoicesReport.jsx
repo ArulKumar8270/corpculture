@@ -36,6 +36,7 @@ import axios from 'axios';
 import { useAuth } from '../../../context/auth';
 import * as XLSX from 'xlsx'; // Import xlsx library
 import { saveAs } from 'file-saver'; // Import saveAs from file-saver
+import { collectSignedCopyDownloadCandidates } from '../../../utils/functions';
 
 const INVOICE_DOWNLOAD_BASE_URL = 'https://pub-ef65b8bdb5974dd191a466c3120cd6b3.r2.dev';
 const PAYMENT_COPY_DOWNLOAD_BASE_URL = 'https://pub-982db31d50054adebd29fa1792b12fb8.r2.dev';
@@ -427,11 +428,11 @@ const ServiceInvoicesReport = (props) => {
     }, [auth?.token, page, rowsPerPage]); // Re-fetch when page or rowsPerPage changes
 
     const handleView = (invoiceId) => {
-        navigate(`/admin/service-invoice/${invoiceId}`);
+        navigate(`../addServiceInvoice/${invoiceId}`);
     };
 
     const handleEdit = (invoiceId) => {
-        navigate(`/admin/edit-service-invoice/${invoiceId}`);
+        navigate(`../addServiceInvoice/${invoiceId}`);
     };
 
     const isQuotationReport = props?.type === 'quotation';
@@ -483,6 +484,36 @@ const ServiceInvoicesReport = (props) => {
         } catch (e) {
             window.open(candidateUrl, '_blank', 'noopener,noreferrer');
         }
+    };
+
+    const handleDownloadSignedCopyPdf = async (invoice) => {
+        const candidates = collectSignedCopyDownloadCandidates(invoice);
+
+        if (candidates.length === 0) {
+            const msg = 'Signed copy not uploaded';
+            toast.error(msg);
+            window.alert(msg);
+            return;
+        }
+
+        let urlToOpen = null;
+        for (const url of candidates) {
+            try {
+                const res = await fetch(url, { method: 'HEAD' });
+                if (res.ok) {
+                    urlToOpen = url;
+                    break;
+                }
+            } catch {
+                // try next candidate
+            }
+        }
+
+        if (!urlToOpen) {
+            urlToOpen = candidates[candidates.length - 1];
+        }
+
+        window.open(urlToOpen, '_blank', 'noopener,noreferrer');
     };
 
     const handleDelete = async (invoiceId) => {
@@ -886,7 +917,7 @@ const ServiceInvoicesReport = (props) => {
     return (
         <Box sx={{ p: 3, bgcolor: 'background.default', minHeight: '100vh' }}>
             <Typography variant="h5" component="h1" gutterBottom sx={{ mb: 3, color: '#019ee3', fontWeight: 'bold' }}>
-                Service Invoices Report
+                {isQuotationReport ? 'Service Quotations Report' : 'Service Invoices Report'}
             </Typography>
             <Paper elevation={3} sx={{ p: 2, borderRadius: '8px' }}>
                 {/* Filter Options */}
@@ -931,12 +962,12 @@ const ServiceInvoicesReport = (props) => {
                                 value={paymentStatusFilter}
                                 label="Payment Status"
                                 onChange={(e) => setPaymentStatusFilter(e.target.value)}
+                                disabled={isQuotationReport}
                             >
                                 <MenuItem value="">All</MenuItem>
                                 <MenuItem value="Paid">Paid</MenuItem>
                                 <MenuItem value="Unpaid">Unpaid</MenuItem>
                                 <MenuItem value="TDS">TDS</MenuItem>
-                                {/* Add other payment statuses as needed */}
                             </Select>
                         </FormControl>
                         <Button variant="contained" onClick={handleFilter} sx={{ height: '56px' }}>
@@ -967,8 +998,8 @@ const ServiceInvoicesReport = (props) => {
                                 <TableCell>Invoice Date</TableCell>
                                 <TableCell>Grand Total</TableCell>
                                 <TableCell>Assigned To</TableCell>
-                                <TableCell>Payment Details</TableCell>
-                                <TableCell>Status</TableCell>
+                                {!isQuotationReport ? <TableCell>Payment Details</TableCell> : null}
+                                {!isQuotationReport ? <TableCell>Status</TableCell> : <TableCell>Send Status</TableCell>}
                                 <TableCell align="center">PDF</TableCell>
                             </TableRow>
                         </TableHead>
@@ -994,35 +1025,53 @@ const ServiceInvoicesReport = (props) => {
                                                 'N/A'
                                             )}
                                         </TableCell>
+                                        {!isQuotationReport ? (
+                                            <TableCell>
+                                                {hasPermission('serviceInvoice') ? (
+                                                    <Button
+                                                        size="small"
+                                                        variant="outlined"
+                                                        sx={{ mb: 1, display: 'block' }}
+                                                        onClick={() => handleOpenPaymentDetailsModal(invoice)}
+                                                    >
+                                                        Edit payment
+                                                    </Button>
+                                                ) : null}
+                                                {invoice?.bankName ? <p>Bank Name : {invoice?.bankName}</p> : null}
+                                                <p>Mode of Payment : {invoice?.modeOfPayment}</p>
+                                                {invoice?.chequeDate ? <p>Cheque Date : {new Date(invoice?.chequeDate).toLocaleDateString()}</p> : null}
+                                                {invoice?.otherPaymentMode ? <p>Other Payment Mode : {invoice?.otherPaymentMode}</p> : null}
+                                                {invoice?.transactionDetails ? <p>Transaction Details : {invoice?.transactionDetails}</p> : null}
+                                                {invoice?.transferDate ? <p>Transfer Date : {new Date(invoice?.transferDate).toLocaleDateString()}</p> : null}
+                                            </TableCell>
+                                        ) : null}
                                         <TableCell>
-                                            {hasPermission('serviceInvoice') && !isQuotationReport ? (
-                                                <Button
+                                            {isQuotationReport ? (
+                                                <Chip
+                                                    label={
+                                                        invoice.invoiceSendStatus === 'Sent' || (Array.isArray(invoice.invoiceLink) && invoice.invoiceLink.length > 0)
+                                                            ? 'Quotation Sent'
+                                                            : 'Quotation Not Sent'
+                                                    }
                                                     size="small"
-                                                    variant="outlined"
-                                                    sx={{ mb: 1, display: 'block' }}
-                                                    onClick={() => handleOpenPaymentDetailsModal(invoice)}
-                                                >
-                                                    Edit payment
-                                                </Button>
-                                            ) : null}
-                                            {invoice?.bankName ? <p>Bank Name : {invoice?.bankName}</p> : null}
-                                            <p>Mode of Payment : {invoice?.modeOfPayment}</p>
-                                            {invoice?.chequeDate ? <p>Cheque Date : {new Date(invoice?.chequeDate).toLocaleDateString()}</p> : null}
-                                            {invoice?.otherPaymentMode ? <p>Other Payment Mode : {invoice?.otherPaymentMode}</p> : null}
-                                            {invoice?.transactionDetails ? <p>Transaction Details : {invoice?.transactionDetails}</p> : null}
-                                            {invoice?.transferDate ? <p>Transfer Date : {new Date(invoice?.transferDate).toLocaleDateString()}</p> : null}
-                                        </TableCell>
-                                        <TableCell>
-                                            <Chip
-                                                label={invoice.status}
-                                                size="small"
-                                                color={
-                                                    invoice.status === 'Paid' ? 'success' :
-                                                    invoice.status === 'Unpaid' ? 'error' :
-                                                    invoice.status === 'Pending' || invoice.status === 'Progress' ? 'warning' :
-                                                    'default'
-                                                }
-                                            />
+                                                    color={
+                                                        invoice.invoiceSendStatus === 'Sent' || (Array.isArray(invoice.invoiceLink) && invoice.invoiceLink.length > 0)
+                                                            ? 'success'
+                                                            : 'error'
+                                                    }
+                                                />
+                                            ) : (
+                                                <Chip
+                                                    label={invoice.status}
+                                                    size="small"
+                                                    color={
+                                                        invoice.status === 'Paid' ? 'success' :
+                                                        invoice.status === 'Unpaid' ? 'error' :
+                                                        invoice.status === 'Pending' || invoice.status === 'Progress' ? 'warning' :
+                                                        'default'
+                                                    }
+                                                />
+                                            )}
                                         </TableCell>
                                         <TableCell align="center">
                                             <Tooltip title={isQuotationReport ? 'Download quotation PDF' : 'Download invoice PDF'}>
@@ -1048,6 +1097,17 @@ const ServiceInvoicesReport = (props) => {
                                                     </IconButton>
                                                 </Tooltip>
                                             ) : null}
+                                            <Tooltip title={isQuotationReport ? 'Download signed quotation PDF' : 'Download signed copy PDF'}>
+                                                <IconButton
+                                                    size="small"
+                                                    color="success"
+                                                    onClick={() => handleDownloadSignedCopyPdf(invoice)}
+                                                    aria-label="Download signed copy PDF"
+                                                    sx={{ ml: 0.5 }}
+                                                >
+                                                    <DownloadIcon fontSize="small" />
+                                                </IconButton>
+                                            </Tooltip>
                                         </TableCell>
                                     </TableRow>
                                 ))

@@ -19,6 +19,7 @@ import { RootState } from '../../../store';
 import axios from 'axios';
 import { getApiBaseUrl } from '../../../services/api';
 import Toast from 'react-native-toast-message';
+import { openSignedCopyDownload } from '../../../utils/functions';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 // @ts-ignore - xlsx may need to be installed: npm install xlsx
@@ -218,6 +219,16 @@ const RentalInvoiceReportScreen = () => {
     setPage(0);
   };
 
+  const handleDownloadSignedCopy = async (invoice: any) => {
+    try {
+      await openSignedCopyDownload(invoice, (msg) => {
+        Toast.show({ type: 'error', text1: msg });
+      });
+    } catch {
+      Toast.show({ type: 'error', text1: 'Could not open signed copy' });
+    }
+  };
+
   const renderInvoice = ({ item, index }: { item: any; index: number }) => {
     const firstProduct = item.products && item.products.length > 0
       ? item.products[0]
@@ -280,6 +291,13 @@ const RentalInvoiceReportScreen = () => {
             </View>
           )}
         </View>
+        <TouchableOpacity
+          style={styles.signedCopyBtn}
+          onPress={() => handleDownloadSignedCopy(item)}
+        >
+          <Icon name="attachment" size={18} color="#019ee3" />
+          <Text style={styles.signedCopyBtnText}>Download Signed Copy</Text>
+        </TouchableOpacity>
       </View>
     );
   };
@@ -661,6 +679,20 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
     overflow: 'hidden',
+  },
+  signedCopyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  signedCopyBtnText: {
+    color: '#019ee3',
+    fontWeight: '600',
+    fontSize: 14,
   },
   invoiceHeader: {
     flexDirection: 'row',

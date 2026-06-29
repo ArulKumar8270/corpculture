@@ -15,6 +15,9 @@ export const parseSendToEmails = (sendTo) => {
     return emails;
 };
 
+/** Use with GET /company/all — API defaults to limit=10, which breaks company pickers. */
+export const companyAllPickerQuery = 'page=1&limit=10000';
+
 export const compareInvoiceNumbers = (a, b) => {
     const numA = a != null ? String(a) : '';
     const numB = b != null ? String(b) : '';
@@ -28,6 +31,54 @@ export const compareInvoiceNumbers = (a, b) => {
 export const isLikelyImageInvoiceLink = (url) => {
     const path = String(url || '').split(/[?#]/)[0].toLowerCase();
     return /\.(jpe?g|png|gif|webp|bmp|heic|heif)(\/)?$/i.test(path);
+};
+
+/** Cloudflare R2 public base for manual signed-copy uploads (auth upload-file). */
+export const SIGNED_COPY_UPLOAD_BASE_URL =
+    'https://pub-48d3e9677d09450a9113bb7bddbe02c8.r2.dev';
+
+/** Normalize signedInvoiceLink from API (array or legacy single string). */
+export const normalizeSignedInvoiceLinks = (record) => {
+    const raw = record?.signedInvoiceLink;
+    if (Array.isArray(raw)) {
+        return raw.map((x) => String(x || '').trim()).filter(Boolean);
+    }
+    if (raw != null && raw !== '') {
+        return [String(raw).trim()].filter(Boolean);
+    }
+    return [];
+};
+
+/**
+ * Signed-copy download URLs: signedInvoiceLink (web) plus legacy/mobile uploads in invoiceLink.
+ * Rental mobile app stores signed scans in invoiceLink, not signedInvoiceLink.
+ */
+export const collectSignedCopyDownloadCandidates = (record) => {
+    const id = record?._id ? String(record._id) : '';
+    const ordered = [];
+    const push = (url) => {
+        const trimmed = String(url || '').trim();
+        if (!trimmed || ordered.includes(trimmed)) return;
+        ordered.push(trimmed);
+    };
+
+    for (const link of normalizeSignedInvoiceLinks(record)) {
+        push(link);
+    }
+
+    const invoiceLinks = Array.isArray(record?.invoiceLink)
+        ? record.invoiceLink.map((x) => String(x || '').trim()).filter(Boolean)
+        : [];
+
+    for (const link of invoiceLinks) {
+        const onUploadBucket = link.includes(SIGNED_COPY_UPLOAD_BASE_URL);
+        const mobileSignedName = id && link.includes(`invoice_${id}_`);
+        if (onUploadBucket || isLikelyImageInvoiceLink(link) || mobileSignedName) {
+            push(link);
+        }
+    }
+
+    return ordered;
 };
 
 /** Cloudflare R2 public base for generated service/rental reports: `/{reportId}`. */

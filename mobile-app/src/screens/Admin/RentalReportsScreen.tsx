@@ -373,7 +373,7 @@ const RentalReportsScreen = () => {
           </View>
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Serial No:</Text>
-            <Text style={styles.detailValue}>{collectReportSerialNumbers(item)}</Text>
+            <Text style={styles.serialValue}>{collectReportSerialNumbers(item)}</Text>
           </View>
           {item.assignedTo && (
             <View style={styles.detailRow}>
@@ -556,6 +556,7 @@ const RentalReportsScreen = () => {
         <ActivityIndicator size="large" color="#019ee3" style={styles.loader} />
       ) : (
         <FlatList
+          style={{ flex: 1 }}
           data={filteredReports}
           renderItem={renderReport}
           keyExtractor={(item) => item._id}
@@ -723,6 +724,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#333',
     flex: 1,
+  },
+  serialValue: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#019ee3',
+    flex: 1,
+    flexWrap: 'wrap',
   },
   actionButtons: {
     flexDirection: 'row',

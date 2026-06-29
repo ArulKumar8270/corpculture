@@ -200,6 +200,62 @@ const FrontHomeSettingsScreen = () => {
         <Text style={styles.meta}>Category banners: {(s.categoryBanners || []).length}</Text>
       </Section>
 
+      {(s.navTabs || []).length > 0 && (
+        <Section title="Nav tabs visibility">
+          {(s.navTabs || []).map((tab, i) => (
+            <Toggle
+              key={tab.id || i}
+              label={`${tab.label || tab.id} — visible`}
+              value={tab.visible !== false}
+              onChange={(v) => patch(`navTabs.${i}.visible`, v)}
+              disabled={!canEdit}
+            />
+          ))}
+        </Section>
+      )}
+
+      {(s.offerCategories || []).length > 0 && (
+        <Section title="Offer categories visibility">
+          {(s.offerCategories || []).map((item, i) => (
+            <Toggle
+              key={item.id || i}
+              label={`${item.title || item.id} — visible`}
+              value={item.visible !== false}
+              onChange={(v) => patch(`offerCategories.${i}.visible`, v)}
+              disabled={!canEdit}
+            />
+          ))}
+        </Section>
+      )}
+
+      {(s.services || []).length > 0 && (
+        <Section title="Services visibility">
+          {(s.services || []).map((item, i) => (
+            <Toggle
+              key={item.title || i}
+              label={`${item.title} — visible`}
+              value={item.visible !== false}
+              onChange={(v) => patch(`services.${i}.visible`, v)}
+              disabled={!canEdit}
+            />
+          ))}
+        </Section>
+      )}
+
+      {(s.homeProducts || []).length > 0 && (
+        <Section title="Home products visibility">
+          {(s.homeProducts || []).map((item, i) => (
+            <Toggle
+              key={item.title || i}
+              label={`${item.title} — visible`}
+              value={item.visible !== false}
+              onChange={(v) => patch(`homeProducts.${i}.visible`, v)}
+              disabled={!canEdit}
+            />
+          ))}
+        </Section>
+      )}
+
       <View style={{ height: 40 }} />
     </ScrollView>
   );

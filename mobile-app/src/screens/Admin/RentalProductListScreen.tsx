@@ -327,6 +327,7 @@ const RentalProductListScreen = () => {
         <ActivityIndicator size="large" color="#007AFF" style={styles.loader} />
       ) : (
         <FlatList
+          style={{ flex: 1 }}
           data={paginatedProducts}
           renderItem={renderProduct}
           keyExtractor={(item) => item._id}

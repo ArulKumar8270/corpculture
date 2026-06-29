@@ -81,7 +81,7 @@ const CompanyReportsScreen = () => {
 
     try {
       const response = await axios.get(
-        `${getApiBaseUrl()}/company/all`,
+        `${getApiBaseUrl()}/company/all?page=1&limit=10000`,
         {
           headers: { Authorization: token },
         }

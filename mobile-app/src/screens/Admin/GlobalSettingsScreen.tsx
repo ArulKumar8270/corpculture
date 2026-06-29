@@ -19,6 +19,8 @@ import axios from 'axios';
 import Toast from 'react-native-toast-message';
 import { usePermissions } from '../../hooks/usePermissions';
 import { getApiBaseUrl } from '../../services/api';
+import QRCode from 'react-native-qrcode-svg';
+import * as Sharing from 'expo-sharing';
 
 const PREDEFINED_MAILS = [
   'noreply@corpculture.com',
@@ -38,6 +40,9 @@ const GlobalSettingsScreen = () => {
   const [mailInputType, setMailInputType] = useState<'select' | 'custom'>('select');
   const [customMail, setCustomMail] = useState('');
   const [mailPickerVisible, setMailPickerVisible] = useState(false);
+  const [petrolPricePerKm, setPetrolPricePerKm] = useState('');
+  const [savingPetrolPrice, setSavingPetrolPrice] = useState(false);
+  const qrUrl = `${getApiBaseUrl().replace(/\/api\/v1$/, '')}/qr`;
 
   const canEdit = hasPermission('otherSettingsSettings', 'edit') || user?.role === 1;
 
@@ -57,6 +62,11 @@ const GlobalSettingsScreen = () => {
         const savedMail = data.commonDetails?.fromMail || '';
         setGlobalInvoiceFormat(data.commonDetails?.globalInvoiceFormat || '');
         setFromMail(savedMail);
+        setPetrolPricePerKm(
+          data.commonDetails?.petrolPricePerKm != null
+            ? String(data.commonDetails.petrolPricePerKm)
+            : ''
+        );
         setCustomMail(PREDEFINED_MAILS.includes(savedMail) ? '' : savedMail);
         setMailInputType(PREDEFINED_MAILS.includes(savedMail) ? 'select' : 'custom');
       }
@@ -142,6 +152,47 @@ const GlobalSettingsScreen = () => {
       });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSavePetrolPrice = async () => {
+    if (!canEdit) {
+      Toast.show({ type: 'error', text1: 'You do not have permission to update settings' });
+      return;
+    }
+    try {
+      setSavingPetrolPrice(true);
+      const { data } = await axios.put(
+        `${getApiBaseUrl()}/common-details`,
+        {
+          petrolPricePerKm: petrolPricePerKm === '' ? 0 : Number(petrolPricePerKm),
+        },
+        { headers: { Authorization: token || '' } }
+      );
+      if (data?.success) {
+        Toast.show({ type: 'success', text1: 'Petrol price updated successfully' });
+      } else {
+        Toast.show({ type: 'error', text1: data?.message || 'Failed to update petrol price' });
+      }
+    } catch (error: any) {
+      Toast.show({
+        type: 'error',
+        text1: error.response?.data?.message || 'Failed to update petrol price',
+      });
+    } finally {
+      setSavingPetrolPrice(false);
+    }
+  };
+
+  const handleDownloadQr = async () => {
+    try {
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(qrUrl, { dialogTitle: 'CorpCulture QR Link' });
+      } else {
+        Toast.show({ type: 'info', text1: 'QR URL', text2: qrUrl });
+      }
+    } catch {
+      Toast.show({ type: 'info', text1: 'QR URL', text2: qrUrl });
     }
   };
 
@@ -259,6 +310,39 @@ const GlobalSettingsScreen = () => {
           />
         )}
 
+        <Text style={[styles.sectionTitle, { marginTop: 24 }]}>Petrol Price (₹ per KM)</Text>
+        <TextInput
+          style={styles.input}
+          value={petrolPricePerKm}
+          onChangeText={setPetrolPricePerKm}
+          placeholder="e.g. 12"
+          placeholderTextColor="#999"
+          keyboardType="decimal-pad"
+          editable={canEdit}
+        />
+        {canEdit && (
+          <TouchableOpacity
+            style={[styles.button, styles.buttonPrimary]}
+            onPress={handleSavePetrolPrice}
+            disabled={savingPetrolPrice}
+          >
+            {savingPetrolPrice ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Text style={styles.buttonText}>Save Petrol Price</Text>
+            )}
+          </TouchableOpacity>
+        )}
+
+        <Text style={[styles.sectionTitle, { marginTop: 24 }]}>App QR Code</Text>
+        <View style={styles.qrBox}>
+          <QRCode value={qrUrl} size={180} />
+          <Text style={styles.qrUrl}>{qrUrl}</Text>
+        </View>
+        <TouchableOpacity style={[styles.button, styles.buttonSecondary]} onPress={handleDownloadQr}>
+          <Text style={styles.buttonTextSecondary}>Share QR Link</Text>
+        </TouchableOpacity>
+
         {canEdit && (
           <TouchableOpacity
             style={[styles.button, styles.buttonPrimary, styles.saveAllButton]}
@@ -374,6 +458,26 @@ const styles = StyleSheet.create({
   pickerItemText: { fontSize: 16, color: '#333' },
   pickerItemTextCancel: { fontSize: 16, color: '#019ee3' },
   saveAllButton: { marginTop: 24 },
+  qrBox: {
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    marginBottom: 8,
+  },
+  qrUrl: { marginTop: 12, fontSize: 12, color: '#666', textAlign: 'center' },
+  buttonSecondary: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#019ee3',
+  },
+  buttonTextSecondary: {
+    color: '#019ee3',
+    fontSize: 16,
+    fontWeight: '600',
+  },
 });
 
 export default GlobalSettingsScreen;

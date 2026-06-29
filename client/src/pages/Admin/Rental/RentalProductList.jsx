@@ -16,6 +16,8 @@ const RentalProductList = () => {
     const [rentalProducts, setRentalProducts] = useState([]);
     const [employees, setEmployees] = useState([]); // New state for storing employee list
     const [searchTerm, setSearchTerm] = useState(''); // New state for search term
+    const [companyFilter, setCompanyFilter] = useState('');
+    const [rentalTypeFilter, setRentalTypeFilter] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
     const { auth, userPermissions } = useAuth();
@@ -28,7 +30,7 @@ const RentalProductList = () => {
     // Reset to page 1 when search term changes
     useEffect(() => {
         setCurrentPage(1);
-    }, [searchTerm]);
+    }, [searchTerm, companyFilter, rentalTypeFilter]);
 
 
     const isAdmin = Number(auth?.user?.role) === 1;
@@ -40,8 +42,8 @@ const RentalProductList = () => {
     const fetchRentalProducts = async () => {
         try {
             const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/rental-products`);
-            if (data?.success && data.rentalProducts.length > 0) {
-                setRentalProducts(data.rentalProducts);
+            if (data?.success) {
+                setRentalProducts(data.rentalProducts || []);
             } else {
                 toast.error(data?.message || 'Failed to fetch rental products. Displaying sample data.');
                 setRentalProducts([]);
@@ -133,16 +135,31 @@ const RentalProductList = () => {
         const companyName = product.company?.companyName?.toLowerCase() || '';
         const modelName = product.modelName?.toLowerCase() || '';
         const serialNo = product.serialNo?.toLowerCase() || '';
+        const rentalType = String(product.rentalType || '').toLowerCase();
         const paymentDate = product.paymentDate ? dayjs(product.paymentDate).format('DD/MM/YYYY').toLowerCase() : '';
         const lowerCaseSearchTerm = searchTerm.toLowerCase();
 
-        return (
+        const matchesSearch =
             companyName.includes(lowerCaseSearchTerm) ||
             modelName.includes(lowerCaseSearchTerm) ||
             serialNo.includes(lowerCaseSearchTerm) ||
-            paymentDate.includes(lowerCaseSearchTerm)
-        );
+            paymentDate.includes(lowerCaseSearchTerm);
+
+        const matchesCompany = !companyFilter || product.company?._id === companyFilter;
+        const matchesType = !rentalTypeFilter || rentalType === rentalTypeFilter.toLowerCase();
+
+        return matchesSearch && matchesCompany && matchesType;
     });
+
+    const companyOptions = [...new Map(
+        rentalProducts
+            .filter((p) => p.company?._id)
+            .map((p) => [p.company._id, p.company])
+    ).values()];
+
+    const rentalTypeOptions = [...new Set(
+        rentalProducts.map((p) => String(p.rentalType || '').trim()).filter(Boolean)
+    )].sort();
 
     // Calculate pagination
     const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
@@ -173,14 +190,45 @@ const RentalProductList = () => {
             </div>
 
             {/* Search Input */}
-            <TextField
-                fullWidth
-                label="Search by Company, Model, Serial No, or Payment Date"
-                variant="outlined"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                sx={{ mb: 3 }}
-            />
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 3 }}>
+                <TextField
+                    label="Search by Company, Model, Serial No, or Payment Date"
+                    variant="outlined"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    sx={{ flex: 1, minWidth: 240 }}
+                />
+                <FormControl sx={{ minWidth: 200 }} size="small">
+                    <InputLabel>Company</InputLabel>
+                    <Select
+                        value={companyFilter}
+                        label="Company"
+                        onChange={(e) => setCompanyFilter(e.target.value)}
+                    >
+                        <MenuItem value="">All Companies</MenuItem>
+                        {companyOptions.map((company) => (
+                            <MenuItem key={company._id} value={company._id}>
+                                {company.companyName}
+                            </MenuItem>
+                        ))}
+                    </Select>
+                </FormControl>
+                <FormControl sx={{ minWidth: 180 }} size="small">
+                    <InputLabel>Rental Type</InputLabel>
+                    <Select
+                        value={rentalTypeFilter}
+                        label="Rental Type"
+                        onChange={(e) => setRentalTypeFilter(e.target.value)}
+                    >
+                        <MenuItem value="">All Types</MenuItem>
+                        {rentalTypeOptions.map((type) => (
+                            <MenuItem key={type} value={type}>
+                                {type}
+                            </MenuItem>
+                        ))}
+                    </Select>
+                </FormControl>
+            </Box>
 
             <Paper className="p-6 shadow-md">
                 <TableContainer>

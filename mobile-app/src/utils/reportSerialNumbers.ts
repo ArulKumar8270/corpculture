@@ -4,22 +4,37 @@ export function collectReportSerialNumbers(report: unknown): string {
   const r = report as Record<string, unknown>;
   const serials = new Set<string>();
 
-  if (typeof r.serialNo === 'string' && r.serialNo.trim()) {
-    serials.add(r.serialNo.trim());
-  }
+  const add = (value: unknown) => {
+    const v = String(value ?? '').trim();
+    if (!v || v === '—' || v === 'N/A' || v === '-') return;
+    if (/^x+$/i.test(v)) return;
+    serials.add(v);
+  };
 
   const groups = Array.isArray(r.materialGroups) ? r.materialGroups : [];
   groups.forEach((group) => {
-    const products = group && typeof group === 'object' && Array.isArray((group as { products?: unknown }).products)
-      ? (group as { products: unknown[] }).products
-      : [];
+    if (group && typeof group === 'object') {
+      add((group as { serialNo?: string }).serialNo);
+    }
+    const products =
+      group && typeof group === 'object' && Array.isArray((group as { products?: unknown }).products)
+        ? (group as { products: unknown[] }).products
+        : [];
     products.forEach((product) => {
       if (product && typeof product === 'object') {
-        const serial = (product as { serialNo?: string }).serialNo;
-        if (typeof serial === 'string' && serial.trim()) serials.add(serial.trim());
+        add((product as { serialNo?: string }).serialNo);
       }
     });
   });
+
+  const materials = Array.isArray(r.materials) ? r.materials : [];
+  materials.forEach((material) => {
+    if (material && typeof material === 'object') {
+      add((material as { serialNo?: string }).serialNo);
+    }
+  });
+
+  add(r.serialNo);
 
   return serials.size > 0 ? Array.from(serials).join(', ') : 'N/A';
 }

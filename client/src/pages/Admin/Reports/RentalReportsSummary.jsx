@@ -26,10 +26,10 @@ const RentalReportsSummary = () => {
     const [reportData, setReportData] = useState([]);
 
     const fetchRentalReportsCount = useCallback(async (serialNo = '') => {
-        const params = new URLSearchParams({ page: '1', limit: '1' });
+        const params = new URLSearchParams({ page: '1', limit: '1', reportType: 'Rental_Report' });
         if (serialNo.trim()) params.set('serialNo', serialNo.trim());
         const { data } = await axios.get(
-            `${import.meta.env.VITE_SERVER_URL}/api/v1/report/rental?${params.toString()}`,
+            `${import.meta.env.VITE_SERVER_URL}/api/v1/report/Rental_Report?${params.toString()}`,
             { headers: { Authorization: auth.token } }
         );
         return data?.totalCount ?? 0;
@@ -47,12 +47,12 @@ const RentalReportsSummary = () => {
             ] = await Promise.allSettled([
                 axios.post(
                     `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/all`,
-                    { invoiceType: "invoice" },
+                    { invoiceType: 'invoice', page: 1, limit: 1 },
                     { headers: { Authorization: auth.token } }
                 ),
                 axios.post(
                     `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/all`,
-                    { invoiceType: "quotation" },
+                    { invoiceType: 'quotation', page: 1, limit: 1 },
                     { headers: { Authorization: auth.token } }
                 ),
                 fetchRentalReportsCount(serialNo),
@@ -65,7 +65,7 @@ const RentalReportsSummary = () => {
             const data = [
                 { id: 'rentalInvoices', name: 'Rental Invoices', count: rentalInvoicesRes?.value?.data?.totalCount ?? 0, path: '../rantalInvoicesReport' },
                 { id: 'rentalQuotations', name: 'Rental Quotations', count: rentalQuotationsRes?.value?.data?.totalCount ?? 0, path: '../rentalQuotationsReport' },
-                { id: 'rentalReports', name: 'Rental Reports', count: typeof rentalReportsCount?.value === 'number' ? rentalReportsCount.value : 0, path: '../rentalReportsReport', supportsSerialFilter: true },
+                { id: 'rentalReports', name: 'Rental Reports', count: rentalReportsCount?.status === 'fulfilled' ? (rentalReportsCount.value ?? 0) : 0, path: '../rentalReportsReport', supportsSerialFilter: true },
                 { id: 'rentalEnquiries', name: 'Rental Enquiries', count: rentalEnquiriesRes?.value?.data?.totalCount ?? 0, path: '../rentalEnquiriesReport' },
             ];
             setReportData(data);

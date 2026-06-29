@@ -308,7 +308,7 @@ const ServiceSection = ({ services }) => {
               <div
                 className={`${service.bgColor} p-6 flex justify-center items-center transition-all duration-300 group-hover:scale-105`}
               >
-                <div className="bg-white/20 p-4 rounded-full">
+                <div className="bg-white/20 rounded-full">
                   {service.icon}
                 </div>
               </div>
@@ -336,7 +336,9 @@ const ServiceSection = ({ services }) => {
             </button>
             <div className="flex flex-col md:flex-row gap-0">
               <div className="flex-1 p-8">
-                <h2 className="text-2xl font-extrabold mb-6 text-center md:text-left text-gray-800 tracking-tight">AC/SERVICE ENQUIRY FORM</h2>
+                <h2 className="text-2xl font-extrabold mb-6 text-center md:text-left text-gray-800 tracking-tight">
+                  {selectedService?.title ? `${selectedService.title} Enquiry Form` : 'SERVICE ENQUIRY FORM'}
+                </h2>
                 {submitStatus === true && ( // Check for explicit true
                   <div className="mb-4 text-green-600 font-semibold">Enquiry submitted successfully!</div>
                 )}

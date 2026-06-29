@@ -56,6 +56,7 @@ import AdminCommission from "./AdminCommission";
 import EmployeeDetails from "./EmployeeDetails";
 import OldInvoicesList from "./OldInvoicesList";
 import CreditManagement from "./CreditManagement";
+import GiftSettings from "./OtherSettings/GiftSettings";
 import EmployeeActivityLogForm from "../Employee/EmployeeActivityLogForm";
 import ActivityLogReport from "./Reports/ActivityLogReport";
 import EmployeeLeaveForm from "../Employee/EmployeeLeaveForm";
@@ -137,6 +138,7 @@ const AdminDashboard = () => {
                             <Route path="companyList" element={<CompanyList />} />
                             <Route path="addCompany/:companyId?" element={<AddCompany />} />
                             <Route path="credit" element={<CreditManagement />} />
+                            <Route path="gift" element={<GiftSettings />} />
                             {/* <Route path="serviceReports" element={<ServiceReports />} /> */}
                             <Route path="addServiceQuotation/:quotationId?" element={<AddServiceQuotation />} />
                             <Route path="addServiceInvoice/:invoiceId?" element={<AddServiceInvoice />} />

@@ -16,6 +16,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { setAuth } from '../../store/slices/authSlice';
 import { fetchUserPermissions } from '../../store/slices/permissionsSlice';
 import { authService } from '../../services/api';
+import { setupPushNotificationsForUser } from '../../services/pushNotifications';
 import Toast from 'react-native-toast-message';
 
 const LoginScreen = () => {
@@ -103,6 +104,12 @@ const LoginScreen = () => {
           console.error('Error fetching permissions:', permissionError);
           // Don't block login if permissions fail to load
         }
+      }
+
+      if (user.role === 1 || user.role === 3) {
+        setupPushNotificationsForUser().catch((err) =>
+          console.error('Push notification setup failed:', err)
+        );
       }
 
       Toast.show({

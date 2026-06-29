@@ -202,6 +202,19 @@ const AddServiceInvoice = () => {
                 const company = data.company;
                 setCompanyData(company);
 
+                if (!invoiceId) {
+                    const contacts = Array.isArray(company.contactPersons) ? company.contactPersons : [];
+                    const defaultContact =
+                        contacts.find((p) => p?.isDefault && String(p?.email || '').trim()) ||
+                        contacts.find((p) => String(p?.email || '').trim());
+                    const defaultEmail = defaultContact ? String(defaultContact.email).trim() : '';
+                    if (defaultEmail) {
+                        setInvoiceData((prev) => ({
+                            ...prev,
+                            sendTo: prev.sendTo?.length ? prev.sendTo : [defaultEmail],
+                        }));
+                    }
+                }
             } else {
                 alert(data?.message || 'Failed to fetch company details.');
             }

@@ -148,6 +148,7 @@ const CustomDrawerContent = (props: CustomDrawerContentProps) => {
       'ServiceReportsReport': 'Reports',
       'ActivityLogReport': 'Reports',
       'LeaveReport': 'Reports',
+      'EmployeeBenefitsReport': 'Reports',
       'EmployeeList': 'Reports',
     };
     
@@ -580,6 +581,70 @@ const CustomDrawerContent = (props: CustomDrawerContentProps) => {
                 onPress={() => navigateToScreen('UserManagement')}
               >
                 <Text style={styles.menuItemText}>Users</Text>
+              </TouchableOpacity>
+            )}
+            {(isAdmin || hasPermission('reportsSales', 'view')) && (
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => navigateToScreen('SalesReportsSummary')}
+              >
+                <Text style={styles.menuItemText}>Sales Over all Details</Text>
+              </TouchableOpacity>
+            )}
+            {(isAdmin || hasPermission('reportsService', 'view')) && (
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => navigateToScreen('ServiceEnquiriesReport')}
+              >
+                <Text style={styles.menuItemText}>Service Enquiries Report</Text>
+              </TouchableOpacity>
+            )}
+            {(isAdmin || hasPermission('reportsService', 'view')) && (
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => navigateToScreen('ServiceInvoicesReport')}
+              >
+                <Text style={styles.menuItemText}>Service Invoices Report</Text>
+              </TouchableOpacity>
+            )}
+            {(isAdmin || hasPermission('reportsService', 'view')) && (
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => navigateToScreen('ServiceReportsReport')}
+              >
+                <Text style={styles.menuItemText}>Service Reports Report</Text>
+              </TouchableOpacity>
+            )}
+            {(isAdmin || hasPermission('reportsRental', 'view')) && (
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => navigateToScreen('RentalInvoiceReport')}
+              >
+                <Text style={styles.menuItemText}>Rental Invoice Report</Text>
+              </TouchableOpacity>
+            )}
+            {(isAdmin || hasPermission('reportsActivityLog', 'view')) && (
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => navigateToScreen('ActivityLogReport')}
+              >
+                <Text style={styles.menuItemText}>Petrol Form Report</Text>
+              </TouchableOpacity>
+            )}
+            {(isAdmin || hasPermission('reportsEmployeeBenefits', 'view')) && (
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => navigateToScreen('EmployeeBenefitsReport')}
+              >
+                <Text style={styles.menuItemText}>Employee Benefits</Text>
+              </TouchableOpacity>
+            )}
+            {(isAdmin || hasPermission('reportsLeaveReport', 'view')) && (
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => navigateToScreen('LeaveReport')}
+              >
+                <Text style={styles.menuItemText}>Leave Report</Text>
               </TouchableOpacity>
             )}
           </View>

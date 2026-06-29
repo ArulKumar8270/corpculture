@@ -374,7 +374,7 @@ const BookShowcase = ({ books: booksProp = [], categoryBanners = [] }) => {
             </button>
             <div className="flex flex-col md:flex-row gap-0">
               <div className="flex-1 p-8">
-                <h2 className="text-2xl font-extrabold mb-6 text-center md:text-left text-gray-800 tracking-tight">AC/SERVICE ENQUIRY FORM</h2>
+                <h2 className="text-2xl font-extrabold mb-6 text-center md:text-left text-gray-800 tracking-tight">RENTAL ENQUIRY FORM</h2>
                 {submitStatus === true && ( // Check for explicit true
                   <div className="mb-4 text-green-600 font-semibold">Enquiry submitted successfully!</div>
                 )}

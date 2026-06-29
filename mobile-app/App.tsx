@@ -12,6 +12,7 @@ import {
   setCompanyEnabled,
   setSelectedCompany,
 } from './src/store/slices/companySlice';
+import { setupPushNotificationsForUser } from './src/services/pushNotifications';
 
 const App = () => {
   useEffect(() => {
@@ -26,6 +27,11 @@ const App = () => {
           // Fetch user permissions
           if (user._id) {
             store.dispatch(fetchUserPermissions(user._id) as any);
+          }
+          if (user.role === 1 || user.role === 3) {
+            setupPushNotificationsForUser().catch((err) =>
+              console.error('Push notification setup failed:', err)
+            );
           }
         } else {
           console.log('App - No stored auth data found');

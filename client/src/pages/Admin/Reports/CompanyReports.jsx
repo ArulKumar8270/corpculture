@@ -17,7 +17,8 @@ import {
     InputLabel,
     Select,
     MenuItem,
-    TextField // Import TextField for search input
+    TextField,
+    TablePagination,
 } from '@mui/material';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
@@ -43,6 +44,8 @@ const CompanyReports = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [searchTerm, setSearchTerm] = useState(''); // New state for search term
+    const [page, setPage] = useState(0);
+    const [rowsPerPage, setRowsPerPage] = useState(10);
 
     // State for the Reminder Modal
     const [openReminderModal, setOpenReminderModal] = useState(false);
@@ -93,8 +96,7 @@ const CompanyReports = () => {
     }, [auth?.token]);
 
     const handleViewDetails = (companyId) => {
-        toast.info(`Viewing general details for company ID: ${companyId}`);
-        navigate(`/admin/reports/company/${companyId}`);
+        navigate(`../addCompany/${companyId}`);
     };
 
     const handleViewServiceInvoices = (companyId) => {
@@ -106,7 +108,7 @@ const CompanyReports = () => {
     };
 
     const handleViewServiceReports = (companyId) => {
-        navigate(`../rantalInvoicesReport/${companyId}/`);
+        navigate(`../serviceReportsReport/${companyId}`);
     };
 
     const handleViewRentalInvoices = (companyId) => {
@@ -118,8 +120,7 @@ const CompanyReports = () => {
     };
 
     const handleViewRentalReports = (companyId) => {
-        toast.info(`Viewing rental reports for company ID: ${companyId}`);
-        navigate(`/admin/reports/company/${companyId}/rental-reports`);
+        navigate(`../rentalReportsReport/${companyId}`);
     };
 
     // Functions for Reminder Modal
@@ -231,6 +232,17 @@ const CompanyReports = () => {
         );
     });
 
+    const paginatedCompanies = filteredCompanies.slice(
+        page * rowsPerPage,
+        page * rowsPerPage + rowsPerPage
+    );
+
+    const handleChangePage = (_, newPage) => setPage(newPage);
+    const handleChangeRowsPerPage = (e) => {
+        setRowsPerPage(parseInt(e.target.value, 10));
+        setPage(0);
+    };
+
     if (loading) {
         return (
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '80vh' }}>
@@ -287,7 +299,7 @@ const CompanyReports = () => {
                                     </TableCell>
                                 </TableRow>
                             ) : (
-                                filteredCompanies.map((company) => ( // Use filteredCompanies here
+                                paginatedCompanies.map((company) => (
                                     <TableRow key={company._id}>
                                         <TableCell>{company.companyName}</TableCell>
                                         <TableCell>{company.companyAddress}</TableCell>
@@ -381,6 +393,15 @@ const CompanyReports = () => {
                         </TableBody>
                     </Table>
                 </TableContainer>
+                <TablePagination
+                    rowsPerPageOptions={[10, 25, 50, 100]}
+                    component="div"
+                    count={filteredCompanies.length}
+                    rowsPerPage={rowsPerPage}
+                    page={page}
+                    onPageChange={handleChangePage}
+                    onRowsPerPageChange={handleChangeRowsPerPage}
+                />
             </Paper>
 
             {/* Reminder Modal */}

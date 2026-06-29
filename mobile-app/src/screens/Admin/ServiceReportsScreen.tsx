@@ -217,14 +217,27 @@ const ServiceReportsScreen = () => {
 
   const handleSendReport = async (report: any) => {
     try {
-      await axios.post(REPORT_SEND_N8N_WEBHOOK, {
+      const res = await axios.post(REPORT_SEND_N8N_WEBHOOK, {
         reportId: report._id,
       });
+      const serviceId = report?.serviceId?._id || report?.serviceId;
+      if (res && serviceId) {
+        try {
+          await axios.put(
+            `${getApiBaseUrl()}/service/update/${serviceId}`,
+            { status: 'Completed' },
+            { headers: { Authorization: token || '' } }
+          );
+        } catch (statusErr) {
+          console.error('Failed to mark service enquiry completed:', statusErr);
+        }
+      }
       Toast.show({
         type: 'success',
         text1: 'Success',
         text2: 'Report sent successfully!',
       });
+      fetchReports();
     } catch (error: any) {
       Toast.show({
         type: 'error',
@@ -379,7 +392,7 @@ const ServiceReportsScreen = () => {
           ) : null}
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Serial No:</Text>
-            <Text style={styles.detailValue}>{collectReportSerialNumbers(item)}</Text>
+            <Text style={styles.serialValue}>{collectReportSerialNumbers(item)}</Text>
           </View>
           {item.assignedTo && (
             <View style={styles.detailRow}>
@@ -604,6 +617,7 @@ const ServiceReportsScreen = () => {
         <ActivityIndicator size="large" color="#007AFF" style={styles.loader} />
       ) : (
         <FlatList
+          style={{ flex: 1 }}
           data={filteredReports}
           renderItem={renderReport}
           keyExtractor={(item) => item._id}
@@ -793,6 +807,14 @@ const styles = StyleSheet.create({
     color: '#333',
     flex: 2,
     textAlign: 'right',
+  },
+  serialValue: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#019ee3',
+    flex: 2,
+    textAlign: 'right',
+    flexWrap: 'wrap',
   },
   actionButtons: {
     flexDirection: 'row',

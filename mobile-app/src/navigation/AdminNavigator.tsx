@@ -33,6 +33,7 @@ import ServiceReportsScreen from '../screens/Admin/ServiceReportsScreen';
 // Rental Management
 import RentalProductListScreen from '../screens/Admin/RentalProductListScreen';
 import RentalInvoiceListScreen from '../screens/Rental/RentalInvoiceListScreen';
+import RentalInvoiceDetailScreen from '../screens/Rental/RentalInvoiceDetailScreen';
 import RentalQuotationListScreen from '../screens/Rental/RentalQuotationListScreen';
 
 // Vendor Management
@@ -97,6 +98,7 @@ import ServiceInvoicesReportScreen from '../screens/Admin/Reports/ServiceInvoice
 import ServiceReportsReportScreen from '../screens/Admin/Reports/ServiceReportsReportScreen';
 import ActivityLogReportScreen from '../screens/Admin/Reports/ActivityLogReportScreen';
 import LeaveReportScreen from '../screens/Admin/Reports/LeaveReportScreen';
+import EmployeeBenefitsReportScreen from '../screens/Admin/Reports/EmployeeBenefitsReportScreen';
 
 // Employee HR
 import EmployeeActivityLogFormScreen from '../screens/Admin/EmployeeActivityLogFormScreen';
@@ -210,6 +212,7 @@ const RentalStack = () => (
     <Stack.Screen name="RentalProductList" component={RentalProductListScreen} options={{ title: 'Rental Products' }} />
     <Stack.Screen name="AddRentalProduct" component={AddRentalProductScreen} options={{ title: 'Add/Edit Rental Product' }} />
     <Stack.Screen name="RentalInvoiceList" component={RentalInvoiceListScreen} options={{ title: 'Rental Invoices' }} />
+    <Stack.Screen name="RentalInvoiceDetail" component={RentalInvoiceDetailScreen} options={{ title: 'Rental Invoice Details' }} />
     <Stack.Screen name="AddRentalInvoice" component={AddRentalInvoiceScreen} options={{ title: 'Add/Edit Rental Invoice' }} />
     <Stack.Screen name="RentalEnquiries" component={RentalEnquiriesScreen} options={{ title: 'Rental Enquiries' }} />
     <Stack.Screen name="RentalQuotationList" component={RentalQuotationListScreen} options={{ title: 'Rental Quotations' }} />
@@ -385,6 +388,7 @@ const ReportsStack = () => (
     <Stack.Screen name="ServiceReportsReport" component={ServiceReportsReportScreen} options={{ title: 'Service Reports Report' }} />
     <Stack.Screen name="ActivityLogReport" component={ActivityLogReportScreen} options={{ title: 'Petrol Form Report' }} />
     <Stack.Screen name="LeaveReport" component={LeaveReportScreen} options={{ title: 'Leave Report' }} />
+    <Stack.Screen name="EmployeeBenefitsReport" component={EmployeeBenefitsReportScreen} options={{ title: 'Employee Benefits' }} />
   </Stack.Navigator>
 );
 

@@ -129,7 +129,7 @@ const CompanyList = () => {
     }
 
     return (
-        <div className="p-6 bg-gradient-to-br from-[#e6fbff] to-[#f7fafd] min-h-screen w-[98%]">
+        <div className="p-6 bg-gradient-to-br from-[#e6fbff] to-[#f7fafd] min-h-screen w-[90%]">
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-bold text-[#019ee3]">Company List</h1>
                {/* {hasPermission("reportsCompanyList") ? */}
@@ -191,8 +191,8 @@ const CompanyList = () => {
                     </Typography>
                 ) : (
                     <>
-                        <TableContainer>
-                            <Table>
+                        <TableContainer sx={{ overflowX: 'auto' }}>
+                            <Table sx={{ minWidth: 1100 }}>
                                 <TableHead>
                                     <TableRow className="bg-gradient-to-r from-[#019ee3] to-[#afcb09] text-white">
                                         <TableCell sx={{ color: 'white' }}>Company Name</TableCell>
@@ -206,7 +206,7 @@ const CompanyList = () => {
                                         <TableCell sx={{ color: 'white' }}>Company Mobile</TableCell>
                                         {/* <TableCell sx={{ color: 'white' }}>Customer Type</TableCell> */}
                                         {/* <TableCell sx={{ color: 'white' }}>Created At</TableCell> */}
-                                        {hasPermission("reportsCompanyList") ? <TableCell sx={{ color: 'white' }}>Action</TableCell> : null}
+                                        {hasPermission("reportsCompanyList") ? <TableCell sx={{ color: 'white', position: 'sticky', right: 0, bgcolor: '#019ee3', zIndex: 1 }}>Action</TableCell> : null}
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
@@ -229,7 +229,8 @@ const CompanyList = () => {
                                                 variant="contained"
                                                 size="small"
                                                 onClick={() => navigate(`../addCompany/${company._id}`)}
-                                                className="bg-[#019ee3] hover:bg-[#017bb3] text-white px-3 py-1 rounded mr-2"
+                                                className="hover:bg-[#017bb3] text-black px-3 py-1 rounded mr-2"
+                                                sx={{ position: 'sticky', right: 0, bgcolor: 'black', zIndex: 1, whiteSpace: 'nowrap', marginBottom: '10px' }}
                                             >
                                                 Edit
                                             </Button>
@@ -240,11 +241,12 @@ const CompanyList = () => {
                                                     color="error"
                                                     onClick={() => handleDeleteCompany(company._id)}
                                                     className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded"
+                                                    sx={{ whiteSpace: 'nowrap' }}
                                                 >
                                                     Delete
                                                 </Button>
                                             ) : null}
-                                        </TableCell> 
+                                        </TableCell>
                                         {/* : null} */}
                                     </TableRow>
                                     ))}

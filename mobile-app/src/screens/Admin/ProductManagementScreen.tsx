@@ -22,6 +22,16 @@ import Toast from 'react-native-toast-message';
 import { usePermissions } from '../../hooks/usePermissions';
 import { getApiBaseUrl } from '../../services/api';
 
+let XLSX: any;
+try {
+  XLSX = require('xlsx');
+} catch {
+  console.warn('xlsx library not found');
+}
+
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
+
 const ProductManagementScreen = () => {
   const navigation = useNavigation();
   const { token, user } = useSelector((state: RootState) => state.auth);
@@ -38,6 +48,7 @@ const ProductManagementScreen = () => {
   const [categoryForm, setCategoryForm] = useState({ name: '', commission: '' });
   const [categoryErrors, setCategoryErrors] = useState<{ name?: string; commission?: string }>({});
   const [categoryLoading, setCategoryLoading] = useState(false);
+  const [exportingExcel, setExportingExcel] = useState(false);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -288,6 +299,50 @@ const ProductManagementScreen = () => {
 
   const canManageProducts = hasPermission('salesAllProducts', 'edit') || user?.role === 1;
 
+  const handleExportExcel = async () => {
+    if (!XLSX) {
+      Toast.show({ type: 'error', text1: 'Excel export unavailable' });
+      return;
+    }
+    if (!filteredProducts.length) {
+      Toast.show({ type: 'error', text1: 'No products to export' });
+      return;
+    }
+    try {
+      setExportingExcel(true);
+      const rows = filteredProducts.map((product, index) => ({
+        'S.No': index + 1,
+        Name: product.name || '',
+        Category: product.category?.name || product.category || '',
+        Price: product.price ?? '',
+        'Discount Price': product.discountPrice ?? '',
+        Stock: product.stock ?? '',
+        Brand: product.brand?.name || product.brand || '',
+      }));
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Products');
+      const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      const fileName = `products_${Date.now()}.xlsx`;
+      const fileUri = `${FileSystem.cacheDirectory}${fileName}`;
+      const base64 = btoa(
+        new Uint8Array(excelBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+      );
+      await FileSystem.writeAsStringAsync(fileUri, base64, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri);
+      }
+      Toast.show({ type: 'success', text1: `Exported ${rows.length} product(s)` });
+    } catch (error) {
+      console.error('Excel export failed:', error);
+      Toast.show({ type: 'error', text1: 'Failed to export products' });
+    } finally {
+      setExportingExcel(false);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -318,6 +373,17 @@ const ProductManagementScreen = () => {
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
+        <TouchableOpacity
+          style={styles.exportButton}
+          onPress={handleExportExcel}
+          disabled={exportingExcel || filteredProducts.length === 0}
+        >
+          {exportingExcel ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Icon name="file-download" size={20} color="#fff" />
+          )}
+        </TouchableOpacity>
       </View>
 
       {loading ? (
@@ -523,6 +589,12 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 16,
     color: '#333',
+  },
+  exportButton: {
+    backgroundColor: '#28a745',
+    padding: 10,
+    borderRadius: 8,
+    marginLeft: 8,
   },
   loaderContainer: {
     flex: 1,

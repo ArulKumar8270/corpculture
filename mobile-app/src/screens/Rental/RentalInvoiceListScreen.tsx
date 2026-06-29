@@ -440,6 +440,11 @@ const RentalInvoiceListScreen = () => {
     });
   };
 
+  const handleView = (entry: any) => {
+    const docId = normalizeMongoId(entry?._id) || String(entry?._id ?? '').trim();
+    (navigation as any).navigate('RentalInvoiceDetail', { id: docId });
+  };
+
   const handleUploadSignedInvoice = async (entry: any) => {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -501,13 +506,12 @@ const RentalInvoiceListScreen = () => {
       );
 
       if (uploadRes.data?.fileUrl) {
-        const oldInvoiceLink = entry.invoiceLink || [];
-        
+        const oldSignedLinks = entry.signedInvoiceLink || [];
+
         const serviceRes = await axios.put(
           `${apiUrl}/rental-payment/${entry._id}`,
           {
-            invoiceLink: [...oldInvoiceLink, uploadRes.data.fileUrl],
-            status: 'InvoiceSent',
+            signedInvoiceLink: [...oldSignedLinks, uploadRes.data.fileUrl],
           },
           {
             headers: {
@@ -1126,6 +1130,13 @@ const RentalInvoiceListScreen = () => {
 
         {/* Action Buttons */}
         <View style={styles.actionButtons}>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.viewButton]}
+            onPress={() => handleView(item)}
+          >
+            <Icon name="visibility" size={18} color="#019ee3" />
+            <Text style={[styles.actionButtonText, { color: '#019ee3' }]}>View</Text>
+          </TouchableOpacity>
           {hasPermission('rentalInvoice', 'edit') && (
             <TouchableOpacity
               style={[styles.actionButton, styles.editButton]}
@@ -2455,6 +2466,9 @@ const styles = StyleSheet.create({
   },
   editButton: {
     backgroundColor: '#e3f2fd',
+  },
+  viewButton: {
+    backgroundColor: '#e6fbff',
   },
   sendButton: {
     backgroundColor: '#28a745',

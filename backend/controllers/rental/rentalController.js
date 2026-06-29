@@ -1,4 +1,6 @@
 import RentalModel from "../../models/rentalModel.js";
+import { resolveNotificationUserId } from "../../utils/resolveNotificationUserId.js";
+import { notifyAssignment } from "../../utils/expoPushNotification.js";
 
 // Create Rental
 export const createrRental = async (req, res) => {
@@ -168,11 +170,26 @@ export const updateRental = async (req, res) => {
             });
         }
 
+        const previousEmployeeId = rental.employeeId ? String(rental.employeeId) : "";
         const updatedRental = await RentalModel.findByIdAndUpdate(
             rentalId,
             req.body,
             { new: true }
         );
+
+        const newEmployeeId = req.body.employeeId ? String(req.body.employeeId) : "";
+        if (newEmployeeId && newEmployeeId !== previousEmployeeId) {
+            const userId = await resolveNotificationUserId(newEmployeeId);
+            if (userId) {
+                const label = updatedRental.companyName || updatedRental.rentalTitle || "Rental enquiry";
+                notifyAssignment(userId, {
+                    type: "rental_enquiry",
+                    title: "New Rental Enquiry Assigned",
+                    body: `You have been assigned: ${label}`,
+                    entityId: updatedRental._id,
+                }).catch((err) => console.error("Rental assignment push failed:", err));
+            }
+        }
 
         res.status(200).send({
             success: true,

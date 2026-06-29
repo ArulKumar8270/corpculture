@@ -788,15 +788,17 @@ function InvoiceRow(props) {
                                     size="small"
                                     color={isInvoiceSent ? "success" : "error"}
                                 />
-                                <Chip
-                                    label={
-                                        hasPaymentDetails
-                                            ? "Payment Details Updated"
-                                            : "Payment Details Not Updated"
-                                    }
-                                    size="small"
-                                    color={hasPaymentDetails ? "success" : "error"}
-                                />
+                                {invoiceType !== 'quotation' ? (
+                                    <Chip
+                                        label={
+                                            hasPaymentDetails
+                                                ? "Payment Details Updated"
+                                                : "Payment Details Not Updated"
+                                        }
+                                        size="small"
+                                        color={hasPaymentDetails ? "success" : "error"}
+                                    />
+                                ) : null}
                                 <Chip
                                     label={
                                         hasSignedCopy
@@ -1446,8 +1448,9 @@ const ServiceInvoiceList = (props) => {
                     `${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/all`,
                     {
                         invoiceType: props?.invoice,
-                        tdsAmount: { $eq: null },
-                        status: { $ne: "Paid" },
+                        ...(props?.invoice === 'invoice'
+                            ? { tdsAmount: { $eq: null }, status: { $ne: 'Paid' } }
+                            : {}),
                         page: 1,
                         limit: 10000,
                     },

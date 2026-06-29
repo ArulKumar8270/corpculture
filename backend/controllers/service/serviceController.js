@@ -1,4 +1,6 @@
 import ServiceModel from "../../models/serviceModel.js";
+import { resolveNotificationUserId } from "../../utils/resolveNotificationUserId.js";
+import { notifyAssignment } from "../../utils/expoPushNotification.js";
 
 // Create Service
 export const createService = async (req, res) => {
@@ -141,11 +143,26 @@ export const updateService = async (req, res) => {
             });
         }
 
+        const previousEmployeeId = service.employeeId ? String(service.employeeId) : "";
         const updatedService = await ServiceModel.findByIdAndUpdate(
             serviceId,
             req.body,
             { new: true }
         );
+
+        const newEmployeeId = req.body.employeeId ? String(req.body.employeeId) : "";
+        if (newEmployeeId && newEmployeeId !== previousEmployeeId) {
+            const userId = await resolveNotificationUserId(newEmployeeId);
+            if (userId) {
+                const label = updatedService.companyName || updatedService.serviceTitle || "Service enquiry";
+                notifyAssignment(userId, {
+                    type: "service_enquiry",
+                    title: "New Service Enquiry Assigned",
+                    body: `You have been assigned: ${label}`,
+                    entityId: updatedService._id,
+                }).catch((err) => console.error("Service assignment push failed:", err));
+            }
+        }
 
         res.status(200).send({
             success: true,

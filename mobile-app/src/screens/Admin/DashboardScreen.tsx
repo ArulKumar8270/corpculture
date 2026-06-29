@@ -420,11 +420,19 @@ const AdminDashboardScreen = () => {
       color: '#009688',
     },
     {
+      id: 'employeeBenefitsReport',
+      title: 'Employee Benefits',
+      icon: 'card-giftcard',
+      screen: 'EmployeeBenefitsReport',
+      permissionKey: 'reportsEmployeeBenefits',
+      color: '#8BC34A',
+    },
+    {
       id: 'activityLogReport',
       title: 'Petrol Form Report',
       icon: 'assessment',
       screen: 'ActivityLogReport',
-      permissionKey: 'reports',
+      permissionKey: 'reportsActivityLog',
       color: '#5C6BC0',
     },
     {
@@ -432,7 +440,7 @@ const AdminDashboardScreen = () => {
       title: 'Leave Report',
       icon: 'event-note',
       screen: 'LeaveReport',
-      permissionKey: 'reports',
+      permissionKey: 'reportsLeaveReport',
       color: '#26A69A',
     },
   ];

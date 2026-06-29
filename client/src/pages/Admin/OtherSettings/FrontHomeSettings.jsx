@@ -733,6 +733,17 @@ const FrontHomeSettings = () => {
                                             />
                                         </Grid>
                                         <Grid item xs={12}>
+                                            <FormControlLabel
+                                                control={
+                                                    <Switch
+                                                        checked={s.visible !== false}
+                                                        onChange={(e) =>
+                                                            updateListItem("services", i, "visible", e.target.checked)
+                                                        }
+                                                    />
+                                                }
+                                                label="Visible on home"
+                                            />
                                             <IconButton color="error" onClick={() => removeListItem("services", i)}>
                                                 <DeleteIcon />
                                             </IconButton>
@@ -824,6 +835,17 @@ const FrontHomeSettings = () => {
                                             />
                                         </Grid>
                                         <Grid item xs={12}>
+                                            <FormControlLabel
+                                                control={
+                                                    <Switch
+                                                        checked={p.visible !== false}
+                                                        onChange={(e) =>
+                                                            updateListItem("homeProducts", i, "visible", e.target.checked)
+                                                        }
+                                                    />
+                                                }
+                                                label="Visible on home"
+                                            />
                                             <IconButton
                                                 color="error"
                                                 onClick={() => removeListItem("homeProducts", i)}

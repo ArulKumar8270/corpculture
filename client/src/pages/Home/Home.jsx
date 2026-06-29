@@ -46,7 +46,7 @@ const Home = () => {
             id: service.id,
             title: service.title,
             icon: service.imageUrl ? (
-                <img src={service.imageUrl} alt={service.title} className="w-8 h-8 object-contain" />
+                <img src={service.imageUrl} alt={service.title} className="object-contain" />
             ) : (
                 getServiceIcon(service.iconKey)
             ),

@@ -1,5 +1,7 @@
 import orderModel from "../../models/orderModel.js";
 import userModel from "../../models/userModel.js";
+import { resolveNotificationUserId } from "../../utils/resolveNotificationUserId.js";
+import { notifyAssignment } from "../../utils/expoPushNotification.js";
 
 const assignOrder = async (req, res) => {
     try {
@@ -44,6 +46,20 @@ const assignOrder = async (req, res) => {
                 console.error(`Error updating order ${id}:`, updateError); // {{ edit_1 }}
             } // {{ edit_1 }}
         } // {{ edit_1 }}
+
+        if (updatedOrders.length > 0) {
+            const userId = await resolveNotificationUserId(employeeId);
+            if (userId) {
+                const count = updatedOrders.length;
+                const orderLabel = count === 1 ? "1 sales order" : `${count} sales orders`;
+                notifyAssignment(userId, {
+                    type: "sales_order",
+                    title: "New Sales Order Assigned",
+                    body: `You have been assigned ${orderLabel}`,
+                    entityId: updatedOrders[0]?._id,
+                }).catch((err) => console.error("Order assignment push failed:", err));
+            }
+        }
 
         // Determine the response based on results
         if (updatedOrders.length > 0 && failedOrders.length === 0) { // {{ edit_1 }}

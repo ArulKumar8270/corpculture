@@ -11,6 +11,7 @@ import AuthNavigator from './AuthNavigator';
 import CustomerNavigator from './CustomerNavigator';
 import EmployeeNavigator from './EmployeeNavigator';
 import AdminNavigator from './AdminNavigator';
+import PushNotificationHandler from '../components/PushNotificationHandler';
 
 const Stack = createStackNavigator();
 
@@ -72,6 +73,7 @@ const AppNavigator = () => {
       <NavigationContainer ref={navigationRef}>
         {getNavigator()}
       </NavigationContainer>
+      <PushNotificationHandler />
     </RootNavigationProvider>
   );
 };

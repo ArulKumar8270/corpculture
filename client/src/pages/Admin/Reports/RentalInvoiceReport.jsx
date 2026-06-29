@@ -36,6 +36,7 @@ import axios from 'axios';
 import { useAuth } from '../../../context/auth';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
+import { collectSignedCopyDownloadCandidates } from '../../../utils/functions';
 
 const RENTAL_INVOICE_DOWNLOAD_BASE_URL = 'https://pub-bcab85dac0c64221ba6b6a756f991c46.r2.dev';
 const PAYMENT_COPY_DOWNLOAD_BASE_URL = 'https://pub-982db31d50054adebd29fa1792b12fb8.r2.dev';
@@ -486,13 +487,11 @@ const RentalInvoiceReport = (props) => {
     }, [auth?.token, page, rowsPerPage]);
 
     const handleView = (invoiceId) => {
-        // Assuming a route for viewing single rental invoice details
-        navigate(`/admin/rental-invoice/${invoiceId}`);
+        navigate(`../addRentalInvoice/${invoiceId}`);
     };
 
     const handleEdit = (invoiceId) => {
-        // Assuming a route for editing rental invoices
-        navigate(`/admin/edit-rental-invoice/${invoiceId}`);
+        navigate(`../addRentalInvoice/${invoiceId}`);
     };
 
     const handleDelete = async (invoiceId) => {
@@ -580,6 +579,36 @@ const RentalInvoiceReport = (props) => {
         } catch (e) {
             window.open(candidateUrl, '_blank', 'noopener,noreferrer');
         }
+    };
+
+    const handleDownloadSignedCopyPdf = async (entry) => {
+        const candidates = collectSignedCopyDownloadCandidates(entry);
+
+        if (candidates.length === 0) {
+            const msg = 'Signed copy not uploaded';
+            toast.error(msg);
+            window.alert(msg);
+            return;
+        }
+
+        let urlToOpen = null;
+        for (const url of candidates) {
+            try {
+                const res = await fetch(url, { method: 'HEAD' });
+                if (res.ok) {
+                    urlToOpen = url;
+                    break;
+                }
+            } catch {
+                // try next candidate
+            }
+        }
+
+        if (!urlToOpen) {
+            urlToOpen = candidates[candidates.length - 1];
+        }
+
+        window.open(urlToOpen, '_blank', 'noopener,noreferrer');
     };
 
     const togglePendingInvoiceSelection = (pendingInv) => {
@@ -936,7 +965,7 @@ const RentalInvoiceReport = (props) => {
     return (
         <Box sx={{ p: 3, bgcolor: 'background.default', minHeight: '100vh' }}>
             <Typography variant="h5" component="h1" gutterBottom sx={{ mb: 3, color: '#019ee3', fontWeight: 'bold' }}>
-                Rental Invoices Report
+                {isQuotationReport ? 'Rental Quotations Report' : 'Rental Invoices Report'}
             </Typography>
             <Paper elevation={3} sx={{ p: 2, borderRadius: '8px' }}>
                 {/* Filter Options */}
@@ -1090,6 +1119,17 @@ const RentalInvoiceReport = (props) => {
                                                     </IconButton>
                                                 </Tooltip>
                                             ) : null}
+                                            <Tooltip title={isQuotationReport ? 'Download signed quotation PDF' : 'Download signed copy PDF'}>
+                                                <IconButton
+                                                    size="small"
+                                                    color="success"
+                                                    onClick={() => handleDownloadSignedCopyPdf(invoice)}
+                                                    aria-label="Download signed copy PDF"
+                                                    sx={{ ml: 0.5 }}
+                                                >
+                                                    <DownloadIcon fontSize="small" />
+                                                </IconButton>
+                                            </Tooltip>
                                         </TableCell>
                                         {/* <TableCell>
                                             <Tooltip title="View Details">

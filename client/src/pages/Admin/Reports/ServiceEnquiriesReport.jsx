@@ -107,12 +107,15 @@ const ServiceEnquiriesReport = (props) => {
         }
     }, [auth?.token, page, rowsPerPage]);
 
+    const enquiriesListPath =
+        props?.type === 'rental' ? '../rental-enquiries' : '../service-enquiries';
+
     const handleView = (enquiryId) => {
-        navigate(`/admin/service-enquiry-details/${enquiryId}`);
+        navigate(enquiriesListPath);
     };
 
     const handleEdit = (enquiryId) => {
-        navigate(`/admin/edit-service-enquiry/${enquiryId}`);
+        navigate(enquiriesListPath);
     };
 
     const handleDelete = async (enquiryId) => {

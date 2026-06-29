@@ -227,7 +227,7 @@ const EmployeeActivityLogFormScreen = () => {
   const fetchCompanies = async () => {
     try {
       setLoadingCompanies(true);
-      const { data } = await axios.get(`${getApiBaseUrl()}/company/all?${companyAllPickerQuery}`, {
+      const { data } = await axios.get(`${getApiBaseUrl()}/company/all?${companyAllPickerQuery}&skipCounts=true`, {
         headers: { Authorization: token || '' },
       });
       if (data?.success) {

@@ -45,6 +45,10 @@ const materialGroupSchema = new mongoose.Schema({
         required: true,
         trim: true,
     },
+    serialNo: {
+        type: String,
+        trim: true,
+    },
     products: [materialSchema], // Array of material items within this group
 }, { _id: false }); // _id: false to prevent Mongoose from adding _id to subdocuments
 

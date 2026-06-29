@@ -26,6 +26,7 @@ import { getServiceProductDisplayName } from '../../utils/serviceProductDisplayN
 
 interface MaterialGroup {
   name: string;
+  serialNo?: string;
   products: Array<{
     id?: string;
     productName: string;
@@ -65,7 +66,6 @@ const AddServiceReportScreen = () => {
     reference: '',
     materialProductName: '',
     materialQuantity: '',
-    materialSerialNo: '',
     materialUsageData: '',
     materialDescription: '',
   });
@@ -148,28 +148,34 @@ const AddServiceReportScreen = () => {
             reference: fetchedReport.reference || '',
             materialProductName: '',
             materialQuantity: '',
-            materialSerialNo: '',
             materialUsageData: '',
             materialDescription: '',
           });
           if (Array.isArray(fetchedReport.materialGroups) && fetchedReport.materialGroups.length > 0) {
             setMaterialGroups(
-              fetchedReport.materialGroups.map((group: any) => ({
-                ...group,
-                products: group.products.map((prod: any, index: number) => ({
-                  ...prod,
-                  id: `initial-${group.name}-${index}-${Date.now()}`,
-                })),
-              }))
+              fetchedReport.materialGroups.map((group: any) => {
+                const products = (group.products || []).map((prod: any, index: number) => {
+                  const { serialNo, ...rest } = prod;
+                  return { ...rest, id: `initial-${group.name}-${index}-${Date.now()}` };
+                });
+                const legacyProductSerial = group.products?.find((p: any) => p?.serialNo?.trim())?.serialNo?.trim();
+                return {
+                  ...group,
+                  serialNo: group.serialNo?.trim() || legacyProductSerial || '',
+                  products,
+                };
+              })
             );
           } else if (Array.isArray(fetchedReport.materials) && fetchedReport.materials.length > 0) {
+            const legacySerial = fetchedReport.materials.find((m: any) => m?.serialNo?.trim())?.serialNo?.trim() || '';
             setMaterialGroups([
               {
                 name: 'Materials1',
-                products: fetchedReport.materials.map((mat: any, index: number) => ({
-                  ...mat,
-                  id: `initial-Materials1-${index}-${Date.now()}`,
-                })),
+                serialNo: legacySerial,
+                products: fetchedReport.materials.map((mat: any, index: number) => {
+                  const { serialNo, ...rest } = mat;
+                  return { ...rest, id: `initial-Materials1-${index}-${Date.now()}` };
+                }),
               },
             ]);
           } else {
@@ -252,17 +258,25 @@ const AddServiceReportScreen = () => {
 
   const handleAddGroup = () => {
     const newGroupName = `Materials${materialGroups.length + 1}`;
-    setMaterialGroups([...materialGroups, { name: newGroupName, products: [] }]);
+    setMaterialGroups([...materialGroups, { name: newGroupName, serialNo: '', products: [] }]);
     setSelectedGroupIndex(materialGroups.length);
     setEditingProductId(null);
     setFormData((prev) => ({
       ...prev,
       materialProductName: '',
       materialQuantity: '',
-      materialSerialNo: '',
       materialUsageData: '',
       materialDescription: '',
     }));
+  };
+
+  const handleGroupSerialChange = (value: string) => {
+    if (selectedGroupIndex === null) return;
+    setMaterialGroups((prevGroups) =>
+      prevGroups.map((group, idx) =>
+        idx === selectedGroupIndex ? { ...group, serialNo: value } : group
+      )
+    );
   };
 
   const handleSelectGroup = (idx: number) => {
@@ -272,7 +286,6 @@ const AddServiceReportScreen = () => {
       ...prev,
       materialProductName: '',
       materialQuantity: '',
-      materialSerialNo: '',
       materialUsageData: '',
       materialDescription: '',
     }));
@@ -314,7 +327,6 @@ const AddServiceReportScreen = () => {
     const productRate = selectedProduct.rate || 0;
     const productData = {
       productName: productName,
-      serialNo: formData.materialSerialNo?.trim() || '',
       usageData: formData.materialUsageData?.trim() || '',
       description: formData.materialDescription?.trim() || '',
       quantity: quantity,
@@ -356,7 +368,6 @@ const AddServiceReportScreen = () => {
       ...prev,
       materialProductName: '',
       materialQuantity: '',
-      materialSerialNo: '',
       materialUsageData: '',
       materialDescription: '',
     }));
@@ -365,7 +376,6 @@ const AddServiceReportScreen = () => {
   const handleEditProduct = (groupIdx: number, product: any) => {
     setSelectedGroupIndex(groupIdx);
     setEditingProductId(product.id || null);
-    // Find product by matching productName (handle both string and object cases)
     const productToEdit = availableProducts.find((p) => {
       const pName = getServiceProductDisplayName(p);
       return pName === product.productName;
@@ -374,7 +384,6 @@ const AddServiceReportScreen = () => {
       ...prev,
       materialProductName: productToEdit ? productToEdit._id : '',
       materialQuantity: product.quantity.toString(),
-      materialSerialNo: product.serialNo || '',
       materialUsageData: product.usageData || '',
       materialDescription: product.description || '',
     }));
@@ -465,14 +474,11 @@ const AddServiceReportScreen = () => {
       // Validate and clean materialGroups before sending
       const cleanedMaterialGroups = materialGroups.map((group) => ({
         name: group.name,
-        products: group.products.map(({ id, ...rest }: any) => {
-          // Use helper function to extract productName safely
+        serialNo: group.serialNo?.trim() || '',
+        products: group.products.map(({ id, serialNo, ...rest }: any) => {
           const productName = extractProductName(rest);
-          
-          // Ensure all numeric fields are numbers
           return {
-            productName: productName, // Already a string from extractProductName
-            serialNo: typeof rest.serialNo === 'string' ? rest.serialNo : '',
+            productName: productName,
             usageData: typeof rest.usageData === 'string' ? rest.usageData : '',
             description: typeof rest.description === 'string' ? rest.description : '',
             quantity: Number(rest.quantity) || 0,
@@ -654,6 +660,15 @@ const AddServiceReportScreen = () => {
 
         {selectedGroupIndex !== null && (
           <View style={styles.productForm}>
+            <Text style={styles.label}>Serial No (for this material group)</Text>
+            <TextInput
+              style={styles.input}
+              value={materialGroups[selectedGroupIndex]?.serialNo || ''}
+              onChangeText={handleGroupSerialChange}
+              placeholder="Enter serial number for this group"
+              autoCapitalize="characters"
+            />
+
             <Text style={styles.label}>Select Product</Text>
             <TouchableOpacity
               style={styles.pickerButton}
@@ -680,14 +695,6 @@ const AddServiceReportScreen = () => {
               onChangeText={(text) => handleChange('materialQuantity', text)}
               placeholder="Enter Quantity"
               keyboardType="numeric"
-            />
-
-            <Text style={styles.label}>Serial No (per product)</Text>
-            <TextInput
-              style={styles.input}
-              value={formData.materialSerialNo}
-              onChangeText={(text) => handleChange('materialSerialNo', text)}
-              placeholder="Optional"
             />
 
             <Text style={styles.label}>Usage Data (per product)</Text>
@@ -726,7 +733,6 @@ const AddServiceReportScreen = () => {
                     ...prev,
                     materialProductName: '',
                     materialQuantity: '',
-                    materialSerialNo: '',
                     materialUsageData: '',
                     materialDescription: '',
                   }));
@@ -741,7 +747,12 @@ const AddServiceReportScreen = () => {
         {materialGroups.map((group, groupIdx) => (
           <View key={group.name} style={styles.materialGroupCard}>
             <View style={styles.groupHeader}>
-              <Text style={styles.groupTitle}>{group.name}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.groupTitle}>{group.name}</Text>
+                <Text style={styles.groupSerial}>
+                  Serial No: {group.serialNo?.trim() || '—'}
+                </Text>
+              </View>
               <TouchableOpacity onPress={() => handleDeleteGroup(groupIdx)}>
                 <Icon name="delete" size={24} color="#FF3B30" />
               </TouchableOpacity>
@@ -755,9 +766,6 @@ const AddServiceReportScreen = () => {
                     <Text style={styles.productName}>
                       {product.productName ? String(product.productName) : 'Unknown Product'}
                     </Text>
-                    {product.serialNo ? (
-                      <Text style={styles.productDetails}>Serial: {product.serialNo}</Text>
-                    ) : null}
                     {product.usageData ? (
                       <Text style={styles.productDetails}>Usage: {product.usageData}</Text>
                     ) : null}
@@ -1085,6 +1093,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#019ee3',
+  },
+  groupSerial: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#019ee3',
+    marginTop: 4,
   },
   productRow: {
     flexDirection: 'row',

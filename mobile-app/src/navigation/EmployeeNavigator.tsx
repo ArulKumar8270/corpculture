@@ -90,6 +90,9 @@ import ServiceEnquiriesReportScreen from '../screens/Admin/Reports/ServiceEnquir
 import ServiceInvoicesReportScreen from '../screens/Admin/Reports/ServiceInvoicesReportScreen';
 import ServiceReportsReportScreen from '../screens/Admin/Reports/ServiceReportsReportScreen';
 import EmployeeListScreen from '../screens/Admin/EmployeeListScreen';
+import ActivityLogReportScreen from '../screens/Admin/Reports/ActivityLogReportScreen';
+import LeaveReportScreen from '../screens/Admin/Reports/LeaveReportScreen';
+import EmployeeBenefitsReportScreen from '../screens/Admin/Reports/EmployeeBenefitsReportScreen';
 
 const Drawer = createDrawerNavigator();
 const Stack = createStackNavigator();
@@ -328,6 +331,9 @@ const ReportsStack = () => (
     <Stack.Screen name="ServiceInvoicesReport" component={ServiceInvoicesReportScreen} options={{ title: 'Service Invoices Report' }} />
     <Stack.Screen name="ServiceReportsReport" component={ServiceReportsReportScreen} options={{ title: 'Service Reports Report' }} />
     <Stack.Screen name="EmployeeList" component={EmployeeListScreen} options={{ title: 'Employees' }} />
+    <Stack.Screen name="ActivityLogReport" component={ActivityLogReportScreen} options={{ title: 'Petrol Form Report' }} />
+    <Stack.Screen name="LeaveReport" component={LeaveReportScreen} options={{ title: 'Leave Report' }} />
+    <Stack.Screen name="EmployeeBenefitsReport" component={EmployeeBenefitsReportScreen} options={{ title: 'Employee Benefits' }} />
   </Stack.Navigator>
 );
 

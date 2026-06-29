@@ -393,15 +393,17 @@ const RentalEnquiriesScreen = () => {
               <Icon name="bar-chart" size={20} color="#007AFF" />
               <Text style={styles.actionMenuText}>Report</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.actionMenuItem}
-              onPress={() => handleMoveToUnwanted(item)}
-            >
-              <Icon name="arrow-forward" size={20} color="#FF3B30" />
-              <Text style={[styles.actionMenuText, styles.actionMenuTextDanger]}>
-                Move To Unwanted Tab
-              </Text>
-            </TouchableOpacity>
+            {Number(user?.role) === 1 ? (
+              <TouchableOpacity
+                style={styles.actionMenuItem}
+                onPress={() => handleMoveToUnwanted(item)}
+              >
+                <Icon name="arrow-forward" size={20} color="#FF3B30" />
+                <Text style={[styles.actionMenuText, styles.actionMenuTextDanger]}>
+                  Move To Unwanted Tab
+                </Text>
+              </TouchableOpacity>
+            ) : null}
           </View>
         )}
 

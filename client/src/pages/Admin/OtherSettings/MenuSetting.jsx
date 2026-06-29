@@ -76,6 +76,7 @@ const menuStructure = [
                     { name: "Rental Details", key: "reportsRental", permissions: ['view', 'add', 'edit', 'delete'] },
                     { name: "Sales Details", key: "reportsSales", permissions: ['view', 'add', 'edit', 'delete'] },
                     { name: "Employee", key: "reportsEmployeeList", permissions: ['view', 'add', 'edit', 'delete'] },
+                    { name: "Employee Benefits", key: "reportsEmployeeBenefits", permissions: ['view'] },
                     { name: "Users", key: "reportsUserList", permissions: ['view', 'add', 'edit', 'delete'] },
                     { name: "Activity Log Report", key: "reportsActivityLog", permissions: ['view', 'add', 'edit', 'delete'] },
                     { name: "Leave Report", key: "reportsLeaveReport", permissions: ['view'] },

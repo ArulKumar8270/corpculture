@@ -676,13 +676,15 @@ const ServiceEnquiriesScreen = () => {
               <Icon name="assessment" size={24} color="#007AFF" />
               <Text style={styles.modalItemText}>Report</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.modalItem}
-              onPress={() => handleAction('moveToUnwanted', selectedService)}
-            >
-              <Icon name="arrow-forward" size={24} color="#FF3B30" />
-              <Text style={[styles.modalItemText, { color: '#FF3B30' }]}>Move To Unwanted Tab</Text>
-            </TouchableOpacity>
+            {Number(user?.role) === 1 ? (
+              <TouchableOpacity
+                style={styles.modalItem}
+                onPress={() => handleAction('moveToUnwanted', selectedService)}
+              >
+                <Icon name="arrow-forward" size={24} color="#FF3B30" />
+                <Text style={[styles.modalItemText, { color: '#FF3B30' }]}>Move To Unwanted Tab</Text>
+              </TouchableOpacity>
+            ) : null}
             <TouchableOpacity
               style={[styles.modalItem, styles.modalCancel]}
               onPress={() => setActionMenuVisible(false)}

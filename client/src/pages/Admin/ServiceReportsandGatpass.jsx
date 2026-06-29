@@ -25,7 +25,7 @@ import {
     FormControl,
     InputLabel,
     Select,
-    MenuItem
+    MenuItem,
 } from '@mui/material';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import EditIcon from '@mui/icons-material/Edit';
@@ -44,16 +44,37 @@ import {
     collectReportDownloadCandidates,
     REPORT_DOWNLOAD_BASE_URL,
 } from '../../utils/functions';
+import {
+    collectReportSerialNumbers,
+    formatReportTypeLabel,
+} from '../../utils/reportSerialNumbers';
 
-const collectSerialNumbers = (report) => {
-    const serials = new Set();
-    if (report?.serialNo?.trim()) serials.add(report.serialNo.trim());
-    (report?.materialGroups || []).forEach((group) => {
-        (group?.products || []).forEach((product) => {
-            if (product?.serialNo?.trim()) serials.add(product.serialNo.trim());
-        });
-    });
-    return Array.from(serials).join(', ') || '—';
+const tableHeadCellSx = { fontWeight: 700, whiteSpace: 'nowrap', bgcolor: '#f5f7fa' };
+const companyCellSx = { minWidth: 160, maxWidth: 220, whiteSpace: 'normal', wordBreak: 'break-word' };
+const problemCellSx = { minWidth: 200, maxWidth: 280, whiteSpace: 'normal', wordBreak: 'break-word', lineHeight: 1.45 };
+const branchCellSx = { minWidth: 140, maxWidth: 200, whiteSpace: 'normal', wordBreak: 'break-word' };
+const serialCellSx = {
+    minWidth: 140,
+    maxWidth: 220,
+    fontWeight: 600,
+    color: '#019ee3',
+    whiteSpace: 'normal',
+    wordBreak: 'break-word',
+    letterSpacing: 'normal',
+    fontFamily: 'inherit',
+};
+
+const CellWithTooltip = ({ value, sx = {} }) => {
+    const text = value || '—';
+    return (
+        <TableCell sx={sx}>
+            <Tooltip title={text} arrow placement="top-start">
+                <Box component="span" sx={{ display: 'block' }}>
+                    {text}
+                </Box>
+            </Tooltip>
+        </TableCell>
+    );
 };
 
 const ServiceReportsandGatpass = (props) => {
@@ -213,16 +234,32 @@ const ServiceReportsandGatpass = (props) => {
         setExpandedReportId(prevId => (prevId === reportId ? null : reportId));
     };
 
-    const handleSendQuotation = async (reportId, companyId) => {
+    const handleSendQuotation = async (report) => {
+        const reportId = report?._id;
+        const serviceId = report?.serviceId?._id || report?.serviceId;
         setOnSendn8n(true)
         try {
             const res = await axios.post('https://n8n.nicknameinfo.net/webhook/88ed0a9b-ee21-43e0-9684-f5c5859f9734', { reportId: reportId });
+            if (res && serviceId && props?.reportType === 'Service_Report') {
+                try {
+                    await axios.put(
+                        `${import.meta.env.VITE_SERVER_URL}/api/v1/service/update/${serviceId}`,
+                        { status: 'Completed' },
+                        { headers: { Authorization: auth.token } }
+                    );
+                } catch (statusErr) {
+                    console.error('Failed to mark service enquiry completed:', statusErr);
+                }
+            }
             if (res) {
-                setOnSendn8n(false)
+                toast.success('Report sent successfully');
+                fetchReports(fromDate, toDate, companyNameFilter, assignedToFilter, serialNoFilter, page, rowsPerPage);
             }
         } catch (webhookError) {
-            setOnSendn8n(false)
             console.error('Error triggering webhook:', webhookError);
+            toast.error('Failed to send report');
+        } finally {
+            setOnSendn8n(false)
         }
     };
 
@@ -507,20 +544,20 @@ const ServiceReportsandGatpass = (props) => {
                     </Grid>
                 </Grid>
             </Paper>
-            <Paper elevation={3} sx={{ p: 2, borderRadius: '8px', overflow: 'auto', width: '100%' }}>
-                <TableContainer>
-                    <Table sx={{ minWidth: 650 }} aria-label="Service_Reports table">
+            <Paper elevation={3} sx={{ p: 2, borderRadius: '12px', overflow: 'auto', width: '100%' }}>
+                <TableContainer sx={{ maxHeight: '70vh' }}>
+                    <Table stickyHeader sx={{ minWidth: 1100 }} aria-label="Service_Reports table" size="small">
                         <TableHead>
-                            <TableRow sx={{ bgcolor: '#f0f0f0' }}>
-                                <TableCell>S.No</TableCell>
-                                <TableCell>Report Type</TableCell>
-                                <TableCell>Company</TableCell>
-                                <TableCell>Problem Report</TableCell>
-                                <TableCell>Branch</TableCell>
-                                <TableCell>Serial No</TableCell>
-                                <TableCell>Submitted At</TableCell>
-                                <TableCell>Assigned To</TableCell>
-                                <TableCell align="center">Actions</TableCell>
+                            <TableRow>
+                                <TableCell sx={{ ...tableHeadCellSx, width: 72 }}>S.No</TableCell>
+                                <TableCell sx={tableHeadCellSx}>Report Type</TableCell>
+                                <TableCell sx={tableHeadCellSx}>Company</TableCell>
+                                <TableCell sx={tableHeadCellSx}>Problem Report</TableCell>
+                                <TableCell sx={tableHeadCellSx}>Branch</TableCell>
+                                <TableCell sx={{ ...tableHeadCellSx, minWidth: 140 }}>Serial No</TableCell>
+                                <TableCell sx={tableHeadCellSx}>Submitted At</TableCell>
+                                <TableCell sx={tableHeadCellSx}>Assigned To</TableCell>
+                                <TableCell align="center" sx={tableHeadCellSx}>Actions</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
@@ -533,8 +570,8 @@ const ServiceReportsandGatpass = (props) => {
                             ) : (
                                 reports.map((report, index) => (
                                     <React.Fragment key={report._id}>
-                                        <TableRow>
-                                            <TableCell>
+                                        <TableRow hover sx={{ '&:last-child td': { borderBottom: 0 } }}>
+                                            <TableCell sx={{ whiteSpace: 'nowrap' }}>
                                                 <IconButton
                                                     aria-label="expand row"
                                                     size="small"
@@ -544,12 +581,32 @@ const ServiceReportsandGatpass = (props) => {
                                                 </IconButton>
                                                 {page * rowsPerPage + index + 1}
                                             </TableCell>
-                                            <TableCell>{report.reportType}</TableCell>
-                                            <TableCell>{report.company?.companyName || 'N/A'}</TableCell> {/* Assuming company is populated */}
-                                            <TableCell>{report.problemReport}</TableCell>
-                                            <TableCell>{report.branch}</TableCell>
-                                            <TableCell>{collectSerialNumbers(report)}</TableCell>
-                                            <TableCell>{new Date(report.createdAt).toLocaleDateString()}</TableCell>
+                                            <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                                                {formatReportTypeLabel(report.reportType)}
+                                            </TableCell>
+                                            <CellWithTooltip
+                                                value={report.company?.companyName || 'N/A'}
+                                                sx={companyCellSx}
+                                            />
+                                            <CellWithTooltip
+                                                value={report.problemReport}
+                                                sx={problemCellSx}
+                                            />
+                                            <CellWithTooltip value={report.branch} sx={branchCellSx} />
+                                            <TableCell sx={serialCellSx}>
+                                                <Tooltip
+                                                    title={collectReportSerialNumbers(report)}
+                                                    arrow
+                                                    placement="top-start"
+                                                >
+                                                    <Box component="span" sx={{ display: 'block' }}>
+                                                        {collectReportSerialNumbers(report)}
+                                                    </Box>
+                                                </Tooltip>
+                                            </TableCell>
+                                            <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                                                {new Date(report.createdAt).toLocaleDateString()}
+                                            </TableCell>
                                             <TableCell>
                                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                                     {report?.assignedTo ? (
@@ -572,7 +629,7 @@ const ServiceReportsandGatpass = (props) => {
                                             <TableCell align="center">
                                                 <Tooltip title="Send Report">
                                                     <IconButton
-                                                        onClick={() => handleSendQuotation(report._id, report.company?._id)}
+                                                        onClick={() => handleSendQuotation(report)}
                                                         color="success" // You can choose a different color
                                                     >
                                                         {onSendn8n ? <CircularProgress size={24} /> : <SendIcon />}
@@ -629,6 +686,11 @@ const ServiceReportsandGatpass = (props) => {
                                                                 <Box key={groupIndex} sx={{ mb: 2 }}>
                                                                     <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mt: 1 }}>
                                                                         {group.name}
+                                                                        {group.serialNo ? (
+                                                                            <Typography component="span" variant="body2" sx={{ ml: 1, color: '#019ee3', fontWeight: 600 }}>
+                                                                                (Serial: {group.serialNo})
+                                                                            </Typography>
+                                                                        ) : null}
                                                                     </Typography>
                                                                     {group.products && group.products.length > 0 ? (
                                                                         <Table size="small" aria-label={`materials for ${group.name}`}>

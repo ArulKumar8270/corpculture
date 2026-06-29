@@ -21,6 +21,7 @@ import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import axios from 'axios';
 import { getApiBaseUrl, companyAllPickerQuery } from '../../services/api';
+import { parseSendToEmails } from '../../utils/functions';
 import { normalizeMongoId } from '../../utils/normalizeMongoId';
 import Toast from 'react-native-toast-message';
 import {
@@ -442,7 +443,7 @@ const AddServiceInvoiceScreen = () => {
                 : invoice.deliveryAddress || '',
             reference: invoice.reference || '',
             description: invoice.description || '',
-            sendTo: Array.isArray(invoice.sendTo) ? invoice.sendTo : invoice.sendTo ? [invoice.sendTo] : [],
+            sendTo: parseSendToEmails(invoice.sendTo),
             reInstall: false,
             otherProducts: '',
             benefitQuantity: '',

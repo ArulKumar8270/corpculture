@@ -479,13 +479,6 @@ const ServiceQuotationListScreen = () => {
             <Text style={styles.actionButtonText}>Move to Invoice</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.actionButton, styles.paymentButton]}
-            onPress={() => handleOpenPaymentModal(item)}
-          >
-            <Icon name="payment" size={18} color="#007AFF" />
-            <Text style={styles.actionButtonText}>Update Payment</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
             style={[styles.actionButton, styles.uploadButton]}
             onPress={() => handleUploadSignedQuotation(item)}
             disabled={isUploadingThis}

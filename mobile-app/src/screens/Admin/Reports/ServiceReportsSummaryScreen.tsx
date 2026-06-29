@@ -36,9 +36,9 @@ const ServiceReportsSummaryScreen = () => {
   const [reportData, setReportData] = useState<ReportData[]>([]);
 
   const fetchServiceReportsCount = useCallback(async (serialNo = '') => {
-    const params = new URLSearchParams({ page: '1', limit: '1' });
+    const params = new URLSearchParams({ page: '1', limit: '1', reportType: 'Service_Report' });
     if (serialNo.trim()) params.set('serialNo', serialNo.trim());
-    const { data } = await axios.get(`${getApiBaseUrl()}/report/service?${params.toString()}`, {
+    const { data } = await axios.get(`${getApiBaseUrl()}/report/Service_Report?${params.toString()}`, {
       headers: { Authorization: token || '' },
     });
     return data?.totalCount ?? 0;

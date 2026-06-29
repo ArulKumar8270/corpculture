@@ -173,9 +173,8 @@ const ServiceProductListScreen = () => {
             )}
           </View>
           <Text style={styles.totalAmount}>Total Amount: ₹{item.totalAmount || 0}</Text>
-          {item.commission && (
-            <Text style={styles.commission}>Commission: {item.commission}%</Text>
-          )}
+          <Text style={styles.commission}>Partner Profit: {item.commission ?? 'N/A'}</Text>
+          <Text style={styles.commission}>Employee Commission: {item.employeeCommission ?? 'N/A'}</Text>
         </View>
       </View>
       {hasPermission('serviceProductList', 'edit') && (
@@ -220,6 +219,7 @@ const ServiceProductListScreen = () => {
         <ActivityIndicator size="large" color="#007AFF" style={styles.loader} />
       ) : (
         <FlatList
+          style={{ flex: 1 }}
           data={paginatedProducts}
           renderItem={renderProduct}
           keyExtractor={(item) => item._id}

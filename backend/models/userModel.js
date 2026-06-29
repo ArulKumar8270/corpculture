@@ -29,6 +29,7 @@ const userSchema = new mongoose.Schema({
         default: {}   // Default to an empty object if no permissions are set
     },
     commissionCategorys: [{ type: String }], // Added commissionCategorys field
+    expoPushTokens: [{ type: String }],
 }, { timestamps: true });
 
 export default mongoose.model('User', userSchema);

@@ -378,6 +378,22 @@ const AdminMenu = ({ toggleMenu }) => {
                                                         </div>
                                                     </NavLink>
                                                 )}
+                                                {hasPermission('salesAllCategory') && (
+                                                    <NavLink
+                                                        to="./all-category"
+                                                        onClick={scrollToTop}
+                                                        className={({ isActive }) =>
+                                                            `rounded-lg mx-2 my-1 transition-all ${isActive
+                                                                ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
+                                                                : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
+                                                            }`
+                                                        }
+                                                    >
+                                                        <div className="h-10 px-8 flex items-center">
+                                                            All Category
+                                                        </div>
+                                                    </NavLink>
+                                                )}
 
                                                 {/* Commission Link (Direct) */}
                                                 {hasPermission('salesCommission') && (
@@ -862,7 +878,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                                         </div>
                                                     </NavLink>
                                                 )}
-                                                {hasPermission('reportsEmployeeList') && (
+                                                {hasPermission('reportsEmployeeBenefits') && (
                                                     <NavLink
                                                         to="./employeeBenefitsReport"
                                                         onClick={scrollToTop}
@@ -1028,7 +1044,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                             </div>
                                         </NavLink>)}
                                         {hasPermission('otherSettingsGift') && (<NavLink
-                                            to="/admin/settings/gift"
+                                            to="./gift"
                                             onClick={scrollToTop}
                                             className={({ isActive }) =>
                                                 `rounded-lg mx-2 my-1 transition-all ${isActive

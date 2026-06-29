@@ -20,6 +20,15 @@ import axios from 'axios';
 import Toast from 'react-native-toast-message';
 import { usePermissions } from '../../hooks/usePermissions';
 import { getApiBaseUrl } from '../../services/api';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
+
+let XLSX: any;
+try {
+  XLSX = require('xlsx');
+} catch {
+  // xlsx optional
+}
 
 const OrderManagementScreen = () => {
   const navigation = useNavigation();
@@ -49,6 +58,7 @@ const OrderManagementScreen = () => {
   const [filtersVisible, setFiltersVisible] = useState(false);
   const [employeePickerVisible, setEmployeePickerVisible] = useState(false);
   const [statusPickerVisible, setStatusPickerVisible] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const isEmployee = Number(user?.role) === 3;
 
@@ -154,6 +164,140 @@ const OrderManagementScreen = () => {
     setStatusFilter('');
     setPage(0);
     // Orders will reload automatically via useEffect when filters change
+  };
+
+  const buildOrdersQueryString = (pageNum: number, limitNum: number) =>
+    new URLSearchParams({
+      search: searchQuery || '',
+      fromDate: fromDate || '',
+      toDate: toDate || '',
+      buyerName: buyerNameFilter || '',
+      employeeId: employeeIdFilter || '',
+      orderStatus: orderStatusFilter || '',
+      page: String(pageNum),
+      limit: String(limitNum),
+    }).toString();
+
+  const handleExportExcel = async () => {
+    if (!token) {
+      Toast.show({ type: 'error', text1: 'Please sign in again.' });
+      return;
+    }
+    if (!XLSX) {
+      Toast.show({
+        type: 'error',
+        text1: 'Excel export requires the xlsx library.',
+      });
+      return;
+    }
+
+    setExporting(true);
+    const batchSize = 500;
+    const allOrders: any[] = [];
+    try {
+      const API_BASE_URL = getApiBaseUrl();
+      let pageNum = 1;
+      let total = 0;
+      while (true) {
+        const qs = buildOrdersQueryString(pageNum, batchSize);
+        const response = await axios.get(`${API_BASE_URL}/user/admin-orders?${qs}`, {
+          headers: { Authorization: token },
+          timeout: 120000,
+        });
+        const batch = response.data?.orders || [];
+        total = response.data?.totalCount ?? 0;
+        allOrders.push(...batch);
+        if (batch.length < batchSize || allOrders.length >= total) break;
+        pageNum += 1;
+      }
+
+      if (allOrders.length === 0) {
+        Toast.show({ type: 'error', text1: 'No orders to export for current filters.' });
+        return;
+      }
+
+      const rows: Record<string, string | number>[] = [];
+      for (const order of allOrders) {
+        const buyerName = order.buyer?.name ?? '';
+        const empName = order.employeeId?.name ?? '';
+        const ship = order.shippingInfo;
+        const shippingAddress = ship
+          ? [ship.address, ship.city, ship.state, ship.pincode, ship.country].filter(Boolean).join(', ')
+          : '';
+        const orderDate = order.createdAt ? new Date(order.createdAt).toLocaleString() : '';
+        const products = order.products || [];
+
+        if (products.length === 0) {
+          rows.push({
+            'Order ID': String(order._id),
+            'Order Date': orderDate,
+            'Order Status': order.orderStatus ?? '',
+            'Order Amount': order.amount ?? '',
+            'Buyer Name': buyerName,
+            'Assigned Employee': empName,
+            'Shipping Address': shippingAddress,
+            'Product Name': '',
+            Brand: '',
+            'Product ID': '',
+            Qty: '',
+            'Unit Price': '',
+            'Line Total': '',
+          });
+          continue;
+        }
+
+        for (const p of products) {
+          const qty = Number(p.quantity) || 1;
+          const hasDiscount = p.discountPrice != null && p.discountPrice !== '';
+          const unit = Number(hasDiscount ? p.discountPrice : p.price ?? 0);
+          rows.push({
+            'Order ID': String(order._id),
+            'Order Date': orderDate,
+            'Order Status': order.orderStatus ?? '',
+            'Order Amount': order.amount ?? '',
+            'Buyer Name': buyerName,
+            'Assigned Employee': empName,
+            'Shipping Address': shippingAddress,
+            'Product Name': p.name ?? '',
+            Brand: p.brandName ?? '',
+            'Product ID': p.productId ?? '',
+            Qty: qty,
+            'Unit Price': unit,
+            'Line Total': qty * unit,
+          });
+        }
+      }
+
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Overall Products');
+      const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      const fileName = `admin_orders_overall_products_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      const fileUri = `${FileSystem.documentDirectory}${fileName}`;
+      await FileSystem.writeAsStringAsync(
+        fileUri,
+        btoa(String.fromCharCode(...excelBuffer)),
+        { encoding: FileSystem.EncodingType.Base64 }
+      );
+
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri);
+        Toast.show({
+          type: 'success',
+          text1: `Exported ${rows.length} line(s) from ${allOrders.length} order(s).`,
+        });
+      } else {
+        Toast.show({ type: 'error', text1: 'Sharing is not available on this device.' });
+      }
+    } catch (error: any) {
+      console.error('Excel export error:', error);
+      Toast.show({
+        type: 'error',
+        text1: error.response?.data?.message || error.message || 'Export failed',
+      });
+    } finally {
+      setExporting(false);
+    }
   };
 
   const handleOrderSelect = (orderId: string) => {
@@ -318,9 +462,22 @@ const OrderManagementScreen = () => {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Orders</Text>
-        <TouchableOpacity onPress={() => setFiltersVisible(true)}>
-          <Icon name="filter-list" size={24} color="#007AFF" />
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            onPress={handleExportExcel}
+            disabled={exporting}
+            style={styles.exportBtn}
+          >
+            {exporting ? (
+              <ActivityIndicator size="small" color="#007AFF" />
+            ) : (
+              <Icon name="file-download" size={24} color="#007AFF" />
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setFiltersVisible(true)}>
+            <Icon name="filter-list" size={24} color="#007AFF" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.searchContainer}>
@@ -641,6 +798,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  exportBtn: {
+    padding: 4,
   },
   title: {
     fontSize: 24,

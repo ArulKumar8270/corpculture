@@ -1,7 +1,26 @@
+import { Linking } from 'react-native';
+
 const hasInvoiceReadingPair = (entryOld: unknown, entryNew: unknown) => {
     if (entryNew === undefined || entryNew === null || entryNew === '') return false;
     if (entryOld === undefined || entryOld === null || entryOld === '') return false;
     return true;
+};
+
+/** Normalize sendTo from API (email strings or contact objects) to email strings. */
+export const parseSendToEmails = (sendTo: unknown): string[] => {
+    const raw = Array.isArray(sendTo) ? sendTo : sendTo != null && sendTo !== '' ? [sendTo] : [];
+    const emails: string[] = [];
+    const seen = new Set<string>();
+    for (const item of raw) {
+        const email =
+            typeof item === 'object' && item !== null && !Array.isArray(item)
+                ? String((item as { email?: string }).email || '').trim()
+                : String(item ?? '').trim();
+        if (!email || seen.has(email.toLowerCase())) continue;
+        seen.add(email.toLowerCase());
+        emails.push(email);
+    }
+    return emails;
 };
 
 const calculateRentalCountAmount = (
@@ -248,4 +267,82 @@ export const formatSendDetailsRecipientsButtonSummary = (
         .filter(Boolean);
     if (!labels.length) return '--select Option--';
     return labels.join(', ');
+};
+
+export const isLikelyImageInvoiceLink = (url: string): boolean => {
+    const path = String(url || '').split(/[?#]/)[0].toLowerCase();
+    return /\.(jpe?g|png|gif|webp|bmp|heic|heif)(\/)?$/i.test(path);
+};
+
+export const SIGNED_COPY_UPLOAD_BASE_URL =
+    'https://pub-48d3e9677d09450a9113bb7bddbe02c8.r2.dev';
+
+export const normalizeSignedInvoiceLinks = (record: any): string[] => {
+    const raw = record?.signedInvoiceLink;
+    if (Array.isArray(raw)) {
+        return raw.map((x) => String(x || '').trim()).filter(Boolean);
+    }
+    if (raw != null && raw !== '') {
+        return [String(raw).trim()].filter(Boolean);
+    }
+    return [];
+};
+
+/** Signed-copy download URLs: signedInvoiceLink (web) plus legacy/mobile uploads in invoiceLink. */
+export const collectSignedCopyDownloadCandidates = (record: any): string[] => {
+    const id = record?._id ? String(record._id) : '';
+    const ordered: string[] = [];
+    const push = (url: string) => {
+        const trimmed = String(url || '').trim();
+        if (!trimmed || ordered.includes(trimmed)) return;
+        ordered.push(trimmed);
+    };
+
+    for (const link of normalizeSignedInvoiceLinks(record)) {
+        push(link);
+    }
+
+    const invoiceLinks = Array.isArray(record?.invoiceLink)
+        ? record.invoiceLink.map((x: unknown) => String(x || '').trim()).filter(Boolean)
+        : [];
+
+    for (const link of invoiceLinks) {
+        const onUploadBucket = link.includes(SIGNED_COPY_UPLOAD_BASE_URL);
+        const mobileSignedName = id && link.includes(`invoice_${id}_`);
+        if (onUploadBucket || isLikelyImageInvoiceLink(link) || mobileSignedName) {
+            push(link);
+        }
+    }
+
+    return ordered;
+};
+
+export const openSignedCopyDownload = async (
+    record: any,
+    onError?: (message: string) => void
+): Promise<boolean> => {
+    const candidates = collectSignedCopyDownloadCandidates(record);
+    if (candidates.length === 0) {
+        onError?.('Signed copy not uploaded');
+        return false;
+    }
+
+    let urlToOpen: string | null = null;
+    for (const url of candidates) {
+        try {
+            const res = await fetch(url, { method: 'HEAD' });
+            if (res.ok) {
+                urlToOpen = url;
+                break;
+            }
+        } catch {
+            // try next
+        }
+    }
+    if (!urlToOpen) {
+        urlToOpen = candidates[candidates.length - 1];
+    }
+
+    await Linking.openURL(urlToOpen);
+    return true;
 };

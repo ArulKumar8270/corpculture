@@ -172,7 +172,7 @@ const AdminServices = () => {
       if (!enquiry.employeeId) {
         newCounts.new++;
       }
-      if (enquiry.employeeId && enquiry.status !== 'Cancelled') {
+      if (enquiry.employeeId && enquiry.status !== 'Cancelled' && enquiry.status !== 'Completed') {
         newCounts.assigned++;
       }
       if (enquiry.status === 'Cancelled') { newCounts.w_u++; }
@@ -189,7 +189,7 @@ const AdminServices = () => {
         finalFilteredServices = currentFilteredServices.filter(enquiry => !enquiry.employeeId);
         break;
       case 'assigned':
-        finalFilteredServices = currentFilteredServices.filter(enquiry => !!enquiry.employeeId && enquiry.status !== 'Cancelled');
+        finalFilteredServices = currentFilteredServices.filter(enquiry => !!enquiry.employeeId && enquiry.status !== 'Cancelled' && enquiry.status !== 'Completed');
         break;
       case 'w_u':
         finalFilteredServices = currentFilteredServices.filter(enquiry => enquiry.status === 'Cancelled');
@@ -370,7 +370,7 @@ const AdminServices = () => {
         >
           Assigned Requests ({tabCounts.assigned})
         </button> : null}
-        {/* <button
+        <button
           className={`px-4 py-2 rounded-md text-sm font-medium ${activeTab === 'pending' ? 'bg-[#019ee3] text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
           onClick={() => setActiveTab('pending')}
         >
@@ -393,13 +393,7 @@ const AdminServices = () => {
           onClick={() => setActiveTab('w_u')}
         >
           W&U ({tabCounts.w_u})
-        </button> : null} */}
-        {/* {auth?.user?.role === 1 ? <button
-          className={`px-4 py-2 rounded-md text-sm font-medium ${activeTab === 'w_u' ? 'bg-[#019ee3] text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
-          onClick={() => setActiveTab('w_u')}
-        >
-          W&U ({tabCounts.w_u})
-        </button> : null} */}
+        </button> : null}
       </div>
 
       <div className="overflow-x-auto bg-white rounded-xl shadow p-4 w-[83%]">
@@ -470,9 +464,11 @@ const AdminServices = () => {
                       <MenuItem onClick={() => handleReport(enquiry._id, enquiry.employeeId, enquiry?.companyId)}>
                         <BarChartIcon sx={{ mr: 1 }} /> Report
                       </MenuItem>
-                      <MenuItem onClick={() => handleMoveStatus(currentServiceIdForMenu, "Cancelled")}>
-                        <ArrowForwardIcon sx={{ mr: 1 }} /> Move To Unwanted Tab
-                      </MenuItem>
+                      {auth?.user?.role === 1 ? (
+                        <MenuItem onClick={() => handleMoveStatus(currentServiceIdForMenu, "Cancelled")}>
+                          <ArrowForwardIcon sx={{ mr: 1 }} /> Move To Unwanted Tab
+                        </MenuItem>
+                      ) : null}
                       {/* <MenuItem onClick={() => handleMoveStatus(currentServiceIdForMenu, "Cancelled")}>
                         <ArrowForwardIcon sx={{ mr: 1 }} /> Move To Unwanted Tab
                       </MenuItem>

@@ -54,7 +54,6 @@ const AddServiceReport = (props) => {
         reference: '',
         materialProductName: '', // For adding new material (will store product _id)
         materialQuantity: '',    // For adding new material
-        materialSerialNo: '',
         materialUsageData: '',
         materialDescription: '',
     });
@@ -109,21 +108,33 @@ const AddServiceReport = (props) => {
                             reference: fetchedReport.reference || '',
                             materialProductName: '', // Reset for new material entry
                             materialQuantity: '',    // Reset for new material entry
-                            materialSerialNo: '',
                             materialUsageData: '',
                             materialDescription: '',
                         });
-                        // If backend supports groups, use them; else, wrap materials in a single group
                         if (Array.isArray(fetchedReport.materialGroups) && fetchedReport.materialGroups.length > 0) {
-                            // Add a temporary 'id' to each product for local table management
-                            setMaterialGroups(fetchedReport.materialGroups.map(group => ({
-                                ...group,
-                                products: group.products.map((prod, index) => ({ ...prod, id: `initial-${group.name}-${index}-${Date.now()}` }))
-                            })));
+                            setMaterialGroups(fetchedReport.materialGroups.map((group) => {
+                                const products = (group.products || []).map((prod, index) => {
+                                    const { serialNo, ...rest } = prod;
+                                    return { ...rest, id: `initial-${group.name}-${index}-${Date.now()}` };
+                                });
+                                const legacyProductSerial = group.products?.find((p) => p?.serialNo?.trim())?.serialNo?.trim();
+                                return {
+                                    ...group,
+                                    serialNo: group.serialNo?.trim() || legacyProductSerial || '',
+                                    products,
+                                };
+                            }));
                         } else if (Array.isArray(fetchedReport.materials) && fetchedReport.materials.length > 0) {
-                            // Fallback for old reports without materialGroups, create a single group
+                            const legacySerial = fetchedReport.materials.find((m) => m?.serialNo?.trim())?.serialNo?.trim() || '';
                             setMaterialGroups([
-                                { name: 'Materials1', products: fetchedReport.materials.map((mat, index) => ({ ...mat, id: `initial-Materials1-${index}-${Date.now()}` })) }
+                                {
+                                    name: 'Materials1',
+                                    serialNo: legacySerial,
+                                    products: fetchedReport.materials.map((mat, index) => {
+                                        const { serialNo, ...rest } = mat;
+                                        return { ...rest, id: `initial-Materials1-${index}-${Date.now()}` };
+                                    }),
+                                },
                             ]);
                         } else {
                             setMaterialGroups([]); // No materials or groups
@@ -226,7 +237,7 @@ const AddServiceReport = (props) => {
     // Add new material group
     const handleAddGroup = () => {
         const newGroupName = `Materials${materialGroups.length + 1}`;
-        setMaterialGroups([...materialGroups, { name: newGroupName, products: [] }]);
+        setMaterialGroups([...materialGroups, { name: newGroupName, serialNo: '', products: [] }]);
         setSelectedGroupIndex(materialGroups.length); // Select the newly added group
         setEditingProductId(null); // Clear any product editing state
         setReportData(prev => ({
@@ -283,15 +294,22 @@ const AddServiceReport = (props) => {
         return 'Unknown Product';
     };
 
+    const handleGroupSerialChange = (groupIdx, value) => {
+        setMaterialGroups((prevGroups) =>
+            prevGroups.map((group, idx) =>
+                idx === groupIdx ? { ...group, serialNo: value } : group
+            )
+        );
+    };
+
     // Select a material group to add/edit products
     const handleSelectGroup = (idx) => {
         setSelectedGroupIndex(idx);
-        setEditingProductId(null); // Clear any product editing state
+        setEditingProductId(null);
         setReportData(prev => ({
             ...prev,
             materialProductName: '',
             materialQuantity: '',
-            materialSerialNo: '',
             materialUsageData: '',
             materialDescription: '',
         }));
@@ -314,7 +332,6 @@ const AddServiceReport = (props) => {
         const productName = extractProductName(selectedProduct);
         const productData = {
             productName: productName,
-            serialNo: reportData.materialSerialNo?.trim() || '',
             usageData: reportData.materialUsageData?.trim() || '',
             description: reportData.materialDescription?.trim() || '',
             quantity: quantity,
@@ -356,7 +373,6 @@ const AddServiceReport = (props) => {
             ...prevData,
             materialProductName: '',
             materialQuantity: '',
-            materialSerialNo: '',
             materialUsageData: '',
             materialDescription: '',
         }));
@@ -364,10 +380,8 @@ const AddServiceReport = (props) => {
 
     // Edit product in group
     const handleEditProduct = (groupIdx, product) => {
-        setSelectedGroupIndex(groupIdx); // Ensure the correct group is selected
+        setSelectedGroupIndex(groupIdx);
         setEditingProductId(product.id);
-        // Find the product _id based on the productName to set the Select value correctly
-        // Compare extracted product names (handle nested structures)
         const productToEdit = availableProducts.find(p => {
             const pName = extractProductName(p);
             return pName === product.productName;
@@ -375,8 +389,7 @@ const AddServiceReport = (props) => {
         setReportData(prevData => ({
             ...prevData,
             materialProductName: productToEdit ? productToEdit._id : '',
-            materialQuantity: product.quantity.toString(), // Convert number to string for TextField
-            materialSerialNo: product.serialNo || '',
+            materialQuantity: product.quantity.toString(),
             materialUsageData: product.usageData || '',
             materialDescription: product.description || '',
         }));
@@ -400,7 +413,6 @@ const AddServiceReport = (props) => {
                 ...prevData,
                 materialProductName: '',
                 materialQuantity: '',
-                materialSerialNo: '',
                 materialUsageData: '',
                 materialDescription: '',
             }));
@@ -411,13 +423,12 @@ const AddServiceReport = (props) => {
     const handleDeleteGroup = (groupIdx) => {
         setMaterialGroups(prevGroups => prevGroups.filter((_, idx) => idx !== groupIdx));
         if (selectedGroupIndex === groupIdx) {
-            setSelectedGroupIndex(null); // Deselect if the deleted group was active
-            setEditingProductId(null); // Clear product editing state
+            setSelectedGroupIndex(null);
+            setEditingProductId(null);
             setReportData(prev => ({
                 ...prev,
                 materialProductName: '',
                 materialQuantity: '',
-                materialSerialNo: '',
                 materialUsageData: '',
                 materialDescription: '',
             }));
@@ -455,7 +466,8 @@ const AddServiceReport = (props) => {
             // Ensure productName is always a string, not an object
             materialGroups: materialGroups.map(group => ({
                 name: group.name,
-                products: group.products.map(({ id, ...rest }) => {
+                serialNo: group.serialNo?.trim() || '',
+                products: group.products.map(({ id, serialNo, ...rest }) => {
                     // Ensure productName is a string
                     const productName = typeof rest.productName === 'string' 
                         ? rest.productName 
@@ -525,7 +537,6 @@ const AddServiceReport = (props) => {
             reference: '',
             materialProductName: '',
             materialQuantity: '',
-            materialSerialNo: '',
             materialUsageData: '',
             materialDescription: '',
         });
@@ -710,27 +721,51 @@ const AddServiceReport = (props) => {
 
                 {selectedGroupIndex !== null && (
                     <Grid container spacing={2} alignItems="center" sx={{ mt: 2 }}>
+                        <Grid item xs={12}>
+                            <TextField
+                                fullWidth
+                                label="Serial No (for this material group)"
+                                value={materialGroups[selectedGroupIndex]?.serialNo || ''}
+                                onChange={(e) => handleGroupSerialChange(selectedGroupIndex, e.target.value)}
+                                placeholder="Enter serial number for this group"
+                                size="small"
+                            />
+                        </Grid>
                         <Grid item xs={12} sm={5}>
-                            <FormControl fullWidth size="small">
-                                <InputLabel id="material-product-name-label">Select a Product</InputLabel>
-                                <Select
-                                    labelId="material-product-name-label"
-                                    id="materialProductName"
-                                    name="materialProductName"
-                                    value={reportData.materialProductName} // This holds the product _id
-                                    onChange={handleChange}
-                                    label="Select a Product"
-                                    disabled={editingProductId !== null} // Disable product selection when editing
-                                >
-                                    <MenuItem value="">Select a Product</MenuItem>
-                                    {availableProducts?.map(prod => {
-                                        const productName = extractProductName(prod);
-                                        return (
-                                            <MenuItem key={prod._id} value={prod._id}>{productName}</MenuItem> // MenuItem value is product _id
-                                        );
-                                    })}
-                                </Select>
-                            </FormControl>
+                            <Autocomplete
+                                id="material-product-name-autocomplete"
+                                options={availableProducts || []}
+                                getOptionLabel={(option) => extractProductName(option)}
+                                isOptionEqualToValue={(option, value) => option._id === value._id}
+                                value={
+                                    availableProducts.find(
+                                        (prod) => prod._id === reportData.materialProductName
+                                    ) || null
+                                }
+                                onChange={(event, newValue) => {
+                                    handleChange({
+                                        target: {
+                                            name: 'materialProductName',
+                                            value: newValue ? newValue._id : '',
+                                        },
+                                    });
+                                }}
+                                disabled={editingProductId !== null}
+                                filterOptions={(options, state) => {
+                                    const inputValue = state.inputValue.toLowerCase();
+                                    return options.filter((option) =>
+                                        extractProductName(option).toLowerCase().includes(inputValue)
+                                    );
+                                }}
+                                renderInput={(params) => (
+                                    <TextField
+                                        {...params}
+                                        label="Select a Product"
+                                        size="small"
+                                        placeholder="Search product..."
+                                    />
+                                )}
+                            />
                         </Grid>
                         <Grid item xs={12} sm={4}>
                             <TextField
@@ -747,18 +782,7 @@ const AddServiceReport = (props) => {
                         <Grid item xs={12} sm={6}>
                             <TextField
                                 fullWidth
-                                label="Serial No (material wise)"
-                                name="materialSerialNo"
-                                value={reportData.materialSerialNo}
-                                onChange={handleChange}
-                                placeholder="Optional"
-                                size="small"
-                            />
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                            <TextField
-                                fullWidth
-                                label="Usage Data (material wise)"
+                                label="Usage Data (per product)"
                                 name="materialUsageData"
                                 value={reportData.materialUsageData}
                                 onChange={handleChange}
@@ -798,7 +822,6 @@ const AddServiceReport = (props) => {
                                             ...prevData,
                                             materialProductName: '',
                                             materialQuantity: '',
-                                            materialSerialNo: '',
                                             materialUsageData: '',
                                             materialDescription: '',
                                         }));
@@ -826,10 +849,21 @@ const AddServiceReport = (props) => {
             {/* Render all material groups and their products */}
             {materialGroups.map((group, groupIdx) => (
                 <TableContainer component={Paper} elevation={3} sx={{ borderRadius: '8px', mt: 3 }} key={group.name}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', px: 2, pt: 2 }}>
-                        <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: '#019ee3' }}>
-                            {group.name}
-                        </Typography>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', px: 2, pt: 2, gap: 2, flexWrap: 'wrap' }}>
+                        <Box>
+                            <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: '#019ee3' }}>
+                                {group.name}
+                            </Typography>
+                            {group.serialNo ? (
+                                <Typography variant="body2" sx={{ color: '#019ee3', fontWeight: 600, mt: 0.5 }}>
+                                    Serial No: {group.serialNo}
+                                </Typography>
+                            ) : (
+                                <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
+                                    Serial No: —
+                                </Typography>
+                            )}
+                        </Box>
                         <Button color="error" onClick={() => handleDeleteGroup(groupIdx)}>
                             Delete Group
                         </Button>
@@ -839,7 +873,6 @@ const AddServiceReport = (props) => {
                             <TableRow sx={{ bgcolor: '#f0f0f0' }}>
                                 <TableCell>S.No</TableCell>
                                 <TableCell>Product Name</TableCell>
-                                <TableCell>Material Serial No</TableCell>
                                 <TableCell>Material Usage Data</TableCell>
                                 <TableCell>Material Description</TableCell>
                                 <TableCell align="right">Quantity</TableCell>
@@ -850,7 +883,7 @@ const AddServiceReport = (props) => {
                         <TableBody>
                             {group.products.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={8} align="center" sx={{ py: 3, color: 'text.secondary' }}>
+                                    <TableCell colSpan={7} align="center" sx={{ py: 3, color: 'text.secondary' }}>
                                         No products added to this group yet.
                                     </TableCell>
                                 </TableRow>
@@ -864,7 +897,6 @@ const AddServiceReport = (props) => {
                                         <TableRow key={product.id}>
                                             <TableCell>{productIdx + 1}</TableCell>
                                             <TableCell>{productName}</TableCell>
-                                            <TableCell>{product.serialNo || '—'}</TableCell>
                                             <TableCell>{product.usageData || '—'}</TableCell>
                                             <TableCell>{product.description || '—'}</TableCell>
                                             <TableCell align="right">{product.quantity}</TableCell>

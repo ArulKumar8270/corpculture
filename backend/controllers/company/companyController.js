@@ -30,8 +30,12 @@ export const getAllCompanies = async (req, res) => {
         const {
             page = 1,
             limit = 10,
-            search = ''
+            search = '',
+            skipCounts = '',
         } = req.query;
+
+        const skipCountQueries =
+            skipCounts === 'true' || skipCounts === '1' || String(skipCounts).toLowerCase() === 'yes';
 
         // Build query for search
         let findQuery = {};
@@ -64,6 +68,17 @@ export const getAllCompanies = async (req, res) => {
             .skip(skip)
             .limit(parseInt(limit))
             .lean(); // Use .lean() for better performance when adding properties
+
+        if (skipCountQueries) {
+            return res.status(200).send({
+                success: true,
+                companies,
+                totalCount,
+                page: parseInt(page),
+                limit: parseInt(limit),
+                totalPages: Math.ceil(totalCount / parseInt(limit)),
+            });
+        }
 
         const companiesWithCounts = await Promise.all(companies.map(async (company) => {
             const [

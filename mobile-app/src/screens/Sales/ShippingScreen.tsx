@@ -62,8 +62,8 @@ const states = [
 const ShippingScreen = () => {
   const navigation = useNavigation();
   const { user, token } = useSelector((state: RootState) => state.auth);
+  const { selectedCompany, companyDetails } = useSelector((state: RootState) => state.company);
   const { items: cartItems } = useSelector((state: RootState) => state.cart);
-  const { selectedCompany } = useSelector((state: RootState) => state.company);
   const { sales } = useFrontHomeSettings();
   const [payOnCredit, setPayOnCredit] = useState(false);
 
@@ -80,6 +80,20 @@ const ShippingScreen = () => {
   useEffect(() => {
     loadShippingInfo();
   }, []);
+
+  useEffect(() => {
+    if (!Array.isArray(companyDetails) || companyDetails.length === 0) return;
+    const company = selectedCompany
+      ? companyDetails.find((c) => String(c._id) === String(selectedCompany))
+      : companyDetails[0];
+    if (!company) return;
+
+    setAddress((prev) => prev || company.billingAddress || company.addressDetail || '');
+    setCity((prev) => prev || company.city || '');
+    setState((prev) => prev || company.state || '');
+    setPincode((prev) => prev || company.pincode || '');
+    setPhoneNo((prev) => prev || company.phone || company.mobileNumber || user?.phone || '');
+  }, [companyDetails, selectedCompany, user?.phone]);
 
   const loadShippingInfo = async () => {
     try {

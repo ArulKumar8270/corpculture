@@ -15,6 +15,7 @@ import {
     Box,
 } from '@mui/material';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { companyAllPickerQuery } from '../../utils/functions';
 
 const EmployeeActivityLogForm = () => {
     const { auth } = useAuth();
@@ -189,7 +190,7 @@ const EmployeeActivityLogForm = () => {
     const fetchCompanies = async () => {
         try {
             const { data } = await axios.get(
-                `${import.meta.env.VITE_SERVER_URL}/api/v1/company/all`,
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/company/all?${companyAllPickerQuery}&skipCounts=true`,
                 {
                     headers: {
                         Authorization: auth?.token,

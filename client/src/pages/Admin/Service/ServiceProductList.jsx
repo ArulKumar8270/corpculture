@@ -132,6 +132,8 @@ const ServiceProductList = () => {
                                 <TableCell className="font-semibold">Quantity</TableCell>
                                 <TableCell className="font-semibold">Rate</TableCell>
                                 <TableCell className="font-semibold">GST Type</TableCell>
+                                <TableCell className="font-semibold">Partner Profit</TableCell>
+                                <TableCell className="font-semibold">Employee Commission</TableCell>
                                 <TableCell className="font-semibold">Total Amount</TableCell>
                                 {showActions ? <TableCell className="font-semibold">Action</TableCell> : null}
                             </TableRow>
@@ -160,6 +162,8 @@ const ServiceProductList = () => {
                                                 'N/A'
                                             )}
                                         </TableCell>
+                                        <TableCell>{product.commission ?? 'N/A'}</TableCell>
+                                        <TableCell>{product.employeeCommission ?? 'N/A'}</TableCell>
                                         <TableCell>{product.totalAmount}</TableCell>
                                         {showActions ? (
                                             <TableCell>

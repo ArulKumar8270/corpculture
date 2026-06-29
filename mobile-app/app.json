@@ -54,6 +54,14 @@
           "cameraPermission": "The app accesses your camera to capture count images."
         }
       ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/logo.png",
+          "color": "#019ee3",
+          "defaultChannel": "assignments"
+        }
+      ],
       "expo-font",
       "expo-asset"
     ],

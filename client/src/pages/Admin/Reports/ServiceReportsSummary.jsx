@@ -26,10 +26,10 @@ const ServiceReportsSummary = () => {
     const [reportData, setReportData] = useState([]);
 
     const fetchServiceReportsCount = useCallback(async (serialNo = '') => {
-        const params = new URLSearchParams({ page: '1', limit: '1' });
+        const params = new URLSearchParams({ page: '1', limit: '1', reportType: 'Service_Report' });
         if (serialNo.trim()) params.set('serialNo', serialNo.trim());
         const { data } = await axios.get(
-            `${import.meta.env.VITE_SERVER_URL}/api/v1/report/service?${params.toString()}`,
+            `${import.meta.env.VITE_SERVER_URL}/api/v1/report/Service_Report?${params.toString()}`,
             { headers: { Authorization: auth.token } }
         );
         return data?.totalCount ?? 0;
@@ -54,12 +54,12 @@ const ServiceReportsSummary = () => {
             ] = await Promise.allSettled([
                 axios.post(
                     `${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/all`,
-                    { invoiceType: 'invoice' },
+                    { invoiceType: 'invoice', page: 1, limit: 1 },
                     { headers: { Authorization: auth.token } }
                 ),
                 axios.post(
                     `${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/all`,
-                    { invoiceType: 'quotation' },
+                    { invoiceType: 'quotation', page: 1, limit: 1 },
                     { headers: { Authorization: auth.token } }
                 ),
                 fetchServiceReportsCount(serialNo),
@@ -85,7 +85,7 @@ const ServiceReportsSummary = () => {
                 {
                     id: 'serviceReports',
                     name: 'Service Reports',
-                    count: typeof serviceReportsCount?.value === 'number' ? serviceReportsCount.value : 0,
+                    count: serviceReportsCount?.status === 'fulfilled' ? (serviceReportsCount.value ?? 0) : 0,
                     path: '../serviceReportsReport',
                     supportsSerialFilter: true,
                 },
