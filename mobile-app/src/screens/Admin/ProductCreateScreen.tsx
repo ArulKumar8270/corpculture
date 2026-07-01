@@ -53,6 +53,10 @@ const ProductCreateScreen = () => {
   const [brand, setBrand] = useState('');
   const [installationCost, setInstallationCost] = useState('');
   const [deliveryCharge, setDeliveryCharge] = useState('');
+  const [weight, setWeight] = useState('');
+  const [length, setLength] = useState('');
+  const [width, setWidth] = useState('');
+  const [height, setHeight] = useState('');
 
   // Highlights
   const [highlights, setHighlights] = useState<string[]>([]);
@@ -102,6 +106,10 @@ const ProductCreateScreen = () => {
     setBrand(product.brandName || product.brand?.name || '');
     setInstallationCost(product.installationCost?.toString() || '');
     setDeliveryCharge(product.deliveryCharge?.toString() || '');
+    setWeight(product.weight?.toString() || '');
+    setLength(product.length?.toString() || '');
+    setWidth(product.width?.toString() || '');
+    setHeight(product.height?.toString() || '');
     setHighlights(product.highlights || []);
     setSpecs(product.specifications || []);
     setPriceRange(product.priceRange || []);
@@ -195,6 +203,10 @@ const ProductCreateScreen = () => {
     setBrand('');
     setInstallationCost('');
     setDeliveryCharge('');
+    setWeight('');
+    setLength('');
+    setWidth('');
+    setHeight('');
     setHighlights([]);
     setHighlightInput('');
     setSpecs([]);
@@ -484,6 +496,10 @@ const ProductCreateScreen = () => {
         brandName: brand,
         installationCost: installationCost || '0',
         deliveryCharge: deliveryCharge || '0',
+        weight: weight || '0',
+        length: length || '0',
+        width: width || '0',
+        height: height || '0',
         highlights: highlights || [],
         specifications: specs.map((s) => JSON.stringify(s)),
         priceRange: (priceRange || []).map((s) => JSON.stringify(s)),
@@ -605,12 +621,62 @@ const ProductCreateScreen = () => {
             />
           </View>
           <View style={styles.halfInput}>
-            <Text style={styles.label}>Delivery Charge</Text>
+            <Text style={styles.label}>Delivery/Freight Charges</Text>
             <TextInput
               style={styles.input}
               value={deliveryCharge}
               onChangeText={setDeliveryCharge}
-              placeholder="Enter delivery charge"
+              placeholder="Enter delivery/freight charges"
+              placeholderTextColor="#999"
+              keyboardType="numeric"
+            />
+          </View>
+        </View>
+
+        <Text style={styles.sectionTitle}>Courier Details</Text>
+        <View style={styles.row}>
+          <View style={styles.halfInput}>
+            <Text style={styles.label}>Weight (kg)</Text>
+            <TextInput
+              style={styles.input}
+              value={weight}
+              onChangeText={setWeight}
+              placeholder="Weight in kg"
+              placeholderTextColor="#999"
+              keyboardType="numeric"
+            />
+          </View>
+          <View style={styles.halfInput}>
+            <Text style={styles.label}>Length (cm)</Text>
+            <TextInput
+              style={styles.input}
+              value={length}
+              onChangeText={setLength}
+              placeholder="Length in cm"
+              placeholderTextColor="#999"
+              keyboardType="numeric"
+            />
+          </View>
+        </View>
+        <View style={styles.row}>
+          <View style={styles.halfInput}>
+            <Text style={styles.label}>Width (cm)</Text>
+            <TextInput
+              style={styles.input}
+              value={width}
+              onChangeText={setWidth}
+              placeholder="Width in cm"
+              placeholderTextColor="#999"
+              keyboardType="numeric"
+            />
+          </View>
+          <View style={styles.halfInput}>
+            <Text style={styles.label}>Height (cm)</Text>
+            <TextInput
+              style={styles.input}
+              value={height}
+              onChangeText={setHeight}
+              placeholder="Height in cm"
               placeholderTextColor="#999"
               keyboardType="numeric"
             />

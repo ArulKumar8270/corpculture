@@ -325,6 +325,18 @@ const ServiceEnquiriesScreen = () => {
         });
         break;
       }
+      case 'gatePass': {
+        const companyIdStr = normalizeMongoId(service?.companyId);
+        (navigation as any).navigate('AddServiceReport', {
+          employeeName,
+          employeeId,
+          reportType: 'Service_Gate_Pass',
+          serviceId: service._id,
+          companyId: companyIdStr || undefined,
+          companyName: service?.companyName,
+        });
+        break;
+      }
       case 'moveToUnwanted':
         Alert.alert(
           'Move to Unwanted',
@@ -675,6 +687,13 @@ const ServiceEnquiriesScreen = () => {
             >
               <Icon name="assessment" size={24} color="#007AFF" />
               <Text style={styles.modalItemText}>Report</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.modalItem}
+              onPress={() => handleAction('gatePass', selectedService)}
+            >
+              <Icon name="badge" size={24} color="#007AFF" />
+              <Text style={styles.modalItemText}>Gate Pass</Text>
             </TouchableOpacity>
             {Number(user?.role) === 1 ? (
               <TouchableOpacity

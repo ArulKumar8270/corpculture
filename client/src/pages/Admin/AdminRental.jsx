@@ -299,6 +299,11 @@ const AdminRental
       handleClose();
     };
 
+    const handleGatePass = (rentalId, employeeName, companyId) => {
+      navigate(`../addRentalGatePass?employeeName=${employeeName}&reportType=Rental_Gate_Pass&rentalId=${rentalId}&companyId=${companyId}`);
+      handleClose();
+    };
+
     const handleMoveStatus = (rentalId, status) => {
       updateStausToRental(rentalId, status)
       handleClose();
@@ -494,6 +499,9 @@ const AdminRental
                         </MenuItem>
                         <MenuItem onClick={() => handleReport(enquiry._id, enquiry.employeeId, enquiry?.companyId)}>
                           <BarChartIcon sx={{ mr: 1 }} /> Report
+                        </MenuItem>
+                        <MenuItem onClick={() => handleGatePass(enquiry._id, enquiry.employeeId, enquiry?.companyId)}>
+                          <DescriptionIcon sx={{ mr: 1 }} /> Gate Pass
                         </MenuItem>
                         {auth?.user?.role === 1 ? (
                           <MenuItem onClick={() => handleMoveStatus(currentRentalIdForMenu, "Cancelled")}>

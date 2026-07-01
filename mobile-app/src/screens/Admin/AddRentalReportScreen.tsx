@@ -22,6 +22,10 @@ import axios from 'axios';
 import { getApiBaseUrl, companyAllPickerQuery } from '../../services/api';
 import Toast from 'react-native-toast-message';
 import { normalizeMongoId } from '../../utils/normalizeMongoId';
+import {
+  getRentalListScreen,
+  resolveRentalReportType,
+} from '../../utils/reportNavigation';
 
 interface MaterialGroup {
   name: string;
@@ -43,6 +47,7 @@ const AddRentalReportScreen = () => {
   const employeeName = params?.employeeName;
   const employeeId = params?.employeeId; // Employee ID for assignedTo field
   const reportFor = params?.reportType || 'rental';
+  const resolvedReportType = resolveRentalReportType(reportFor);
   const rentalId = params?.rentalId;
   const paramCompanyId = normalizeMongoId(params?.companyId);
   const paramCompanyName =
@@ -50,7 +55,7 @@ const AddRentalReportScreen = () => {
   const isEditMode = !!reportId;
 
   const [formData, setFormData] = useState({
-    reportType: 'Rental Report',
+    reportType: resolvedReportType,
     reportFor: reportFor,
     company: '',
     problemReport: '',
@@ -133,7 +138,7 @@ const AddRentalReportScreen = () => {
         if (reportResponse.data.success) {
           const fetchedReport = reportResponse.data.report;
           setFormData({
-            reportType: fetchedReport.reportType || 'Rental Report',
+            reportType: fetchedReport.reportType || resolvedReportType,
             reportFor: fetchedReport.reportFor || 'rental',
             company: fetchedReport.company?._id || '',
             problemReport: fetchedReport.problemReport || '',
@@ -486,7 +491,7 @@ const AddRentalReportScreen = () => {
 
       const payload = {
         serviceId: rentalId,
-        reportType: formData.reportType,
+        reportType: formData.reportType || resolvedReportType,
         company: formData.company,
         problemReport: formData.problemReport,
         remarksPendingWorks: formData.remarksPendingWorks,
@@ -522,7 +527,7 @@ const AddRentalReportScreen = () => {
           text1: 'Success',
           text2: response.data.message || (reportId ? 'Report updated successfully' : 'Report created successfully'),
         });
-        (navigation as any).navigate('RentalReports');
+        (navigation as any).navigate(getRentalListScreen(resolvedReportType));
       } else {
         Toast.show({
           type: 'error',

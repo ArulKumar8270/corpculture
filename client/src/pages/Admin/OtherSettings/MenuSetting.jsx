@@ -40,6 +40,7 @@ const menuStructure = [
                     { name: "Invoice", key: "serviceInvoice", permissions: ['view', 'add', 'edit', 'delete'] },
                     { name: "Quotation", key: "serviceQuotation", permissions: ['view', 'add', 'edit', 'delete'] },
                     { name: "Reports", key: "serviceReport", permissions: ['view', 'add', 'edit', 'delete'] },
+                    { name: "Gate Pass", key: "serviceGatePass", permissions: ['view', 'add', 'edit', 'delete'] },
                     { name: "Partners", key: "servicePartner", permissions: ['view', 'add', 'edit', 'delete'] },
                 ]
             },
@@ -53,6 +54,7 @@ const menuStructure = [
                     { name: "Invoice", key: "rentalInvoice", permissions: ['view', 'add', 'edit', 'delete'] },
                     { name: "Quotation", key: "rentalQuotation", permissions: ['view', 'add', 'edit', 'delete'] },
                     { name: "Reports", key: "rentalReport", permissions: ['view', 'add', 'edit', 'delete'] },
+                    { name: "Gate Pass", key: "rentalGatePass", permissions: ['view', 'add', 'edit', 'delete'] },
                     { name: "Partners", key: "rentalPartners", permissions: ['view', 'add', 'edit', 'delete'] },
                 ]
             },

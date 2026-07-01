@@ -60,6 +60,10 @@ const EditProduct = () => {
 
     const [deliveryCharge, setDeliveryCharge] = useState();
     const [installationCost, setInstallationCost] = useState();
+    const [weight, setWeight] = useState();
+    const [length, setLength] = useState();
+    const [width, setWidth] = useState();
+    const [height, setHeight] = useState();
 
 
 
@@ -236,6 +240,10 @@ const EditProduct = () => {
             // Append new fields to formData
             formData.append("installationCost", installationCost);
             formData.append("deliveryCharge", deliveryCharge);
+            formData.append("weight", weight);
+            formData.append("length", length);
+            formData.append("width", width);
+            formData.append("height", height);
 
             images.forEach((image) => {
                 formData.append("images", image);
@@ -318,6 +326,10 @@ const EditProduct = () => {
                 setPriceRange(res.data.product.priceRange || []);
                 setInstallationCost(res.data.product.installationCost || 0);
                 setDeliveryCharge(res.data.product.deliveryCharge || 0);
+                setWeight(res.data.product.weight || 0);
+                setLength(res.data.product.length || 0);
+                setWidth(res.data.product.width || 0);
+                setHeight(res.data.product.height || 0);
                 setOldLogo(() => {
                     return {
                         url: res.data.product.brand.logo.url,
@@ -400,7 +412,7 @@ const EditProduct = () => {
                                     onChange={(e) => setPrice(e.target.value)}
                                 />
                                 <TextField
-                                    label="deliveryCharge"
+                                    label="Delivery/Freight Charges"
                                     type="number"
                                     variant="outlined"
                                     size="small"
@@ -440,6 +452,62 @@ const EditProduct = () => {
                                     onChange={(e) =>
                                         setDiscountPrice(e.target.value)
                                     }
+                                />
+                            </div>
+                            <h2 className="font-medium">Courier Details</h2>
+                            <div className="flex gap-2 justify-between">
+                                <TextField
+                                    label="Weight (kg)"
+                                    type="number"
+                                    variant="outlined"
+                                    size="small"
+                                    InputProps={{
+                                        inputProps: {
+                                            min: 0,
+                                            step: 0.01,
+                                        },
+                                    }}
+                                    value={weight}
+                                    onChange={(e) => setWeight(e.target.value)}
+                                />
+                                <TextField
+                                    label="Length (cm)"
+                                    type="number"
+                                    variant="outlined"
+                                    size="small"
+                                    InputProps={{
+                                        inputProps: {
+                                            min: 0,
+                                        },
+                                    }}
+                                    value={length}
+                                    onChange={(e) => setLength(e.target.value)}
+                                />
+                                <TextField
+                                    label="Width (cm)"
+                                    type="number"
+                                    variant="outlined"
+                                    size="small"
+                                    InputProps={{
+                                        inputProps: {
+                                            min: 0,
+                                        },
+                                    }}
+                                    value={width}
+                                    onChange={(e) => setWidth(e.target.value)}
+                                />
+                                <TextField
+                                    label="Height (cm)"
+                                    type="number"
+                                    variant="outlined"
+                                    size="small"
+                                    InputProps={{
+                                        inputProps: {
+                                            min: 0,
+                                        },
+                                    }}
+                                    value={height}
+                                    onChange={(e) => setHeight(e.target.value)}
                                 />
                             </div>
                             <div className="flex justify-between gap-4">

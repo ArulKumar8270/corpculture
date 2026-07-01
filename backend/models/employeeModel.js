@@ -34,6 +34,16 @@ const employeeSchema = new mongoose.Schema(
             type: [String],
             trim: true,
         },
+        orderPriceFrom: {
+            type: Number,
+            default: 0,
+            min: 0,
+        },
+        orderPriceTo: {
+            type: Number,
+            default: 0,
+            min: 0,
+        },
         employeeType: {
             type: [String],
             required: true,

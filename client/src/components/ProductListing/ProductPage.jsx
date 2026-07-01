@@ -22,6 +22,7 @@ import Rating from "@mui/material/Rating";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import { getDeliveryDate, getDiscount } from "../../utils/functions";
+import { getCompanyShippingDefaults, storeCompanyShippingInfo } from "../../utils/companyShipping";
 import MinCategory from "../../components/MinCategory";
 import axios from "axios";
 import { useAuth } from "../../context/auth";
@@ -35,6 +36,7 @@ import SeoData from "../../SEO/SeoData";
 const ProductDetails = () => {
     const navigate = useNavigate();
     const { auth, setAuth, LogOut, isAdmin, isContextLoading } = useAuth();
+    const isStorefrontBlocked = Number(auth?.user?.role) === 1;
     const { sales } = useFrontHomeSettings();
     const [cartItems, setCartItems, addItems] = useCart();
     // reviews toggle
@@ -90,13 +92,24 @@ const ProductDetails = () => {
 
         setOpen(false);
     };
+    const productStock = Number(product?.stock) || 0;
+
     const addToCartHandler = () => {
+        if (!auth?.token) {
+            toast.info("Please login to add items to cart");
+            navigate("/login");
+            return;
+        }
+        if (!product?._id) {
+            toast.error("Product is still loading. Please try again.");
+            return;
+        }
         const item = {
             productId: product._id,
             name: product.name,
-            stock: product.stock,
-            image: product.images[0].url,
-            brandName: product.brand.name,
+            stock: productStock,
+            image: product.images?.[0]?.url || '',
+            brandName: product.brand?.name || '',
             price: product.price,
             discountPrice: product.discountPrice,
             seller: product.seller,
@@ -301,14 +314,14 @@ const ProductDetails = () => {
 
                                     <div className="w-full flex gap-3">
                                         {/* <!-- add to cart btn --> */}
-                                        {product.stock > 0 && (
+                                        {productStock > 0 && (
                                             <button
                                                 onClick={
                                                     itemInCart
                                                         ? goToCart
                                                         : addToCartHandler
                                                 }
-                                                disabled={isAdmin}
+                                                disabled={isStorefrontBlocked}
                                                 className="disabled:cursor-not-allowed p-3 sm:p-4 w-1/2 flex items-center justify-center gap-2 text-white rounded-xl shadow bg-gradient-to-r from-[#019ee3] to-[#afcb09] font-semibold hover:shadow-lg transition"
                                             >
                                                 <ShoppingCartIcon />
@@ -320,16 +333,16 @@ const ProductDetails = () => {
                                         <button
                                             onClick={buyNow}
                                             disabled={
-                                                isAdmin || product.stock < 1
+                                                isStorefrontBlocked || productStock < 1
                                             }
                                             className={`disabled:cursor-not-allowed flex items-center justify-center gap-2 text-white rounded-xl shadow font-semibold hover:shadow-lg p-4 transition ${
-                                                product.stock < 1
+                                                productStock < 1
                                                     ? "w-full bg-red-600 cursor-not-allowed"
                                                     : "w-1/2 bg-gradient-to-r from-[#fb641b] to-[#ff9f00]"
                                             }`}
                                         >
                                             <FlashOnIcon />
-                                            {product?.stock < 1
+                                            {productStock < 1
                                                 ? "OUT OF STOCK"
                                                 : "BUY NOW"}
                                         </button>
@@ -381,7 +394,7 @@ const ProductDetails = () => {
                                     </div>
 
                                     {/* Quantity slider & quantity-based price */}
-                                    {product?.stock > 0 && (
+                                    {productStock > 0 && (
                                         <div className="rounded-xl border border-[#e6fbff] p-4 bg-gray-50/50 shadow-sm">
                                             <Typography variant="subtitle1" className="font-semibold text-gray-800 mb-1">
                                                 Quantity
@@ -391,7 +404,7 @@ const ProductDetails = () => {
                                                     value={quantity}
                                                     onChange={(e, val) => setQuantity(val)}
                                                     min={1}
-                                                    max={Math.max(1, product?.stock || 1)}
+                                                    max={Math.max(1, productStock)}
                                                     step={1}
                                                     valueLabelDisplay="on"
                                                     valueLabelFormat={(v) => v}
@@ -440,9 +453,9 @@ const ProductDetails = () => {
                                         </div>
                                     )}
 
-                                    {product?.stock <= 10 && product?.stock > 0 && (
+                                    {productStock <= 10 && productStock > 0 && (
                                         <span className="text-red-600 text-base font-semibold bg-red-50 px-3 py-1 rounded-lg w-fit shadow-sm">
-                                            Hurry, Only {product.stock} left!
+                                            Hurry, Only {productStock} left!
                                         </span>
                                     )}
                                     {/* <!-- price desc --> */}

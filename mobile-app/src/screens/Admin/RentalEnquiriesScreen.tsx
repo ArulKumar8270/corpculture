@@ -319,6 +319,22 @@ const RentalEnquiriesScreen = () => {
     setActionMenuVisible(null);
   };
 
+  const handleGatePass = (enquiry: any) => {
+    const employee = employees.find((emp) => emp.userId === enquiry.employeeId);
+    const employeeName = employee?.name || enquiry.employeeId;
+    const employeeUserId = employee?.userId || enquiry.employeeId;
+    const companyIdStr = normalizeMongoId(enquiry?.companyId);
+    (navigation as any).navigate('AddRentalReport', {
+      employeeName,
+      employeeId: employeeUserId,
+      reportType: 'Rental_Gate_Pass',
+      rentalId: enquiry._id,
+      companyId: companyIdStr || undefined,
+      companyName: enquiry?.companyName,
+    });
+    setActionMenuVisible(null);
+  };
+
   const handleMoveToUnwanted = (enquiry: any) => {
     updateStatusToRental(enquiry._id, 'Cancelled');
     setActionMenuVisible(null);
@@ -392,6 +408,13 @@ const RentalEnquiriesScreen = () => {
             >
               <Icon name="bar-chart" size={20} color="#007AFF" />
               <Text style={styles.actionMenuText}>Report</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.actionMenuItem}
+              onPress={() => handleGatePass(item)}
+            >
+              <Icon name="badge" size={20} color="#007AFF" />
+              <Text style={styles.actionMenuText}>Gate Pass</Text>
             </TouchableOpacity>
             {Number(user?.role) === 1 ? (
               <TouchableOpacity

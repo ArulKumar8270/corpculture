@@ -20,6 +20,7 @@ import axios from 'axios';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { getApiBaseUrl } from '../services/api';
+import { storeCompanyShippingInfo } from '../utils/companyShipping';
 
 interface CompanyToggleHeaderProps {
   onCompanyChange?: (enabled: boolean) => void;
@@ -152,6 +153,10 @@ const CompanyToggleHeader: React.FC<CompanyToggleHeaderProps> = ({
     setCompanyPickerVisible(false);
     try {
       await AsyncStorage.setItem('selectedCompany', companyId);
+      const company = companyDetails.find((c: any) => String(c._id) === String(companyId));
+      if (company) {
+        await storeCompanyShippingInfo(company, user?.phone);
+      }
     } catch (error) {
       console.error('Error saving selected company:', error);
     }

@@ -51,11 +51,13 @@ const AdminMenu = ({ toggleMenu }) => {
         serviceInvoice: 0,
         serviceQuotation: 0,
         serviceReport: 0,
+        serviceGatePass: 0,
         rentalEnquiries: 0,
         rentalProduct: 0,
         rentalInvoice: 0,
         rentalQuotation: 0,
         rentalReport: 0,
+        rentalGatePass: 0,
     });
 
     useEffect(() => {
@@ -118,6 +120,19 @@ const AdminMenu = ({ toggleMenu }) => {
                 const serviceReportCount =
                     serviceReportRes.data?.totalCount ?? serviceReportRes.data?.reports?.length ?? 0;
 
+                const serviceGatePassQuery = new URLSearchParams({
+                    reportType: 'Service_Gate_Pass',
+                    page: '1',
+                    limit: '1',
+                }).toString();
+                const serviceGatePassUrl =
+                    auth?.user?.role === 3
+                        ? `${import.meta.env.VITE_SERVER_URL}/api/v1/report/getByassigned/${auth?.user?._id}/Service_Gate_Pass?${serviceGatePassQuery}`
+                        : `${import.meta.env.VITE_SERVER_URL}/api/v1/report/Service_Gate_Pass?${serviceGatePassQuery}`;
+                const serviceGatePassRes = await axios.get(serviceGatePassUrl, config);
+                const serviceGatePassCount =
+                    serviceGatePassRes.data?.totalCount ?? serviceGatePassRes.data?.reports?.length ?? 0;
+
                 // Fetch Rental Enquiries count
                 const rentalEnquiriesUrl = `${import.meta.env.VITE_SERVER_URL}/api/v1/rental/${auth?.user?.role === 3 ? `assignedTo/${auth?.user?._id}` : "all"}`;
                 const rentalEnquiriesRes = await axios.get(rentalEnquiriesUrl, config);
@@ -166,6 +181,19 @@ const AdminMenu = ({ toggleMenu }) => {
                 const rentalReportCount =
                     rentalReportRes.data?.totalCount ?? rentalReportRes.data?.reports?.length ?? 0;
 
+                const rentalGatePassQuery = new URLSearchParams({
+                    reportType: 'Rental_Gate_Pass',
+                    page: '1',
+                    limit: '1',
+                }).toString();
+                const rentalGatePassUrl =
+                    auth?.user?.role === 3
+                        ? `${import.meta.env.VITE_SERVER_URL}/api/v1/report/getByassigned/${auth?.user?._id}/Rental_Gate_Pass?${rentalGatePassQuery}`
+                        : `${import.meta.env.VITE_SERVER_URL}/api/v1/report/Rental_Gate_Pass?${rentalGatePassQuery}`;
+                const rentalGatePassRes = await axios.get(rentalGatePassUrl, config);
+                const rentalGatePassCount =
+                    rentalGatePassRes.data?.totalCount ?? rentalGatePassRes.data?.reports?.length ?? 0;
+
 
                 setRecordCounts(prevCounts => ({
                     ...prevCounts,
@@ -174,11 +202,13 @@ const AdminMenu = ({ toggleMenu }) => {
                     serviceInvoice: serviceInvoiceCount,
                     serviceQuotation: quotationInvoiceCount,
                     serviceReport: serviceReportCount,
+                    serviceGatePass: serviceGatePassCount,
                     rentalEnquiries: rentalEnquiriesCount,
                     rentalProduct: rentalProductCount,
                     rentalInvoice: rentalInvoiceCount,
                     rentalQuotation: rentalQuotationCount,
                     rentalReport: rentalReportCount,
+                    rentalGatePass: rentalGatePassCount,
                     // serviceQuotation and rentalQuotation remain unchanged as APIs were not provided.
                 }));
 
@@ -191,10 +221,12 @@ const AdminMenu = ({ toggleMenu }) => {
                     serviceProduct: 0,
                     serviceInvoice: 0,
                     serviceReport: 0,
+                    serviceGatePass: 0,
                     rentalEnquiries: 0,
                     rentalProduct: 0,
                     rentalInvoice: 0,
                     rentalReport: 0,
+                    rentalGatePass: 0,
                 }));
             }
         };
@@ -516,6 +548,20 @@ const AdminMenu = ({ toggleMenu }) => {
                                                         Reports <span className="ml-2 text-xs font-normal text-gray-500 bg-gray-200 px-2 py-1 rounded-full">{recordCounts?.serviceReport}</span>
                                                     </div>
                                                 </NavLink>)}
+                {hasPermission('serviceReport') && (<NavLink
+                                                    to="./serviceGatePassList"
+                                                    onClick={scrollToTop}
+                                                    className={({ isActive }) =>
+                                                        `rounded-lg mx-2 my-1 transition-all ${isActive
+                                                            ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
+                                                            : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
+                                                        }`
+                                                    }
+                                                >
+                                                    <div className="h-10 px-8 flex items-center">
+                                                        Gate Pass <span className="ml-2 text-xs font-normal text-gray-500 bg-gray-200 px-2 py-1 rounded-full">{recordCounts?.serviceGatePass}</span>
+                                                    </div>
+                                                </NavLink>)}
                                                 {/* Commission under Service */}
                                                 {hasPermission('servicePartner') && (
                                                     <NavLink
@@ -636,6 +682,20 @@ const AdminMenu = ({ toggleMenu }) => {
                                                 >
                                                     <div className="h-10 px-8 flex items-center">
                                                         Reports <span className="ml-2 text-xs font-normal text-gray-500 bg-gray-200 px-2 py-1 rounded-full">{recordCounts?.rentalReport}</span>
+                                                    </div>
+                                                </NavLink>)}
+                                                {hasPermission('rentalReport') && (<NavLink
+                                                    to="./rentalGatePassList"
+                                                    onClick={scrollToTop}
+                                                    className={({ isActive }) =>
+                                                        `rounded-lg mx-2 my-1 transition-all ${isActive
+                                                            ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
+                                                            : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
+                                                        }`
+                                                    }
+                                                >
+                                                    <div className="h-10 px-8 flex items-center">
+                                                        Gate Pass <span className="ml-2 text-xs font-normal text-gray-500 bg-gray-200 px-2 py-1 rounded-full">{recordCounts?.rentalGatePass}</span>
                                                     </div>
                                                 </NavLink>)}
                                                 {hasPermission('rentalPartners') && (

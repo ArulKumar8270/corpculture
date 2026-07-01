@@ -12,6 +12,7 @@ import getOrdersByEmployeeId from "../controllers/user/getOrdersByEmpId.js";
 import getAdminOrders from "../controllers/user/getAdminOrders.js";
 import updateOrder from "../controllers/user/updateOrder.js";
 import assignOrder from "../controllers/user/assignOrder.js";
+import autoAssignOrders, { suggestEmployeesForOrder } from "../controllers/user/autoAssignOrders.js";
 import getAllUserOrder from "../controllers/user/getAllUserOrder.js";
 import getUsersByCompany from "../controllers/user/getUsersByCompany.js";
 import { updateUserPermissions } from "../controllers/user/userController.js";
@@ -46,6 +47,8 @@ router.get("/admin-order-detail", getOrderDetail);
 //update order status
 router.patch("/update/order-status", requireSignIn, updateOrder);
 router.patch("/update/aassign-orders", requireSignIn, assignOrder);
+router.patch("/auto-assign-orders", requireSignIn, autoAssignOrders);
+router.get("/order/:id/suggest-employee", requireSignIn, suggestEmployeesForOrder);
 
 //get all order and delete if possible
 router.get("/get-all-order", requireSignIn, getAllUserOrder);

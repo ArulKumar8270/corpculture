@@ -48,6 +48,12 @@ import {
     collectReportSerialNumbers,
     formatReportTypeLabel,
 } from '../../utils/reportSerialNumbers';
+import {
+    getReportEditPath,
+    getReportPageTitle,
+    getReportSendWebhook,
+    isGatePassReportType,
+} from '../../utils/reportNavigation';
 
 const tableHeadCellSx = { fontWeight: 700, whiteSpace: 'nowrap', bgcolor: '#f5f7fa' };
 const companyCellSx = { minWidth: 160, maxWidth: 220, whiteSpace: 'normal', wordBreak: 'break-word' };
@@ -197,10 +203,8 @@ const ServiceReportsandGatpass = (props) => {
         }
     };
 
-    const handleEdit = (reportId) => {
-        // Navigate to an edit page for the report
-        // You'll need to create an EditServiceReport component and a corresponding route
-        navigate(`../addServiceReport/${reportId}`);
+    const handleEdit = (reportId, reportType) => {
+        navigate(getReportEditPath(reportType || props?.reportType, reportId));
     };
 
     const handleDelete = async (reportId) => {
@@ -237,9 +241,11 @@ const ServiceReportsandGatpass = (props) => {
     const handleSendQuotation = async (report) => {
         const reportId = report?._id;
         const serviceId = report?.serviceId?._id || report?.serviceId;
+        const reportType = report?.reportType || props?.reportType;
+        const isGatePass = isGatePassReportType(reportType);
         setOnSendn8n(true)
         try {
-            const res = await axios.post('https://n8n.nicknameinfo.net/webhook/88ed0a9b-ee21-43e0-9684-f5c5859f9734', { reportId: reportId });
+            const res = await axios.post(getReportSendWebhook(reportType), { reportId: reportId });
             if (res && serviceId && props?.reportType === 'Service_Report') {
                 try {
                     await axios.put(
@@ -252,12 +258,12 @@ const ServiceReportsandGatpass = (props) => {
                 }
             }
             if (res) {
-                toast.success('Report sent successfully');
+                toast.success(isGatePass ? 'Gate pass sent successfully' : 'Report sent successfully');
                 fetchReports(fromDate, toDate, companyNameFilter, assignedToFilter, serialNoFilter, page, rowsPerPage);
             }
         } catch (webhookError) {
             console.error('Error triggering webhook:', webhookError);
-            toast.error('Failed to send report');
+            toast.error(isGatePass ? 'Failed to send gate pass' : 'Failed to send report');
         } finally {
             setOnSendn8n(false)
         }
@@ -461,7 +467,7 @@ const ServiceReportsandGatpass = (props) => {
         <Box sx={{ p: 3, bgcolor: 'background.default', minHeight: '100vh', overflow: 'auto', width: '91%' }}>
             <div className='flex justify-between'>
                 <Typography variant="h5" component="h1" gutterBottom sx={{ mb: 3, color: '#019ee3', fontWeight: 'bold' }}>
-                    Reports
+                    {getReportPageTitle(props?.reportType)}
                 </Typography>
                 {/* <Typography variant="h5" component="h1" gutterBottom sx={{ mb: 3, color: '#019ee3', fontWeight: 'bold' }}>
                     <Button onClick={() => navigate("../addServiceReport")} color="primary">
@@ -661,7 +667,7 @@ const ServiceReportsandGatpass = (props) => {
                                                     </IconButton>
                                                 </Tooltip>
                                                 <Tooltip title="Edit Report">
-                                                    <IconButton onClick={() => handleEdit(report._id)} color="primary">
+                                                    <IconButton onClick={() => handleEdit(report._id, report.reportType)} color="primary">
                                                         <EditIcon />
                                                     </IconButton>
                                                 </Tooltip>

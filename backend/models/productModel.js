@@ -16,6 +16,22 @@ const productSchema = new mongoose.Schema({
     deliveryCharge : {
         type: Number,
     },
+    weight: {
+        type: Number,
+        default: 0,
+    },
+    length: {
+        type: Number,
+        default: 0,
+    },
+    width: {
+        type: Number,
+        default: 0,
+    },
+    height: {
+        type: Number,
+        default: 0,
+    },
     highlights: [
         {
             type: String,

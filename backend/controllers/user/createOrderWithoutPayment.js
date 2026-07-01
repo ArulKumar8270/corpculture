@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import orderModel from "../../models/orderModel.js";
 import productModel from "../../models/productModel.js";
+import { tryAutoAssignNewOrder } from "../../utils/tryAutoAssignNewOrder.js";
 
 const computeAmountFromItems = (orderItems) => {
   const getUnitBase = (item) => {
@@ -122,6 +123,8 @@ const createOrderWithoutPayment = async (req, res) => {
 
     const order = new orderModel(combinedOrder);
     await order.save();
+
+    await tryAutoAssignNewOrder(order);
 
     // Reduce stock
     for (const item of orderItems) {

@@ -376,6 +376,14 @@ const CustomDrawerContent = (props: CustomDrawerContentProps) => {
                 <Text style={styles.menuItemText}>Reports</Text>
               </TouchableOpacity>
             )}
+            {(isAdmin || hasPermission('serviceReport', 'view')) && (
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => navigateToScreen('ServiceGatePass')}
+              >
+                <Text style={styles.menuItemText}>Gate Pass</Text>
+              </TouchableOpacity>
+            )}
             {(isAdmin || hasPermission('servicePartner', 'view')) && (
               <TouchableOpacity
                 style={styles.menuItem}
@@ -451,6 +459,14 @@ const CustomDrawerContent = (props: CustomDrawerContentProps) => {
                 onPress={() => navigateToScreen('RentalReports')}
               >
                 <Text style={styles.menuItemText}>Reports</Text>
+              </TouchableOpacity>
+            )}
+            {(isAdmin || hasPermission('rentalReport', 'view')) && (
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => navigateToScreen('RentalGatePass')}
+              >
+                <Text style={styles.menuItemText}>Gate Pass</Text>
               </TouchableOpacity>
             )}
             {(isAdmin || hasPermission('rentalPartners', 'view')) && (

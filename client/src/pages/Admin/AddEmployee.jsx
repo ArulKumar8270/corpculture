@@ -30,6 +30,8 @@ const AddEmployee = () => {
         department: [],
         salary: '',
         bikeAllowance: '',
+        orderPriceFrom: '',
+        orderPriceTo: '',
         image: '',
         parentName: '',
         parentPhone: '',
@@ -102,6 +104,8 @@ const AddEmployee = () => {
                             : (employeeData.department?._id || employeeData.department ? [employeeData.department?._id || employeeData.department] : []),
                         salary: employeeData.salary || '',
                         bikeAllowance: employeeData.bikeAllowance ?? '',
+                        orderPriceFrom: employeeData.orderPriceFrom ?? '',
+                        orderPriceTo: employeeData.orderPriceTo ?? '',
                         image: employeeData.image || '',
                         parentName: employeeData.parentName || '',
                         parentPhone: employeeData.parentPhone || '',
@@ -125,7 +129,7 @@ const AddEmployee = () => {
             // Clear form data if switching from edit to add mode
             setFormData({
                 name: '', email: '', phone: '', address: '', pincode: [], employeeType: [],
-                designation: [], idCradNo: '', department: [], salary: '', bikeAllowance: '', image: '',
+                designation: [], idCradNo: '', department: [], salary: '', bikeAllowance: '', orderPriceFrom: '', orderPriceTo: '', image: '',
                 parentName: '', parentPhone: '', parentAddress: '', parentRelation: '', idProof: '',
             });
         }
@@ -321,6 +325,8 @@ const AddEmployee = () => {
                         ...formData,
                         salary: formData.salary ? Number(formData.salary) : undefined,
                         bikeAllowance: formData.bikeAllowance ? Number(formData.bikeAllowance) : 0,
+                        orderPriceFrom: formData.orderPriceFrom ? Number(formData.orderPriceFrom) : 0,
+                        orderPriceTo: formData.orderPriceTo ? Number(formData.orderPriceTo) : 0,
                         image: formData.image || undefined
                     },
                     {
@@ -352,6 +358,8 @@ const AddEmployee = () => {
                             userId: registerUser?._id,
                             salary: formData.salary ? Number(formData.salary) : undefined,
                             bikeAllowance: formData.bikeAllowance ? Number(formData.bikeAllowance) : 0,
+                            orderPriceFrom: formData.orderPriceFrom ? Number(formData.orderPriceFrom) : 0,
+                            orderPriceTo: formData.orderPriceTo ? Number(formData.orderPriceTo) : 0,
                             image: formData.image || undefined
                         },
                         {
@@ -718,6 +726,32 @@ const AddEmployee = () => {
                             fullWidth
                             inputProps={{ min: 0 }}
                         />
+                        <div className="flex gap-3">
+                            <TextField
+                                label="Order Price From (₹)"
+                                name="orderPriceFrom"
+                                type="number"
+                                value={formData.orderPriceFrom}
+                                onChange={handleInputChange}
+                                variant="outlined"
+                                size="small"
+                                fullWidth
+                                inputProps={{ min: 0 }}
+                                helperText="Min order amount for auto-assign"
+                            />
+                            <TextField
+                                label="Order Price To (₹)"
+                                name="orderPriceTo"
+                                type="number"
+                                value={formData.orderPriceTo}
+                                onChange={handleInputChange}
+                                variant="outlined"
+                                size="small"
+                                fullWidth
+                                inputProps={{ min: 0 }}
+                                helperText="Max order amount (0 = no limit)"
+                            />
+                        </div>
 
                         <Button
                             type="submit"

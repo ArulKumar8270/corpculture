@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 // import OrderItem from "./OrderItem"; // We will refactor to use a table directly
 import SearchIcon from "@mui/icons-material/Search";
 import Spinner from "../../components/Spinner";
@@ -104,6 +104,8 @@ const AdminOrders = () => {
     /** `${orderId}-send` | `${orderId}-download` while webhook is in progress */
     const [invoiceLoadingKey, setInvoiceLoadingKey] = useState(null);
     const [exportingProductsExcel, setExportingProductsExcel] = useState(false);
+    const [autoAssigning, setAutoAssigning] = useState(false);
+    const autoAssignAttemptedRef = useRef(new Set());
 
     const hasPermission = (key) => {
         return userPermissions.some(p => p.key === key && p.actions.includes('edit')) || auth?.user?.role === 1;
@@ -117,6 +119,38 @@ const AdminOrders = () => {
     };
 
     const salesEmployees = (employees || []).filter((e) => hasEmployeeType(e, "Sales"));
+
+    const normalizePincode = (pincode) => {
+        if (pincode == null || pincode === "") return "";
+        return String(pincode).trim();
+    };
+
+    const employeeMatchesOrder = (employee, order) => {
+        if (!hasEmployeeType(employee, "Sales")) return false;
+        const pin = normalizePincode(order?.shippingInfo?.pincode);
+        const employeePincodes = (employee?.pincode || [])
+            .map(normalizePincode)
+            .filter(Boolean);
+        if (!pin || employeePincodes.length === 0 || !employeePincodes.includes(pin)) {
+            return false;
+        }
+        const amount = Number(order?.amount) || 0;
+        const priceFrom = Number(employee?.orderPriceFrom);
+        const priceTo = Number(employee?.orderPriceTo);
+        const hasFrom = Number.isFinite(priceFrom) && priceFrom > 0;
+        const hasTo = Number.isFinite(priceTo) && priceTo > 0;
+        if (!hasFrom && !hasTo) return true;
+        if (hasFrom && amount < priceFrom) return false;
+        if (hasTo && amount > priceTo) return false;
+        return true;
+    };
+
+    const getSuggestedEmployee = (order) => {
+        const matches = salesEmployees.filter((emp) => employeeMatchesOrder(emp, order));
+        return matches[0] || null;
+    };
+
+    const isOrderAssigned = (order) => !!(order?.employeeId?._id || order?.employeeId);
 
     const isEmployee = Number(auth?.user?.role) === 3;
     const myEmployeeId = useMemo(() => {
@@ -225,14 +259,88 @@ const AdminOrders = () => {
         }
     };
 
-    // Handle order selection
+    // Handle order selection — pre-select suggested employee when one order is checked
     const handleOrderSelect = (orderId) => {
-        setSelectedOrderIds(prevSelected =>
-            prevSelected.includes(orderId)
-                ? prevSelected.filter(id => id !== orderId) // Deselect
-                : [...prevSelected, orderId] // Select
-        );
+        setSelectedOrderIds((prevSelected) => {
+            const next = prevSelected.includes(orderId)
+                ? prevSelected.filter((id) => id !== orderId)
+                : [...prevSelected, orderId];
+
+            if (!prevSelected.includes(orderId) && next.length === 1) {
+                const order = orders.find((o) => o._id === orderId);
+                const suggested = order ? getSuggestedEmployee(order) : null;
+                if (suggested) {
+                    setSelectedEmployeeId(suggested._id);
+                }
+            }
+            return next;
+        });
     };
+
+    const handleAutoAssignOrders = async (orderIds = selectedOrderIds, { silent = false } = {}) => {
+        if (!orderIds?.length) {
+            if (!silent) toast.error("Please select at least one order to auto-assign.");
+            return;
+        }
+
+        setAutoAssigning(true);
+        try {
+            const response = await axios.patch(
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/user/auto-assign-orders`,
+                { orderId: orderIds },
+                { headers: { Authorization: auth?.token } }
+            );
+
+            const assigned = response.data?.assigned || [];
+            const failed = response.data?.failed || [];
+
+            if (assigned.length > 0) {
+                const names = [...new Set(assigned.map((a) => a.employeeName))].join(", ");
+                if (!silent) {
+                    toast.success(
+                        `Auto-assigned ${assigned.length} order(s) to ${names}`
+                    );
+                }
+                setSelectedOrderIds([]);
+                setSelectedEmployeeId("");
+                setRefetchOrders((prev) => !prev);
+            }
+
+            if (failed.length > 0 && !silent) {
+                toast.error(
+                    `${failed.length} order(s) could not be auto-assigned (no matching employee for pincode/amount).`
+                );
+            }
+
+            if (assigned.length === 0 && failed.length > 0 && !silent) {
+                toast.error("No matching employee found for pincode and order amount.");
+            }
+        } catch (error) {
+            console.error("Error auto-assigning orders:", error);
+            if (!silent) {
+                toast.error(
+                    error.response?.data?.message || "Failed to auto-assign orders."
+                );
+            }
+        } finally {
+            setAutoAssigning(false);
+        }
+    };
+
+    // Auto-assign unassigned orders when the orders list loads (once per order id)
+    useEffect(() => {
+        if (isEmployee || !hasPermission("salesOrders") || !auth?.token || loading) return;
+
+        const unassignedIds = (orders || [])
+            .filter((o) => !isOrderAssigned(o) && !autoAssignAttemptedRef.current.has(o._id))
+            .map((o) => o._id);
+
+        if (unassignedIds.length === 0) return;
+
+        unassignedIds.forEach((id) => autoAssignAttemptedRef.current.add(id));
+        handleAutoAssignOrders(unassignedIds, { silent: true });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [orders, loading, isEmployee, auth?.token]);
 
     // Handle assignment button click (Placeholder)
     const buildInvoiceWebhookPayload = (order, action) => ({
@@ -686,8 +794,13 @@ const AdminOrders = () => {
 
                             {/* Assignment Controls */}
                             {hasPermission("salesOrders") ? <div className="flex flex-col sm:flex-row items-center gap-4 mb-4 p-4 bg-white rounded-xl shadow justify-between">
-                                <span className="font-semibold text-gray-700">Assign Selected Orders:</span>
-                                <div className="flex items-center gap-2">
+                                <div className="flex flex-col gap-1">
+                                    <span className="font-semibold text-gray-700">Assign Selected Orders</span>
+                                    <span className="text-xs text-gray-500">
+                                        Auto-assign matches Sales employees by order pincode and amount range
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-2 flex-wrap justify-end">
                                     <select
                                         value={selectedEmployeeId}
                                         onChange={(e) => setSelectedEmployeeId(e.target.value)}
@@ -710,6 +823,18 @@ const AdminOrders = () => {
                                             }`}
                                     >
                                         Assign
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleAutoAssignOrders()}
+                                        disabled={selectedOrderIds.length === 0 || autoAssigning}
+                                        className={`p-2 px-4 rounded-md text-white font-semibold transition w-full sm:w-auto
+                                        ${selectedOrderIds.length === 0 || autoAssigning
+                                                ? 'bg-gray-400 cursor-not-allowed'
+                                                : 'bg-[#019ee3] hover:opacity-90'
+                                            }`}
+                                    >
+                                        {autoAssigning ? "Assigning…" : "Auto Assign"}
                                     </button>
                                 </div> </div> : null}
 
@@ -754,6 +879,7 @@ const AdminOrders = () => {
                                                 <th className="py-2 px-3 text-left">Status</th>
                                                 <th className="py-2 px-3 text-left">Assigned Users</th>
                                                 <th className="py-2 px-3 text-left">Amount</th>
+                                                <th className="py-2 px-3 text-left">Pincode</th>
                                                 <th className="py-2 px-3 text-left">Products</th>
                                                 <th className="py-2 px-3 text-left">Order Date</th>
                                                 {hasPermission("salesOrders") ? (
@@ -779,15 +905,27 @@ const AdminOrders = () => {
                                                     </td>
                                                     <td className="py-2 px-3">{order.orderStatus}</td>
                                                     <td className="py-2 px-3">
-                                                        <Link // {{ edit_2 }}
-                                                            to={`../employee_details/${order.employeeId?._id}`} // Link to employee details page // {{ edit_2 }}
-                                                            className="text-blue-600 hover:underline" // Add styling to make it look like a link // {{ edit_2 }}
-                                                        > {/* {{ edit_2 }} */}
-                                                            {order.employeeId?.name} {/* {{ edit_2 }} */}
-                                                        </Link>
+                                                        {isOrderAssigned(order) ? (
+                                                            <Link
+                                                                to={`../employee_details/${order.employeeId?._id || order.employeeId}`}
+                                                                className="text-blue-600 hover:underline"
+                                                            >
+                                                                {order.employeeId?.name || "Assigned"}
+                                                            </Link>
+                                                        ) : (
+                                                            <span className="text-amber-600 text-xs">
+                                                                Unassigned
+                                                                {getSuggestedEmployee(order)
+                                                                    ? ` → ${getSuggestedEmployee(order).name}`
+                                                                    : " (no match)"}
+                                                            </span>
+                                                        )}
                                                     </td>
                                                     <td className="py-2 px-3">
                                                         ₹ {order.amount || '0'}
+                                                    </td>
+                                                    <td className="py-2 px-3">
+                                                        {order.shippingInfo?.pincode || '-'}
                                                     </td>
                                                     <td className="py-2 px-3">
                                                         {/* Display product count or list */}

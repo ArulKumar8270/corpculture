@@ -37,14 +37,17 @@ const AddEmployeeScreen = () => {
     email: '',
     phone: '',
     address: '',
-    pincode: '',
+    pincode: [] as string[],
     employeeType: '',
     designation: '',
     idCradNo: '',
     department: '',
     salary: '',
+    orderPriceFrom: '',
+    orderPriceTo: '',
     image: '',
   });
+  const [newPincode, setNewPincode] = useState('');
 
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState<any[]>([]);
@@ -118,12 +121,18 @@ const AddEmployeeScreen = () => {
           email: data.employee.email || '',
           phone: data.employee.phone || '',
           address: data.employee.address || '',
-          pincode: data.employee.pincode || '',
+          pincode: Array.isArray(data.employee.pincode)
+            ? data.employee.pincode
+            : data.employee.pincode
+              ? [data.employee.pincode]
+              : [],
           employeeType: data.employee.employeeType || '',
           designation: data.employee.designation || '',
           idCradNo: data.employee.idCradNo || '',
           department: data.employee.department?._id || data.employee.department || '',
           salary: data.employee.salary?.toString() || '',
+          orderPriceFrom: data.employee.orderPriceFrom?.toString() || '',
+          orderPriceTo: data.employee.orderPriceTo?.toString() || '',
           image: data.employee.image || '',
         });
       }
@@ -212,6 +221,38 @@ const AddEmployeeScreen = () => {
     }
   };
 
+  const handleAddPincode = () => {
+    const pin = newPincode.trim();
+    if (pin.length !== 6) {
+      Toast.show({
+        type: 'error',
+        text1: 'Invalid pincode',
+        text2: 'Please enter a valid 6-digit pincode',
+      });
+      return;
+    }
+    if (!formData.pincode.includes(pin)) {
+      setFormData({ ...formData, pincode: [...formData.pincode, pin] });
+    }
+    setNewPincode('');
+  };
+
+  const handleRemovePincode = (pincodeToDelete: string) => {
+    setFormData({
+      ...formData,
+      pincode: formData.pincode.filter((p) => p !== pincodeToDelete),
+    });
+  };
+
+  const buildEmployeePayload = () => ({
+    ...formData,
+    pincode: formData.pincode,
+    salary: formData.salary ? Number(formData.salary) : undefined,
+    orderPriceFrom: formData.orderPriceFrom ? Number(formData.orderPriceFrom) : 0,
+    orderPriceTo: formData.orderPriceTo ? Number(formData.orderPriceTo) : 0,
+    image: formData.image || undefined,
+  });
+
   const handleSubmit = async () => {
     if (!formData.name || !formData.email || !formData.phone || !formData.address || !formData.employeeType) {
       Toast.show({
@@ -238,11 +279,7 @@ const AddEmployeeScreen = () => {
         // Update existing employee
         const response = await axios.put(
           `${getApiBaseUrl()}/employee/update/${employeeId}`,
-          {
-            ...formData,
-            salary: formData.salary ? Number(formData.salary) : undefined,
-            image: formData.image || undefined,
-          },
+          buildEmployeePayload(),
           {
             headers: { Authorization: token || '' },
           }
@@ -277,11 +314,9 @@ const AddEmployeeScreen = () => {
             const employeeCreateResponse = await axios.post(
               `${getApiBaseUrl()}/employee/create`,
               {
-                ...formData,
+                ...buildEmployeePayload(),
                 password: formData.phone,
                 userId: registerUser._id,
-                salary: formData.salary ? Number(formData.salary) : undefined,
-                image: formData.image || undefined,
               },
               {
                 headers: { Authorization: token || '' },
@@ -377,14 +412,50 @@ const AddEmployeeScreen = () => {
           />
         </View>
 
-        <Text style={styles.label}>Pincode</Text>
+        <Text style={styles.label}>Pincode(s)</Text>
+        <View style={styles.pincodeRow}>
+          <TextInput
+            style={[styles.input, styles.pincodeInput]}
+            value={newPincode}
+            onChangeText={(text) => setNewPincode(text.replace(/[^0-9]/g, '').slice(0, 6))}
+            placeholder="Enter 6-digit pincode"
+            keyboardType="numeric"
+            maxLength={6}
+            onSubmitEditing={handleAddPincode}
+          />
+          <TouchableOpacity style={styles.addPincodeButton} onPress={handleAddPincode}>
+            <Icon name="add" size={22} color="#fff" />
+          </TouchableOpacity>
+        </View>
+        {formData.pincode.length > 0 && (
+          <View style={styles.pincodeChips}>
+            {formData.pincode.map((pin) => (
+              <View key={pin} style={styles.pincodeChip}>
+                <Text style={styles.pincodeChipText}>{pin}</Text>
+                <TouchableOpacity onPress={() => handleRemovePincode(pin)}>
+                  <Icon name="close" size={16} color="#666" />
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        )}
+
+        <Text style={styles.label}>Order Price From</Text>
         <TextInput
           style={styles.input}
-          value={formData.pincode}
-          onChangeText={(text) => setFormData({ ...formData, pincode: text.replace(/[^0-9]/g, '').slice(0, 6) })}
-          placeholder="Enter pincode"
+          value={formData.orderPriceFrom}
+          onChangeText={(text) => setFormData({ ...formData, orderPriceFrom: text.replace(/[^0-9.]/g, '') })}
+          placeholder="Minimum order amount"
           keyboardType="numeric"
-          maxLength={6}
+        />
+
+        <Text style={styles.label}>Order Price To</Text>
+        <TextInput
+          style={styles.input}
+          value={formData.orderPriceTo}
+          onChangeText={(text) => setFormData({ ...formData, orderPriceTo: text.replace(/[^0-9.]/g, '') })}
+          placeholder="Maximum order amount"
+          keyboardType="numeric"
         />
 
         <Text style={styles.label}>Employee Type *</Text>
@@ -616,6 +687,42 @@ const styles = StyleSheet.create({
   inputDisabled: {
     backgroundColor: '#f5f5f5',
     color: '#999',
+  },
+  pincodeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  pincodeInput: {
+    flex: 1,
+  },
+  addPincodeButton: {
+    backgroundColor: '#019ee3',
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pincodeChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  pincodeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#e8f4fc',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    gap: 6,
+  },
+  pincodeChipText: {
+    fontSize: 14,
+    color: '#333',
   },
   dropdownIcon: {
     marginLeft: 10,

@@ -10,7 +10,7 @@ import {
   Alert,
   Linking,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 // @ts-ignore
 import { MaterialIcons as Icon } from '@expo/vector-icons';
@@ -22,11 +22,12 @@ import { getApiBaseUrl } from '../../services/api';
 import Toast from 'react-native-toast-message';
 import ReportListFilters from '../../components/ReportListFilters';
 import {
+  getReportSendWebhook,
+  isGatePassReportType,
   RENTAL_REPORT_TYPE,
   buildReportListQueryParams,
   getReportsListUrl,
   ReportListFilterValues,
-  REPORT_SEND_N8N_WEBHOOK,
 } from '../../utils/reportListApi';
 import { collectReportSerialNumbers } from '../../utils/reportSerialNumbers';
 import { openReportDownload } from '../../utils/reportDownload';
@@ -43,6 +44,9 @@ function companyIdFromReport(report: any): string | undefined {
 
 const RentalReportsScreen = () => {
   const navigation = useNavigation();
+  const route = useRoute<any>();
+  const reportTypeKey = route.params?.reportTypeKey || RENTAL_REPORT_TYPE;
+  const screenTitle = route.params?.screenTitle || 'Rental Reports';
   const { user, token } = useSelector((state: RootState) => state.auth);
   const { hasPermission } = usePermissions();
 
@@ -72,13 +76,13 @@ const RentalReportsScreen = () => {
         setLoading(true);
         const query = buildReportListQueryParams(
           filterValues,
-          RENTAL_REPORT_TYPE,
+          reportTypeKey,
           currentPage,
           currentRowsPerPage
         );
         const url = getReportsListUrl(
           getApiBaseUrl(),
-          RENTAL_REPORT_TYPE,
+          reportTypeKey,
           user?.role,
           user?._id,
           query
@@ -142,8 +146,12 @@ const RentalReportsScreen = () => {
     setExpandedReports(newExpanded);
   };
 
-  const handleEdit = (reportId: string) => {
-    (navigation as any).navigate('AddRentalReport', { id: reportId });
+  const handleEdit = (report: any) => {
+    (navigation as any).navigate('AddRentalReport', {
+      id: report._id || report,
+      reportType: report.reportType || reportTypeKey,
+      reportFor: report.reportFor || 'rental',
+    });
   };
 
   const handleDelete = async (reportId: string) => {
@@ -206,22 +214,24 @@ const RentalReportsScreen = () => {
     }
   };
 
-  const handleSendReport = async (reportId: string, _companyId?: string) => {
+  const handleSendReport = async (reportId: string, reportType?: string) => {
+    const type = reportType || reportTypeKey;
+    const isGatePass = isGatePassReportType(type);
     setSendingReport(reportId);
     try {
-      await axios.post(REPORT_SEND_N8N_WEBHOOK, {
+      await axios.post(getReportSendWebhook(type), {
         reportId: reportId,
       });
       Toast.show({
         type: 'success',
         text1: 'Success',
-        text2: 'Report sent successfully!',
+        text2: isGatePass ? 'Gate pass sent successfully!' : 'Report sent successfully!',
       });
     } catch (error: any) {
       Toast.show({
         type: 'error',
         text1: 'Error',
-        text2: 'Failed to send report',
+        text2: isGatePass ? 'Failed to send gate pass' : 'Failed to send report',
       });
     } finally {
       setSendingReport(null);
@@ -386,7 +396,7 @@ const RentalReportsScreen = () => {
         <View style={styles.actionButtons}>
           <TouchableOpacity
             style={[styles.actionButton, styles.sendButton]}
-            onPress={() => handleSendReport(item._id, item.company?._id || item.company)}
+            onPress={() => handleSendReport(item._id, item.reportType)}
             disabled={isSendingThis}
           >
             {isSendingThis ? (
@@ -438,7 +448,7 @@ const RentalReportsScreen = () => {
           {(hasPermission('rentalReport', 'edit') || user?.role === 1) && (
             <TouchableOpacity
               style={[styles.actionButton, styles.editButton]}
-              onPress={() => handleEdit(item._id)}
+              onPress={() => handleEdit(item)}
             >
               <Icon name="edit" size={18} color="#007AFF" />
               <Text style={styles.actionButtonText}>Edit</Text>
@@ -524,11 +534,16 @@ const RentalReportsScreen = () => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Rental_Reports & Gatpass</Text>
+        <Text style={styles.title}>{screenTitle}</Text>
         {(hasPermission('rentalReport', 'edit') || user?.role === 1) && (
           <TouchableOpacity
             style={styles.addButton}
-            onPress={() => (navigation as any).navigate('AddRentalReport')}
+            onPress={() =>
+              (navigation as any).navigate('AddRentalReport', {
+                reportType: reportTypeKey,
+                reportFor: 'rental',
+              })
+            }
           >
             <Icon name="add" size={24} color="#fff" />
           </TouchableOpacity>

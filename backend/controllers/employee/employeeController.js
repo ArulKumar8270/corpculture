@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs"; // Assuming you use bcrypt for password hashing
 // Create a new employee
 export const createEmployeeController = async (req, res) => {
     try {
-        const { name, email, password, phone, address, pincode, employeeType, userId, designation, idCradNo, department, salary, bikeAllowance, image, parentName, parentPhone, parentAddress, parentRelation, idProof } = req.body;
+        const { name, email, password, phone, address, pincode, employeeType, userId, designation, idCradNo, department, salary, bikeAllowance, image, parentName, parentPhone, parentAddress, parentRelation, idProof, orderPriceFrom, orderPriceTo } = req.body;
 
         // Validation
         const isValidEmployeeType = Array.isArray(employeeType) ? employeeType.length > 0 : employeeType;
@@ -49,6 +49,8 @@ export const createEmployeeController = async (req, res) => {
             parentAddress, // Added
             parentRelation, // Added
             idProof,     // Added
+            orderPriceFrom: orderPriceFrom !== undefined ? Number(orderPriceFrom) : 0,
+            orderPriceTo: orderPriceTo !== undefined ? Number(orderPriceTo) : 0,
         });
 
         await employee.save();
@@ -158,7 +160,7 @@ export const getEmployeeByUserIdController = async (req, res) => {
 // Update an employee by ID
 export const updateEmployeeController = async (req, res) => {
     try {
-        const { name, email, phone, address, pincode, employeeType, designation, idCradNo, department, salary, bikeAllowance, image, parentName, parentPhone, parentAddress, parentRelation, idProof } = req.body;
+        const { name, email, phone, address, pincode, employeeType, designation, idCradNo, department, salary, bikeAllowance, image, parentName, parentPhone, parentAddress, parentRelation, idProof, orderPriceFrom, orderPriceTo } = req.body;
         const employeeId = req.params.id;
 
         // Find the employee
@@ -188,6 +190,8 @@ export const updateEmployeeController = async (req, res) => {
         employee.parentAddress = parentAddress !== undefined ? parentAddress : employee.parentAddress; // Added
         employee.parentRelation = parentRelation !== undefined ? parentRelation : employee.parentRelation; // Added
         employee.idProof = idProof !== undefined ? idProof : employee.idProof; // Added
+        employee.orderPriceFrom = orderPriceFrom !== undefined ? Number(orderPriceFrom) : employee.orderPriceFrom;
+        employee.orderPriceTo = orderPriceTo !== undefined ? Number(orderPriceTo) : employee.orderPriceTo;
 
         // Note: Password update should ideally be handled in a separate route for security
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -20,6 +20,10 @@ import axios from 'axios';
 import Toast from 'react-native-toast-message';
 import { usePermissions } from '../../hooks/usePermissions';
 import { getApiBaseUrl } from '../../services/api';
+import {
+  getSuggestedEmployee,
+  isOrderAssigned,
+} from '../../utils/orderEmployeeMatcher';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 
@@ -59,6 +63,8 @@ const OrderManagementScreen = () => {
   const [employeePickerVisible, setEmployeePickerVisible] = useState(false);
   const [statusPickerVisible, setStatusPickerVisible] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [autoAssigning, setAutoAssigning] = useState(false);
+  const autoAssignAttemptedRef = useRef(new Set<string>());
 
   const isEmployee = Number(user?.role) === 3;
 
@@ -301,11 +307,82 @@ const OrderManagementScreen = () => {
   };
 
   const handleOrderSelect = (orderId: string) => {
-    setSelectedOrderIds((prev) =>
-      prev.includes(orderId)
+    setSelectedOrderIds((prev) => {
+      const next = prev.includes(orderId)
         ? prev.filter((id) => id !== orderId)
-        : [...prev, orderId]
-    );
+        : [...prev, orderId];
+
+      if (!prev.includes(orderId) && next.length === 1) {
+        const order = orders.find((o) => o._id === orderId);
+        const suggested = order ? getSuggestedEmployee(order, salesEmployees) : null;
+        if (suggested?._id) {
+          setSelectedEmployeeId(suggested._id);
+        }
+      }
+      return next;
+    });
+  };
+
+  const handleAutoAssignOrders = async (
+    orderIds: string[] = selectedOrderIds,
+    { silent = false }: { silent?: boolean } = {}
+  ) => {
+    if (isEmployee) return;
+    if (!orderIds.length) {
+      if (!silent) Alert.alert('Error', 'Please select at least one order to auto-assign.');
+      return;
+    }
+
+    setAutoAssigning(true);
+    try {
+      const response = await axios.patch(
+        `${getApiBaseUrl()}/user/auto-assign-orders`,
+        { orderId: orderIds },
+        { headers: { Authorization: token } }
+      );
+
+      const assigned = response.data?.assigned || [];
+      const failed = response.data?.failed || [];
+
+      if (assigned.length > 0) {
+        if (!silent) {
+          Toast.show({
+            type: 'success',
+            text1: 'Success',
+            text2: `Auto-assigned ${assigned.length} order(s)`,
+          });
+        }
+        setSelectedOrderIds([]);
+        setSelectedEmployeeId('');
+        loadOrders();
+      }
+
+      if (failed.length > 0 && !silent) {
+        Toast.show({
+          type: 'error',
+          text1: 'Partial failure',
+          text2: `${failed.length} order(s) could not be auto-assigned`,
+        });
+      }
+
+      if (assigned.length === 0 && failed.length > 0 && !silent) {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: 'No matching employee for pincode and order amount',
+        });
+      }
+    } catch (error: any) {
+      if (!silent) {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: error.response?.data?.message || 'Failed to auto-assign orders',
+        });
+      }
+    } finally {
+      setAutoAssigning(false);
+    }
   };
 
   const handleAssignOrders = async () => {
@@ -377,6 +454,20 @@ const OrderManagementScreen = () => {
     return (employees || []).filter((emp) => hasEmployeeType(emp, 'Sales'));
   }, [employees]);
 
+  useEffect(() => {
+    if (isEmployee || !hasPermission('salesOrders') || !token || loading) return;
+
+    const unassignedIds = orders
+      .filter((o) => !isOrderAssigned(o) && !autoAssignAttemptedRef.current.has(o._id))
+      .map((o) => o._id);
+
+    if (unassignedIds.length === 0) return;
+
+    unassignedIds.forEach((id) => autoAssignAttemptedRef.current.add(id));
+    handleAutoAssignOrders(unassignedIds, { silent: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orders, loading, isEmployee, token]);
+
   const renderOrder = ({ item }: { item: any }) => {
     const handleOrderPress = () => {
       (navigation as any).navigate('OrderUpdate', { orderId: item._id });
@@ -419,7 +510,7 @@ const OrderManagementScreen = () => {
           <Text style={styles.label}>Customer:</Text>
           <Text style={styles.value}>{item.user?.name || item.buyerName || 'N/A'}</Text>
         </View>
-        {item.employeeId && (
+        {item.employeeId ? (
           <View style={styles.orderInfoRow}>
             <Text style={styles.label}>Assigned:</Text>
             <TouchableOpacity
@@ -434,7 +525,21 @@ const OrderManagementScreen = () => {
               </Text>
             </TouchableOpacity>
           </View>
+        ) : (
+          <View style={styles.orderInfoRow}>
+            <Text style={styles.label}>Assigned:</Text>
+            <Text style={[styles.value, { color: '#FF9500' }]}>
+              Unassigned
+              {getSuggestedEmployee(item, salesEmployees)
+                ? ` → ${getSuggestedEmployee(item, salesEmployees)?.name}`
+                : ' (no match)'}
+            </Text>
+          </View>
         )}
+        <View style={styles.orderInfoRow}>
+          <Text style={styles.label}>Pincode:</Text>
+          <Text style={styles.value}>{item.shippingInfo?.pincode || 'N/A'}</Text>
+        </View>
         <View style={styles.orderInfoRow}>
           <Text style={styles.label}>Products:</Text>
           <Text style={styles.value}>
@@ -548,6 +653,19 @@ const OrderManagementScreen = () => {
             <Icon name="person-add" size={20} color="#fff" style={{ marginRight: 8 }} />
             <Text style={styles.assignButtonText}>
               Assign to {selectedEmployeeId ? salesEmployees.find((e) => e._id === selectedEmployeeId)?.name : 'Employee'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.autoAssignButton,
+              (selectedOrderIds.length === 0 || autoAssigning) && styles.assignButtonDisabled,
+            ]}
+            onPress={() => handleAutoAssignOrders()}
+            disabled={selectedOrderIds.length === 0 || autoAssigning}
+          >
+            <Icon name="auto-fix-high" size={20} color="#fff" style={{ marginRight: 8 }} />
+            <Text style={styles.assignButtonText}>
+              {autoAssigning ? 'Assigning…' : 'Auto Assign'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -905,6 +1023,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  autoAssignButton: {
+    backgroundColor: '#34C759',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderRadius: 8,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 10,
+    shadowColor: '#34C759',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,

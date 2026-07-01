@@ -25,6 +25,7 @@ interface ReportData {
   screen: string;
   type?: string;
   supportsSerialFilter?: boolean;
+  parentStack?: string;
 }
 
 const ServiceReportsSummaryScreen = () => {
@@ -39,6 +40,15 @@ const ServiceReportsSummaryScreen = () => {
     const params = new URLSearchParams({ page: '1', limit: '1', reportType: 'Service_Report' });
     if (serialNo.trim()) params.set('serialNo', serialNo.trim());
     const { data } = await axios.get(`${getApiBaseUrl()}/report/Service_Report?${params.toString()}`, {
+      headers: { Authorization: token || '' },
+    });
+    return data?.totalCount ?? 0;
+  }, [token]);
+
+  const fetchServiceGatePassCount = useCallback(async (serialNo = '') => {
+    const params = new URLSearchParams({ page: '1', limit: '1', reportType: 'Service_Gate_Pass' });
+    if (serialNo.trim()) params.set('serialNo', serialNo.trim());
+    const { data } = await axios.get(`${getApiBaseUrl()}/report/Service_Gate_Pass?${params.toString()}`, {
       headers: { Authorization: token || '' },
     });
     return data?.totalCount ?? 0;
@@ -76,6 +86,7 @@ const ServiceReportsSummaryScreen = () => {
       ]);
 
       const serviceReportsCount = await fetchServiceReportsCount(serialNo);
+      const serviceGatePassCount = await fetchServiceGatePassCount(serialNo);
 
       const newReportData: ReportData[] = [
         {
@@ -104,6 +115,14 @@ const ServiceReportsSummaryScreen = () => {
           supportsSerialFilter: true,
         },
         {
+          id: 'serviceGatePass',
+          name: 'Service Gate Pass',
+          count: serviceGatePassCount,
+          screen: 'ServiceGatePass',
+          parentStack: 'Services',
+          supportsSerialFilter: true,
+        },
+        {
           id: 'serviceEnquiries',
           name: 'Service Enquiries',
           count: serviceEnquiriesRes.status === 'fulfilled' && serviceEnquiriesRes.value.data.success
@@ -126,7 +145,7 @@ const ServiceReportsSummaryScreen = () => {
     } finally {
       setLoading(false);
     }
-  }, [token, fetchServiceReportsCount]);
+  }, [token, fetchServiceReportsCount, fetchServiceGatePassCount]);
 
   useFocusEffect(
     useCallback(() => {
@@ -149,6 +168,16 @@ const ServiceReportsSummaryScreen = () => {
         type: 'info',
         text1: 'Info',
         text2: 'No data available for this report.',
+      });
+      return;
+    }
+
+    if (item.parentStack) {
+      (navigation as any).navigate(item.parentStack, {
+        screen: item.screen,
+        params: item.supportsSerialFilter && serialNoFilter.trim()
+          ? { serialNo: serialNoFilter.trim() }
+          : undefined,
       });
       return;
     }

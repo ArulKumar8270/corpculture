@@ -13,16 +13,16 @@ const buildReportScopeFilter = (urlScope) => {
     if (lower === "service" || scope === "Service_Report") {
         return {
             $or: [
-                { reportFor: { $in: ["service", "Service_Report"] } },
-                { reportType: "Service_Report" },
+                { reportFor: { $in: ["service", "Service_Report", "Service_Gate_Pass"] } },
+                { reportType: { $in: ["Service_Report", "Service_Gate_Pass"] } },
             ],
         };
     }
     if (lower === "rental" || scope === "Rental_Report") {
         return {
             $or: [
-                { reportFor: { $in: ["rental", "Rental_Report"] } },
-                { reportType: "Rental_Report" },
+                { reportFor: { $in: ["rental", "Rental_Report", "Rental_Gate_Pass"] } },
+                { reportType: { $in: ["Rental_Report", "Rental_Gate_Pass"] } },
             ],
         };
     }

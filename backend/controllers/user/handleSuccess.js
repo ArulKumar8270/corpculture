@@ -5,6 +5,7 @@ const stripeInstance = stripe(process.env.STRIPE_SECRET_KEY);
 import orderModel from "../../models/orderModel.js";
 import mongoose from "mongoose";
 import productModel from "../../models/productModel.js";
+import { tryAutoAssignNewOrder } from "../../utils/tryAutoAssignNewOrder.js";
 
 const handleSuccess = async (req, res) => {
     try {
@@ -144,6 +145,8 @@ const handleSuccess = async (req, res) => {
         };
         const order = new orderModel(combinedOrder);
         await order.save();
+
+        await tryAutoAssignNewOrder(order);
 
         // Reduce stock for each product
         for (const item of orderItems) {

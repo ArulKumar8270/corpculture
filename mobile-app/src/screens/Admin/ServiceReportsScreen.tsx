@@ -10,7 +10,7 @@ import {
   Alert,
   Linking,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 // @ts-ignore - @expo/vector-icons is available via expo dependency
 import { MaterialIcons as Icon } from '@expo/vector-icons';
@@ -22,11 +22,12 @@ import Toast from 'react-native-toast-message';
 import { getApiBaseUrl } from '../../services/api';
 import ReportListFilters from '../../components/ReportListFilters';
 import {
+  getReportSendWebhook,
+  isGatePassReportType,
   SERVICE_REPORT_TYPE,
   buildReportListQueryParams,
   getReportsListUrl,
   ReportListFilterValues,
-  REPORT_SEND_N8N_WEBHOOK,
 } from '../../utils/reportListApi';
 import { collectReportSerialNumbers } from '../../utils/reportSerialNumbers';
 import { openReportDownload } from '../../utils/reportDownload';
@@ -43,6 +44,9 @@ function companyIdFromReport(report: any): string | undefined {
 
 const ServiceReportsScreen = () => {
   const navigation = useNavigation();
+  const route = useRoute<any>();
+  const reportTypeKey = route.params?.reportTypeKey || SERVICE_REPORT_TYPE;
+  const screenTitle = route.params?.screenTitle || 'Service Reports';
   const { user, token } = useSelector((state: RootState) => state.auth);
   const { hasPermission } = usePermissions();
 
@@ -71,13 +75,13 @@ const ServiceReportsScreen = () => {
         setLoading(true);
         const query = buildReportListQueryParams(
           filterValues,
-          SERVICE_REPORT_TYPE,
+          reportTypeKey,
           currentPage,
           currentRowsPerPage
         );
         const url = getReportsListUrl(
           getApiBaseUrl(),
-          SERVICE_REPORT_TYPE,
+          reportTypeKey,
           user?.role,
           user?._id,
           query
@@ -144,8 +148,8 @@ const ServiceReportsScreen = () => {
 
   const handleEdit = (report: any) => {
     (navigation as any).navigate('AddServiceReport', {
-      id: report._id, // AddServiceReportScreen expects 'id', not 'reportId'
-      reportType: report.reportType || 'Service Report',
+      id: report._id,
+      reportType: report.reportType || reportTypeKey,
       reportFor: report.reportFor || 'service',
     });
   };
@@ -216,12 +220,14 @@ const ServiceReportsScreen = () => {
   };
 
   const handleSendReport = async (report: any) => {
+    const reportType = report?.reportType || reportTypeKey;
+    const isGatePass = isGatePassReportType(reportType);
     try {
-      const res = await axios.post(REPORT_SEND_N8N_WEBHOOK, {
+      const res = await axios.post(getReportSendWebhook(reportType), {
         reportId: report._id,
       });
       const serviceId = report?.serviceId?._id || report?.serviceId;
-      if (res && serviceId) {
+      if (res && serviceId && reportType === SERVICE_REPORT_TYPE) {
         try {
           await axios.put(
             `${getApiBaseUrl()}/service/update/${serviceId}`,
@@ -235,7 +241,7 @@ const ServiceReportsScreen = () => {
       Toast.show({
         type: 'success',
         text1: 'Success',
-        text2: 'Report sent successfully!',
+        text2: isGatePass ? 'Gate pass sent successfully!' : 'Report sent successfully!',
       });
       fetchReports();
     } catch (error: any) {
@@ -585,11 +591,16 @@ const ServiceReportsScreen = () => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Service Reports</Text>
+        <Text style={styles.title}>{screenTitle}</Text>
         {hasPermission('serviceReport', 'edit') && (
           <TouchableOpacity
             style={styles.addButton}
-            onPress={() => (navigation as any).navigate('AddServiceReport')}
+            onPress={() =>
+              (navigation as any).navigate('AddServiceReport', {
+                reportType: reportTypeKey,
+                reportFor: 'service',
+              })
+            }
           >
             <Icon name="add" size={24} color="#fff" />
           </TouchableOpacity>

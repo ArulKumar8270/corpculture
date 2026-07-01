@@ -285,6 +285,11 @@ const AdminServices = () => {
     handleClose();
   };
 
+  const handleGatePass = (serviceId, employeeName, companyId) => {
+    navigate(`../addServiceGatePass?employeeName=${employeeName}&reportType=Service_Gate_Pass&serviceId=${serviceId}&companyId=${companyId}`);
+    handleClose();
+  };
+
   const handleMoveStatus = (serviceId, status) => {
     updateStausToService(serviceId, status)
     handleClose();
@@ -463,6 +468,9 @@ const AdminServices = () => {
                       </MenuItem>
                       <MenuItem onClick={() => handleReport(enquiry._id, enquiry.employeeId, enquiry?.companyId)}>
                         <BarChartIcon sx={{ mr: 1 }} /> Report
+                      </MenuItem>
+                      <MenuItem onClick={() => handleGatePass(enquiry._id, enquiry.employeeId, enquiry?.companyId)}>
+                        <DescriptionIcon sx={{ mr: 1 }} /> Gate Pass
                       </MenuItem>
                       {auth?.user?.role === 1 ? (
                         <MenuItem onClick={() => handleMoveStatus(currentServiceIdForMenu, "Cancelled")}>

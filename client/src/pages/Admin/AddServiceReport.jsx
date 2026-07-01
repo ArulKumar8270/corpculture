@@ -30,6 +30,10 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'; // I
 import toast from 'react-hot-toast';
 import axios from 'axios'; // Assuming axios is used for API calls
 import { useAuth } from '../../context/auth'; // Import useAuth to get the token
+import { getReportListPath } from '../../utils/reportNavigation';
+
+const defaultReportType = (props, reportFor) =>
+    reportFor || props?.reportType || 'Service_Report';
 
 const AddServiceReport = (props) => {
     const navigate = useNavigate();
@@ -43,8 +47,8 @@ const AddServiceReport = (props) => {
     // State for form fields
     const [reportData, setReportData] = useState({
         reportNumber: '',
-        reportType: reportFor || 'Service_Report', // Default to 'Service_Report'
-        reportFor: reportFor,
+        reportType: defaultReportType(props, reportFor),
+        reportFor: reportFor || props?.reportType,
         company: companyId, // This will store the company _id
         sendDetailsTo: [],
         assignedTo: employeeName || '',
@@ -141,7 +145,7 @@ const AddServiceReport = (props) => {
                         }
                     } else {
                         alert(reportResponse.data.message || 'Failed to fetch report details.');
-                        navigate('../serviceReportlist'); // Redirect if report not found
+                        navigate(getReportListPath(fetchedReport.reportType || props?.reportType));
                     }
                 }
             } catch (error) {
@@ -515,7 +519,7 @@ const AddServiceReport = (props) => {
                 }
                 alert(response.data.message);
                 handleCancel(); // Reset form after successful submission/update
-                navigate('../serviceReportlist'); // Changed from ../serviceReportlist
+                navigate(getReportListPath(reportData.reportType || props?.reportType));
             } else {
                 alert(response.data.message || `Failed to ${reportId ? 'update' : 'submit'} Service_Report.`);
             }
@@ -527,7 +531,7 @@ const AddServiceReport = (props) => {
     const handleCancel = () => {
         setReportData({
             reportNumber: '',
-            reportType: 'Service_Report',
+            reportType: defaultReportType(props, reportFor),
             company: '',
             sendDetailsTo: [],
             assignedTo: employeeName || '',
@@ -557,7 +561,8 @@ const AddServiceReport = (props) => {
     return (
         <Box sx={{ p: 3, bgcolor: 'background.default', minHeight: '100vh' }}>
             <Typography variant="h5" component="h1" gutterBottom sx={{ mb: 3, color: '#019ee3', fontWeight: 'bold' }}>
-                {reportId ? `Edit` : `Add`} {/* Dynamic Title */}
+                {reportId ? 'Edit' : 'Add'}{' '}
+                {String(reportData.reportType || '').includes('Gate_Pass') ? 'Gate Pass' : 'Report'}
             </Typography>
 
             <Paper elevation={3} sx={{ p: 4, mb: 4, borderRadius: '8px' }}>

@@ -15,6 +15,7 @@ import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 // Import the CompanyRegistrationForm component
 import CompanyRegistrationForm from '../CompanyRegistration/CompanyRegistrationForm'; // {{ edit_1 }}
+import { storeCompanyShippingInfo } from '../../../utils/companyShipping';
 
 
 const Cart = () => {
@@ -106,11 +107,23 @@ const Cart = () => {
         }
     };
 
-    const placeOrderHandler = async () => { // Make the function async
+    const placeOrderHandler = async () => {
         if (!auth?.user || !auth?.token) {
             alert("Please log in to place an order.");
-            navigate("/login"); // Redirect to login if not authenticated
+            navigate("/login");
             return;
+        }
+        if (isCompanyEnabled) {
+            if (!selectedCompany || selectedCompany === "new") {
+                toast.error("Please select a company from the header before placing an order.");
+                return;
+            }
+            const company = companyDetails?.find(
+                (c) => String(c._id) === String(selectedCompany)
+            );
+            if (company) {
+                storeCompanyShippingInfo(company, auth.user.phone);
+            }
         }
         navigate("/shipping");
     };

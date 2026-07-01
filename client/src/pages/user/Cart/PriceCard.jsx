@@ -61,7 +61,7 @@ const PriceCard = ({ cartItems }) => {
                         </span>
                     </p>
                     <p className="flex justify-between text-base">
-                        Delivery Charges
+                        Delivery/Freight Charges
                         <span className="text-primaryGreen font-semibold">
                             ₹{totalDeliveryCharges.toLocaleString()}
                         </span>

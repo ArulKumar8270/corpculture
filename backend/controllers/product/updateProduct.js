@@ -82,6 +82,12 @@ const updateProduct = async (req, res) => {
         product.description = req.body.description || product.description;
         product.price = req.body.price || product.price;
         product.discountPrice = req.body.discountPrice || product.discountPrice;
+        product.installationCost = req.body.installationCost !== undefined ? req.body.installationCost : product.installationCost;
+        product.deliveryCharge = req.body.deliveryCharge !== undefined ? req.body.deliveryCharge : product.deliveryCharge;
+        product.weight = req.body.weight !== undefined ? req.body.weight : product.weight;
+        product.length = req.body.length !== undefined ? req.body.length : product.length;
+        product.width = req.body.width !== undefined ? req.body.width : product.width;
+        product.height = req.body.height !== undefined ? req.body.height : product.height;
         product.ratings = req.body.ratings || product.ratings;
         product.highlights = req.body.highlights || product.highlights;
 

@@ -23,6 +23,10 @@ import { getApiBaseUrl, companyAllPickerQuery } from '../../services/api';
 import Toast from 'react-native-toast-message';
 import { normalizeMongoId } from '../../utils/normalizeMongoId';
 import { getServiceProductDisplayName } from '../../utils/serviceProductDisplayName';
+import {
+  getServiceListScreen,
+  resolveServiceReportType,
+} from '../../utils/reportNavigation';
 
 interface MaterialGroup {
   name: string;
@@ -48,6 +52,7 @@ const AddServiceReportScreen = () => {
   const employeeName = params?.employeeName;
   const employeeId = params?.employeeId; // Employee ID for assignedTo field
   const reportFor = params?.reportType || 'service';
+  const resolvedReportType = resolveServiceReportType(reportFor);
   const serviceId = params?.serviceId;
   const paramCompanyId = normalizeMongoId(params?.companyId);
   const paramCompanyName =
@@ -55,7 +60,7 @@ const AddServiceReportScreen = () => {
   const isEditMode = !!reportId;
 
   const [formData, setFormData] = useState({
-    reportType: 'Service Report',
+    reportType: resolvedReportType,
     reportFor: reportFor,
     company: '',
     problemReport: '',
@@ -137,7 +142,7 @@ const AddServiceReportScreen = () => {
         if (reportResponse.data.success) {
           const fetchedReport = reportResponse.data.report;
           setFormData({
-            reportType: fetchedReport.reportType || 'Service Report',
+            reportType: fetchedReport.reportType || resolvedReportType,
             reportFor: fetchedReport.reportFor || 'service',
             company: fetchedReport.company?._id || '',
             problemReport: fetchedReport.problemReport || '',
@@ -490,7 +495,7 @@ const AddServiceReportScreen = () => {
 
       const payload = {
         serviceId: serviceId,
-        reportType: formData.reportType,
+        reportType: formData.reportType || resolvedReportType,
         company: formData.company,
         problemReport: formData.problemReport,
         remarksPendingWorks: formData.remarksPendingWorks,
@@ -523,7 +528,7 @@ const AddServiceReportScreen = () => {
           text1: 'Success',
           text2: response.data.message || (reportId ? 'Report updated successfully' : 'Report created successfully'),
         });
-        (navigation as any).navigate('ServiceReports');
+        (navigation as any).navigate(getServiceListScreen(resolvedReportType));
       } else {
         Toast.show({
           type: 'error',

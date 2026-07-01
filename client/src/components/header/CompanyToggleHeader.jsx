@@ -8,6 +8,7 @@ import FormControl from '@mui/material/FormControl';
 import Select from '@mui/material/Select';
 import { MdBusiness } from "react-icons/md";
 import CompanyRegistrationForm from "../../pages/user/CompanyRegistration/CompanyRegistrationForm";
+import { storeCompanyShippingInfo } from "../../utils/companyShipping";
 
 const CompanyToggleHeader = () => {
     const navigate = useNavigate();
@@ -23,7 +24,16 @@ const CompanyToggleHeader = () => {
     } = useAuth();
     const [showCompanyModal, setShowCompanyModal] = useState(false);
 
-    console.log(companyDetails, 'selectedCompany', selectedCompany);
+    useEffect(() => {
+        if (!selectedCompany || selectedCompany === 'new') return;
+        if (!Array.isArray(companyDetails) || companyDetails.length === 0) return;
+        const company = companyDetails.find(
+            (c) => String(c._id) === String(selectedCompany)
+        );
+        if (company) {
+            storeCompanyShippingInfo(company, auth?.user?.phone);
+        }
+    }, [selectedCompany, companyDetails, auth?.user?.phone]);
 
     // Update localStorage whenever isCompanyEnabled changes (state is already initialized from context)
     useEffect(() => {

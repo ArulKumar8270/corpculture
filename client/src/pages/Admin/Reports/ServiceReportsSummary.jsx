@@ -35,6 +35,16 @@ const ServiceReportsSummary = () => {
         return data?.totalCount ?? 0;
     }, [auth.token]);
 
+    const fetchServiceGatePassCount = useCallback(async (serialNo = '') => {
+        const params = new URLSearchParams({ page: '1', limit: '1', reportType: 'Service_Gate_Pass' });
+        if (serialNo.trim()) params.set('serialNo', serialNo.trim());
+        const { data } = await axios.get(
+            `${import.meta.env.VITE_SERVER_URL}/api/v1/report/Service_Gate_Pass?${params.toString()}`,
+            { headers: { Authorization: auth.token } }
+        );
+        return data?.totalCount ?? 0;
+    }, [auth.token]);
+
     const fetchSummaryData = useCallback(async (serialNo = '') => {
         setLoading(true);
         setError(null);
@@ -50,6 +60,7 @@ const ServiceReportsSummary = () => {
                 serviceInvoicesRes,
                 serviceQuotationsRes,
                 serviceReportsCount,
+                serviceGatePassCount,
                 serviceEnquiriesRes
             ] = await Promise.allSettled([
                 axios.post(
@@ -63,6 +74,7 @@ const ServiceReportsSummary = () => {
                     { headers: { Authorization: auth.token } }
                 ),
                 fetchServiceReportsCount(serialNo),
+                fetchServiceGatePassCount(serialNo),
                 axios.get(
                     `${import.meta.env.VITE_SERVER_URL}/api/v1/service/all`,
                     { headers: { Authorization: auth.token } }
@@ -90,6 +102,13 @@ const ServiceReportsSummary = () => {
                     supportsSerialFilter: true,
                 },
                 {
+                    id: 'serviceGatePass',
+                    name: 'Service Gate Pass',
+                    count: serviceGatePassCount?.status === 'fulfilled' ? (serviceGatePassCount.value ?? 0) : 0,
+                    path: '../serviceGatePassList',
+                    supportsSerialFilter: true,
+                },
+                {
                     id: 'serviceEnquiries',
                     name: 'Service Enquiries',
                     count: serviceEnquiriesRes?.value?.data?.totalCount ?? 0,
@@ -102,7 +121,7 @@ const ServiceReportsSummary = () => {
         } finally {
             setLoading(false);
         }
-    }, [auth?.token, fetchServiceReportsCount]);
+    }, [auth?.token, fetchServiceReportsCount, fetchServiceGatePassCount]);
 
     useEffect(() => {
         if (auth?.token) fetchSummaryData('');

@@ -37,6 +37,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { getApiBaseUrl } from '../../services/api';
 import CompanyToggleHeader from '../../components/CompanyToggleHeader';
+import { storeCompanyShippingInfo } from '../../utils/companyShipping';
 
 const CartScreen = () => {
   const dispatch = useDispatch();
@@ -268,7 +269,23 @@ const CartScreen = () => {
       return;
     }
 
-    // Set sessionId similar to client's placeOrderHandler
+    if (isCompanyEnabled) {
+      if (!selectedCompany || selectedCompany === 'new') {
+        Toast.show({
+          type: 'error',
+          text1: 'Select Company',
+          text2: 'Please select a company before placing an order',
+        });
+        return;
+      }
+      const company = companyDetails?.find(
+        (c) => String(c._id) === String(selectedCompany)
+      );
+      if (company) {
+        await storeCompanyShippingInfo(company, user?.phone);
+      }
+    }
+
     await AsyncStorage.setItem('sessionId', 'sdfas09df8as7');
     
     // Navigate to shipping screen (equivalent to /shipping/confirm)
@@ -654,7 +671,7 @@ const CartScreen = () => {
                 </View>
               )}
               <View style={styles.priceRow}>
-                <Text style={styles.priceLabel}>Delivery Charges</Text>
+                <Text style={styles.priceLabel}>Delivery/Freight Charges</Text>
                 <Text style={styles.priceValue}>
                   ₹{totalDeliveryCharges.toFixed(2)}
                 </Text>

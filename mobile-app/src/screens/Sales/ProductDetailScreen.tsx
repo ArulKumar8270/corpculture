@@ -38,6 +38,8 @@ const ProductDetailScreen = () => {
   const dispatch = useDispatch();
   const { selectedProduct, isLoading } = useSelector((state: RootState) => state.product);
   const cartItems = useSelector((state: RootState) => state.cart.items);
+  const { isAuthenticated, user } = useSelector((state: RootState) => state.auth);
+  const isStorefrontBlocked = Number(user?.role) === 1;
   const [quantity, setQuantity] = useState(1);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [viewAllReviews, setViewAllReviews] = useState(false);
@@ -69,11 +71,42 @@ const ProductDetailScreen = () => {
   };
 
   const handleAddToCart = () => {
-    if (selectedProduct) {
-      const product = selectedProduct as any;
-      const productImage = product.images && product.images.length > 0
-        ? product.images[0].url
-        : 'https://via.placeholder.com/300';
+    if (!isAuthenticated) {
+      Toast.show({
+        type: 'info',
+        text1: 'Login Required',
+        text2: 'Please login to add items to cart',
+      });
+      (navigation as any).navigate('Login');
+      return;
+    }
+    if (isStorefrontBlocked) {
+      Toast.show({
+        type: 'error',
+        text1: 'Not Available',
+        text2: 'Admin accounts cannot purchase from the storefront',
+      });
+      return;
+    }
+    if (!selectedProduct) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Product is still loading. Please try again.',
+      });
+      return;
+    }
+    const product = selectedProduct as any;
+    const productStock = Number(product.stock) || 0;
+    if (productStock < 1) {
+      Toast.show({
+        type: 'error',
+        text1: 'Out of Stock',
+        text2: 'This product is currently unavailable',
+      });
+      return;
+    }
+    const productImage = product.images?.[0]?.url || 'https://via.placeholder.com/300';
 
       dispatch(
         addToCart({
@@ -89,8 +122,8 @@ const ProductDetailScreen = () => {
           installationCost: product.installationCost ?? 0,
           isInstalation: product.isInstalation ?? false,
           sendInvoice: product.sendInvoice ?? false,
-          brandName: product.brand?.name ?? product.brandName,
-          stock: product.stock,
+          brandName: product.brand?.name ?? product.brandName ?? '',
+          stock: productStock,
         })
       );
       Toast.show({
@@ -98,7 +131,6 @@ const ProductDetailScreen = () => {
         text1: 'Added to Cart',
         text2: `${product.name} added to cart`,
       });
-    }
   };
 
   const goToCart = () => {
@@ -130,13 +162,14 @@ const ProductDetailScreen = () => {
   }
 
   const product = selectedProduct as any;
+  const productStock = Number(product.stock) || 0;
   const productImages = product.images && product.images.length > 0
     ? product.images
     : [{ url: 'https://via.placeholder.com/300' }];
 
   const currentUnitPrice = getPriceForQuantity(quantity, product);
   const currentTotal = currentUnitPrice * quantity;
-  const maxStock = Math.max(1, product.stock ?? 1);
+  const maxStock = Math.max(1, productStock);
   const reviews = product.reviews ?? [];
   const displayedReviews = viewAllReviews ? reviews : reviews.slice(-3);
 
@@ -197,9 +230,9 @@ const ProductDetailScreen = () => {
               ⭐ {Number(product.ratings).toFixed(1)} ({product.numOfReviews ?? 0} Reviews)
             </Text>
           )}
-          <Text style={styles.stock}>Stock: {product.stock ?? 0} available</Text>
+          <Text style={styles.stock}>Stock: {productStock} available</Text>
 
-          {product.stock > 0 && (
+          {productStock > 0 && (
             <>
               <View style={styles.quantitySection}>
                 <Text style={styles.quantitySectionTitle}>Quantity</Text>
@@ -267,9 +300,9 @@ const ProductDetailScreen = () => {
             </>
           )}
 
-          {product.stock <= 10 && product.stock > 0 && (
+          {productStock <= 10 && productStock > 0 && (
             <Text style={styles.lowStock}>
-              Hurry, Only {product.stock} left!
+              Hurry, Only {productStock} left!
             </Text>
           )}
 
@@ -294,7 +327,7 @@ const ProductDetailScreen = () => {
 
           {product.deliveryCharge != null && (
             <Text style={styles.delivery}>
-              Delivery by {getDeliveryDate()} | ₹{product.deliveryCharge}
+              Delivery/Freight by {getDeliveryDate()} | ₹{product.deliveryCharge}
             </Text>
           )}
 
@@ -344,7 +377,7 @@ const ProductDetailScreen = () => {
             </View>
           )}
 
-          {product.stock > 0 && (
+          {productStock > 0 && !isStorefrontBlocked && (
             <View style={styles.buttonRow}>
               <TouchableOpacity
                 style={[styles.addToCartButton, styles.halfButton]}
@@ -362,9 +395,11 @@ const ProductDetailScreen = () => {
               </TouchableOpacity>
             </View>
           )}
-          {product.stock <= 0 && (
+          {(productStock <= 0 || isStorefrontBlocked) && (
             <View style={styles.outOfStockButton}>
-              <Text style={styles.addToCartText}>Out of Stock</Text>
+              <Text style={styles.addToCartText}>
+                {isStorefrontBlocked ? 'Purchase Not Available' : 'Out of Stock'}
+              </Text>
             </View>
           )}
         </View>

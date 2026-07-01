@@ -1,8 +1,18 @@
 export const SERVICE_REPORT_TYPE = 'Service_Report';
 export const RENTAL_REPORT_TYPE = 'Rental_Report';
+export const SERVICE_GATE_PASS_TYPE = 'Service_Gate_Pass';
+export const RENTAL_GATE_PASS_TYPE = 'Rental_Gate_Pass';
 
 export const REPORT_SEND_N8N_WEBHOOK =
   'https://n8n.nicknameinfo.net/webhook/88ed0a9b-ee21-43e0-9684-f5c5859f9734';
+export const GATE_PASS_SEND_N8N_WEBHOOK =
+  'https://n8n.nicknameinfo.net/webhook/232a4cac-a830-4a4c-a848-dbf66d242d79';
+
+export const isGatePassReportType = (reportType?: string) =>
+  reportType === 'Service_Gate_Pass' || reportType === 'Rental_Gate_Pass';
+
+export const getReportSendWebhook = (reportType?: string) =>
+  isGatePassReportType(reportType) ? GATE_PASS_SEND_N8N_WEBHOOK : REPORT_SEND_N8N_WEBHOOK;
 
 export type ReportListFilterValues = {
   fromDate: string;

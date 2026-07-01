@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -18,6 +18,7 @@ import Toast from 'react-native-toast-message';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFrontHomeSettings } from '../../hooks/useFrontHomeSettings';
+import { getCompanyShippingDefaults } from '../../utils/companyShipping';
 
 // States data
 const states = [
@@ -76,6 +77,20 @@ const ShippingScreen = () => {
   const [phoneNo, setPhoneNo] = useState('');
   const [statePickerVisible, setStatePickerVisible] = useState(false);
   const [loading, setLoading] = useState(false);
+  const lastAppliedCompanyRef = useRef<string | null>(null);
+
+  const applyCompanyToShipping = async (company: any) => {
+    const defaults = getCompanyShippingDefaults(company, user?.phone);
+    if (!defaults) return;
+    setAddress(defaults.address);
+    setCity(defaults.city);
+    setState(defaults.state);
+    setPincode(defaults.pincode);
+    setPhoneNo(defaults.phoneNo);
+    setLandmark(defaults.landmark || '');
+    setCountry(defaults.country || 'IN');
+    await AsyncStorage.setItem('shippingInfo', JSON.stringify(defaults));
+  };
 
   useEffect(() => {
     loadShippingInfo();
@@ -83,16 +98,16 @@ const ShippingScreen = () => {
 
   useEffect(() => {
     if (!Array.isArray(companyDetails) || companyDetails.length === 0) return;
-    const company = selectedCompany
-      ? companyDetails.find((c) => String(c._id) === String(selectedCompany))
-      : companyDetails[0];
+    if (!selectedCompany || selectedCompany === 'new') return;
+    if (lastAppliedCompanyRef.current === selectedCompany) return;
+
+    const company = companyDetails.find(
+      (c) => String(c._id) === String(selectedCompany)
+    );
     if (!company) return;
 
-    setAddress((prev) => prev || company.billingAddress || company.addressDetail || '');
-    setCity((prev) => prev || company.city || '');
-    setState((prev) => prev || company.state || '');
-    setPincode((prev) => prev || company.pincode || '');
-    setPhoneNo((prev) => prev || company.phone || company.mobileNumber || user?.phone || '');
+    lastAppliedCompanyRef.current = selectedCompany;
+    applyCompanyToShipping(company);
   }, [companyDetails, selectedCompany, user?.phone]);
 
   const loadShippingInfo = async () => {
@@ -317,7 +332,7 @@ const ShippingScreen = () => {
             </View>
           )}
           <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>Delivery Charges</Text>
+            <Text style={styles.priceLabel}>Delivery/Freight Charges</Text>
             <Text style={styles.priceValue}>
               ₹{totalDeliveryCharges.toFixed(2)}
             </Text>

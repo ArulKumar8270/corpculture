@@ -25,6 +25,7 @@ interface ReportData {
   screen: string;
   type?: string;
   supportsSerialFilter?: boolean;
+  parentStack?: string;
 }
 
 const RentalReportsSummaryScreen = () => {
@@ -39,6 +40,15 @@ const RentalReportsSummaryScreen = () => {
     const params = new URLSearchParams({ page: '1', limit: '1', reportType: 'Rental_Report' });
     if (serialNo.trim()) params.set('serialNo', serialNo.trim());
     const { data } = await axios.get(`${getApiBaseUrl()}/report/Rental_Report?${params.toString()}`, {
+      headers: { Authorization: token || '' },
+    });
+    return data?.totalCount ?? 0;
+  }, [token]);
+
+  const fetchRentalGatePassCount = useCallback(async (serialNo = '') => {
+    const params = new URLSearchParams({ page: '1', limit: '1', reportType: 'Rental_Gate_Pass' });
+    if (serialNo.trim()) params.set('serialNo', serialNo.trim());
+    const { data } = await axios.get(`${getApiBaseUrl()}/report/Rental_Gate_Pass?${params.toString()}`, {
       headers: { Authorization: token || '' },
     });
     return data?.totalCount ?? 0;
@@ -76,6 +86,7 @@ const RentalReportsSummaryScreen = () => {
       ]);
 
       const rentalReportsCount = await fetchRentalReportsCount(serialNo);
+      const rentalGatePassCount = await fetchRentalGatePassCount(serialNo);
 
       const newReportData: ReportData[] = [
         {
@@ -105,6 +116,14 @@ const RentalReportsSummaryScreen = () => {
           supportsSerialFilter: true,
         },
         {
+          id: 'rentalGatePass',
+          name: 'Rental Gate Pass',
+          count: rentalGatePassCount,
+          screen: 'RentalGatePass',
+          parentStack: 'Rentals',
+          supportsSerialFilter: true,
+        },
+        {
           id: 'rentalEnquiries',
           name: 'Rental Enquiries',
           count: rentalEnquiriesRes.status === 'fulfilled' && rentalEnquiriesRes.value.data.success
@@ -127,7 +146,7 @@ const RentalReportsSummaryScreen = () => {
     } finally {
       setLoading(false);
     }
-  }, [token, fetchRentalReportsCount]);
+  }, [token, fetchRentalReportsCount, fetchRentalGatePassCount]);
 
   useFocusEffect(
     useCallback(() => {
@@ -150,6 +169,16 @@ const RentalReportsSummaryScreen = () => {
         type: 'info',
         text1: 'Info',
         text2: 'No data available for this report.',
+      });
+      return;
+    }
+
+    if (item.parentStack) {
+      (navigation as any).navigate(item.parentStack, {
+        screen: item.screen,
+        params: item.supportsSerialFilter && serialNoFilter.trim()
+          ? { serialNo: serialNoFilter.trim() }
+          : undefined,
       });
       return;
     }

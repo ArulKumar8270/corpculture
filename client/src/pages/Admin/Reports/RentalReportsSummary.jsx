@@ -35,6 +35,16 @@ const RentalReportsSummary = () => {
         return data?.totalCount ?? 0;
     }, [auth.token]);
 
+    const fetchRentalGatePassCount = useCallback(async (serialNo = '') => {
+        const params = new URLSearchParams({ page: '1', limit: '1', reportType: 'Rental_Gate_Pass' });
+        if (serialNo.trim()) params.set('serialNo', serialNo.trim());
+        const { data } = await axios.get(
+            `${import.meta.env.VITE_SERVER_URL}/api/v1/report/Rental_Gate_Pass?${params.toString()}`,
+            { headers: { Authorization: auth.token } }
+        );
+        return data?.totalCount ?? 0;
+    }, [auth.token]);
+
     const fetchData = useCallback(async (serialNo = '') => {
         setLoading(true);
         setError(null);
@@ -43,6 +53,7 @@ const RentalReportsSummary = () => {
                 rentalInvoicesRes,
                 rentalQuotationsRes,
                 rentalReportsCount,
+                rentalGatePassCount,
                 rentalEnquiriesRes
             ] = await Promise.allSettled([
                 axios.post(
@@ -56,6 +67,7 @@ const RentalReportsSummary = () => {
                     { headers: { Authorization: auth.token } }
                 ),
                 fetchRentalReportsCount(serialNo),
+                fetchRentalGatePassCount(serialNo),
                 axios.get(
                     `${import.meta.env.VITE_SERVER_URL}/api/v1/rental/all`,
                     { headers: { Authorization: auth.token } }
@@ -66,6 +78,7 @@ const RentalReportsSummary = () => {
                 { id: 'rentalInvoices', name: 'Rental Invoices', count: rentalInvoicesRes?.value?.data?.totalCount ?? 0, path: '../rantalInvoicesReport' },
                 { id: 'rentalQuotations', name: 'Rental Quotations', count: rentalQuotationsRes?.value?.data?.totalCount ?? 0, path: '../rentalQuotationsReport' },
                 { id: 'rentalReports', name: 'Rental Reports', count: rentalReportsCount?.status === 'fulfilled' ? (rentalReportsCount.value ?? 0) : 0, path: '../rentalReportsReport', supportsSerialFilter: true },
+                { id: 'rentalGatePass', name: 'Rental Gate Pass', count: rentalGatePassCount?.status === 'fulfilled' ? (rentalGatePassCount.value ?? 0) : 0, path: '../rentalGatePassList', supportsSerialFilter: true },
                 { id: 'rentalEnquiries', name: 'Rental Enquiries', count: rentalEnquiriesRes?.value?.data?.totalCount ?? 0, path: '../rentalEnquiriesReport' },
             ];
             setReportData(data);
@@ -75,7 +88,7 @@ const RentalReportsSummary = () => {
         } finally {
             setLoading(false);
         }
-    }, [auth.token, fetchRentalReportsCount]);
+    }, [auth.token, fetchRentalReportsCount, fetchRentalGatePassCount]);
 
     useEffect(() => {
         if (auth?.token) fetchData('');

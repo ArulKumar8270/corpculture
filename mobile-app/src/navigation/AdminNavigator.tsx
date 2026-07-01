@@ -186,6 +186,12 @@ const ServiceStack = () => (
     <Stack.Screen name="ServiceQuotationList" component={ServiceQuotationListScreen} options={{ title: 'Service Quotations', headerShown: true }} />
     <Stack.Screen name="AddServiceQuotation" component={AddServiceInvoiceScreen} options={{ title: 'Add/Edit Quotation', headerShown: true }} />
     <Stack.Screen name="ServiceReports" component={ServiceReportsScreen} options={{ title: 'Service Reports', headerShown: true }} />
+    <Stack.Screen
+      name="ServiceGatePass"
+      component={ServiceReportsScreen}
+      initialParams={{ reportTypeKey: 'Service_Gate_Pass', screenTitle: 'Gate Pass' }}
+      options={{ title: 'Gate Pass', headerShown: true }}
+    />
     <Stack.Screen name="AddServiceReport" component={AddServiceReportScreen} options={{ title: 'Add Service Report', headerShown: true }} />
     <Stack.Screen name="ServicePartners" component={CommissionScreen} options={{ title: 'Partners (Service)', headerShown: true }} />
   </Stack.Navigator>
@@ -217,6 +223,12 @@ const RentalStack = () => (
     <Stack.Screen name="RentalEnquiries" component={RentalEnquiriesScreen} options={{ title: 'Rental Enquiries' }} />
     <Stack.Screen name="RentalQuotationList" component={RentalQuotationListScreen} options={{ title: 'Rental Quotations' }} />
     <Stack.Screen name="RentalReports" component={RentalReportsScreen} options={{ title: 'Rental Reports' }} />
+    <Stack.Screen
+      name="RentalGatePass"
+      component={RentalReportsScreen}
+      initialParams={{ reportTypeKey: 'Rental_Gate_Pass', screenTitle: 'Gate Pass' }}
+      options={{ title: 'Gate Pass', headerShown: true }}
+    />
     <Stack.Screen name="AddRentalReport" component={AddRentalReportScreen} options={{ title: 'Add/Edit Rental Report' }} />
     <Stack.Screen name="RentalPartners" component={CommissionScreen} options={{ title: 'Partners (Rental)' }} />
   </Stack.Navigator>

@@ -3,12 +3,13 @@ import InputLabel from "@mui/material/InputLabel";
 import Select from "@mui/material/Select";
 import TextField from "@mui/material/TextField";
 import MenuItem from "@mui/material/MenuItem";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import states from "../../../utils/states";
 import { toast } from "react-toastify";
 import { useCart } from "../../../context/cart";
 import { useAuth } from "../../../context/auth";
 import { useFrontHomeSettings } from "../../../context/frontHomeSettings";
+import { getCompanyShippingDefaults } from "../../../utils/companyShipping";
 import axios from "axios";
 
 //payment using stripe
@@ -18,8 +19,15 @@ import PriceCard from "./PriceCard";
 import { useNavigate } from "react-router-dom";
 
 const Shipping = () => {
-    const Info = localStorage.getItem("shippingInfo");
-    const shippingInfo = JSON.parse(Info);
+    const parseShippingInfo = () => {
+        try {
+            const info = localStorage.getItem("shippingInfo");
+            return info ? JSON.parse(info) : null;
+        } catch {
+            return null;
+        }
+    };
+    const shippingInfo = parseShippingInfo();
     const storedOrderRef = localStorage.getItem("orderReferenceNo") || "";
 
     const [cartItems] = useCart();
@@ -38,19 +46,33 @@ const Shipping = () => {
     const [pincode, setPincode] = useState(shippingInfo?.pincode);
     const [phoneNo, setPhoneNo] = useState(shippingInfo?.phoneNo);
     const [orderReferenceNo, setOrderReferenceNo] = useState(storedOrderRef);
+    const lastAppliedCompanyRef = useRef(null);
+
+    const applyCompanyToShipping = (company) => {
+        const defaults = getCompanyShippingDefaults(company, auth?.user?.phone);
+        if (!defaults) return;
+        setAddress(defaults.address);
+        setCity(defaults.city);
+        setState(defaults.state);
+        setPincode(defaults.pincode);
+        setPhoneNo(defaults.phoneNo);
+        setLandmark(defaults.landmark || '');
+        setCountry(defaults.country || 'IN');
+        localStorage.setItem("shippingInfo", JSON.stringify(defaults));
+    };
 
     useEffect(() => {
         if (!Array.isArray(companyDetails) || companyDetails.length === 0) return;
-        const company = selectedCompany
-            ? companyDetails.find((c) => String(c._id) === String(selectedCompany))
-            : companyDetails[0];
+        if (!selectedCompany || selectedCompany === 'new') return;
+        if (lastAppliedCompanyRef.current === selectedCompany) return;
+
+        const company = companyDetails.find(
+            (c) => String(c._id) === String(selectedCompany)
+        );
         if (!company) return;
 
-        setAddress((prev) => prev || company.billingAddress || company.addressDetail || '');
-        setCity((prev) => prev || company.city || '');
-        setState((prev) => prev || company.state || '');
-        setPincode((prev) => prev || company.pincode || '');
-        setPhoneNo((prev) => prev || company.phone || company.mobileNumber || auth?.user?.phone || '');
+        lastAppliedCompanyRef.current = selectedCompany;
+        applyCompanyToShipping(company);
     }, [companyDetails, selectedCompany, auth?.user?.phone]);
 
     //stripe details

@@ -263,7 +263,17 @@ const ServiceReportsReport = ({ type = 'service' }) => {
                                 onChange={(e) => setReportTypeFilter(e.target.value)}
                             >
                                 <MenuItem value="">All</MenuItem>
-                                <MenuItem value="Service Report">Service Report</MenuItem>
+                                {isRental ? (
+                                    <>
+                                        <MenuItem value="Rental_Report">Rental Report</MenuItem>
+                                        <MenuItem value="Rental_Gate_Pass">Rental Gate Pass</MenuItem>
+                                    </>
+                                ) : (
+                                    <>
+                                        <MenuItem value="Service_Report">Service Report</MenuItem>
+                                        <MenuItem value="Service_Gate_Pass">Service Gate Pass</MenuItem>
+                                    </>
+                                )}
                             </Select>
                         </FormControl>
                     </Box>
