@@ -565,14 +565,14 @@ const EditProduct = () => {
                                     value={corpcultureWarranty}
                                     onChange={(e) => setCorpcultureWarranty(e.target.value)}
                                 />
-                                <TextField
+                                {/* <TextField
                                     label="Order Reference No"
                                     variant="outlined"
                                     size="small"
                                     placeholder="e.g. ORD-REF-001"
                                     value={orderReferenceNo}
                                     onChange={(e) => setOrderReferenceNo(e.target.value)}
-                                />
+                                /> */}
                             </div>
 
                             <div className="flex flex-col gap-2">

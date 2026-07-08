@@ -18,6 +18,34 @@ import axios from 'axios';
 import Toast from 'react-native-toast-message';
 import { usePermissions } from '../../hooks/usePermissions';
 import { getApiBaseUrl } from '../../services/api';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
+
+let XLSX: any;
+try {
+  XLSX = require('xlsx');
+} catch {
+  // xlsx optional
+}
+
+const formatListField = (value: unknown): string => {
+  if (Array.isArray(value)) return value.filter(Boolean).join(', ');
+  return value != null && value !== '' ? String(value) : '';
+};
+
+const formatDepartments = (department: unknown): string => {
+  if (!department) return '';
+  if (Array.isArray(department)) {
+    return department
+      .map((d) => (typeof d === 'object' && d !== null ? (d as { name?: string }).name : d))
+      .filter(Boolean)
+      .join(', ');
+  }
+  if (typeof department === 'object' && department !== null) {
+    return (department as { name?: string }).name || '';
+  }
+  return String(department);
+};
 
 interface Employee {
   _id: string;
@@ -25,12 +53,28 @@ interface Employee {
   email: string;
   phone: string;
   address: string;
-  employeeType: string;
-  designation?: string;
+  employeeType: string | string[];
+  designation?: string | string[];
   department?: {
     _id: string;
     name: string;
   };
+  pincode?: string | string[];
+  idCradNo?: string;
+  salary?: number | string;
+  bikeAllowance?: number | string;
+  orderPriceFrom?: number | string;
+  orderPriceTo?: number | string;
+  hireDate?: string;
+  parentName?: string;
+  parentPhone?: string;
+  parentAddress?: string;
+  parentRelation?: string;
+  image?: string;
+  idProof?: string;
+  userId?: { _id?: string } | string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 const EmployeeListScreen = () => {
@@ -39,6 +83,7 @@ const EmployeeListScreen = () => {
   const { hasPermission } = usePermissions();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
+  const [exportingExcel, setExportingExcel] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -116,14 +161,86 @@ const EmployeeListScreen = () => {
 
   const filteredEmployees = employees.filter((employee) => {
     const query = searchQuery.toLowerCase();
+    const employeeType = formatListField(employee.employeeType).toLowerCase();
+    const designation = formatListField(employee.designation).toLowerCase();
     return (
       employee.name.toLowerCase().includes(query) ||
       employee.email.toLowerCase().includes(query) ||
       employee.phone.toLowerCase().includes(query) ||
-      employee.employeeType.toLowerCase().includes(query) ||
-      (employee.designation && employee.designation.toLowerCase().includes(query))
+      employeeType.includes(query) ||
+      designation.includes(query)
     );
   });
+
+  const handleDownloadEmployeesExcel = async () => {
+    if (!XLSX) {
+      Toast.show({ type: 'error', text1: 'Excel export unavailable' });
+      return;
+    }
+    if (!employees.length) {
+      Toast.show({ type: 'error', text1: 'No employees to export.' });
+      return;
+    }
+    try {
+      setExportingExcel(true);
+      const rows = employees.map((employee) => ({
+        'Employee ID': String(employee._id ?? ''),
+        Name: employee.name ?? '',
+        Email: employee.email ?? '',
+        Phone: employee.phone ?? '',
+        Address: employee.address ?? '',
+        'Pincode(s)': formatListField(employee.pincode),
+        'Employee Type': formatListField(employee.employeeType),
+        Designation: formatListField(employee.designation),
+        'ID Card No': employee.idCradNo ?? '',
+        Department: formatDepartments(employee.department),
+        Salary: employee.salary ?? '',
+        'Bike Allowance': employee.bikeAllowance ?? '',
+        'Order Price From': employee.orderPriceFrom ?? '',
+        'Order Price To': employee.orderPriceTo ?? '',
+        'Hire Date': employee.hireDate
+          ? new Date(employee.hireDate).toLocaleDateString()
+          : '',
+        'Parent Name': employee.parentName ?? '',
+        'Parent Phone': employee.parentPhone ?? '',
+        'Parent Address': employee.parentAddress ?? '',
+        'Parent Relation': employee.parentRelation ?? '',
+        'Image URL': employee.image ?? '',
+        'ID Proof URL': employee.idProof ?? '',
+        'User ID': employee.userId && typeof employee.userId === 'object'
+          ? String(employee.userId._id ?? '')
+          : String(employee.userId ?? ''),
+        'Created At': employee.createdAt
+          ? new Date(employee.createdAt).toLocaleString()
+          : '',
+        'Updated At': employee.updatedAt
+          ? new Date(employee.updatedAt).toLocaleString()
+          : '',
+      }));
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Employees');
+      const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      const stamp = new Date().toISOString().slice(0, 10);
+      const fileName = `all_employees_${stamp}.xlsx`;
+      const fileUri = `${FileSystem.cacheDirectory}${fileName}`;
+      const base64 = btoa(
+        new Uint8Array(excelBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+      );
+      await FileSystem.writeAsStringAsync(fileUri, base64, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri);
+      }
+      Toast.show({ type: 'success', text1: `Exported ${rows.length} employee(s) to Excel.` });
+    } catch (err) {
+      console.error('Excel export error:', err);
+      Toast.show({ type: 'error', text1: 'Failed to export Excel.' });
+    } finally {
+      setExportingExcel(false);
+    }
+  };
 
   const paginatedEmployees = useMemo(() => {
     const start = page * rowsPerPage;
@@ -178,7 +295,7 @@ const EmployeeListScreen = () => {
         </View>
         <View style={styles.detailRow}>
           <Icon name="work" size={16} color="#666" />
-          <Text style={styles.detailText}>{item.employeeType}</Text>
+          <Text style={styles.detailText}>{formatListField(item.employeeType)}</Text>
         </View>
         {item.department && (
           <View style={styles.detailRow}>
@@ -186,12 +303,12 @@ const EmployeeListScreen = () => {
             <Text style={styles.detailText}>{item.department.name}</Text>
           </View>
         )}
-        {item.designation && (
+        {formatListField(item.designation) ? (
           <View style={styles.detailRow}>
             <Icon name="badge" size={16} color="#666" />
-            <Text style={styles.detailText}>{item.designation}</Text>
+            <Text style={styles.detailText}>{formatListField(item.designation)}</Text>
           </View>
-        )}
+        ) : null}
       </View>
     </TouchableOpacity>
   );
@@ -208,15 +325,34 @@ const EmployeeListScreen = () => {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Employees</Text>
-        {(isAdmin || hasPermission('reportsEmployeeList', 'create')) && (
+        <View style={styles.headerActions}>
           <TouchableOpacity
-            style={styles.addButton}
-            onPress={() => (navigation as any).navigate('AddEmployee')}
+            style={[
+              styles.exportButton,
+              (exportingExcel || !employees.length) && styles.exportButtonDisabled,
+            ]}
+            onPress={handleDownloadEmployeesExcel}
+            disabled={exportingExcel || !employees.length}
           >
-            <Icon name="add" size={24} color="#fff" />
-            <Text style={styles.addButtonText}>New</Text>
+            {exportingExcel ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <>
+                <Icon name="download" size={20} color="#fff" />
+                <Text style={styles.exportButtonText}>Excel</Text>
+              </>
+            )}
           </TouchableOpacity>
-        )}
+          {(isAdmin || hasPermission('reportsEmployeeList', 'create')) && (
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={() => (navigation as any).navigate('AddEmployee')}
+            >
+              <Icon name="add" size={24} color="#fff" />
+              <Text style={styles.addButtonText}>New</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       <View style={styles.searchContainer}>
@@ -319,6 +455,30 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: '#019ee3',
+    flexShrink: 1,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  exportButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#019ee3',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    gap: 4,
+  },
+  exportButtonDisabled: {
+    backgroundColor: '#9e9e9e',
+    opacity: 0.8,
+  },
+  exportButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
   addButton: {
     flexDirection: 'row',

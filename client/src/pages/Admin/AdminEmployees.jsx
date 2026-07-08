@@ -10,12 +10,33 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { toast } from 'react-toastify';
 import TextField from "@mui/material/TextField"; // Import TextField for search input
+import * as XLSX from "xlsx";
+import { saveAs } from "file-saver";
+import DownloadIcon from '@mui/icons-material/Download';
+
+const formatListField = (value) => {
+  if (Array.isArray(value)) return value.filter(Boolean).join(', ');
+  return value ?? '';
+};
+
+const formatDepartments = (department) => {
+  if (!department) return '';
+  if (Array.isArray(department)) {
+    return department
+      .map((d) => (typeof d === 'object' ? d?.name : d))
+      .filter(Boolean)
+      .join(', ');
+  }
+  if (typeof department === 'object') return department?.name || '';
+  return String(department);
+};
 
 const AdminEmployees = () => {
   const { auth, userPermissions } = useAuth();
   const navigate = useNavigate();
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [exportingExcel, setExportingExcel] = useState(false);
   const [searchQuery, setSearchQuery] = useState(''); // New state for search query
 
   const fetchEmployees = async () => {
@@ -80,14 +101,75 @@ const AdminEmployees = () => {
   // Filter employees based on search query
   const filteredEmployees = employees.filter(employee => {
     const query = searchQuery.toLowerCase();
+    const employeeType = formatListField(employee.employeeType).toLowerCase();
+    const designation = formatListField(employee.designation).toLowerCase();
     return (
       employee.name.toLowerCase().includes(query) ||
       employee.email.toLowerCase().includes(query) ||
       employee.phone.toLowerCase().includes(query) ||
-      employee.employeeType.toLowerCase().includes(query) ||
-      (employee.designation && employee.designation.toLowerCase().includes(query)) // Check for designation existence
+      employeeType.includes(query) ||
+      designation.includes(query)
     );
   });
+
+  const handleDownloadEmployeesExcel = () => {
+    if (!employees?.length) {
+      toast.error("No employees to export.");
+      return;
+    }
+    setExportingExcel(true);
+    try {
+      const rows = employees.map((employee) => ({
+        "Employee ID": String(employee._id ?? ""),
+        Name: employee.name ?? "",
+        Email: employee.email ?? "",
+        Phone: employee.phone ?? "",
+        Address: employee.address ?? "",
+        "Pincode(s)": formatListField(employee.pincode),
+        "Employee Type": formatListField(employee.employeeType),
+        Designation: formatListField(employee.designation),
+        "ID Card No": employee.idCradNo ?? "",
+        Department: formatDepartments(employee.department),
+        Salary: employee.salary ?? "",
+        "Bike Allowance": employee.bikeAllowance ?? "",
+        "Order Price From": employee.orderPriceFrom ?? "",
+        "Order Price To": employee.orderPriceTo ?? "",
+        "Hire Date": employee.hireDate
+          ? new Date(employee.hireDate).toLocaleDateString()
+          : "",
+        "Parent Name": employee.parentName ?? "",
+        "Parent Phone": employee.parentPhone ?? "",
+        "Parent Address": employee.parentAddress ?? "",
+        "Parent Relation": employee.parentRelation ?? "",
+        "Image URL": employee.image ?? "",
+        "ID Proof URL": employee.idProof ?? "",
+        "User ID": employee.userId?._id
+          ? String(employee.userId._id)
+          : String(employee.userId ?? ""),
+        "Created At": employee.createdAt
+          ? new Date(employee.createdAt).toLocaleString()
+          : "",
+        "Updated At": employee.updatedAt
+          ? new Date(employee.updatedAt).toLocaleString()
+          : "",
+      }));
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Employees");
+      const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+      const blob = new Blob([excelBuffer], {
+        type: "application/octet-stream",
+      });
+      const stamp = new Date().toISOString().slice(0, 10);
+      saveAs(blob, `all_employees_${stamp}.xlsx`);
+      toast.success(`Exported ${rows.length} employee(s) to Excel.`);
+    } catch (err) {
+      console.error("Excel export error:", err);
+      toast.error("Failed to export Excel.");
+    } finally {
+      setExportingExcel(false);
+    }
+  };
 
   return (
     <div className="p-6 bg-gradient-to-br from-[#e6fbff] to-[#f7fafd] min-h-screen">
@@ -96,12 +178,29 @@ const AdminEmployees = () => {
         <h1 className="text-lg font-bold uppercase text-[#019ee3] tracking-wide">
           Employees
         </h1>
-        {hasPermission("reportsEmployeeList", "create") ? <button
-          onClick={() => navigate('../addEmployee')}
-          className="py-2 px-5 rounded-xl shadow font-semibold text-white bg-gradient-to-r from-[#afcb09] to-[#019ee3] hover:from-[#019ee3] hover:to-[#afcb09] transition"
-        >
-          + New Employees
-        </button> : null}
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={handleDownloadEmployeesExcel}
+            disabled={exportingExcel || !employees?.length}
+            className={`py-2 px-5 rounded-xl shadow font-semibold text-white flex items-center gap-2 transition ${
+              exportingExcel || !employees?.length
+                ? "bg-gray-400 cursor-not-allowed"
+                : "bg-gradient-to-r from-[#019ee3] to-[#afcb09] hover:from-[#afcb09] hover:to-[#019ee3]"
+            }`}
+          >
+            <DownloadIcon fontSize="small" />
+            {exportingExcel ? "Preparing Excel…" : "Download Excel"}
+          </button>
+          {hasPermission("reportsEmployeeList", "create") ? (
+            <button
+              onClick={() => navigate('../addEmployee')}
+              className="py-2 px-5 rounded-xl shadow font-semibold text-white bg-gradient-to-r from-[#afcb09] to-[#019ee3] hover:from-[#019ee3] hover:to-[#afcb09] transition"
+            >
+              + New Employees
+            </button>
+          ) : null}
+        </div>
       </div>
 
       {/* Search Input Field */}
@@ -154,7 +253,7 @@ const AdminEmployees = () => {
                     <td className="py-2 px-3">{employee.email}</td>
                     <td className="py-2 px-3">{employee.phone}</td>
                     <td className="py-2 px-3">{employee.address}</td>
-                    <td className="py-2 px-3">{employee.employeeType}</td>
+                    <td className="py-2 px-3">{formatListField(employee.employeeType)}</td>
                     <td className="py-2 px-3">{employee.department?.name || 'N/A'}</td>
                     <td className="py-2 px-3 text-center">
                       {hasPermission("reportsEmployeeList", "edit") && (

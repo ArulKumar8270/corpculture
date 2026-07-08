@@ -311,9 +311,9 @@ const AddRentalProduct = () => {
             hsn,
             basePrice: parseFloat(basePrice),
             gstType: cleanedGstTypeIds,
-            paymentDate: paymentDate ? dayjs(paymentDate).utc().startOf('day').toISOString() : null,
-            openingDate: openingDate ? dayjs(openingDate).utc().startOf('day').toISOString() : null,
-            closingDate: closingDate ? dayjs(closingDate).utc().startOf('day').toISOString() : null,
+            paymentDate: paymentDate ? dayjs(paymentDate).format('YYYY-MM-DD') : null,
+            openingDate: openingDate ? dayjs(openingDate).format('YYYY-MM-DD') : null,
+            closingDate: closingDate ? dayjs(closingDate).format('YYYY-MM-DD') : null,
             commission: commission === '' || commission == null ? undefined : parseFloat(commission),
             employeeCommission:
                 employeeCommission === '' || employeeCommission == null

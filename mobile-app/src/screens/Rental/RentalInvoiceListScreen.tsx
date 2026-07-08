@@ -617,6 +617,71 @@ const RentalInvoiceListScreen = () => {
     );
   };
 
+  const handleDeleteSignedInvoiceLink = async (entry: any, linkToDelete: string) => {
+    Alert.alert(
+      'Delete Signed Copy',
+      'Are you sure you want to delete this signed copy link?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setDeletingLink(rentalEntryRowId(entry));
+              const fileName = linkToDelete.split('/').pop();
+              await axios.post(
+                `${getApiBaseUrl()}/auth/delete-file/${fileName}`,
+                {},
+                {
+                  headers: {
+                    Authorization: token || '',
+                  },
+                }
+              );
+
+              const updatedLinks = (entry.signedInvoiceLink || []).filter(
+                (link: string) => link !== linkToDelete
+              );
+              const res = await axios.put(
+                `${getApiBaseUrl()}/rental-payment/${entry._id}`,
+                { signedInvoiceLink: updatedLinks },
+                {
+                  headers: {
+                    Authorization: token || '',
+                  },
+                }
+              );
+
+              if (res.data?.success) {
+                Toast.show({
+                  type: 'success',
+                  text1: 'Success',
+                  text2: 'Signed copy link deleted successfully!',
+                });
+                fetchRentalEntries({ silent: true });
+              } else {
+                Toast.show({
+                  type: 'error',
+                  text1: 'Error',
+                  text2: res.data?.message || 'Failed to delete signed copy link.',
+                });
+              }
+            } catch (error: any) {
+              Toast.show({
+                type: 'error',
+                text1: 'Error',
+                text2: error.response?.data?.message || 'Failed to delete signed copy link',
+              });
+            } finally {
+              setDeletingLink(null);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleOpenPaymentModal = (entry: any) => {
     setSelectedEntry(entry);
     let initialPaymentAmount = 0;
@@ -1259,6 +1324,36 @@ const RentalInvoiceListScreen = () => {
         {/* Expanded Content */}
         {isExpanded && (
           <View style={styles.expandedContent}>
+            {/* Signed Copy Links */}
+            {item.signedInvoiceLink && item.signedInvoiceLink.length > 0 && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Signed Copy Links</Text>
+                {item.signedInvoiceLink.map((link: string, index: number) => (
+                  <View key={`signed-${index}`} style={styles.linkRow}>
+                    <TouchableOpacity
+                      style={styles.linkButton}
+                      onPress={() => Linking.openURL(link)}
+                    >
+                      <Icon name="link" size={18} color="#007AFF" />
+                      <Text style={styles.linkText}>Signed {index + 1}</Text>
+                    </TouchableOpacity>
+                    {hasPermission('rentalInvoice', 'edit') && (
+                      <TouchableOpacity
+                        onPress={() => handleDeleteSignedInvoiceLink(item, link)}
+                        disabled={isDeletingThis}
+                      >
+                        {isDeletingThis ? (
+                          <ActivityIndicator size="small" color="#FF3B30" />
+                        ) : (
+                          <Icon name="delete" size={20} color="#FF3B30" />
+                        )}
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                ))}
+              </View>
+            )}
+
             {/* Invoice Links */}
             {item.invoiceLink && item.invoiceLink.length > 0 && (
               <View style={styles.section}>

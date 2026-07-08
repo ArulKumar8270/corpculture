@@ -6,7 +6,8 @@ import {
     updateRentalProduct,
     deleteRentalProduct,
     getRentalProductsByCompany,
-    getTodaysRentalProducts
+    getTodaysRentalProducts,
+    normalizeExistingRentalPaymentDates,
 } from "../controllers/rentalProduct/rentalProductController.js";
 // You might want to add authentication/authorization middleware here, e.g., isAdmin, requireSignIn
 // import { requireSignIn, isAdmin } from "../middleware/authMiddleware.js";
@@ -25,6 +26,9 @@ router.get("/getServiceProductsByCompany/:companyId", getRentalProductsByCompany
 
 // Get Today's Rental Products
 router.get("/payment/today", getTodaysRentalProducts);
+
+// Normalize existing payment dates (run once after deploy)
+router.post("/normalize-payment-dates", normalizeExistingRentalPaymentDates);
 
 // Update Rental Product
 router.put("/:id", updateRentalProduct); // Consider adding isAdmin middleware here

@@ -807,6 +807,46 @@ function RentalInvoiceList(props) {
         }
     };
 
+    const handleDeleteSignedInvoiceLink = async (invoiceId, linkToDelete, invoice) => {
+        if (!window.confirm("Are you sure you want to delete this signed copy link?")) {
+            return;
+        }
+        try {
+            setDeletingLink(true);
+            const fileName = linkToDelete.split("/").pop();
+            await axios.post(
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/auth/delete-file/${fileName}`,
+                {
+                    headers: {
+                        Authorization: auth?.token
+                    },
+                }
+            );
+            const updatedLinks = (invoice.signedInvoiceLink || []).filter(link => link !== linkToDelete);
+            const res = await axios.put(
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/${invoiceId}`,
+                {
+                    signedInvoiceLink: updatedLinks,
+                },
+                {
+                    headers: {
+                        Authorization: auth.token,
+                    },
+                }
+            );
+
+            if (res.data?.success) {
+                fetchRentalEntries();
+            } else {
+                toast.error(res.data?.message || 'Failed to delete signed copy link.');
+            }
+        } catch (error) {
+            toast.error('Error deleting signed copy link.');
+        } finally {
+            setDeletingLink(false);
+        }
+    };
+
     const handleUpdateInvoiceCount = async () => {
         try {
             // The backend endpoint automatically increments by 1
@@ -1388,6 +1428,36 @@ function RentalInvoiceList(props) {
                                                 <TableRow>
                                                     <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={props?.invoice === "invoice" ? 11 : 10}>
                                                         <Collapse in={expanded} timeout="auto" unmountOnExit>
+                                                        <Typography variant="h6" gutterBottom component="div" sx={{ mt: 2 }}>
+                                                                    Signed Copy Links
+                                                                </Typography>
+                                                                <Stack direction="row" spacing={1} flexWrap="wrap">
+                                                                    {(entry.signedInvoiceLink || []).map((link, index) => (
+                                                                        <Box key={index} sx={{ display: 'flex', alignItems: 'center', my: 0.5 }}>
+                                                                            <Button
+                                                                                variant="outlined"
+                                                                                size="small"
+                                                                                startIcon={<LinkIcon />}
+                                                                                href={link}
+                                                                                target="_blank"
+                                                                                rel="noopener noreferrer"
+                                                                            >
+                                                                                Signed {index + 1}
+                                                                            </Button>
+                                                                            {hasPermission("rentalInvoice") && (
+                                                                                <IconButton
+                                                                                    aria-label={`delete signed link ${index + 1}`}
+                                                                                    size="small"
+                                                                                    onClick={() => handleDeleteSignedInvoiceLink(entry._id, link, entry)}
+                                                                                    disabled={deletingLink}
+                                                                                    sx={{ ml: 0.5 }}
+                                                                                >
+                                                                                    {deletingLink ? <CircularProgress size={16} /> : <DeleteIcon fontSize="small" />}
+                                                                                </IconButton>
+                                                                            )}
+                                                                        </Box>
+                                                                    ))}
+                                                                </Stack>
                                                             <Box sx={{ margin: 2 }}>
                                                                 <Typography variant="h6" gutterBottom component="div" sx={{ mb: 2 }}>
                                                                     Products ({productsToShow.length})
@@ -1464,7 +1534,7 @@ function RentalInvoiceList(props) {
                                                                         >
                                                                             {props?.invoice === "quotation" ? "Quotation" : "Invoice"} {index + 1}
                                                                         </Button>
-                                                                        {hasPermission("serviceInvoice") && (
+                                                                        {hasPermission("rentalInvoice") && (
                                                                             <IconButton
                                                                                 aria-label={`delete invoice link ${index + 1}`}
                                                                                 size="small"

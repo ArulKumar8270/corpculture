@@ -759,16 +759,7 @@ const ProductCreateScreen = () => {
               placeholderTextColor="#999"
             />
           </View>
-          <View style={styles.halfInput}>
-            <Text style={styles.label}>Order Reference No</Text>
-            <TextInput
-              style={styles.input}
-              value={orderReferenceNo}
-              onChangeText={setOrderReferenceNo}
-              placeholder="e.g. ORD-REF-001"
-              placeholderTextColor="#999"
-            />
-          </View>
+          {/* Order Reference No hidden — matches web admin create/edit product */}
         </View>
 
         {/* Highlights Section */}

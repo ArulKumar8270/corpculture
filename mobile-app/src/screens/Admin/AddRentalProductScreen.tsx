@@ -28,6 +28,20 @@ interface ModelSpecs {
   isA5Selected: boolean;
 }
 
+const IST = 'Asia/Kolkata';
+
+/** YYYY-MM-DD in IST for calendar dates from the API. */
+function formatIstYmd(value: string | Date): string {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: IST,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(d);
+}
+
 interface Config {
   bwOldCount: number | string;
   freeCopiesBw: number | string;
@@ -323,15 +337,9 @@ const AddRentalProductScreen = () => {
           hsn: product.hsn || '',
           basePrice: product.basePrice?.toString() || '',
           commission: product.commission?.toString() || '',
-          paymentDate: product.paymentDate
-            ? new Date(product.paymentDate).toISOString().split('T')[0]
-            : '',
-          openingDate: product.openingDate
-            ? new Date(product.openingDate).toISOString().split('T')[0]
-            : '',
-          closingDate: product.closingDate
-            ? new Date(product.closingDate).toISOString().split('T')[0]
-            : '',
+          paymentDate: product.paymentDate ? formatIstYmd(product.paymentDate) : '',
+          openingDate: product.openingDate ? formatIstYmd(product.openingDate) : '',
+          closingDate: product.closingDate ? formatIstYmd(product.closingDate) : '',
           gstTypeIds: Array.isArray(product.gstType)
             ? product.gstType.map((gst: any) => gst._id)
             : product.gstType?._id
@@ -409,9 +417,9 @@ const AddRentalProductScreen = () => {
         hsn: formData.hsn,
         basePrice: parseFloat(formData.basePrice),
         gstType: formData.gstTypeIds,
-        paymentDate: formData.paymentDate ? new Date(formData.paymentDate).toISOString() : null,
-        openingDate: formData.openingDate ? new Date(formData.openingDate).toISOString() : null,
-        closingDate: formData.closingDate ? new Date(formData.closingDate).toISOString() : null,
+        paymentDate: formData.paymentDate || null,
+        openingDate: formData.openingDate || null,
+        closingDate: formData.closingDate || null,
         commission: formData.commission ? parseFloat(formData.commission) : 0,
         modelSpecs,
         a3Config: modelSpecs.isA3Selected ? a3Config : {},

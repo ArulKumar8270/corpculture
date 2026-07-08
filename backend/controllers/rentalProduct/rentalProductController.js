@@ -4,8 +4,8 @@ import GST from "../../models/gstModel.js"; // Assuming this path is correct
 
 const IST = "Asia/Kolkata";
 
-/** YYYY-MM-DD for "today" in IST (matches business calendar, not UTC midnight). */
-function getTodayIstYmd(referenceDate = new Date()) {
+/** YYYY-MM-DD for a given instant in IST (business calendar, not UTC midnight). */
+function getIstYmd(referenceDate = new Date()) {
     const parts = new Intl.DateTimeFormat("en-CA", {
         timeZone: IST,
         year: "numeric",
@@ -45,6 +45,14 @@ function parseDateInput(value) {
     }
     const d = new Date(value);
     return Number.isNaN(d.getTime()) ? undefined : d;
+}
+
+/** Store calendar date as IST midnight so list UI and automation agree. */
+function normalizePaymentDateInput(value) {
+    const d = parseDateInput(value);
+    if (!d) return undefined;
+    const ymd = getIstYmd(d);
+    return new Date(`${ymd}T00:00:00+05:30`);
 }
 
 // Create Rental Product
@@ -95,7 +103,7 @@ export const createRentalProduct = async (req, res) => {
             gstType,
             commission,
             employeeCommission: employeeCommission === undefined || employeeCommission === null || employeeCommission === "" ? 0 : parseFloat(employeeCommission),
-            paymentDate: new Date(paymentDate),
+            paymentDate: normalizePaymentDateInput(paymentDate),
             openingDate: openingDate ? new Date(openingDate) : undefined,
             closingDate: closingDate ? new Date(closingDate) : undefined,
             modelSpecs: modelSpecs || {},
@@ -204,7 +212,7 @@ export const updateRentalProduct = async (req, res) => {
             const pd = parseDateInput(paymentDate);
             const od = parseDateInput(openingDate);
             const cd = parseDateInput(closingDate);
-            if (pd !== undefined) $set.paymentDate = pd;
+            if (pd !== undefined) $set.paymentDate = normalizePaymentDateInput(paymentDate);
             if (od !== undefined) $set.openingDate = od;
             if (cd !== undefined) $set.closingDate = cd;
             if (Object.keys($set).length === 0) {
@@ -253,7 +261,7 @@ export const updateRentalProduct = async (req, res) => {
             return res.status(409).send({ success: false, message: 'Another Rental Product with this serial number already exists.' });
         }
 
-        const pdFull = parseDateInput(paymentDate);
+        const pdFull = normalizePaymentDateInput(paymentDate);
         if (pdFull === undefined) {
             return res.status(400).send({ success: false, message: "Invalid paymentDate." });
         }
@@ -309,13 +317,17 @@ export const deleteRentalProduct = async (req, res) => {
     }
 };
 
-// Get Today's Rental Products (one row per company; all serial numbers combined)
-// - Uses IST calendar date for paymentDate (automation in India + date-only UTC storage were missing rows).
-// - Serial list keeps one entry per product; empty serial is "(no serial)" so counts match automation runs.
-// - ?flat=1 — no grouping (one API row per rental product document).
+// Get Today's Rental Products — exact IST calendar date only (one row per product by default).
+// - ?date=YYYY-MM-DD — reference day in IST (for replays / testing); defaults to today IST.
+// - ?groupByCompany=1 — one row per company with combined serial numbers.
 export const getTodaysRentalProducts = async (req, res) => {
     try {
-        const todayIstYmd = getTodayIstYmd();
+        const dateParam = req.query?.date ? String(req.query.date).slice(0, 10) : null;
+        const referenceDate = dateParam
+            ? new Date(`${dateParam}T12:00:00+05:30`)
+            : new Date();
+
+        const paymentDateIst = getIstYmd(referenceDate);
 
         const rentalProducts = await RentalProduct.find({
             $expr: {
@@ -327,7 +339,7 @@ export const getTodaysRentalProducts = async (req, res) => {
                             timezone: IST,
                         },
                     },
-                    todayIstYmd,
+                    paymentDateIst,
                 ],
             },
         })
@@ -338,15 +350,14 @@ export const getTodaysRentalProducts = async (req, res) => {
 
         const totalRentalProducts = rentalProducts.length;
 
-        const flat =
-            req.query?.flat === "1" ||
-            req.query?.flat === "true" ||
-            req.query?.groupByCompany === "false";
+        const groupByCompany =
+            req.query?.groupByCompany === "1" ||
+            req.query?.groupByCompany === "true";
 
-        if (flat) {
+        if (!groupByCompany) {
             return res.status(200).json({
                 success: true,
-                paymentDateIst: todayIstYmd,
+                paymentDateIst,
                 totalRentalProducts,
                 products: rentalProducts,
             });
@@ -381,13 +392,51 @@ export const getTodaysRentalProducts = async (req, res) => {
 
         res.status(200).json({
             success: true,
-            paymentDateIst: todayIstYmd,
+            paymentDateIst,
             totalRentalProducts,
             groupedRowCount: products.length,
             products,
         });
     } catch (error) {
         console.error(error);
+        res.status(500).json({ success: false, message: "Server Error" });
+    }
+};
+
+// One-time fix: normalize all existing paymentDate values to IST midnight (keeps displayed calendar date).
+export const normalizeExistingRentalPaymentDates = async (req, res) => {
+    try {
+        const products = await RentalProduct.find({
+            paymentDate: { $exists: true, $ne: null },
+        }).select("_id paymentDate");
+
+        let updated = 0;
+        let unchanged = 0;
+
+        for (const product of products) {
+            const normalized = normalizePaymentDateInput(product.paymentDate);
+            if (!normalized) continue;
+
+            if (normalized.getTime() !== new Date(product.paymentDate).getTime()) {
+                await RentalProduct.updateOne(
+                    { _id: product._id },
+                    { $set: { paymentDate: normalized } }
+                );
+                updated += 1;
+            } else {
+                unchanged += 1;
+            }
+        }
+
+        res.status(200).json({
+            success: true,
+            message: "Existing rental product payment dates normalized to IST calendar dates.",
+            total: products.length,
+            updated,
+            unchanged,
+        });
+    } catch (error) {
+        console.error("Error in normalizeExistingRentalPaymentDates:", error);
         res.status(500).json({ success: false, message: "Server Error" });
     }
 };
