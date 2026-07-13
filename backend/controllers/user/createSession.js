@@ -3,6 +3,7 @@ import stripe from "stripe";
 import dotenv from "dotenv";
 dotenv.config();
 const stripeInstance = stripe(process.env.STRIPE_SECRET_KEY);
+import { getCartItemLineTotal } from "../../utils/orderAmountUtil.js";
 
 const createSession = async (req, res) => {
     try {
@@ -20,17 +21,19 @@ const createSession = async (req, res) => {
         const successURL = frontendURL + successPath;
         const cancelURL = frontendURL + cancelPath;
         // console.log(successURL, cancelURL);
-        const lineItems = products?.map((item) => ({
-            price_data: {
-                currency: "inr",
-                //price goes in decimal so we have to multiply by 100
-                unit_amount: item.discountPrice * 100,
-                product_data: {
-                    name: item?.name,
+        const lineItems = products?.map((item) => {
+            const lineTotal = getCartItemLineTotal(item);
+            return {
+                price_data: {
+                    currency: "inr",
+                    unit_amount: Math.round(lineTotal * 100),
+                    product_data: {
+                        name: item?.name,
+                    },
                 },
-            },
-            quantity: item.quantity,
-        }));
+                quantity: 1,
+            };
+        });
         const session = await stripeInstance.checkout.sessions.create({
             payment_method_types: ["card"],
             currency: "inr",

@@ -1,10 +1,21 @@
+import {
+    getDocumentMeta,
+    getDocumentTitle,
+    isGatePassReportType,
+    isOperationalDocumentReportType,
+    SERVICE_DELIVERY_CHALLAN,
+    SERVICE_GATE_PASS,
+    SERVICE_RETURNABLE_CHALLAN,
+    RENTAL_DELIVERY_CHALLAN,
+    RENTAL_GATE_PASS,
+    RENTAL_RETURNABLE_CHALLAN,
+} from './reportDocumentTypes';
+
 /** List page paths keyed by reportType */
 export const getReportListPath = (reportType) => {
+    const meta = getDocumentMeta(reportType);
+    if (meta?.listPath) return meta.listPath;
     switch (reportType) {
-        case 'Service_Gate_Pass':
-            return '../serviceGatePassList';
-        case 'Rental_Gate_Pass':
-            return '../rentalGatePassList';
         case 'Rental_Report':
             return '../rentalReportlist';
         case 'Service_Report':
@@ -15,11 +26,9 @@ export const getReportListPath = (reportType) => {
 
 /** Add/edit form path (no id) keyed by reportType */
 export const getReportFormPath = (reportType) => {
+    const meta = getDocumentMeta(reportType);
+    if (meta?.formPath) return meta.formPath;
     switch (reportType) {
-        case 'Service_Gate_Pass':
-            return '../addServiceGatePass';
-        case 'Rental_Gate_Pass':
-            return '../addRentalGatePass';
         case 'Rental_Report':
             return '../addRentalReport';
         case 'Service_Report':
@@ -34,8 +43,7 @@ export const getReportEditPath = (reportType, reportId) => {
     return `../${base}/${reportId}`;
 };
 
-export const isGatePassReportType = (reportType) =>
-    reportType === 'Service_Gate_Pass' || reportType === 'Rental_Gate_Pass';
+export { isGatePassReportType, isOperationalDocumentReportType };
 
 export const REPORT_SEND_N8N_WEBHOOK =
     'https://n8n.nicknameinfo.net/webhook/88ed0a9b-ee21-43e0-9684-f5c5859f9734';
@@ -43,7 +51,22 @@ export const GATE_PASS_SEND_N8N_WEBHOOK =
     'https://n8n.nicknameinfo.net/webhook/232a4cac-a830-4a4c-a848-dbf66d242d79';
 
 export const getReportSendWebhook = (reportType) =>
-    isGatePassReportType(reportType) ? GATE_PASS_SEND_N8N_WEBHOOK : REPORT_SEND_N8N_WEBHOOK;
+    isOperationalDocumentReportType(reportType) ? GATE_PASS_SEND_N8N_WEBHOOK : REPORT_SEND_N8N_WEBHOOK;
 
-export const getReportPageTitle = (reportType) =>
-    isGatePassReportType(reportType) ? 'Gate Pass' : 'Reports';
+export const getReportPageTitle = (reportType) => {
+    if (isOperationalDocumentReportType(reportType)) {
+        return getDocumentTitle(reportType);
+    }
+    return 'Reports';
+};
+
+export const REPORT_TYPE_LABELS = {
+    Service_Report: 'Service Report',
+    Rental_Report: 'Rental Report',
+    [SERVICE_GATE_PASS]: 'Gate Pass',
+    [RENTAL_GATE_PASS]: 'Gate Pass',
+    [SERVICE_DELIVERY_CHALLAN]: 'Delivery Challan (DC Copy)',
+    [RENTAL_DELIVERY_CHALLAN]: 'Delivery Challan (DC Copy)',
+    [SERVICE_RETURNABLE_CHALLAN]: 'Returnable Challan',
+    [RENTAL_RETURNABLE_CHALLAN]: 'Returnable Challan',
+};

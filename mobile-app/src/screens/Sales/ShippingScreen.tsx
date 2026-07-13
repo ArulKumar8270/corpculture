@@ -19,6 +19,8 @@ import { MaterialIcons as Icon } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFrontHomeSettings } from '../../hooks/useFrontHomeSettings';
 import { getCompanyShippingDefaults } from '../../utils/companyShipping';
+import { getApiBaseUrl } from '../../services/api';
+import { computeOrderAmountFromItems } from '../../utils/orderAmountUtil';
 
 // States data
 const states = [
@@ -75,6 +77,8 @@ const ShippingScreen = () => {
   const [landmark, setLandmark] = useState('');
   const [pincode, setPincode] = useState('');
   const [phoneNo, setPhoneNo] = useState('');
+  const [orderReferenceNo, setOrderReferenceNo] = useState('');
+  const [availableCredit, setAvailableCredit] = useState(0);
   const [statePickerVisible, setStatePickerVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const lastAppliedCompanyRef = useRef<string | null>(null);
@@ -110,6 +114,37 @@ const ShippingScreen = () => {
     applyCompanyToShipping(company);
   }, [companyDetails, selectedCompany, user?.phone]);
 
+  const activeCompanyId =
+    selectedCompany && selectedCompany !== 'new' ? selectedCompany : null;
+  const orderTotal = computeOrderAmountFromItems(cartItems);
+  const canUseCompanyCredit =
+    sales?.creditOptionEnabled && !!activeCompanyId && availableCredit > 0;
+  const creditCoversOrder = availableCredit >= orderTotal;
+
+  useEffect(() => {
+    const fetchCreditBalance = async () => {
+      if (!token || !activeCompanyId) {
+        setAvailableCredit(0);
+        if (payOnCredit) setPayOnCredit(false);
+        return;
+      }
+      try {
+        const { data } = await axios.get(`${getApiBaseUrl()}/credit/balance`, {
+          params: { companyId: activeCompanyId },
+          headers: { Authorization: token },
+        });
+        const balance = Number(data?.summary?.availableCredit) || 0;
+        setAvailableCredit(balance);
+        if (balance <= 0 && payOnCredit) setPayOnCredit(false);
+      } catch (error) {
+        console.error('Error fetching credit balance:', error);
+        setAvailableCredit(0);
+        if (payOnCredit) setPayOnCredit(false);
+      }
+    };
+    fetchCreditBalance();
+  }, [token, activeCompanyId]);
+
   const loadShippingInfo = async () => {
     try {
       const info = await AsyncStorage.getItem('shippingInfo');
@@ -122,6 +157,8 @@ const ShippingScreen = () => {
         setPincode(shippingInfo.pincode || '');
         setPhoneNo(shippingInfo.phoneNo || '');
       }
+      const storedRef = await AsyncStorage.getItem('orderReferenceNo');
+      if (storedRef) setOrderReferenceNo(storedRef);
     } catch (error) {
       console.error('Error loading shipping info:', error);
     }
@@ -202,6 +239,16 @@ const ShippingScreen = () => {
       return;
     }
 
+    const ref = String(orderReferenceNo || '').trim();
+    if (!ref) {
+      Toast.show({
+        type: 'error',
+        text1: 'Reference Required',
+        text2: 'Please enter an order reference number',
+      });
+      return;
+    }
+
     if (!address || !city || !state || !pincode || !phoneNo) {
       Toast.show({
         type: 'error',
@@ -211,27 +258,72 @@ const ShippingScreen = () => {
       return;
     }
 
+    if (payOnCredit) {
+      if (!activeCompanyId) {
+        Toast.show({
+          type: 'error',
+          text1: 'Company Required',
+          text2: 'Select your company to use credit',
+        });
+        return;
+      }
+      if (!creditCoversOrder) {
+        Toast.show({
+          type: 'error',
+          text1: 'Insufficient Credit',
+          text2: `Available ₹${availableCredit}, order total ₹${orderTotal}`,
+        });
+        return;
+      }
+    }
+
     setLoading(true);
     try {
-      await saveShippingInfo();
-      await AsyncStorage.setItem('paymentMethod', payOnCredit ? 'credit' : 'cash');
-      if (payOnCredit && selectedCompany && selectedCompany !== 'new') {
-        await AsyncStorage.setItem('checkoutCompanyId', selectedCompany);
+      const shippingInfo = {
+        address,
+        city,
+        country,
+        state,
+        landmark,
+        pincode,
+        phoneNo,
+      };
+      await AsyncStorage.setItem('shippingInfo', JSON.stringify(shippingInfo));
+      await AsyncStorage.setItem('orderReferenceNo', ref);
+      const paymentMethod = payOnCredit ? 'credit' : 'cash';
+      await AsyncStorage.setItem('paymentMethod', paymentMethod);
+
+      const { data } = await axios.post(
+        `${getApiBaseUrl()}/user/create-order`,
+        {
+          orderItems: cartItems,
+          shippingInfo,
+          orderReferenceNo: ref,
+          paymentMethod,
+          companyId: activeCompanyId || undefined,
+        },
+        {
+          headers: { Authorization: token },
+          timeout: 120000,
+        }
+      );
+
+      if (data?.success && data?.order?._id) {
+        await AsyncStorage.setItem('skipOrderId', String(data.order._id));
+        navigation.navigate('OrderSuccess' as never);
       } else {
-        await AsyncStorage.removeItem('checkoutCompanyId');
+        Toast.show({
+          type: 'error',
+          text1: 'Order Failed',
+          text2: data?.message || 'Failed to place order',
+        });
       }
-      
-      // Set sessionId similar to client's placeOrderHandler
-      await AsyncStorage.setItem('sessionId', 'sdfas09df8as7');
-      
-      // Navigate to order success screen (equivalent to /shipping/confirm)
-      navigation.navigate('OrderSuccess' as never);
     } catch (error: any) {
       console.error('Error:', error);
       Toast.show({
         type: 'error',
         text1: 'Error',
-        text2: 'Something went wrong. Please try again',
+        text2: error.response?.data?.message || 'Something went wrong. Please try again',
       });
     } finally {
       setLoading(false);
@@ -245,6 +337,16 @@ const ShippingScreen = () => {
       </View>
 
       <View style={styles.formContainer}>
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Order Reference Number *</Text>
+          <TextInput
+            style={styles.input}
+            value={orderReferenceNo}
+            onChangeText={setOrderReferenceNo}
+            placeholder="Enter reference number"
+          />
+        </View>
+
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Address *</Text>
           <TextInput
@@ -357,19 +459,30 @@ const ShippingScreen = () => {
           )}
         </View>
 
-        {sales?.creditOptionEnabled && (
+        {canUseCompanyCredit && (
           <TouchableOpacity
             style={styles.creditRow}
-            onPress={() => setPayOnCredit(!payOnCredit)}
+            onPress={() => creditCoversOrder && setPayOnCredit(!payOnCredit)}
+            disabled={!creditCoversOrder}
           >
             <Icon
               name={payOnCredit ? 'check-box' : 'check-box-outline-blank'}
               size={22}
-              color="#019ee3"
+              color={creditCoversOrder ? '#019ee3' : '#ccc'}
             />
-            <Text style={styles.creditLabel}>
-              {sales?.creditLabel || 'Pay on Company Credit'}
-            </Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.creditLabel}>
+                {sales?.creditLabel || 'Pay on Company Credit'}
+              </Text>
+              <Text style={styles.creditBalance}>
+                Available credit: ₹{availableCredit.toLocaleString()}
+              </Text>
+              {!creditCoversOrder && (
+                <Text style={styles.creditWarning}>
+                  Order total exceeds available credit
+                </Text>
+              )}
+            </View>
           </TouchableOpacity>
         )}
 
@@ -390,7 +503,9 @@ const ShippingScreen = () => {
           {loading ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.paymentButtonText}>Make Payment</Text>
+            <Text style={styles.paymentButtonText}>
+              {payOnCredit ? 'Place Order (Use Credit)' : 'Place Order'}
+            </Text>
           )}
         </TouchableOpacity>
       </View>
@@ -565,6 +680,16 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#333',
     flex: 1,
+  },
+  creditBalance: {
+    fontSize: 13,
+    color: '#019ee3',
+    marginTop: 4,
+  },
+  creditWarning: {
+    fontSize: 12,
+    color: '#d32f2f',
+    marginTop: 2,
   },
   assuredRow: {
     flexDirection: 'row',

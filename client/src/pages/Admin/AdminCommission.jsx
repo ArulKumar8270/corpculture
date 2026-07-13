@@ -148,6 +148,7 @@ const AdminCommission = () => {
                                             <tr className="bg-gradient-to-r from-[#019ee3] to-[#afcb09] text-white">
                                                 <th className="py-2 px-3 text-left">User Id</th>
                                                 <th className="py-2 px-3 text-left">Order ID</th>
+                                                <th className="py-2 px-3 text-left">Product</th>
                                                 <th className="py-2 px-3 text-left">Amount</th>
                                                 <th className="py-2 px-3 text-left">Paid</th>
                                                 <th className="py-2 px-3 text-left">Date</th>
@@ -193,6 +194,11 @@ const AdminCommission = () => {
                                                                             {commission?.serviceInvoiceId || commission?.rentalInvoiceId}
                                                                         </Link>
                                                                     ) : 'N/A'}
+                                                                </td>
+                                                                <td className="py-2 px-3">
+                                                                    {commission.rentalProductId?.modelName
+                                                                        ? `${commission.rentalProductId.modelName}${commission.rentalProductId.serialNo ? ` (${commission.rentalProductId.serialNo})` : ''}`
+                                                                        : commission.productId?.productName?.name || commission.productId?.sku || '—'}
                                                                 </td>
                                                                 <td className="py-2 px-3">₹ {commission.commissionAmount || '0.00'}</td>
                                                                 <td className="py-2 px-3">{commission.isPaid ? "Yes" : "No"}</td>

@@ -17,6 +17,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { clearAuth } from '../../store/slices/authSlice';
+import { cleanupPushNotificationsOnLogout } from '../../services/pushNotifications';
 import { clearPermissions } from '../../store/slices/permissionsSlice';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 // @ts-ignore - @expo/vector-icons is available via expo dependency
@@ -25,6 +26,11 @@ import Toast from 'react-native-toast-message';
 import axios from 'axios';
 import { getApiBaseUrl } from '../../services/api';
 import QRCode from 'react-native-qrcode-svg';
+import {
+  formatCommissionAmount,
+  getCommissionReferenceLabel,
+  getCommissionProductLabel,
+} from '../../utils/commissionDisplay';
 
 const paymentCoversGrandTotal = (paymentAmt: any, grandTotal: any) => {
   const p = Number(paymentAmt);
@@ -73,6 +79,9 @@ const ProfileScreen = () => {
   const [pendingAmount, setPendingAmount] = useState(0);
   const [companyPendingInvoices, setCompanyPendingInvoices] = useState<any[]>([]);
   const [selectedPendingInvoiceId, setSelectedPendingInvoiceId] = useState<string | null>(null);
+  const [commissions, setCommissions] = useState<any[]>([]);
+  const [commissionSummary, setCommissionSummary] = useState<any>(null);
+  const [loadingCommissions, setLoadingCommissions] = useState(false);
   
   // Edit Profile states
   const [editingName, setEditingName] = useState(false);
@@ -80,6 +89,7 @@ const ProfileScreen = () => {
   const [nameInputFocused, setNameInputFocused] = useState(false);
 
   const handleLogout = async () => {
+    await cleanupPushNotificationsOnLogout();
     await AsyncStorage.removeItem('authToken');
     await AsyncStorage.removeItem('auth');
     dispatch(clearAuth());
@@ -110,7 +120,31 @@ const ProfileScreen = () => {
     .replace(/^"(.*)"$/, '$1')
     .trim();
 
-  console.log(authToken, 'user23452345', user?._id);
+  const fetchMyCommissions = useCallback(async () => {
+    if (!user?._id || !authToken || user?.role !== 0) return;
+    try {
+      setLoadingCommissions(true);
+      const response = await axios.get(`${getApiBaseUrl()}/commissions/me`, {
+        headers: { Authorization: authToken },
+        timeout: 30000,
+      });
+      if (response.data?.success) {
+        setCommissions(response.data.commissions || []);
+        setCommissionSummary(response.data.summary || null);
+      }
+    } catch (error) {
+      console.error('Error fetching commissions:', error);
+    } finally {
+      setLoadingCommissions(false);
+    }
+  }, [user?._id, user?.role, authToken]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchMyCommissions();
+    }, [fetchMyCommissions])
+  );
+
   // Fetch employee data
   const fetchEmployeeData = async () => {
     if (!user?._id || !authToken) {
@@ -153,6 +187,7 @@ const ProfileScreen = () => {
 
         // Common when API base changed: token is no longer valid on the new backend.
         if (status === 401 || status === 403 || (status === 500 && String(msg).toLowerCase().includes('server error'))) {
+          await cleanupPushNotificationsOnLogout();
           await AsyncStorage.removeItem('authToken');
           await AsyncStorage.removeItem('auth');
           dispatch(clearAuth());
@@ -720,6 +755,74 @@ const ProfileScreen = () => {
           </View>
         </View>
       )}
+
+      {user?.role === 0 ? (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>My Commission</Text>
+          {loadingCommissions ? (
+            <ActivityIndicator size="small" color="#019ee3" style={{ marginVertical: 16 }} />
+          ) : (
+            <>
+              <View style={styles.commissionSummaryRow}>
+                <View style={[styles.commissionSummaryCard, styles.commissionEarnedCard]}>
+                  <Text style={styles.commissionSummaryLabel}>Total Earned</Text>
+                  <Text style={styles.commissionSummaryValue}>
+                    {formatCommissionAmount(commissionSummary?.totalEarned)}
+                  </Text>
+                </View>
+                <View style={[styles.commissionSummaryCard, styles.commissionPaidCard]}>
+                  <Text style={styles.commissionSummaryLabel}>Paid</Text>
+                  <Text style={styles.commissionSummaryValue}>
+                    {formatCommissionAmount(commissionSummary?.totalPaid)}
+                  </Text>
+                </View>
+                <View style={[styles.commissionSummaryCard, styles.commissionPendingCard]}>
+                  <Text style={styles.commissionSummaryLabel}>Pending</Text>
+                  <Text style={styles.commissionSummaryValue}>
+                    {formatCommissionAmount(commissionSummary?.totalPending)}
+                  </Text>
+                </View>
+              </View>
+
+              {commissions.length === 0 ? (
+                <Text style={styles.emptyText}>No commission records yet.</Text>
+              ) : (
+                commissions.map((commission) => (
+                  <View key={commission._id} style={styles.commissionItem}>
+                    <View style={styles.commissionItemHeader}>
+                      <Text style={styles.commissionType}>{commission.commissionFrom || '—'}</Text>
+                      <Text style={styles.commissionAmount}>
+                        {formatCommissionAmount(commission.commissionAmount)}
+                      </Text>
+                    </View>
+                    <Text style={styles.commissionDetail}>
+                      {getCommissionProductLabel(commission)}
+                    </Text>
+                    <View style={styles.commissionItemFooter}>
+                      <Text style={styles.commissionMeta}>
+                        {getCommissionReferenceLabel(commission)}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.commissionStatus,
+                          commission.isPaid ? styles.commissionStatusPaid : styles.commissionStatusPending,
+                        ]}
+                      >
+                        {commission.isPaid ? 'Paid' : 'Pending'}
+                      </Text>
+                    </View>
+                    <Text style={styles.commissionDate}>
+                      {commission.createdAt
+                        ? new Date(commission.createdAt).toLocaleDateString()
+                        : '—'}
+                    </Text>
+                  </View>
+                ))
+              )}
+            </>
+          )}
+        </View>
+      ) : null}
 
       {/* Regular User Info Section */}
       {user?.role !== 3 && (
@@ -1431,6 +1534,103 @@ const styles = StyleSheet.create({
     padding: 15,
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
+  },
+  commissionSummaryRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    padding: 15,
+  },
+  commissionSummaryCard: {
+    flex: 1,
+    minWidth: 100,
+    borderRadius: 10,
+    padding: 12,
+    borderWidth: 1,
+  },
+  commissionEarnedCard: {
+    backgroundColor: '#ecfdf5',
+    borderColor: '#bbf7d0',
+  },
+  commissionPaidCard: {
+    backgroundColor: '#eff6ff',
+    borderColor: '#bfdbfe',
+  },
+  commissionPendingCard: {
+    backgroundColor: '#fffbeb',
+    borderColor: '#fde68a',
+  },
+  commissionSummaryLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 4,
+  },
+  commissionSummaryValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#111',
+  },
+  commissionItem: {
+    marginHorizontal: 15,
+    marginBottom: 12,
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: '#f9fafb',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  commissionItemHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  commissionType: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#019ee3',
+  },
+  commissionAmount: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#111',
+  },
+  commissionDetail: {
+    fontSize: 13,
+    color: '#444',
+    marginBottom: 6,
+  },
+  commissionItemFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  commissionMeta: {
+    fontSize: 12,
+    color: '#666',
+    flex: 1,
+    marginRight: 8,
+  },
+  commissionStatus: {
+    fontSize: 12,
+    fontWeight: '600',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  commissionStatusPaid: {
+    backgroundColor: '#dcfce7',
+    color: '#166534',
+  },
+  commissionStatusPending: {
+    backgroundColor: '#fef3c7',
+    color: '#92400e',
+  },
+  commissionDate: {
+    fontSize: 11,
+    color: '#999',
+    marginTop: 6,
   },
   loader: {
     padding: 20,

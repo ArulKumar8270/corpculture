@@ -10,6 +10,10 @@ import { TablePagination } from "@mui/material";
 import toast from "react-hot-toast";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
+import {
+    getStoredOrderProductBaseUnit,
+    getStoredOrderProductLineTotal,
+} from "../../utils/functions";
 
 const INVOICE_WEBHOOK_URL =
     "https://n8n.nicknameinfo.net/webhook/cbb63555-0bcc-4a74-bdde-36a995ac303a";
@@ -561,6 +565,7 @@ const AdminOrders = () => {
             }
 
             const rows = [];
+            let serialNo = 0;
             for (const order of allOrders) {
                 const buyerName = order.buyer?.name ?? "";
                 const empName = order.employeeId?.name ?? "";
@@ -576,8 +581,9 @@ const AdminOrders = () => {
                 const products = order.products || [];
 
                 if (products.length === 0) {
+                    serialNo += 1;
                     rows.push({
-                        "Order ID": String(order._id),
+                        "Serial Number": serialNo,
                         "Order Date": orderDate,
                         "Order Status": order.orderStatus ?? "",
                         "Order Amount": order.amount ?? "",
@@ -595,15 +601,12 @@ const AdminOrders = () => {
                 }
 
                 for (const p of products) {
+                    serialNo += 1;
                     const qty = Number(p.quantity) || 1;
-                    const hasDiscount =
-                        p.discountPrice != null && p.discountPrice !== "";
-                    const unit = Number(
-                        hasDiscount ? p.discountPrice : p.price ?? 0
-                    );
-                    const lineTotal = qty * unit;
+                    const unit = getStoredOrderProductBaseUnit(p);
+                    const lineTotal = getStoredOrderProductLineTotal(p);
                     rows.push({
-                        "Order ID": String(order._id),
+                        "Serial Number": serialNo,
                         "Order Date": orderDate,
                         "Order Status": order.orderStatus ?? "",
                         "Order Amount": order.amount ?? "",
@@ -670,7 +673,7 @@ const AdminOrders = () => {
                                         onChange={(e) => setSearch(e.target.value)}
                                         type="search"
                                         name="search"
-                                        placeholder="Search orders by ID, Customer, Address..."
+                                        placeholder="Search orders by customer, address, order reference..."
                                         className="p-3 text-sm outline-none flex-1 rounded-l-2xl bg-[#f7fafd]"
                                     />
                                     <button
@@ -875,7 +878,7 @@ const AdminOrders = () => {
                                                         }}
                                                     /> */}
                                                 </th> : null}
-                                                <th className="py-2 px-3 text-left">Order ID</th>
+                                                <th className="py-2 px-3 text-left">Serial Number</th>
                                                 <th className="py-2 px-3 text-left">Status</th>
                                                 <th className="py-2 px-3 text-left">Assigned Users</th>
                                                 <th className="py-2 px-3 text-left">Amount</th>
@@ -888,7 +891,7 @@ const AdminOrders = () => {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {orders?.map(order => (
+                                            {orders?.map((order, index) => (
                                                 <tr key={order._id} className="border-b last:border-b-0 hover:bg-gray-50">
                                                     {hasPermission("salesOrders") ? <td className="py-2 px-3">
                                                         <input
@@ -899,9 +902,7 @@ const AdminOrders = () => {
                                                         />
                                                     </td> : null}
                                                     <td className="py-2 px-3">
-                                                        <Link to={`../order_details/${order._id}`} className="text-blue-600 hover:underline">
-                                                            {order._id}
-                                                        </Link>
+                                                        {page * rowsPerPage + index + 1}
                                                     </td>
                                                     <td className="py-2 px-3">{order.orderStatus}</td>
                                                     <td className="py-2 px-3">
@@ -922,7 +923,9 @@ const AdminOrders = () => {
                                                         )}
                                                     </td>
                                                     <td className="py-2 px-3">
-                                                        ₹ {order.amount || '0'}
+                                                        <Link to={`../order_details/${order._id}`} className="text-blue-600 hover:underline">
+                                                            ₹ {order.amount || '0'}
+                                                        </Link>
                                                     </td>
                                                     <td className="py-2 px-3">
                                                         {order.shippingInfo?.pincode || '-'}

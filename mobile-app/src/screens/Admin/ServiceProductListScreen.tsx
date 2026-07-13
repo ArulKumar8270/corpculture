@@ -19,6 +19,20 @@ import axios from 'axios';
 import { getApiBaseUrl } from '../../services/api';
 import { getServiceProductDisplayName, getServiceProductSearchText } from '../../utils/serviceProductDisplayName';
 import Toast from 'react-native-toast-message';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
+
+let XLSX: any;
+try {
+  XLSX = require('xlsx');
+} catch {
+  // xlsx optional
+}
+
+const formatGstTypes = (gstType: any) => {
+  if (!Array.isArray(gstType) || gstType.length === 0) return 'N/A';
+  return gstType.map((gst: any) => `${gst.gstType} (${gst.gstPercentage}%)`).join(', ');
+};
 
 const ServiceProductListScreen = () => {
   const navigation = useNavigation();
@@ -29,6 +43,7 @@ const ServiceProductListScreen = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [exportingExcel, setExportingExcel] = useState(false);
   const ROWS_PER_PAGE_OPTIONS = [5, 10, 25, 50, 100];
 
   useEffect(() => {
@@ -139,6 +154,57 @@ const ServiceProductListScreen = () => {
     setPage(0);
   }, [rowsPerPage]);
 
+  const handleDownloadExcel = async () => {
+    if (!filteredProducts.length) {
+      Toast.show({ type: 'error', text1: 'No service products to export.' });
+      return;
+    }
+    if (!XLSX) {
+      Toast.show({ type: 'error', text1: 'Excel export requires the xlsx library.' });
+      return;
+    }
+    try {
+      setExportingExcel(true);
+      const rows = filteredProducts.map((product, index) => ({
+        'S.No': index + 1,
+        Company: product.company?.companyName || 'N/A',
+        'Product Name': getServiceProductDisplayName(product),
+        HSN: product.hsn ?? '',
+        Quantity: product.quantity ?? '',
+        Rate: product.rate ?? '',
+        'GST Type': formatGstTypes(product.gstType),
+        'Partner Profit': product.commission ?? '',
+        'Employee Commission': product.employeeCommission ?? '',
+        'Total Amount': product.totalAmount ?? '',
+      }));
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Service Products');
+      const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      const stamp = new Date().toISOString().slice(0, 10);
+      const fileName = `service_products_${stamp}.xlsx`;
+      const fileUri = `${FileSystem.cacheDirectory}${fileName}`;
+      const base64 = btoa(
+        new Uint8Array(excelBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+      );
+      await FileSystem.writeAsStringAsync(fileUri, base64, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri);
+      }
+      Toast.show({
+        type: 'success',
+        text1: `Exported ${rows.length} service product(s) to Excel.`,
+      });
+    } catch (err) {
+      console.error('Excel export error:', err);
+      Toast.show({ type: 'error', text1: 'Failed to export Excel.' });
+    } finally {
+      setExportingExcel(false);
+    }
+  };
+
   const renderProduct = ({ item, index }: { item: any; index: number }) => (
     <View style={styles.productCard}>
       <View style={styles.productInfo}>
@@ -194,14 +260,33 @@ const ServiceProductListScreen = () => {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Service Product List</Text>
-        {hasPermission('serviceProductList', 'edit') && (
+        <View style={styles.headerActions}>
           <TouchableOpacity
-            style={styles.addButton}
-            onPress={() => (navigation as any).navigate('AddServiceProduct')}
+            style={[
+              styles.exportButton,
+              (exportingExcel || !filteredProducts.length) && styles.exportButtonDisabled,
+            ]}
+            onPress={handleDownloadExcel}
+            disabled={exportingExcel || !filteredProducts.length}
           >
-            <Icon name="add" size={24} color="#fff" />
+            {exportingExcel ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <>
+                <Icon name="download" size={20} color="#fff" />
+                <Text style={styles.exportButtonText}>Excel</Text>
+              </>
+            )}
           </TouchableOpacity>
-        )}
+          {hasPermission('serviceProductList', 'edit') && (
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={() => (navigation as any).navigate('AddServiceProduct')}
+            >
+              <Icon name="add" size={24} color="#fff" />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* Search Input */}
@@ -296,6 +381,30 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: '#333',
+    flex: 1,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  exportButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#019ee3',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    gap: 4,
+  },
+  exportButtonDisabled: {
+    backgroundColor: '#9e9e9e',
+    opacity: 0.8,
+  },
+  exportButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
   addButton: {
     width: 40,

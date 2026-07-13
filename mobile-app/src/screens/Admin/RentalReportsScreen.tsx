@@ -23,7 +23,8 @@ import Toast from 'react-native-toast-message';
 import ReportListFilters from '../../components/ReportListFilters';
 import {
   getReportSendWebhook,
-  isGatePassReportType,
+  isOperationalDocumentReportType,
+  getDocumentTitle,
   RENTAL_REPORT_TYPE,
   buildReportListQueryParams,
   getReportsListUrl,
@@ -216,7 +217,8 @@ const RentalReportsScreen = () => {
 
   const handleSendReport = async (reportId: string, reportType?: string) => {
     const type = reportType || reportTypeKey;
-    const isGatePass = isGatePassReportType(type);
+    const isOperationalDoc = isOperationalDocumentReportType(type);
+    const docTitle = getDocumentTitle(type);
     setSendingReport(reportId);
     try {
       await axios.post(getReportSendWebhook(type), {
@@ -225,13 +227,13 @@ const RentalReportsScreen = () => {
       Toast.show({
         type: 'success',
         text1: 'Success',
-        text2: isGatePass ? 'Gate pass sent successfully!' : 'Report sent successfully!',
+        text2: isOperationalDoc ? `${docTitle} sent successfully!` : 'Report sent successfully!',
       });
     } catch (error: any) {
       Toast.show({
         type: 'error',
         text1: 'Error',
-        text2: isGatePass ? 'Failed to send gate pass' : 'Failed to send report',
+        text2: isOperationalDoc ? `Failed to send ${docTitle.toLowerCase()}` : 'Failed to send report',
       });
     } finally {
       setSendingReport(null);

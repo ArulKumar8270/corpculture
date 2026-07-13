@@ -20,6 +20,20 @@ import { usePermissions } from '../../hooks/usePermissions';
 import axios from 'axios';
 import { getApiBaseUrl } from '../../services/api';
 import Toast from 'react-native-toast-message';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
+
+let XLSX: any;
+try {
+  XLSX = require('xlsx');
+} catch {
+  // xlsx optional
+}
+
+const formatGstTypes = (gstType: any) => {
+  if (!Array.isArray(gstType) || gstType.length === 0) return 'N/A';
+  return gstType.map((gst: any) => `${gst.gstType} (${gst.gstPercentage}%)`).join(', ');
+};
 
 const RentalProductListScreen = () => {
   const navigation = useNavigation();
@@ -33,6 +47,7 @@ const RentalProductListScreen = () => {
   const [employeePickerVisible, setEmployeePickerVisible] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [exportingExcel, setExportingExcel] = useState(false);
   const ROWS_PER_PAGE_OPTIONS = [5, 10, 25, 50, 100];
 
   useEffect(() => {
@@ -217,6 +232,71 @@ const RentalProductListScreen = () => {
     setPage(0);
   }, [rowsPerPage]);
 
+  const getAssignedEmployeeName = (product: any) => {
+    if (product?.employeeId?.name) return product.employeeId.name;
+    const employeeId =
+      typeof product?.employeeId === 'object'
+        ? product?.employeeId?._id
+        : product?.employeeId;
+    if (!employeeId) return '';
+    return employees.find((emp) => emp._id === employeeId)?.name || '';
+  };
+
+  const handleDownloadExcel = async () => {
+    if (!filteredProducts.length) {
+      Toast.show({ type: 'error', text1: 'No rental products to export.' });
+      return;
+    }
+    if (!XLSX) {
+      Toast.show({ type: 'error', text1: 'Excel export requires the xlsx library.' });
+      return;
+    }
+    try {
+      setExportingExcel(true);
+      const rows = filteredProducts.map((product, index) => ({
+        'S.No': index + 1,
+        Company: product.company?.companyName || 'N/A',
+        'Model Name': product.modelName ?? '',
+        'Serial No': product.serialNo ?? '',
+        HSN: product.hsn ?? '',
+        'Base Price': product.basePrice ?? '',
+        'GST Type': formatGstTypes(product.gstType),
+        'Payment Date': product.paymentDate
+          ? new Date(product.paymentDate).toLocaleDateString()
+          : '',
+        Commission: product.commission != null ? `${product.commission}%` : '',
+        'Assigned Employee': getAssignedEmployeeName(product) || 'None',
+        Branch: product.branch ?? '',
+        Department: product.department ?? '',
+      }));
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Rental Products');
+      const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      const stamp = new Date().toISOString().slice(0, 10);
+      const fileName = `rental_products_${stamp}.xlsx`;
+      const fileUri = `${FileSystem.cacheDirectory}${fileName}`;
+      const base64 = btoa(
+        new Uint8Array(excelBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+      );
+      await FileSystem.writeAsStringAsync(fileUri, base64, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri);
+      }
+      Toast.show({
+        type: 'success',
+        text1: `Exported ${rows.length} rental product(s) to Excel.`,
+      });
+    } catch (err) {
+      console.error('Excel export error:', err);
+      Toast.show({ type: 'error', text1: 'Failed to export Excel.' });
+    } finally {
+      setExportingExcel(false);
+    }
+  };
+
   const renderProduct = ({ item, index }: { item: any; index: number }) => {
     const gstTypes = Array.isArray(item.gstType) && item.gstType.length > 0
       ? item.gstType.map((gst: any) => `${gst.gstType} (${gst.gstPercentage}%)`).join(', ')
@@ -302,14 +382,33 @@ const RentalProductListScreen = () => {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Rental Product List</Text>
-        {hasPermission('rentalAllProducts') && (
+        <View style={styles.headerActions}>
           <TouchableOpacity
-            style={styles.addButton}
-            onPress={() => (navigation as any).navigate('AddRentalProduct')}
+            style={[
+              styles.exportButton,
+              (exportingExcel || !filteredProducts.length) && styles.exportButtonDisabled,
+            ]}
+            onPress={handleDownloadExcel}
+            disabled={exportingExcel || !filteredProducts.length}
           >
-            <Icon name="add" size={24} color="#fff" />
+            {exportingExcel ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <>
+                <Icon name="download" size={20} color="#fff" />
+                <Text style={styles.exportButtonText}>Excel</Text>
+              </>
+            )}
           </TouchableOpacity>
-        )}
+          {hasPermission('rentalAllProducts') && (
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={() => (navigation as any).navigate('AddRentalProduct')}
+            >
+              <Icon name="add" size={24} color="#fff" />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* Search Input */}
@@ -448,6 +547,30 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: '#019ee3',
+    flex: 1,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  exportButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#019ee3',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    gap: 4,
+  },
+  exportButtonDisabled: {
+    backgroundColor: '#9e9e9e',
+    opacity: 0.8,
+  },
+  exportButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
   addButton: {
     width: 40,

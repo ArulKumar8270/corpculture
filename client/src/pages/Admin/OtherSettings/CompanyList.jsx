@@ -3,10 +3,13 @@ import axios from 'axios';
 import { useAuth } from '../../../context/auth';
 import {
     Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-    CircularProgress, Box, Button, TextField, TablePagination // Added TablePagination
+    CircularProgress, Box, Button, TextField, TablePagination
 } from '@mui/material';
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
+import * as XLSX from 'xlsx';
+import { saveAs } from 'file-saver';
 
 const CompanyList = () => {
     const { auth, userPermissions } = useAuth();
@@ -19,6 +22,7 @@ const CompanyList = () => {
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [totalCount, setTotalCount] = useState(0);
+    const [exportingExcel, setExportingExcel] = useState(false);
 
 
     const fetchCompanies = async () => {
@@ -112,6 +116,93 @@ const CompanyList = () => {
         setPage(0);
     };
 
+    const formatContactPersons = (contactPersons = []) => {
+        if (!contactPersons.length) return '';
+        return contactPersons
+            .map((cp) => {
+                const parts = [cp.name, cp.mobile, cp.email, cp.designation].filter(Boolean);
+                return parts.join(' / ');
+            })
+            .join('; ');
+    };
+
+    const formatDeliveryAddresses = (addresses = []) => {
+        if (!addresses.length) return '';
+        return addresses
+            .map((addr) => [addr.address, addr.pincode].filter(Boolean).join(' - '))
+            .join('; ');
+    };
+
+    const buildCompanyExcelRows = (list) =>
+        list.map((company, index) => ({
+            'S.No': index + 1,
+            'Company Name': company.companyName || '',
+            'Billing Address': company.billingAddress || '',
+            City: company.city || '',
+            State: company.state || '',
+            Pincode: company.pincode || '',
+            'GST No': company.gstNo || '',
+            'Contact Person': company.contactPersons?.[0]?.name || company.contactPerson || '',
+            'Company Mobile': company.phone || company.contactPersons?.[0]?.mobile || '',
+            'Customer Type': company.customerType || '',
+            'Invoice Type': company.invoiceType || '',
+            'All Contacts': formatContactPersons(company.contactPersons),
+            'Delivery Addresses': formatDeliveryAddresses(company.serviceDeliveryAddresses),
+            'Created At': company.createdAt
+                ? new Date(company.createdAt).toLocaleString()
+                : '',
+        }));
+
+    const fetchAllCompaniesForExport = async () => {
+        const queryParams = new URLSearchParams({
+            page: '1',
+            limit: '0',
+            search: appliedSearch || '',
+            skipCounts: 'true',
+        }).toString();
+
+        const { data } = await axios.get(
+            `${import.meta.env.VITE_SERVER_URL}/api/v1/company/all?${queryParams}`,
+            {
+                headers: {
+                    Authorization: auth.token,
+                },
+            }
+        );
+
+        if (!data?.success) {
+            throw new Error(data?.message || 'Failed to fetch companies for export.');
+        }
+
+        return data.companies || [];
+    };
+
+    const handleDownloadExcel = async () => {
+        setExportingExcel(true);
+        try {
+            const allCompanies = await fetchAllCompaniesForExport();
+            if (!allCompanies.length) {
+                toast.error('No companies to export.');
+                return;
+            }
+
+            const rows = buildCompanyExcelRows(allCompanies);
+            const ws = XLSX.utils.json_to_sheet(rows);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Companies');
+            const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+            const blob = new Blob([excelBuffer], { type: 'application/octet-stream' });
+            const stamp = new Date().toISOString().slice(0, 10);
+            saveAs(blob, `companies_${stamp}.xlsx`);
+            toast.success(`Exported ${rows.length} company(ies) to Excel.`);
+        } catch (err) {
+            console.error('Excel export error:', err);
+            toast.error(err.message || 'Failed to export Excel.');
+        } finally {
+            setExportingExcel(false);
+        }
+    };
+
     if (loading) {
         return (
             <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
@@ -132,16 +223,25 @@ const CompanyList = () => {
         <div className="p-6 bg-gradient-to-br from-[#e6fbff] to-[#f7fafd] min-h-screen w-[90%]">
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-bold text-[#019ee3]">Company List</h1>
-               {/* {hasPermission("reportsCompanyList") ? */}
-                <Button
-                    variant="contained"
-                    color="primary"
-                    onClick={() => navigate("../addCompany")}
-                    className="bg-[#019ee3] hover:bg-[#017bb3] text-white px-4 py-2 rounded"
-                >
-                    Add New Company
-                </Button> 
-                {/* : null} */}
+                <div className="flex gap-2">
+                    <Button
+                        variant="outlined"
+                        color="success"
+                        startIcon={<FileDownloadIcon />}
+                        onClick={handleDownloadExcel}
+                        disabled={exportingExcel || totalCount === 0}
+                    >
+                        {exportingExcel ? 'Preparing Excel…' : 'Download Excel'}
+                    </Button>
+                    <Button
+                        variant="contained"
+                        color="primary"
+                        onClick={() => navigate("../addCompany")}
+                        className="bg-[#019ee3] hover:bg-[#017bb3] text-white px-4 py-2 rounded"
+                    >
+                        Add New Company
+                    </Button>
+                </div>
             </div>
             {/* Filter Section */}
             <Paper className="p-4 mb-4 shadow-md rounded-xl bg-white">

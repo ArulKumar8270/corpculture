@@ -2,7 +2,7 @@
 /* eslint-disable react/prop-types */
 import CircleIcon from "@mui/icons-material/Circle";
 import { Link } from "react-router-dom";
-import { formatDate } from "../../../utils/functions";
+import { formatDate, getStoredOrderProductLineTotal } from "../../../utils/functions";
 
 const OrderItem = ({
     item,
@@ -45,7 +45,7 @@ const OrderItem = ({
 
                 <div className="flex flex-col sm:flex-row mt-1 sm:mt-0 gap-2 sm:gap-20 sm:w-1/2">
                     <p className="text-lg w-[100px] font-bold text-[#019ee3]">
-                        ₹ {(item?.price)}
+                        ₹ {getStoredOrderProductLineTotal(item).toLocaleString()}
                     </p>
 
                     <div className="flex flex-col gap-2">

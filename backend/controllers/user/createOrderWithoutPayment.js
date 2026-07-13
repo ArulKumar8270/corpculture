@@ -2,35 +2,15 @@ import mongoose from "mongoose";
 import orderModel from "../../models/orderModel.js";
 import productModel from "../../models/productModel.js";
 import { tryAutoAssignNewOrder } from "../../utils/tryAutoAssignNewOrder.js";
-
-const computeAmountFromItems = (orderItems) => {
-  const getUnitBase = (item) => {
-    const quantity = item.quantity || 0;
-    const priceRange = item.priceRange?.find(
-      (range) =>
-        quantity >= parseFloat(range.from) && quantity <= parseFloat(range.to)
-    );
-    return priceRange ? parseFloat(priceRange.price) : item.discountPrice || 0;
-  };
-
-  const subtotal = orderItems.reduce((sum, item) => {
-    const unit = getUnitBase(item);
-    return sum + unit * (item.quantity || 0);
-  }, 0);
-
-  const totalDeliveryCharges = orderItems.reduce(
-    (sum, item) => sum + (item.deliveryCharge || 0),
-    0
-  );
-
-  const totalInstallationCharges = orderItems.reduce(
-    (sum, item) =>
-      sum + (item.isInstalation ? item.installationCost || 0 : 0),
-    0
-  );
-
-  return Number(subtotal + totalDeliveryCharges + totalInstallationCharges);
-};
+import {
+  computeOrderAmountFromItems,
+  getCartItemBaseUnit,
+} from "../../utils/orderAmountUtil.js";
+import {
+  computeCompanyCreditSummary,
+  userCanAccessCompany,
+  recordCreditUsed,
+} from "../../utils/companyCreditUtil.js";
 
 // Create order without online payment (COD/manual)
 const createOrderWithoutPayment = async (req, res) => {
@@ -83,21 +63,7 @@ const createOrderWithoutPayment = async (req, res) => {
       sendInvoice: product.sendInvoice,
       isInstalation: product.isInstalation,
       brandName: product.brandName,
-      price: (() => {
-        const quantity = product.quantity || 0;
-        const priceRange = product.priceRange?.find(
-          (range) =>
-            quantity >= parseFloat(range.from) && quantity <= parseFloat(range.to)
-        );
-        const basePrice = priceRange
-          ? parseFloat(priceRange.price)
-          : product.discountPrice || 0;
-        const deliveryCost = product.deliveryCharge || 0;
-        const installationCost = product.isInstalation
-          ? product.installationCost || 0
-          : 0;
-        return basePrice + deliveryCost + installationCost;
-      })(),
+      price: getCartItemBaseUnit(product),
       discountPrice: product.discountPrice,
       deliveryCharge: product.deliveryCharge,
       installationCost: product.installationCost,
@@ -106,7 +72,39 @@ const createOrderWithoutPayment = async (req, res) => {
       seller: product.seller ? new mongoose.Types.ObjectId(product.seller) : undefined,
     }));
 
-    const amount = computeAmountFromItems(orderItems);
+    const amount = computeOrderAmountFromItems(orderItems);
+    const isCreditPayment = paymentMethod === "credit";
+    const resolvedCompanyId =
+      companyId && mongoose.Types.ObjectId.isValid(companyId)
+        ? new mongoose.Types.ObjectId(companyId)
+        : null;
+
+    if (isCreditPayment) {
+      if (!resolvedCompanyId) {
+        return res.status(400).send({
+          success: false,
+          message: "Company is required to pay with credit",
+        });
+      }
+
+      const canAccess = await userCanAccessCompany(req.user, resolvedCompanyId);
+      if (!canAccess) {
+        return res.status(403).send({
+          success: false,
+          message: "You do not have access to this company's credit",
+        });
+      }
+
+      const { availableCredit } = await computeCompanyCreditSummary(resolvedCompanyId);
+      if (amount > availableCredit) {
+        return res.status(400).send({
+          success: false,
+          message: `Insufficient company credit. Available: ₹${availableCredit}, order total: ₹${amount}`,
+          availableCredit,
+          orderAmount: amount,
+        });
+      }
+    }
 
     const combinedOrder = {
       paymentId: `manual_${Date.now()}`,
@@ -115,14 +113,21 @@ const createOrderWithoutPayment = async (req, res) => {
       orderReferenceNo: ref,
       shippingInfo,
       amount,
-      paymentMethod: paymentMethod === "credit" ? "credit" : "cash",
-      ...(companyId && mongoose.Types.ObjectId.isValid(companyId)
-        ? { companyId: new mongoose.Types.ObjectId(companyId) }
-        : {}),
+      paymentMethod: isCreditPayment ? "credit" : "cash",
+      ...(resolvedCompanyId ? { companyId: resolvedCompanyId } : {}),
     };
 
     const order = new orderModel(combinedOrder);
     await order.save();
+
+    if (isCreditPayment && resolvedCompanyId) {
+      await recordCreditUsed({
+        companyId: resolvedCompanyId,
+        amount,
+        createdBy: req.user._id,
+        description: `Sales order ${ref} (${order._id})`,
+      });
+    }
 
     await tryAutoAssignNewOrder(order);
 

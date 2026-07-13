@@ -112,47 +112,51 @@ const AdminEmployees = () => {
     );
   });
 
+  const buildEmployeeExcelRows = (list) =>
+    list.map((employee, index) => ({
+      "S.No": index + 1,
+      "Employee ID": String(employee._id ?? ""),
+      Name: employee.name ?? "",
+      Email: employee.email ?? "",
+      Phone: employee.phone ?? "",
+      Address: employee.address ?? "",
+      "Pincode(s)": formatListField(employee.pincode),
+      "Employee Type": formatListField(employee.employeeType),
+      Designation: formatListField(employee.designation),
+      "ID Card No": employee.idCradNo ?? "",
+      Department: formatDepartments(employee.department),
+      Salary: employee.salary ?? "",
+      "Bike Allowance": employee.bikeAllowance ?? "",
+      "Order Price From": employee.orderPriceFrom ?? "",
+      "Order Price To": employee.orderPriceTo ?? "",
+      "Hire Date": employee.hireDate
+        ? new Date(employee.hireDate).toLocaleDateString()
+        : "",
+      "Parent Name": employee.parentName ?? "",
+      "Parent Phone": employee.parentPhone ?? "",
+      "Parent Address": employee.parentAddress ?? "",
+      "Parent Relation": employee.parentRelation ?? "",
+      "Image URL": employee.image ?? "",
+      "ID Proof URL": employee.idProof ?? "",
+      "User ID": employee.userId?._id
+        ? String(employee.userId._id)
+        : String(employee.userId ?? ""),
+      "Created At": employee.createdAt
+        ? new Date(employee.createdAt).toLocaleString()
+        : "",
+      "Updated At": employee.updatedAt
+        ? new Date(employee.updatedAt).toLocaleString()
+        : "",
+    }));
+
   const handleDownloadEmployeesExcel = () => {
-    if (!employees?.length) {
+    if (!filteredEmployees?.length) {
       toast.error("No employees to export.");
       return;
     }
     setExportingExcel(true);
     try {
-      const rows = employees.map((employee) => ({
-        "Employee ID": String(employee._id ?? ""),
-        Name: employee.name ?? "",
-        Email: employee.email ?? "",
-        Phone: employee.phone ?? "",
-        Address: employee.address ?? "",
-        "Pincode(s)": formatListField(employee.pincode),
-        "Employee Type": formatListField(employee.employeeType),
-        Designation: formatListField(employee.designation),
-        "ID Card No": employee.idCradNo ?? "",
-        Department: formatDepartments(employee.department),
-        Salary: employee.salary ?? "",
-        "Bike Allowance": employee.bikeAllowance ?? "",
-        "Order Price From": employee.orderPriceFrom ?? "",
-        "Order Price To": employee.orderPriceTo ?? "",
-        "Hire Date": employee.hireDate
-          ? new Date(employee.hireDate).toLocaleDateString()
-          : "",
-        "Parent Name": employee.parentName ?? "",
-        "Parent Phone": employee.parentPhone ?? "",
-        "Parent Address": employee.parentAddress ?? "",
-        "Parent Relation": employee.parentRelation ?? "",
-        "Image URL": employee.image ?? "",
-        "ID Proof URL": employee.idProof ?? "",
-        "User ID": employee.userId?._id
-          ? String(employee.userId._id)
-          : String(employee.userId ?? ""),
-        "Created At": employee.createdAt
-          ? new Date(employee.createdAt).toLocaleString()
-          : "",
-        "Updated At": employee.updatedAt
-          ? new Date(employee.updatedAt).toLocaleString()
-          : "",
-      }));
+      const rows = buildEmployeeExcelRows(filteredEmployees);
       const ws = XLSX.utils.json_to_sheet(rows);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Employees");
@@ -182,9 +186,9 @@ const AdminEmployees = () => {
           <button
             type="button"
             onClick={handleDownloadEmployeesExcel}
-            disabled={exportingExcel || !employees?.length}
+            disabled={exportingExcel || !filteredEmployees?.length}
             className={`py-2 px-5 rounded-xl shadow font-semibold text-white flex items-center gap-2 transition ${
-              exportingExcel || !employees?.length
+              exportingExcel || !filteredEmployees?.length
                 ? "bg-gray-400 cursor-not-allowed"
                 : "bg-gradient-to-r from-[#019ee3] to-[#afcb09] hover:from-[#afcb09] hover:to-[#019ee3]"
             }`}

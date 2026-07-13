@@ -1,17 +1,24 @@
 import ServiceModel from "../../models/serviceModel.js";
 import { resolveNotificationUserId } from "../../utils/resolveNotificationUserId.js";
 import { notifyAssignment } from "../../utils/expoPushNotification.js";
+import { resolveEnquiryPincode, attachEnquiryPincodes } from "../../utils/resolveEnquiryPincode.js";
+import { tryAutoAssignNewServiceEnquiry } from "../../utils/tryAutoAssignNewEnquiry.js";
 
 // Create Service
 export const createService = async (req, res) => {
     try {
-        const service = new ServiceModel(req.body);
+        const body = { ...req.body };
+        body.pincode = await resolveEnquiryPincode(body);
+        const service = new ServiceModel(body);
         await service.save();
+
+        await tryAutoAssignNewServiceEnquiry(service);
+        const refreshed = await ServiceModel.findById(service._id);
         
         res.status(201).send({
             success: true,
             message: "Service request created successfully",
-            service
+            service: refreshed || service
         });
     } catch (error) {
         console.error("Error in service creation:", error);
@@ -85,10 +92,11 @@ export const getAllServices = async (req, res) => {
             query = query.limit(limitNum);
         }
         const services = await query;
+        const servicesWithPincode = await attachEnquiryPincodes(services);
         
         res.status(200).send({
             success: true,
-            services,
+            services: servicesWithPincode,
             totalCount
         });
     } catch (error) {

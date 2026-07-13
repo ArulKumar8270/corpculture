@@ -29,6 +29,11 @@ const serviceSchema = new mongoose.Schema({
         type: String,
         required: false
     },
+    pincode: {
+        type: String,
+        required: false,
+        trim: true,
+    },
     employeeId : {
         type: String,
         required: false

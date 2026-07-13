@@ -24,6 +24,14 @@ const commissionSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'ServiceInvoice', // Reference to the service invoice this commission is based on
     },
+    productId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'ServiceProduct', // Service invoice line product for per-item partner profit
+    },
+    rentalProductId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'RentalProduct', // Rental invoice line product for per-item commission
+    },
     rentalInvoiceId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'RentalInvoice', // Reference to the rental invoice this commission is based on

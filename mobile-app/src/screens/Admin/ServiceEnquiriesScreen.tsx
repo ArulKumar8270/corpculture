@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -26,6 +26,11 @@ import axios from 'axios';
 import { getApiBaseUrl } from '../../services/api';
 import Toast from 'react-native-toast-message';
 import { normalizeMongoId } from '../../utils/normalizeMongoId';
+import {
+  getSuggestedEnquiryEmployee,
+  isEnquiryAssigned,
+  hasEmployeeType,
+} from '../../utils/enquiryEmployeeMatcher';
 // Using custom picker modal instead of @react-native-picker/picker
 
 /** Encode path segments so spaces and special chars in filenames (e.g. R2 URLs) load in <Image />. */
@@ -83,6 +88,17 @@ const ServiceEnquiriesScreen = () => {
   const LIST_BOTTOM_PADDING = Platform.OS === 'ios' ? 140 : 120;
   const [imagePreviewUri, setImagePreviewUri] = useState<string | null>(null);
   const [imagePreviewFailed, setImagePreviewFailed] = useState(false);
+  const [autoAssigning, setAutoAssigning] = useState(false);
+  const autoAssignAttemptedRef = useRef(new Set<string>());
+  const isEmployee = user?.role === 3;
+
+  const serviceEmployees = useMemo(
+    () => (employees || []).filter((emp) => hasEmployeeType(emp, 'Service')),
+    [employees]
+  );
+
+  const getSuggestedEmployee = (enquiry: any) =>
+    getSuggestedEnquiryEmployee(enquiry, serviceEmployees, 'Service');
 
   // Base filtered data by service title (for counts and list)
   const baseFiltered = React.useMemo(() => {
@@ -251,6 +267,85 @@ const ServiceEnquiriesScreen = () => {
     }
   };
 
+  const handleAutoAssignEnquiries = async (
+    serviceIds: string[] = [],
+    { silent = false }: { silent?: boolean } = {}
+  ) => {
+    if (isEmployee) return;
+    if (!serviceIds.length) {
+      if (!silent) Alert.alert('Error', 'No unassigned service enquiries to auto-assign.');
+      return;
+    }
+
+    setAutoAssigning(true);
+    try {
+      const response = await axios.patch(
+        `${getApiBaseUrl()}/service/auto-assign`,
+        { serviceId: serviceIds },
+        { headers: { Authorization: token || '' } }
+      );
+
+      const assigned = response.data?.assigned || [];
+      const failed = response.data?.failed || [];
+
+      if (assigned.length > 0) {
+        if (!silent) {
+          Toast.show({
+            type: 'success',
+            text1: 'Success',
+            text2: `Auto-assigned ${assigned.length} enquiry(s)`,
+          });
+        }
+        setAllServicesData((prev) =>
+          prev.map((enquiry) => {
+            const match = assigned.find((a: any) => a.enquiryId === enquiry._id);
+            return match ? { ...enquiry, employeeId: match.employeeId } : enquiry;
+          })
+        );
+      }
+
+      if (failed.length > 0 && !silent) {
+        Toast.show({
+          type: 'error',
+          text1: 'Partial failure',
+          text2: `${failed.length} enquiry(s) could not be auto-assigned`,
+        });
+      }
+
+      if (assigned.length === 0 && failed.length > 0 && !silent) {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: 'No matching Service employee for pincode',
+        });
+      }
+    } catch (error: any) {
+      if (!silent) {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: error.response?.data?.message || 'Failed to auto-assign service enquiries',
+        });
+      }
+    } finally {
+      setAutoAssigning(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isEmployee || !hasPermission('serviceEnquiries') || !token || loading) return;
+
+    const unassignedIds = (allServicesData || [])
+      .filter((e) => !isEnquiryAssigned(e) && !autoAssignAttemptedRef.current.has(e._id))
+      .map((e) => e._id);
+
+    if (unassignedIds.length === 0) return;
+
+    unassignedIds.forEach((id) => autoAssignAttemptedRef.current.add(id));
+    handleAutoAssignEnquiries(unassignedIds, { silent: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allServicesData, loading, isEmployee, token]);
+
   const updateStatusToService = async (serviceId: string, status: string) => {
     setUpdatingServiceId(serviceId);
     try {
@@ -337,6 +432,30 @@ const ServiceEnquiriesScreen = () => {
         });
         break;
       }
+      case 'deliveryChallan': {
+        const companyIdStr = normalizeMongoId(service?.companyId);
+        (navigation as any).navigate('AddServiceReport', {
+          employeeName,
+          employeeId,
+          reportType: 'Service_Delivery_Challan',
+          serviceId: service._id,
+          companyId: companyIdStr || undefined,
+          companyName: service?.companyName,
+        });
+        break;
+      }
+      case 'returnableChallan': {
+        const companyIdStr = normalizeMongoId(service?.companyId);
+        (navigation as any).navigate('AddServiceReport', {
+          employeeName,
+          employeeId,
+          reportType: 'Service_Returnable_Challan',
+          serviceId: service._id,
+          companyId: companyIdStr || undefined,
+          companyName: service?.companyName,
+        });
+        break;
+      }
       case 'moveToUnwanted':
         Alert.alert(
           'Move to Unwanted',
@@ -399,6 +518,12 @@ const ServiceEnquiriesScreen = () => {
           <Icon name="location-on" size={16} color="#666" />
           <Text style={styles.detailText}>{item.location || 'N/A'}</Text>
         </View>
+        {item.pincode ? (
+          <View style={styles.detailRow}>
+            <Icon name="pin-drop" size={16} color="#666" />
+            <Text style={styles.detailText}>Pincode: {item.pincode}</Text>
+          </View>
+        ) : null}
         {item.serviceImage && (
           <TouchableOpacity
             style={styles.imageLink}
@@ -441,6 +566,14 @@ const ServiceEnquiriesScreen = () => {
             </Text>
             {user?.role === 1 && <Icon name="arrow-drop-down" size={24} color="#666" />}
           </TouchableOpacity>
+        )}
+        {!item.employeeId && (
+          <Text style={styles.suggestedText}>
+            Suggested
+            {getSuggestedEmployee(item)
+              ? ` → ${getSuggestedEmployee(item)?.name}`
+              : ' (no match)'}
+          </Text>
         )}
       </View>
 
@@ -587,6 +720,28 @@ const ServiceEnquiriesScreen = () => {
         </ScrollView>
       )}
 
+      {user?.role === 1 && hasPermission('serviceEnquiries') && activeTab === 'new' ? (
+        <TouchableOpacity
+          style={[
+            styles.autoAssignButton,
+            (enquiries.filter((e) => !isEnquiryAssigned(e)).length === 0 || autoAssigning) &&
+              styles.assignButtonDisabled,
+          ]}
+          onPress={() =>
+            handleAutoAssignEnquiries(
+              enquiries.filter((e) => !isEnquiryAssigned(e)).map((e) => e._id)
+            )
+          }
+          disabled={
+            enquiries.filter((e) => !isEnquiryAssigned(e)).length === 0 || autoAssigning
+          }
+        >
+          <Text style={styles.assignButtonText}>
+            {autoAssigning ? 'Assigning…' : 'Auto Assign'}
+          </Text>
+        </TouchableOpacity>
+      ) : null}
+
       {/* Enquiries List */}
       {loading ? (
         <ActivityIndicator size="large" color="#007AFF" style={styles.loader} />
@@ -695,6 +850,20 @@ const ServiceEnquiriesScreen = () => {
               <Icon name="badge" size={24} color="#007AFF" />
               <Text style={styles.modalItemText}>Gate Pass</Text>
             </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.modalItem}
+              onPress={() => handleAction('deliveryChallan', selectedService)}
+            >
+              <Icon name="local-shipping" size={24} color="#007AFF" />
+              <Text style={styles.modalItemText}>Delivery Challan (DC Copy)</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.modalItem}
+              onPress={() => handleAction('returnableChallan', selectedService)}
+            >
+              <Icon name="assignment-return" size={24} color="#007AFF" />
+              <Text style={styles.modalItemText}>Returnable Challan</Text>
+            </TouchableOpacity>
             {Number(user?.role) === 1 ? (
               <TouchableOpacity
                 style={styles.modalItem}
@@ -729,7 +898,7 @@ const ServiceEnquiriesScreen = () => {
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Select Employee</Text>
             <FlatList
-              data={employees}
+              data={serviceEmployees}
               keyExtractor={(item) => item.userId}
               renderItem={({ item: employee }) => (
                 <TouchableOpacity
@@ -1134,6 +1303,28 @@ const styles = StyleSheet.create({
   pickerButtonText: {
     fontSize: 14,
     color: '#333',
+  },
+  suggestedText: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 6,
+  },
+  autoAssignButton: {
+    backgroundColor: '#34C759',
+    marginHorizontal: 15,
+    marginBottom: 10,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  assignButtonDisabled: {
+    backgroundColor: '#ccc',
+  },
+  assignButtonText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 16,
   },
   dateText: {
     fontSize: 12,

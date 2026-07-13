@@ -27,6 +27,12 @@ import {
   getServiceListScreen,
   resolveServiceReportType,
 } from '../../utils/reportNavigation';
+import {
+  CONTENT_SCOPE_OPTIONS,
+  getDocumentTitle,
+  showsContentScopeField,
+  isContentScopeRequired,
+} from '../../utils/reportDocumentTypes';
 
 interface MaterialGroup {
   name: string;
@@ -69,6 +75,7 @@ const AddServiceReportScreen = () => {
     modelNo: '',
     branch: '',
     reference: '',
+    contentScope: '',
     materialProductName: '',
     materialQuantity: '',
     materialUsageData: '',
@@ -86,6 +93,7 @@ const AddServiceReportScreen = () => {
   const [companyPickerVisible, setCompanyPickerVisible] = useState(false);
   const [branchPickerVisible, setBranchPickerVisible] = useState(false);
   const [productPickerVisible, setProductPickerVisible] = useState(false);
+  const [contentScopePickerVisible, setContentScopePickerVisible] = useState(false);
 
   useEffect(() => {
     fetchInitialData();
@@ -151,6 +159,7 @@ const AddServiceReportScreen = () => {
             modelNo: fetchedReport.modelNo || '',
             branch: fetchedReport.branch || '',
             reference: fetchedReport.reference || '',
+            contentScope: fetchedReport.contentScope || '',
             materialProductName: '',
             materialQuantity: '',
             materialUsageData: '',
@@ -463,6 +472,14 @@ const AddServiceReportScreen = () => {
       });
       return;
     }
+    if (isContentScopeRequired(formData.reportType || resolvedReportType) && !formData.contentScope) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Please select Service / Product for Delivery Challan (DC Copy)',
+      });
+      return;
+    }
     const hasProducts = materialGroups.some((group) => group.products.length > 0);
     if (materialGroups.length === 0 || !hasProducts) {
       Toast.show({
@@ -503,6 +520,7 @@ const AddServiceReportScreen = () => {
         modelNo: formData.modelNo,
         branch: formData.branch,
         reference: formData.reference,
+        contentScope: formData.contentScope || undefined,
         assignedTo: employeeId || user?._id,
         reportFor: reportFor,
         materialGroups: cleanedMaterialGroups,
@@ -562,7 +580,12 @@ const AddServiceReportScreen = () => {
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
       <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
-        <Text style={styles.title}>{isEditMode ? 'Edit Service Report' : 'Add Service Report'}</Text>
+        <Text style={styles.title}>
+          {isEditMode ? 'Edit' : 'Add'}{' '}
+          {getDocumentTitle(formData.reportType || resolvedReportType) !== 'Report'
+            ? getDocumentTitle(formData.reportType || resolvedReportType)
+            : 'Service Report'}
+        </Text>
       </View>
 
       <View style={styles.form}>
@@ -626,6 +649,25 @@ const AddServiceReportScreen = () => {
           </Text>
           <Icon name="arrow-drop-down" size={24} color="#666" />
         </TouchableOpacity>
+
+        {showsContentScopeField(formData.reportType || resolvedReportType) && (
+          <>
+            <Text style={styles.label}>
+              Service / Product{isContentScopeRequired(formData.reportType || resolvedReportType) ? ' *' : ' (optional)'}
+            </Text>
+            <TouchableOpacity
+              style={styles.pickerButton}
+              onPress={() => setContentScopePickerVisible(true)}
+            >
+              <Text style={styles.pickerButtonText}>
+                {formData.contentScope || (isContentScopeRequired(formData.reportType || resolvedReportType)
+                  ? 'Select Service / Product'
+                  : 'None (optional)')}
+              </Text>
+              <Icon name="arrow-drop-down" size={24} color="#666" />
+            </TouchableOpacity>
+          </>
+        )}
 
         <Text style={styles.label}>Reference</Text>
         <TextInput
@@ -892,6 +934,56 @@ const AddServiceReportScreen = () => {
             <TouchableOpacity
               style={styles.modalCloseButton}
               onPress={() => setBranchPickerVisible(false)}
+            >
+              <Text style={styles.modalCloseButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Content Scope Picker Modal */}
+      <Modal
+        visible={contentScopePickerVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setContentScopePickerVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setContentScopePickerVisible(false)}
+        >
+          <View style={styles.pickerModal}>
+            <Text style={styles.pickerModalTitle}>Service / Product</Text>
+            {!isContentScopeRequired(formData.reportType || resolvedReportType) && (
+              <TouchableOpacity
+                style={styles.pickerOption}
+                onPress={() => {
+                  handleChange('contentScope', '');
+                  setContentScopePickerVisible(false);
+                }}
+              >
+                <Text style={styles.pickerOptionText}>None (optional)</Text>
+              </TouchableOpacity>
+            )}
+            <FlatList
+              data={[...CONTENT_SCOPE_OPTIONS]}
+              keyExtractor={(item) => item}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.pickerOption}
+                  onPress={() => {
+                    handleChange('contentScope', item);
+                    setContentScopePickerVisible(false);
+                  }}
+                >
+                  <Text style={styles.pickerOptionText}>{item}</Text>
+                </TouchableOpacity>
+              )}
+            />
+            <TouchableOpacity
+              style={styles.modalCloseButton}
+              onPress={() => setContentScopePickerVisible(false)}
             >
               <Text style={styles.modalCloseButtonText}>Cancel</Text>
             </TouchableOpacity>

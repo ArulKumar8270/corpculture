@@ -80,15 +80,13 @@ const OrdersScreen = () => {
     }
   };
 
-  const renderOrder = ({ item }: { item: any }) => (
+  const renderOrder = ({ item, index }: { item: any; index: number }) => (
     <TouchableOpacity
       style={styles.orderCard}
       onPress={() => (navigation as any).navigate('OrderDetail', { orderId: item._id })}
     >
       <View style={styles.orderHeader}>
-        <Text style={styles.orderNumber}>
-          {item.orderNumber || item._id?.slice(-8) || 'Order #N/A'}
-        </Text>
+        <Text style={styles.orderNumber}>#{index + 1}</Text>
         <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status || item.orderStatus || 'pending') }]}>
           <Text style={styles.statusText}>
             {(item.status || item.orderStatus || 'Pending').toUpperCase()}
@@ -96,10 +94,11 @@ const OrdersScreen = () => {
         </View>
       </View>
       <Text style={styles.orderDate}>
-        Date: {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : 'N/A'}
+        Ref: {item.orderReferenceNo || '—'} ·{' '}
+        {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : 'N/A'}
       </Text>
       <Text style={styles.orderTotal}>
-        Total: ₹{item.total ? item.total.toFixed(2) : item.amount ? item.amount.toFixed(2) : '0.00'}
+        Total: ₹{Number(item.amount || item.total || 0).toLocaleString()}
       </Text>
       <Text style={styles.productCount}>
         {item.products?.length || 0} product{(item.products?.length || 0) > 1 ? 's' : ''}

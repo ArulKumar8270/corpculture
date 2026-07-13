@@ -1,6 +1,71 @@
 import EmployeeBenefits from "../../models/employeeBenefitsModel.js";
 import Employee from "../../models/employeeModel.js";
 
+const benefitPopulate = [
+    { path: "employeeId", select: "name email employeeId userId" },
+    { path: "invoiceId", select: "invoiceNumber invoiceType companyId" },
+    {
+        path: "productId",
+        select: "sku commission employeeCommission productName",
+        populate: { path: "productName", select: "name unit" },
+    },
+];
+
+const fetchBenefitsWithPositiveAmount = async (query, skip, limit) => {
+    const [aggResult] = await EmployeeBenefits.aggregate([
+        { $match: query },
+        {
+            $lookup: {
+                from: "serviceproducts",
+                localField: "productId",
+                foreignField: "_id",
+                as: "productDoc",
+            },
+        },
+        { $unwind: { path: "$productDoc", preserveNullAndEmptyArrays: true } },
+        {
+            $addFields: {
+                benefitAmount: {
+                    $multiply: [
+                        { $ifNull: ["$quantity", 0] },
+                        {
+                            $ifNull: [
+                                "$productDoc.employeeCommission",
+                                { $ifNull: ["$productDoc.commission", 0] },
+                            ],
+                        },
+                    ],
+                },
+            },
+        },
+        { $match: { benefitAmount: { $gt: 0 } } },
+        { $sort: { createdAt: -1 } },
+        {
+            $facet: {
+                metadata: [{ $count: "total" }],
+                data: [{ $skip: skip }, { $limit: limit }],
+            },
+        },
+    ]);
+
+    const pageRows = aggResult?.data || [];
+    const totalCount = aggResult?.metadata?.[0]?.total || 0;
+    const ids = pageRows.map((row) => row._id);
+
+    if (!ids.length) {
+        return { benefits: [], totalCount };
+    }
+
+    const benefits = await EmployeeBenefits.find({ _id: { $in: ids } })
+        .populate(benefitPopulate)
+        .lean();
+
+    const byId = new Map(benefits.map((b) => [String(b._id), b]));
+    const orderedBenefits = ids.map((id) => byId.get(String(id))).filter(Boolean);
+
+    return { benefits: orderedBenefits, totalCount };
+};
+
 // Create Employee Benefit
 export const createEmployeeBenefit = async (req, res) => {
     try {
@@ -87,19 +152,11 @@ export const getAllEmployeeBenefits = async (req, res) => {
             }
         }
 
-        const benefits = await EmployeeBenefits.find(query)
-            .populate("employeeId", "name email employeeId userId")
-            .populate("invoiceId", "invoiceNumber invoiceType companyId")
-            .populate({
-                path: "productId",
-                select: "sku commission employeeCommission productName",
-                populate: { path: "productName", select: "name unit" },
-            })
-            .sort({ createdAt: -1 })
-            .skip(skip)
-            .limit(parseInt(limit));
-
-        const totalCount = await EmployeeBenefits.countDocuments(query);
+        const { benefits, totalCount } = await fetchBenefitsWithPositiveAmount(
+            query,
+            skip,
+            parseInt(limit)
+        );
 
         res.status(200).send({ success: true, benefits, totalCount });
     } catch (error) {
@@ -125,19 +182,11 @@ export const getMyEmployeeBenefits = async (req, res) => {
             { $set: { employeeId: employee._id } }
         );
 
-        const benefits = await EmployeeBenefits.find({ employeeId: employee._id })
-            .populate("employeeId", "name email employeeId userId")
-            .populate("invoiceId", "invoiceNumber invoiceType companyId")
-            .populate({
-                path: "productId",
-                select: "sku commission employeeCommission productName",
-                populate: { path: "productName", select: "name unit" },
-            })
-            .sort({ createdAt: -1 })
-            .skip(skip)
-            .limit(parseInt(limit));
-
-        const totalCount = await EmployeeBenefits.countDocuments({ employeeId: employee._id });
+        const { benefits, totalCount } = await fetchBenefitsWithPositiveAmount(
+            { employeeId: employee._id },
+            skip,
+            parseInt(limit)
+        );
 
         return res.status(200).send({ success: true, benefits, totalCount });
     } catch (error) {

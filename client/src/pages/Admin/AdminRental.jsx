@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import axios from 'axios';
 import { useAuth } from '../../context/auth';
 import Spinner from '../../components/Spinner';
@@ -13,6 +13,11 @@ import BarChartIcon from '@mui/icons-material/BarChart'; // For Report
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward'; // For Move To Unwanted Tab
 import TextField from '@mui/material/TextField';
 import PhoneIcon from '@mui/icons-material/Phone';
+import {
+  getSuggestedEnquiryEmployee,
+  isEnquiryAssigned,
+  hasEmployeeType,
+} from '../../utils/enquiryEmployeeMatcher';
 
 const telHref = (phone) => {
     if (!phone) return '#';
@@ -48,6 +53,17 @@ const AdminRental
     const [rentalTypeFilter, setRentalTypeFilter] = useState('');
     const [page, setPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(10);
+    const [autoAssigning, setAutoAssigning] = useState(false);
+    const autoAssignAttemptedRef = useRef(new Set());
+    const isEmployee = auth?.user?.role === 3;
+
+    const rentalEmployees = useMemo(
+      () => (employees || []).filter((emp) => hasEmployeeType(emp, 'Rentals')),
+      [employees]
+    );
+
+    const getSuggestedEmployee = (enquiry) =>
+      getSuggestedEnquiryEmployee(enquiry, rentalEmployees, 'Rentals');
 
     // Unique rental titles for filter dropdown (must be before any early return)
     const rentalTitles = React.useMemo(() => {
@@ -252,6 +268,76 @@ const AdminRental
         setUpdatingRentalId(null);
       }
     };
+
+    const handleAutoAssignEnquiries = async (
+      rentalIds = [],
+      { silent = false } = {}
+    ) => {
+      if (isEmployee) return;
+      if (!rentalIds?.length) {
+        if (!silent) toast.error('No unassigned rental enquiries to auto-assign.');
+        return;
+      }
+
+      setAutoAssigning(true);
+      try {
+        const response = await axios.patch(
+          `${import.meta.env.VITE_SERVER_URL}/api/v1/rental/auto-assign`,
+          { rentalId: rentalIds },
+          { headers: { Authorization: auth?.token } }
+        );
+
+        const assigned = response.data?.assigned || [];
+        const failed = response.data?.failed || [];
+
+        if (assigned.length > 0) {
+          const names = [...new Set(assigned.map((a) => a.employeeName))].join(', ');
+          if (!silent) {
+            toast.success(`Auto-assigned ${assigned.length} enquiry(s) to ${names}`);
+          }
+          setAllRentalsData((prev) =>
+            prev.map((enquiry) => {
+              const match = assigned.find((a) => a.enquiryId === enquiry._id);
+              return match ? { ...enquiry, employeeId: match.employeeId } : enquiry;
+            })
+          );
+        }
+
+        if (failed.length > 0 && !silent) {
+          toast.error(
+            `${failed.length} enquiry(s) could not be auto-assigned (no matching Rentals employee for pincode).`
+          );
+        }
+
+        if (assigned.length === 0 && failed.length > 0 && !silent) {
+          toast.error('No matching Rentals employee found for pincode.');
+        }
+      } catch (error) {
+        console.error('Error auto-assigning rental enquiries:', error);
+        if (!silent) {
+          toast.error(
+            error.response?.data?.message || 'Failed to auto-assign rental enquiries.'
+          );
+        }
+      } finally {
+        setAutoAssigning(false);
+      }
+    };
+
+    useEffect(() => {
+      if (isEmployee || !hasPermission('rentalEnquiries') || !auth?.token || loading) return;
+
+      const unassignedIds = (allRentalsData || [])
+        .filter((e) => !isEnquiryAssigned(e) && !autoAssignAttemptedRef.current.has(e._id))
+        .map((e) => e._id);
+
+      if (unassignedIds.length === 0) return;
+
+      unassignedIds.forEach((id) => autoAssignAttemptedRef.current.add(id));
+      handleAutoAssignEnquiries(unassignedIds, { silent: true });
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [allRentalsData, loading, isEmployee, auth?.token]);
+
     const updateStausToRental = async (rentalId, status) => {
       setUpdatingRentalId(rentalId);
       try {
@@ -304,6 +390,16 @@ const AdminRental
       handleClose();
     };
 
+    const handleDeliveryChallan = (rentalId, employeeName, companyId) => {
+      navigate(`../addRentalDeliveryChallan?employeeName=${employeeName}&reportType=Rental_Delivery_Challan&rentalId=${rentalId}&companyId=${companyId}`);
+      handleClose();
+    };
+
+    const handleReturnableChallan = (rentalId, employeeName, companyId) => {
+      navigate(`../addRentalReturnableChallan?employeeName=${employeeName}&reportType=Rental_Returnable_Challan&rentalId=${rentalId}&companyId=${companyId}`);
+      handleClose();
+    };
+
     const handleMoveStatus = (rentalId, status) => {
       updateStausToRental(rentalId, status)
       handleClose();
@@ -341,6 +437,10 @@ const AdminRental
       setRowsPerPage(Number(e.target.value));
       setPage(1);
     };
+
+    const unassignedFilteredIds = filteredEnquiries
+      .filter((e) => !isEnquiryAssigned(e))
+      .map((e) => e._id);
 
     return (
       <div className="p-6 bg-gradient-to-br from-[#e6fbff] to-[#f7fafd] min-h-screen">
@@ -434,6 +534,23 @@ const AdminRental
           </button> : null}
         </div>
 
+        {auth?.user?.role === 1 && hasPermission('rentalEnquiries') && activeTab === 'new' ? (
+          <div className="mb-4 w-[83%] flex justify-end">
+            <button
+              type="button"
+              onClick={() => handleAutoAssignEnquiries(unassignedFilteredIds)}
+              disabled={unassignedFilteredIds.length === 0 || autoAssigning}
+              className={`p-2 px-4 rounded-md text-white font-semibold transition
+                ${unassignedFilteredIds.length === 0 || autoAssigning
+                  ? 'bg-gray-400 cursor-not-allowed'
+                  : 'bg-[#019ee3] hover:opacity-90'
+                }`}
+            >
+              {autoAssigning ? 'Assigning…' : 'Auto Assign'}
+            </button>
+          </div>
+        ) : null}
+
         <div className="overflow-x-auto bg-white rounded-xl shadow p-4 w-[83%]">
           <table className="w-[80%] text-sm">
             <thead>
@@ -441,6 +558,7 @@ const AdminRental
                 {hasPermission("rentalEnquiries") ? <th className="py-2 px-3 text-left">Action</th> : null}
                 {/* <th className="py-2 px-3 text-left">Assigned To</th> */}
                 <th className="py-2 px-3 text-left">Assigned Employee</th>
+                <th className="py-2 px-3 text-left">Pincode</th>
                 <th className="py-2 px-3 text-left">Customer Type</th>
                 <th className="py-2 px-3 text-left">{isAdmin ? 'Phone' : 'Call'}</th>
                 <th className="py-2 px-3 text-left">Company Name</th>
@@ -457,7 +575,7 @@ const AdminRental
             <tbody>
               {paginatedEnquiries.length === 0 ? (
                 <tr>
-                  <td colSpan={14} className="text-center py-6 text-gray-400">No rental enquiries found.</td>
+                  <td colSpan={15} className="text-center py-6 text-gray-400">No rental enquiries found.</td>
                 </tr>
               ) : (
                 paginatedEnquiries.map(enquiry => (
@@ -503,6 +621,12 @@ const AdminRental
                         <MenuItem onClick={() => handleGatePass(enquiry._id, enquiry.employeeId, enquiry?.companyId)}>
                           <DescriptionIcon sx={{ mr: 1 }} /> Gate Pass
                         </MenuItem>
+                        <MenuItem onClick={() => handleDeliveryChallan(enquiry._id, enquiry.employeeId, enquiry?.companyId)}>
+                          <DescriptionIcon sx={{ mr: 1 }} /> Delivery Challan (DC Copy)
+                        </MenuItem>
+                        <MenuItem onClick={() => handleReturnableChallan(enquiry._id, enquiry.employeeId, enquiry?.companyId)}>
+                          <DescriptionIcon sx={{ mr: 1 }} /> Returnable Challan
+                        </MenuItem>
                         {auth?.user?.role === 1 ? (
                           <MenuItem onClick={() => handleMoveStatus(currentRentalIdForMenu, "Cancelled")}>
                             <ArrowForwardIcon sx={{ mr: 1 }} /> Move To Unwanted Tab
@@ -545,14 +669,23 @@ const AdminRental
                           disabled={auth?.user?.role === 1 ? false : true}
                         >
                           <option value="">-- Select Employee --</option>
-                          {employees?.map(employee => (
+                          {rentalEmployees?.map(employee => (
                               <option key={employee.userId} value={employee.userId}>
                                 {employee.name}
                               </option>
                             ))}
                         </select>
                       )}
+                      {!enquiry.employeeId && (
+                        <span className="block text-xs text-gray-500 mt-1">
+                          Suggested
+                          {getSuggestedEmployee(enquiry)
+                            ? ` → ${getSuggestedEmployee(enquiry).name}`
+                            : ' (no match)'}
+                        </span>
+                      )}
                     </td>
+                    <td className="py-2 px-3">{enquiry.pincode || '—'}</td>
                     <td className="py-2 px-3">{enquiry.customerType}</td>
                     <td className="py-2 px-3">
                       {isAdmin ? (

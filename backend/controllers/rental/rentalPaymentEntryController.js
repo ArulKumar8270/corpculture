@@ -5,6 +5,16 @@ import Company from "../../models/companyModel.js";
 import CommonDetails from "../../models/commonDetailsModel.js";
 import { normalizeSendDetailsTo } from "../../utils/normalizeSendDetailsTo.js";
 import Counter from "../../models/counterModel.js";
+import { syncRentalInvoiceCommissions } from "../../utils/syncRentalInvoiceCommissions.js";
+import {
+    generateInvoiceNumber,
+    isInvoiceType,
+    isQuotationType,
+    reserveNextInvoiceNumber,
+} from "../../utils/invoiceConversionUtil.js";
+
+const resolveCommissionUserId = (req, entry) =>
+    req.user?._id || entry?.assignedTo?._id || entry?.assignedTo;
 
 /** Use opening meter from the invoice line when both old+new readings exist (PDF snapshot); else live machine opening (legacy). */
 const hasInvoiceReadingPair = (entryOld, entryNew) => {
@@ -70,35 +80,6 @@ const calculateProductTotal = (machine, a3Config, a4Config, a5Config) => {
     const commissionAmount = (totalWithGST * commissionRate) / 100;
 
     return totalWithGST + commissionAmount;
-};
-
-// Helper function to generate invoice number based on format
-// Helper function to generate invoice number based on format
-// Preserves the format structure (year, prefix, etc.) and only replaces the sequential number part
-const generateInvoiceNumber = (invoiceCount, format) => {
-    if (!format || format.trim() === '') {
-        return invoiceCount.toString();
-    }
-
-    // DO NOT replace year patterns - preserve them as-is from the format template
-    // The format template (e.g., "CC/23-24/00001") should be used as-is, only the number part changes
-    
-    // Extract the last number sequence (sequential number part) from the original format
-    const lastNumberMatch = format.match(/(\d+)(?!.*\d)/);
-    
-    if (lastNumberMatch) {
-        // Get the number of digits in the template (e.g., "00001" has 5 digits)
-        const numberDigits = lastNumberMatch[1].length;
-        // Get the prefix (everything before the last number sequence)
-        const prefix = format.substring(0, format.lastIndexOf(lastNumberMatch[1]));
-        // Format the invoice count with the same number of digits (e.g., 6 → "00006")
-        const formattedNumber = invoiceCount.toString().padStart(numberDigits, '0');
-        // Return prefix + formatted number (e.g., "CC/23-24/" + "00006" = "CC/23-24/00006")
-        return prefix + formattedNumber;
-    }
-    
-    // Fallback: append count to format if no number pattern found
-    return format + invoiceCount.toString().padStart(5, '0');
 };
 
 const normalizePaymentContactEmails = (paymentContactEmails, paymentContactEmail) => {
@@ -368,6 +349,18 @@ export const createRentalPaymentEntry = async (req, res) => {
                 .populate("assignedTo")
                 .populate("machineId.gstType");
 
+            const commissionUserId = resolveCommissionUserId(req, populatedInvoice);
+            if (commissionUserId) {
+                try {
+                    await syncRentalInvoiceCommissions({
+                        entry: populatedInvoice,
+                        userId: commissionUserId,
+                    });
+                } catch (commissionError) {
+                    console.error("[Commission Sync] Error syncing rental invoice commissions:", commissionError);
+                }
+            }
+
             return res.status(201).send({
                 success: true,
                 message: "Rental Payment Entry created successfully",
@@ -535,6 +528,18 @@ export const createRentalPaymentEntry = async (req, res) => {
                     },
                 });
 
+            const commissionUserId = resolveCommissionUserId(req, populatedInvoice);
+            if (commissionUserId) {
+                try {
+                    await syncRentalInvoiceCommissions({
+                        entry: populatedInvoice,
+                        userId: commissionUserId,
+                    });
+                } catch (commissionError) {
+                    console.error("[Commission Sync] Error syncing rental invoice commissions:", commissionError);
+                }
+            }
+
             return res.status(201).send({
                 success: true,
                 message: "Rental Payment Entry created successfully with multiple products",
@@ -569,9 +574,9 @@ export const getAllRentalPaymentEntries = async (req, res) => {
 
         let query = {};
 
-        // Add invoiceType filter if provided
+        // Add invoiceType filter if provided (case-insensitive for legacy data)
         if (invoiceType) {
-            query.invoiceType = invoiceType;
+            query.invoiceType = { $regex: new RegExp(`^${String(invoiceType).trim()}$`, "i") };
         }
 
         // Add invoiceNumber filter if provided
@@ -717,7 +722,11 @@ export const getRentalInvoiceAssignedTo = async (req, res) => {
 
         let query = {};
         if (invoiceType && assignedTo) {
-            query = { invoiceType, assignedTo, tdsAmount: { $eq: null } };
+            query = {
+                invoiceType: { $regex: new RegExp(`^${String(invoiceType).trim()}$`, "i") },
+                assignedTo,
+                tdsAmount: { $eq: null },
+            };
         }
 
         const entries = await RentalPaymentEntry.find(query)
@@ -844,41 +853,23 @@ export const updateRentalPaymentEntry = async (req, res) => {
         }
 
         // Check if moving from quotation to invoice BEFORE updating invoiceType
-        const wasQuotation = entry.invoiceType === 'quotation';
-        const isMovingToInvoice = invoiceType === 'invoice' && wasQuotation;
+        const wasQuotation = isQuotationType(entry.invoiceType);
+        const wantsInvoice = isInvoiceType(invoiceType);
+        const isMovingToInvoice = wantsInvoice && wasQuotation;
 
-        // Generate invoice number from global settings when moving from quotation to invoice
+        // Generate invoice number when converting quotation -> invoice (atomic global count)
         let finalInvoiceNumber = invoiceNumber;
-        if (isMovingToInvoice && !invoiceNumber) {
-            // Fetch global invoice count and format
-            const commonDetails = await CommonDetails.findOne({});
-            
-            if (!commonDetails) {
-                return res.status(500).send({ 
-                    success: false, 
-                    message: 'Global invoice settings not found. Please configure invoice settings first.' 
+        if (isMovingToInvoice) {
+            try {
+                finalInvoiceNumber = await reserveNextInvoiceNumber();
+                console.log(`[Rental Move to Invoice] Reserved invoice number: ${finalInvoiceNumber}`);
+            } catch (reserveError) {
+                console.error("[Rental Move to Invoice] Failed to reserve invoice number:", reserveError);
+                return res.status(500).send({
+                    success: false,
+                    message: reserveError.message || "Failed to generate invoice number.",
                 });
             }
-
-            const globalFormat = commonDetails.globalInvoiceFormat || '';
-            
-            // Use the stored invoiceCount from DB (this is the actual current count)
-            // The format is just a template - we preserve its structure (year, prefix) but use DB count
-            let currentCount = typeof commonDetails.invoiceCount === 'number' 
-                ? commonDetails.invoiceCount 
-                : parseInt(commonDetails.invoiceCount) || 0;
-            
-            console.log(`[Rental Move to Invoice] Using stored invoiceCount from DB: ${currentCount}`);
-            console.log(`[Rental Move to Invoice] Global format template: "${globalFormat}"`);
-            console.log(`[Rental Move to Invoice] Format will be preserved (year, prefix) - only number will be replaced`);
-            
-            // Use currentCount + 1 for the next invoice number
-            const nextInvoiceCount = currentCount + 1;
-            
-            // Generate invoice number from global count and format
-            finalInvoiceNumber = generateInvoiceNumber(nextInvoiceCount, globalFormat);
-            
-            console.log(`[Rental Move to Invoice] Global count: ${currentCount}, Next count: ${nextInvoiceCount}, Format: ${globalFormat}, Generated: ${finalInvoiceNumber}`);
         }
 
         // Parse products if it's a JSON string (from FormData)
@@ -1081,7 +1072,11 @@ export const updateRentalPaymentEntry = async (req, res) => {
         if (companyId) entry.companyId = companyId;
         if (invoiceLink !== undefined) entry.invoiceLink = invoiceLink;
         if (signedInvoiceLink !== undefined) entry.signedInvoiceLink = signedInvoiceLink;
-        if (invoiceType) entry.invoiceType = invoiceType;
+        if (invoiceType) {
+            if (wantsInvoice) entry.invoiceType = "invoice";
+            else if (isQuotationType(invoiceType)) entry.invoiceType = "quotation";
+            else entry.invoiceType = invoiceType;
+        }
         if (invoiceSendStatus !== undefined) entry.invoiceSendStatus = invoiceSendStatus;
         if (invoiceSentAt !== undefined) {
             entry.invoiceSentAt = invoiceSentAt ? new Date(invoiceSentAt) : null;
@@ -1116,19 +1111,7 @@ export const updateRentalPaymentEntry = async (req, res) => {
 
         await entry.save();
 
-        // Increment global invoice count when moving from quotation to invoice
-        if (isMovingToInvoice && finalInvoiceNumber) {
-            try {
-                await CommonDetails.findOneAndUpdate(
-                    {},
-                    { $inc: { invoiceCount: 1 } },
-                    { new: true, upsert: true }
-                );
-            } catch (error) {
-                console.error('Error incrementing invoice count:', error);
-                // Don't fail the request if count increment fails
-            }
-        }
+        // Invoice count already incremented atomically during reserveNextInvoiceNumber()
 
         // Populate the entry with all necessary data
         const populatedInvoice = await RentalPaymentEntry.findById(id)
@@ -1146,6 +1129,18 @@ export const updateRentalPaymentEntry = async (req, res) => {
                 },
             })
             .populate('assignedTo');
+
+        const commissionUserId = resolveCommissionUserId(req, populatedInvoice);
+        if (commissionUserId) {
+            try {
+                await syncRentalInvoiceCommissions({
+                    entry: populatedInvoice,
+                    userId: commissionUserId,
+                });
+            } catch (commissionError) {
+                console.error("[Commission Sync] Error syncing rental invoice commissions:", commissionError);
+            }
+        }
 
         res.status(200).send({
             success: true,

@@ -177,13 +177,14 @@ const EmployeeListScreen = () => {
       Toast.show({ type: 'error', text1: 'Excel export unavailable' });
       return;
     }
-    if (!employees.length) {
+    if (!filteredEmployees.length) {
       Toast.show({ type: 'error', text1: 'No employees to export.' });
       return;
     }
     try {
       setExportingExcel(true);
-      const rows = employees.map((employee) => ({
+      const rows = filteredEmployees.map((employee, index) => ({
+        'S.No': index + 1,
         'Employee ID': String(employee._id ?? ''),
         Name: employee.name ?? '',
         Email: employee.email ?? '',
@@ -329,10 +330,10 @@ const EmployeeListScreen = () => {
           <TouchableOpacity
             style={[
               styles.exportButton,
-              (exportingExcel || !employees.length) && styles.exportButtonDisabled,
+              (exportingExcel || !filteredEmployees.length) && styles.exportButtonDisabled,
             ]}
             onPress={handleDownloadEmployeesExcel}
-            disabled={exportingExcel || !employees.length}
+            disabled={exportingExcel || !filteredEmployees.length}
           >
             {exportingExcel ? (
               <ActivityIndicator size="small" color="#fff" />

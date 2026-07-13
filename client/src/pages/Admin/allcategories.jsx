@@ -172,12 +172,6 @@ const AllCategories = () => {
 
     const columns = [
         {
-            field: "id",
-            headerName: "Category ID",
-            minWidth: 150,
-            flex: 0.5,
-        },
-        {
             field: "name",
             headerName: "Name",
             minWidth: 200,

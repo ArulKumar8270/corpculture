@@ -24,6 +24,10 @@ import {
   getSuggestedEmployee,
   isOrderAssigned,
 } from '../../utils/orderEmployeeMatcher';
+import {
+  getStoredOrderProductBaseUnit,
+  getStoredOrderProductLineTotal,
+} from '../../utils/orderAmountUtil';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 
@@ -223,6 +227,7 @@ const OrderManagementScreen = () => {
       }
 
       const rows: Record<string, string | number>[] = [];
+      let serialNo = 0;
       for (const order of allOrders) {
         const buyerName = order.buyer?.name ?? '';
         const empName = order.employeeId?.name ?? '';
@@ -234,8 +239,9 @@ const OrderManagementScreen = () => {
         const products = order.products || [];
 
         if (products.length === 0) {
+          serialNo += 1;
           rows.push({
-            'Order ID': String(order._id),
+            'Serial Number': serialNo,
             'Order Date': orderDate,
             'Order Status': order.orderStatus ?? '',
             'Order Amount': order.amount ?? '',
@@ -253,11 +259,12 @@ const OrderManagementScreen = () => {
         }
 
         for (const p of products) {
+          serialNo += 1;
           const qty = Number(p.quantity) || 1;
-          const hasDiscount = p.discountPrice != null && p.discountPrice !== '';
-          const unit = Number(hasDiscount ? p.discountPrice : p.price ?? 0);
+          const unit = getStoredOrderProductBaseUnit(p);
+          const lineTotal = getStoredOrderProductLineTotal(p);
           rows.push({
-            'Order ID': String(order._id),
+            'Serial Number': serialNo,
             'Order Date': orderDate,
             'Order Status': order.orderStatus ?? '',
             'Order Amount': order.amount ?? '',
@@ -269,7 +276,7 @@ const OrderManagementScreen = () => {
             'Product ID': p.productId ?? '',
             Qty: qty,
             'Unit Price': unit,
-            'Line Total': qty * unit,
+            'Line Total': lineTotal,
           });
         }
       }
@@ -468,7 +475,7 @@ const OrderManagementScreen = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orders, loading, isEmployee, token]);
 
-  const renderOrder = ({ item }: { item: any }) => {
+  const renderOrder = ({ item, index }: { item: any; index: number }) => {
     const handleOrderPress = () => {
       (navigation as any).navigate('OrderUpdate', { orderId: item._id });
     };
@@ -500,7 +507,7 @@ const OrderManagementScreen = () => {
       <View style={styles.orderContent}>
         <View style={styles.orderHeader}>
           <Text style={styles.orderId} numberOfLines={1}>
-            {item._id?.slice(-8) || 'N/A'}
+            #{page * rowsPerPage + index + 1}
           </Text>
           <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.orderStatus || item.status) }]}>
             <Text style={styles.statusText}>{item.orderStatus || item.status || 'Pending'}</Text>
@@ -508,7 +515,7 @@ const OrderManagementScreen = () => {
         </View>
         <View style={styles.orderInfoRow}>
           <Text style={styles.label}>Customer:</Text>
-          <Text style={styles.value}>{item.user?.name || item.buyerName || 'N/A'}</Text>
+          <Text style={styles.value}>{item.buyer?.name || item.user?.name || item.buyerName || 'N/A'}</Text>
         </View>
         {item.employeeId ? (
           <View style={styles.orderInfoRow}>
@@ -589,7 +596,7 @@ const OrderManagementScreen = () => {
         <Icon name="search" size={20} color="#999" style={styles.searchIcon} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search orders by ID, Customer, Address..."
+          placeholder="Search orders by customer, address, order reference..."
           value={searchQuery}
           onChangeText={setSearchQuery}
           onSubmitEditing={() => {

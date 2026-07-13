@@ -7,6 +7,10 @@ import axios from "axios";
 import { useAuth } from "../../../context/auth";
 import Spinner from "../../../components/Spinner";
 import SeoData from "../../../SEO/SeoData";
+import {
+    getStoredOrderProductBaseUnit,
+    getStoredOrderProductLineTotal,
+} from "../../../utils/functions";
 
 const OrderDetails = () => {
     const params = useParams();
@@ -149,7 +153,14 @@ const OrderDetails = () => {
                                                 </p>
                                                 <span className="font-bold text-[#019ee3] text-lg">
                                                     ₹
-                                                    {price}
+                                                    {getStoredOrderProductBaseUnit(item).toLocaleString()}
+                                                    {quantity > 1 ? (
+                                                        <span className="text-sm font-normal text-gray-600">
+                                                            {" "}
+                                                            × {quantity} = ₹
+                                                            {getStoredOrderProductLineTotal(item).toLocaleString()}
+                                                        </span>
+                                                    ) : null}
                                                 </span>
                                                 <div className="flex items-center justify-between">
                                                     <span className="text-[15px] text-gray-700">

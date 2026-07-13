@@ -118,9 +118,15 @@ const EmployeeDetailsScreen = () => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Assigned Orders ({assignedOrders.length})</Text>
           {assignedOrders.map((order, index) => (
-            <View key={index} style={styles.orderCard}>
-              <Text style={styles.orderText}>Order ID: {order._id || order.orderId}</Text>
-              <Text style={styles.orderText}>Status: {order.status || 'N/A'}</Text>
+            <View key={order._id || index} style={styles.orderCard}>
+              <Text style={styles.orderText}>Serial No: {index + 1}</Text>
+              <Text style={styles.orderText}>
+                Ref: {order.orderReferenceNo || '—'}
+              </Text>
+              <Text style={styles.orderText}>
+                Amount: ₹{Number(order.amount || 0).toLocaleString()}
+              </Text>
+              <Text style={styles.orderText}>Status: {order.orderStatus || order.status || 'N/A'}</Text>
             </View>
           ))}
         </View>

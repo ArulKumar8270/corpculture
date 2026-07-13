@@ -17,6 +17,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../store';
 import { usePermissions } from '../hooks/usePermissions';
 import { clearAuth } from '../store/slices/authSlice';
+import { cleanupPushNotificationsOnLogout } from '../services/pushNotifications';
 import { clearPermissions } from '../store/slices/permissionsSlice';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Toast from 'react-native-toast-message';
@@ -810,6 +811,7 @@ const CustomDrawerContent = (props: CustomDrawerContentProps) => {
           style={styles.logoutButton}
           onPress={async () => {
             try {
+              await cleanupPushNotificationsOnLogout();
               await AsyncStorage.removeItem('authToken');
               await AsyncStorage.removeItem('auth');
               dispatch(clearAuth());

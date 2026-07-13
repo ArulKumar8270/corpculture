@@ -23,7 +23,8 @@ import { getApiBaseUrl } from '../../services/api';
 import ReportListFilters from '../../components/ReportListFilters';
 import {
   getReportSendWebhook,
-  isGatePassReportType,
+  isOperationalDocumentReportType,
+  getDocumentTitle,
   SERVICE_REPORT_TYPE,
   buildReportListQueryParams,
   getReportsListUrl,
@@ -221,7 +222,8 @@ const ServiceReportsScreen = () => {
 
   const handleSendReport = async (report: any) => {
     const reportType = report?.reportType || reportTypeKey;
-    const isGatePass = isGatePassReportType(reportType);
+    const isOperationalDoc = isOperationalDocumentReportType(reportType);
+    const docTitle = getDocumentTitle(reportType);
     try {
       const res = await axios.post(getReportSendWebhook(reportType), {
         reportId: report._id,
@@ -241,7 +243,7 @@ const ServiceReportsScreen = () => {
       Toast.show({
         type: 'success',
         text1: 'Success',
-        text2: isGatePass ? 'Gate pass sent successfully!' : 'Report sent successfully!',
+        text2: isOperationalDoc ? `${docTitle} sent successfully!` : 'Report sent successfully!',
       });
       fetchReports();
     } catch (error: any) {

@@ -192,6 +192,18 @@ const ServiceStack = () => (
       initialParams={{ reportTypeKey: 'Service_Gate_Pass', screenTitle: 'Gate Pass' }}
       options={{ title: 'Gate Pass', headerShown: true }}
     />
+    <Stack.Screen
+      name="ServiceDeliveryChallan"
+      component={ServiceReportsScreen}
+      initialParams={{ reportTypeKey: 'Service_Delivery_Challan', screenTitle: 'Delivery Challan (DC Copy)' }}
+      options={{ title: 'Delivery Challan (DC Copy)', headerShown: true }}
+    />
+    <Stack.Screen
+      name="ServiceReturnableChallan"
+      component={ServiceReportsScreen}
+      initialParams={{ reportTypeKey: 'Service_Returnable_Challan', screenTitle: 'Returnable Challan' }}
+      options={{ title: 'Returnable Challan', headerShown: true }}
+    />
     <Stack.Screen name="AddServiceReport" component={AddServiceReportScreen} options={{ title: 'Add Service Report', headerShown: true }} />
     <Stack.Screen name="ServicePartners" component={CommissionScreen} options={{ title: 'Partners (Service)', headerShown: true }} />
   </Stack.Navigator>
@@ -228,6 +240,18 @@ const RentalStack = () => (
       component={RentalReportsScreen}
       initialParams={{ reportTypeKey: 'Rental_Gate_Pass', screenTitle: 'Gate Pass' }}
       options={{ title: 'Gate Pass', headerShown: true }}
+    />
+    <Stack.Screen
+      name="RentalDeliveryChallan"
+      component={RentalReportsScreen}
+      initialParams={{ reportTypeKey: 'Rental_Delivery_Challan', screenTitle: 'Delivery Challan (DC Copy)' }}
+      options={{ title: 'Delivery Challan (DC Copy)', headerShown: true }}
+    />
+    <Stack.Screen
+      name="RentalReturnableChallan"
+      component={RentalReportsScreen}
+      initialParams={{ reportTypeKey: 'Rental_Returnable_Challan', screenTitle: 'Returnable Challan' }}
+      options={{ title: 'Returnable Challan', headerShown: true }}
     />
     <Stack.Screen name="AddRentalReport" component={AddRentalReportScreen} options={{ title: 'Add/Edit Rental Report' }} />
     <Stack.Screen name="RentalPartners" component={CommissionScreen} options={{ title: 'Partners (Rental)' }} />

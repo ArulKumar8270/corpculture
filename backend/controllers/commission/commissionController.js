@@ -1,15 +1,48 @@
 import commissionModel from "../../models/commissionModel.js";
 
+const buildCommissionSummary = (commissions = []) => {
+    const totalEarned = commissions.reduce(
+        (sum, c) => sum + (Number(c.commissionAmount) || 0),
+        0
+    );
+    const totalPaid = commissions
+        .filter((c) => c.isPaid)
+        .reduce((sum, c) => sum + (Number(c.commissionAmount) || 0), 0);
+    const totalPending = totalEarned - totalPaid;
+
+    const byType = commissions.reduce((acc, c) => {
+        const key = c.commissionFrom || "Other";
+        if (!acc[key]) {
+            acc[key] = { count: 0, amount: 0 };
+        }
+        acc[key].count += 1;
+        acc[key].amount += Number(c.commissionAmount) || 0;
+        return acc;
+    }, {});
+
+    return {
+        totalEarned,
+        totalPaid,
+        totalPending,
+        count: commissions.length,
+        byType,
+    };
+};
+
 // Create Commission
 export const createCommission = async (req, res) => {
     try {
-        const { rentalInvoiceId, serviceInvoiceId, salesInvoiceId } = req.body;
+        const { rentalInvoiceId, serviceInvoiceId, salesInvoiceId, productId, rentalProductId } = req.body;
 
         let result;
         if (rentalInvoiceId || serviceInvoiceId || salesInvoiceId) {
             let query = {};
-            if (rentalInvoiceId) {
+            if (rentalInvoiceId && rentalProductId) {
+                query = { rentalInvoiceId, rentalProductId };
+            } else if (rentalInvoiceId) {
                 query = { rentalInvoiceId };
+            } else if (serviceInvoiceId && productId) {
+                query = { serviceInvoiceId, productId };
             } else if (serviceInvoiceId) {
                 query = { serviceInvoiceId };
             } else if (salesInvoiceId) {
@@ -61,7 +94,18 @@ export const createCommission = async (req, res) => {
 export const getAllCommissions = async (req, res) => {
     try {
         const commissionFrom = req.query.commissionFrom || "Sales";
-        const commissions = await commissionModel.find({commissionFrom}).populate("userId").populate("companyId")
+        const commissions = await commissionModel.find({commissionFrom})
+            .populate("userId")
+            .populate("companyId")
+            .populate({
+                path: "productId",
+                select: "sku commission productName",
+                populate: { path: "productName", select: "name" },
+            })
+            .populate({
+                path: "rentalProductId",
+                select: "modelName serialNo commission",
+            })
             .sort({ createdAt: -1 });
 
         res.status(200).send({
@@ -170,32 +214,88 @@ export const deleteCommission = async (req, res) => {
     }
 };
 
+// Get commissions for the logged-in user (customer profile)
+export const getMyCommissions = async (req, res) => {
+    try {
+        const userId = req.user?._id;
+        if (!userId) {
+            return res.status(401).send({
+                success: false,
+                message: "Unauthorized",
+            });
+        }
+
+        const commissions = await commissionModel
+            .find({ userId })
+            .populate("companyId", "companyName")
+            .populate({
+                path: "productId",
+                select: "sku commission productName",
+                populate: { path: "productName", select: "name" },
+            })
+            .populate({
+                path: "rentalProductId",
+                select: "modelName serialNo commission",
+            })
+            .sort({ createdAt: -1 })
+            .lean();
+
+        res.status(200).send({
+            success: true,
+            commissions,
+            summary: buildCommissionSummary(commissions),
+        });
+    } catch (error) {
+        console.error("Error in getting my commissions:", error);
+        res.status(500).send({
+            success: false,
+            message: "Error in getting commissions",
+            error: error.message,
+        });
+    }
+};
+
 // Get Commission by User ID
 export const getCommissionsByUser = async (req, res) => {
     try {
-        const userId = req.params.id;
-        const commissions = await commissionModel.find({ userId })
-            .sort({ createdAt: -1 });
+        const requestedUserId = req.params.id;
+        const authUserId = String(req.user?._id || "");
+        const isAdmin = Number(req.user?.role) === 1;
 
-        if (!commissions || commissions.length === 0) {
-            return res.status(404).send({
+        if (!isAdmin && authUserId !== String(requestedUserId)) {
+            return res.status(403).send({
                 success: false,
-                message: "No commissions found for this user",
-                errorType: "commissionNotFound"
+                message: "You can only view your own commissions",
             });
         }
+
+        const commissions = await commissionModel
+            .find({ userId: requestedUserId })
+            .populate("companyId", "companyName")
+            .populate({
+                path: "productId",
+                select: "sku commission productName",
+                populate: { path: "productName", select: "name" },
+            })
+            .populate({
+                path: "rentalProductId",
+                select: "modelName serialNo commission",
+            })
+            .sort({ createdAt: -1 })
+            .lean();
 
         res.status(200).send({
             success: true,
             message: "Commissions fetched successfully",
-            commissions
+            commissions,
+            summary: buildCommissionSummary(commissions),
         });
     } catch (error) {
         console.error("Error in getting user commissions:", error);
         res.status(500).send({
             success: false,
             message: "Error in getting user commissions",
-            error
+            error: error.message,
         });
     }
 };

@@ -31,6 +31,12 @@ import toast from 'react-hot-toast';
 import axios from 'axios'; // Assuming axios is used for API calls
 import { useAuth } from '../../context/auth'; // Import useAuth to get the token
 import { getReportListPath } from '../../utils/reportNavigation';
+import {
+    CONTENT_SCOPE_OPTIONS,
+    getDocumentTitle,
+    showsContentScopeField,
+    isContentScopeRequired,
+} from '../../utils/reportDocumentTypes';
 
 const defaultReportType = (props, reportFor) =>
     reportFor || props?.reportType || 'Service_Report';
@@ -56,6 +62,7 @@ const AddServiceReport = (props) => {
         remarksPendingWorks: '',
         branch: '', // This will store the branch name
         reference: '',
+        contentScope: '',
         materialProductName: '', // For adding new material (will store product _id)
         materialQuantity: '',    // For adding new material
         materialUsageData: '',
@@ -110,6 +117,7 @@ const AddServiceReport = (props) => {
                             remarksPendingWorks: fetchedReport.remarksPendingWorks || '',
                             branch: fetchedReport.branch || '',
                             reference: fetchedReport.reference || '',
+                            contentScope: fetchedReport.contentScope || '',
                             materialProductName: '', // Reset for new material entry
                             materialQuantity: '',    // Reset for new material entry
                             materialUsageData: '',
@@ -447,6 +455,10 @@ const AddServiceReport = (props) => {
             toast.error('Please select a company.');
             return;
         }
+        if (isContentScopeRequired(reportData.reportType) && !reportData.contentScope) {
+            toast.error('Please select Service / Product for Delivery Challan (DC Copy).');
+            return;
+        }
         // Validate at least one material group exists and has products
         const hasProducts = materialGroups.some(group => group.products.length > 0);
         if (materialGroups.length === 0 || !hasProducts) {
@@ -464,6 +476,7 @@ const AddServiceReport = (props) => {
             remarksPendingWorks: reportData.remarksPendingWorks,
             branch: reportData.branch, // This is the branch name string
             reference: reportData.reference,
+            contentScope: reportData.contentScope || undefined,
             assignedTo: reportData.assignedTo || employeeName,
             reportFor: reportFor,
             // Send materialGroups as array of objects, without temporary 'id' field from products
@@ -539,6 +552,7 @@ const AddServiceReport = (props) => {
             remarksPendingWorks: '',
             branch: '',
             reference: '',
+            contentScope: '',
             materialProductName: '',
             materialQuantity: '',
             materialUsageData: '',
@@ -562,7 +576,11 @@ const AddServiceReport = (props) => {
         <Box sx={{ p: 3, bgcolor: 'background.default', minHeight: '100vh' }}>
             <Typography variant="h5" component="h1" gutterBottom sx={{ mb: 3, color: '#019ee3', fontWeight: 'bold' }}>
                 {reportId ? 'Edit' : 'Add'}{' '}
-                {String(reportData.reportType || '').includes('Gate_Pass') ? 'Gate Pass' : 'Report'}
+                {getDocumentTitle(reportData.reportType) !== 'Report'
+                    ? getDocumentTitle(reportData.reportType)
+                    : String(reportData.reportType || '').includes('Rental')
+                      ? 'Rental Report'
+                      : 'Service Report'}
             </Typography>
 
             <Paper elevation={3} sx={{ p: 4, mb: 4, borderRadius: '8px' }}>
@@ -690,6 +708,32 @@ const AddServiceReport = (props) => {
                             </Select>
                         </FormControl>
                     </Grid>
+                    {showsContentScopeField(reportData.reportType) && (
+                        <Grid item xs={12} sm={6}>
+                            <FormControl fullWidth margin="normal" size="small" required={isContentScopeRequired(reportData.reportType)}>
+                                <InputLabel id="content-scope-label">Service / Product</InputLabel>
+                                <Select
+                                    labelId="content-scope-label"
+                                    id="contentScope"
+                                    name="contentScope"
+                                    value={reportData.contentScope}
+                                    onChange={handleChange}
+                                    label="Service / Product"
+                                >
+                                    <MenuItem value="">
+                                        {isContentScopeRequired(reportData.reportType)
+                                            ? 'Select Service / Product'
+                                            : 'None (optional)'}
+                                    </MenuItem>
+                                    {CONTENT_SCOPE_OPTIONS.map((option) => (
+                                        <MenuItem key={option} value={option}>
+                                            {option}
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        </Grid>
+                    )}
                     <Grid item xs={12} sm={6}>
                         <TextField
                             fullWidth

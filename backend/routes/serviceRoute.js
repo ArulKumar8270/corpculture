@@ -10,6 +10,7 @@ import {
     getServiceByType,
     getServiceAssignedTo
 } from "../controllers/service/serviceController.js";
+import autoAssignServiceEnquiries from "../controllers/enquiry/autoAssignServiceEnquiries.js";
 
 const router = express.Router();
 
@@ -27,6 +28,9 @@ router.get("/serviceType/:serviceType", getServiceByType);
 
 // Update service (e.g. mark enquiry completed after invoice — employees need this)
 router.put("/update/:id", isAdminOrEmployee, updateService);
+
+// Auto-assign service enquiries by pincode
+router.patch("/auto-assign", isAdminOrEmployee, autoAssignServiceEnquiries);
 
 // Delete service
 router.delete("/delete/:id", isAdminOrEmployee, deleteService);

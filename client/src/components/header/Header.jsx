@@ -57,7 +57,7 @@ const Header = () => {
     const getCommisionDetails = async () => {
         try {
             const response = await axios.get(
-                `${import.meta.env.VITE_SERVER_URL}/api/v1/commissions/user/${auth?.user?._id}`,
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/commissions/me`,
                 {
                     headers: {
                         Authorization: auth?.token,
@@ -71,6 +71,7 @@ const Header = () => {
             }
         } catch (error) {
             console.error("Error fetching commissions:", error);
+            setCommissions([]);
         }
     }
     useEffect(() => {

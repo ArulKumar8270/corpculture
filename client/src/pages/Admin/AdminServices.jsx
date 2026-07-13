@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import axios from 'axios';
 import { useAuth } from '../../context/auth';
 import Spinner from '../../components/Spinner';
@@ -13,6 +13,11 @@ import BarChartIcon from '@mui/icons-material/BarChart'; // For Report
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward'; // For Move To Unwanted Tab
 import TextField from '@mui/material/TextField';
 import PhoneIcon from '@mui/icons-material/Phone';
+import {
+  getSuggestedEnquiryEmployee,
+  isEnquiryAssigned,
+  hasEmployeeType,
+} from '../../utils/enquiryEmployeeMatcher';
 
 const telHref = (phone) => {
   if (!phone) return '#';
@@ -46,6 +51,17 @@ const AdminServices = () => {
   const [serviceTitleFilter, setServiceTitleFilter] = useState('');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [autoAssigning, setAutoAssigning] = useState(false);
+  const autoAssignAttemptedRef = useRef(new Set());
+  const isEmployee = auth?.user?.role === 3;
+
+  const serviceEmployees = useMemo(
+    () => (employees || []).filter((emp) => hasEmployeeType(emp, 'Service')),
+    [employees]
+  );
+
+  const getSuggestedEmployee = (enquiry) =>
+    getSuggestedEnquiryEmployee(enquiry, serviceEmployees, 'Service');
 
   // Unique service titles for filter dropdown (must be before any early return)
   const serviceTitles = React.useMemo(() => {
@@ -245,6 +261,76 @@ const AdminServices = () => {
       setUpdatingServiceId(null);
     }
   };
+
+  const handleAutoAssignEnquiries = async (
+    serviceIds = [],
+    { silent = false } = {}
+  ) => {
+    if (isEmployee) return;
+    if (!serviceIds?.length) {
+      if (!silent) toast.error('No unassigned service enquiries to auto-assign.');
+      return;
+    }
+
+    setAutoAssigning(true);
+    try {
+      const response = await axios.patch(
+        `${import.meta.env.VITE_SERVER_URL}/api/v1/service/auto-assign`,
+        { serviceId: serviceIds },
+        { headers: { Authorization: auth?.token } }
+      );
+
+      const assigned = response.data?.assigned || [];
+      const failed = response.data?.failed || [];
+
+      if (assigned.length > 0) {
+        const names = [...new Set(assigned.map((a) => a.employeeName))].join(', ');
+        if (!silent) {
+          toast.success(`Auto-assigned ${assigned.length} enquiry(s) to ${names}`);
+        }
+        setAllServicesData((prev) =>
+          prev.map((enquiry) => {
+            const match = assigned.find((a) => a.enquiryId === enquiry._id);
+            return match ? { ...enquiry, employeeId: match.employeeId } : enquiry;
+          })
+        );
+      }
+
+      if (failed.length > 0 && !silent) {
+        toast.error(
+          `${failed.length} enquiry(s) could not be auto-assigned (no matching Service employee for pincode).`
+        );
+      }
+
+      if (assigned.length === 0 && failed.length > 0 && !silent) {
+        toast.error('No matching Service employee found for pincode.');
+      }
+    } catch (error) {
+      console.error('Error auto-assigning service enquiries:', error);
+      if (!silent) {
+        toast.error(
+          error.response?.data?.message || 'Failed to auto-assign service enquiries.'
+        );
+      }
+    } finally {
+      setAutoAssigning(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isEmployee || !hasPermission('serviceEnquiries') || !auth?.token || loading) return;
+
+    const unassignedIds = (allServicesData || [])
+      .filter((e) => !isEnquiryAssigned(e) && !autoAssignAttemptedRef.current.has(e._id))
+      .map((e) => e._id);
+
+    if (unassignedIds.length === 0) return;
+
+    unassignedIds.forEach((id) => autoAssignAttemptedRef.current.add(id));
+    handleAutoAssignEnquiries(unassignedIds, { silent: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allServicesData, loading, isEmployee, auth?.token]);
+
   const updateStausToService = async (serviceId, status) => {
     setUpdatingServiceId(serviceId);
     try {
@@ -290,6 +376,16 @@ const AdminServices = () => {
     handleClose();
   };
 
+  const handleDeliveryChallan = (serviceId, employeeName, companyId) => {
+    navigate(`../addServiceDeliveryChallan?employeeName=${employeeName}&reportType=Service_Delivery_Challan&serviceId=${serviceId}&companyId=${companyId}`);
+    handleClose();
+  };
+
+  const handleReturnableChallan = (serviceId, employeeName, companyId) => {
+    navigate(`../addServiceReturnableChallan?employeeName=${employeeName}&reportType=Service_Returnable_Challan&serviceId=${serviceId}&companyId=${companyId}`);
+    handleClose();
+  };
+
   const handleMoveStatus = (serviceId, status) => {
     updateStausToService(serviceId, status)
     handleClose();
@@ -326,6 +422,10 @@ const AdminServices = () => {
     page * rowsPerPage,
     page * rowsPerPage + rowsPerPage
   );
+
+  const unassignedFilteredIds = filteredEnquiries
+    .filter((e) => !isEnquiryAssigned(e))
+    .map((e) => e._id);
 
   return (
     <div className="p-6 bg-gradient-to-br from-[#e6fbff] to-[#f7fafd] min-h-screen">
@@ -401,6 +501,23 @@ const AdminServices = () => {
         </button> : null}
       </div>
 
+      {auth?.user?.role === 1 && hasPermission('serviceEnquiries') && activeTab === 'new' ? (
+        <div className="mb-4 w-[83%] flex justify-end">
+          <button
+            type="button"
+            onClick={() => handleAutoAssignEnquiries(unassignedFilteredIds)}
+            disabled={unassignedFilteredIds.length === 0 || autoAssigning}
+            className={`p-2 px-4 rounded-md text-white font-semibold transition
+              ${unassignedFilteredIds.length === 0 || autoAssigning
+                ? 'bg-gray-400 cursor-not-allowed'
+                : 'bg-[#019ee3] hover:opacity-90'
+              }`}
+          >
+            {autoAssigning ? 'Assigning…' : 'Auto Assign'}
+          </button>
+        </div>
+      ) : null}
+
       <div className="overflow-x-auto bg-white rounded-xl shadow p-4 w-[83%]">
         <table className="w-[80%] text-sm">
           <thead>
@@ -408,6 +525,7 @@ const AdminServices = () => {
               {hasPermission("serviceEnquiries") ? <th className="py-2 px-3 text-left">Action</th> : null}
               {/* <th className="py-2 px-3 text-left">Assigned To</th> */}
               <th className="py-2 px-3 text-left">Assigned Employee</th>
+              <th className="py-2 px-3 text-left">Pincode</th>
               <th className="py-2 px-3 text-left">Customer Type</th>
               <th className="py-2 px-3 text-left">{isAdmin ? 'Phone' : 'Call'}</th>
               <th className="py-2 px-3 text-left">Company Name</th>
@@ -426,7 +544,7 @@ const AdminServices = () => {
           <tbody>
             {paginatedEnquiries.length === 0 ? (
               <tr>
-                <td colSpan={16} className="text-center py-6 text-gray-400">No service enquiries found.</td>
+                <td colSpan={17} className="text-center py-6 text-gray-400">No service enquiries found.</td>
               </tr>
             ) : (
               paginatedEnquiries.map(enquiry => (
@@ -472,6 +590,12 @@ const AdminServices = () => {
                       <MenuItem onClick={() => handleGatePass(enquiry._id, enquiry.employeeId, enquiry?.companyId)}>
                         <DescriptionIcon sx={{ mr: 1 }} /> Gate Pass
                       </MenuItem>
+                      <MenuItem onClick={() => handleDeliveryChallan(enquiry._id, enquiry.employeeId, enquiry?.companyId)}>
+                        <DescriptionIcon sx={{ mr: 1 }} /> Delivery Challan (DC Copy)
+                      </MenuItem>
+                      <MenuItem onClick={() => handleReturnableChallan(enquiry._id, enquiry.employeeId, enquiry?.companyId)}>
+                        <DescriptionIcon sx={{ mr: 1 }} /> Returnable Challan
+                      </MenuItem>
                       {auth?.user?.role === 1 ? (
                         <MenuItem onClick={() => handleMoveStatus(currentServiceIdForMenu, "Cancelled")}>
                           <ArrowForwardIcon sx={{ mr: 1 }} /> Move To Unwanted Tab
@@ -514,14 +638,23 @@ const AdminServices = () => {
                         disabled={auth?.user?.role === 1 ? false : true}
                       >
                         <option value="">-- Select Employee --</option>
-                        {employees?.map(employee => (
+                        {serviceEmployees?.map(employee => (
                           <option key={employee.userId} value={employee.userId}>
                             {employee.name}
                           </option>
                         ))}
                       </select>
                     )}
+                    {!enquiry.employeeId && (
+                      <span className="block text-xs text-gray-500 mt-1">
+                        Suggested
+                        {getSuggestedEmployee(enquiry)
+                          ? ` → ${getSuggestedEmployee(enquiry).name}`
+                          : ' (no match)'}
+                      </span>
+                    )}
                   </td>
+                  <td className="py-2 px-3">{enquiry.pincode || '—'}</td>
                   <td className="py-2 px-3">{enquiry.customerType}</td>
                   <td className="py-2 px-3">
                     {isAdmin ? (

@@ -490,79 +490,91 @@ const AddServiceInvoice = () => {
         }
     };
 
+    const resolvePartnerProfit = (lineItem, tableProduct) => {
+        const productRef = lineItem?.productId;
+        if (productRef && typeof productRef === 'object' && productRef.commission != null) {
+            return Number(productRef.commission) || 0;
+        }
+        const productId = productRef?._id || productRef || tableProduct?.productId;
+        const fromCatalog = availableProducts.find((p) => p._id === productId);
+        return Number(fromCatalog?.commission ?? 0);
+    };
+
     const updateCommissionDetails = async (invoice) => {
+        if (invoice?.invoiceType === 'quotation') return;
 
         try {
-            let totalCommissionAmount = 0;
-            let percentageRate = 0; // Default or first product's commission percentage
+            const lines = invoice?.products?.length
+                ? invoice.products
+                : productsInTable.map((product) => ({
+                    productId: product.productId,
+                    quantity: product.quantity,
+                }));
 
-            if (invoice?.products && invoice.products.length > 0) {
-                // Calculate total commission amount by summing commissions from all products
-                totalCommissionAmount = invoice.products.reduce((sum, product) => {
-                    // Ensure productId and commission exist and are numbers
-                    if (product.productId && typeof product.productId.commission === 'number') {
-                        return sum + (product.totalAmount * (product.productId.commission / 100));
-                    }
-                    return sum;
-                }, 0);
+            for (const line of lines) {
+                const tableProduct = productsInTable.find(
+                    (product) => String(product.productId) === String(line.productId?._id || line.productId)
+                );
+                const productId = line.productId?._id || line.productId || tableProduct?.productId;
+                if (!productId) continue;
 
-                // Set percentageRate from the first product's commission, if available.
-                // Note: If products have different commission percentages, this single field
-                // might not accurately reflect all product commissions.
-                if (invoice.products[0].productId && typeof invoice.products[0].productId.commission === 'number') {
-                    percentageRate = invoice.products[0].productId.commission;
-                }
-            }
+                const partnerProfit = resolvePartnerProfit(line, tableProduct);
+                const quantity = Number(line.quantity ?? tableProduct?.quantity ?? 0);
+                const commissionAmount = quantity * partnerProfit;
 
-            const apiParams = {
-                commissionFrom: "Service",
-                userId: auth?.user?._id,
-                companyId: invoice?.companyId?._id,
-                serviceInvoiceId: invoice?._id,
-                commissionAmount: totalCommissionAmount, // Calculated dynamically
-                percentageRate: percentageRate, // Derived from first product's commission
-            }
-            const payment = await axios.post(
-                `${import.meta.env.VITE_SERVER_URL
-                }/api/v1/commissions`,
-                apiParams,
-                {
-                    headers: {
-                        Authorization: auth?.token,
+                await axios.post(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/commissions`,
+                    {
+                        commissionFrom: 'Service',
+                        userId: auth?.user?._id,
+                        companyId: invoice?.companyId?._id || invoice?.companyId,
+                        serviceInvoiceId: invoice?._id,
+                        productId,
+                        commissionAmount,
+                        percentageRate: partnerProfit,
                     },
-                }
-            );
-
+                    {
+                        headers: {
+                            Authorization: auth?.token,
+                        },
+                    }
+                );
+            }
         } catch (error) {
             console.log(error);
         }
-    }
+    };
+    const resolveBenefitQuantity = (product) => {
+        if (product.benefitQuantity !== '' && product.benefitQuantity != null) {
+            return Number(product.benefitQuantity);
+        }
+        return Number(product.quantity || 0);
+    };
+
     const updateEmployeeBenefit = async (invoice) => {
         try {
             for (const product of productsInTable) {
-                if (product.reInstall === true || product.otherProducts !== '') {
-                    const apiParams = {
-                        employeeId: invoice?.assignedTo?._id, // or employeeName if needed
-                        invoiceId: invoice?._id,
-                        productId: product.productId,
-                        quantity: product.benefitQuantity === '' || product.benefitQuantity == null ? 0 : Number(product.benefitQuantity),
-                        reInstall: product.reInstall || false,
-                        otherProducts: product.otherProducts || null,
-                    };
+                const apiParams = {
+                    employeeId: invoice?.assignedTo?._id,
+                    invoiceId: invoice?._id,
+                    productId: product.productId,
+                    quantity: resolveBenefitQuantity(product),
+                    reInstall: product.reInstall === true,
+                    otherProducts: product.otherProducts || '',
+                };
 
-                    const { data } = await axios.post(
-                        `${import.meta.env.VITE_SERVER_URL}/api/v1/employee-benefits`,
-                        apiParams, // ✅ send object directly, not wrapped in { apiParams }
-                        {
-                            headers: {
-                                Authorization: auth.token,
-                            },
-                        }
-                    );
-
-                    if (data?.success) {
-                        console.log("Benefit updated:", data.message);
+                const { data } = await axios.post(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/employee-benefits`,
+                    apiParams,
+                    {
+                        headers: {
+                            Authorization: auth.token,
+                        },
                     }
+                );
+
+                if (data?.success) {
+                    console.log("Benefit updated:", data.message);
                 }
             }
             alert("All benefits updated successfully!");

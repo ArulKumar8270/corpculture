@@ -738,66 +738,88 @@ const AddServiceInvoiceScreen = () => {
     }
   };
 
+  const resolvePartnerProfit = (lineItem: any, tableProduct?: ProductInTable) => {
+    const productRef = lineItem?.productId;
+    if (productRef && typeof productRef === 'object' && productRef.commission != null) {
+      return Number(productRef.commission) || 0;
+    }
+    const productId = productRef?._id || productRef || tableProduct?.productId;
+    const fromCatalog = availableProducts.find((p) => p._id === productId);
+    const fromOriginal = tableProduct?.originalProduct;
+    return Number(fromCatalog?.commission ?? fromOriginal?.commission ?? 0);
+  };
+
   const updateCommissionDetails = async (invoice: any) => {
+    if (invoice?.invoiceType === 'quotation') return;
+
     try {
-      let totalCommissionAmount = 0;
-      let percentageRate = 0;
+      const lines = invoice?.products?.length
+        ? invoice.products
+        : productsInTable.map((product) => ({
+            productId: product.productId,
+            quantity: product.quantity,
+          }));
 
-      if (invoice?.products && invoice.products.length > 0) {
-        totalCommissionAmount = invoice.products.reduce((sum: number, product: any) => {
-          if (product.productId && typeof product.productId.commission === 'number') {
-            return sum + product.totalAmount * (product.productId.commission / 100);
-          }
-          return sum;
-        }, 0);
+      for (const line of lines) {
+        const tableProduct = productsInTable.find(
+          (product) => String(product.productId) === String(line.productId?._id || line.productId)
+        );
+        const productId = line.productId?._id || line.productId || tableProduct?.productId;
+        if (!productId) continue;
 
-        if (invoice.products[0].productId && typeof invoice.products[0].productId.commission === 'number') {
-          percentageRate = invoice.products[0].productId.commission;
-        }
-      }
+        const partnerProfit = resolvePartnerProfit(line, tableProduct);
+        const quantity = Number(line.quantity ?? tableProduct?.quantity ?? 0);
+        const commissionAmount = quantity * partnerProfit;
 
-      await axios.post(
-        `${getApiBaseUrl()}/commissions`,
-        {
-          commissionFrom: 'Service',
-          userId: user?._id,
-          companyId: invoice?.companyId?._id,
-          serviceInvoiceId: invoice?._id,
-          commissionAmount: totalCommissionAmount,
-          percentageRate: percentageRate,
-        },
-        {
-          headers: {
-            Authorization: token || '',
+        await axios.post(
+          `${getApiBaseUrl()}/commissions`,
+          {
+            commissionFrom: 'Service',
+            userId: user?._id,
+            companyId: invoice?.companyId?._id || invoice?.companyId,
+            serviceInvoiceId: invoice?._id,
+            productId,
+            commissionAmount,
+            percentageRate: partnerProfit,
           },
-        }
-      );
+          {
+            headers: {
+              Authorization: token || '',
+            },
+          }
+        );
+      }
     } catch (error) {
       console.error('Error updating commission details:', error);
     }
   };
 
+  const resolveBenefitQuantity = (product: ProductInTable) => {
+    if (product.benefitQuantity != null) {
+      return Number(product.benefitQuantity);
+    }
+    return Number(product.quantity || 0);
+  };
+
   const updateEmployeeBenefit = async (invoice: any) => {
     try {
       for (const product of productsInTable) {
-        if (product.reInstall === true || product.otherProducts) {
-          await axios.post(
-            `${getApiBaseUrl()}/employee-benefits`,
-            {
-              employeeId: invoice?.assignedTo?._id,
-              invoiceId: invoice?._id,
-              productId: product.productId,
-              quantity: product.benefitQuantity,
-              reInstall: product.reInstall || false,
-              otherProducts: product.otherProducts || null,
+        await axios.post(
+          `${getApiBaseUrl()}/employee-benefits`,
+          {
+            employeeId: invoice?.assignedTo?._id,
+            invoiceId: invoice?._id,
+            productId: product.productId,
+            quantity: resolveBenefitQuantity(product),
+            reInstall: product.reInstall === true,
+            otherProducts: product.otherProducts || '',
+          },
+          {
+            headers: {
+              Authorization: token || '',
             },
-            {
-              headers: {
-                Authorization: token || '',
-              },
-            }
-          );
-        }
+          }
+        );
       }
     } catch (error) {
       console.error('Error updating employee benefit:', error);

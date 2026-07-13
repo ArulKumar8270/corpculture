@@ -1,17 +1,24 @@
 import RentalModel from "../../models/rentalModel.js";
 import { resolveNotificationUserId } from "../../utils/resolveNotificationUserId.js";
 import { notifyAssignment } from "../../utils/expoPushNotification.js";
+import { resolveEnquiryPincode, attachEnquiryPincodes } from "../../utils/resolveEnquiryPincode.js";
+import { tryAutoAssignNewRentalEnquiry } from "../../utils/tryAutoAssignNewEnquiry.js";
 
 // Create Rental
 export const createrRental = async (req, res) => {
     try {
-        const rental = new RentalModel(req.body);
+        const body = { ...req.body };
+        body.pincode = await resolveEnquiryPincode(body);
+        const rental = new RentalModel(body);
         await rental.save();
+
+        await tryAutoAssignNewRentalEnquiry(rental);
+        const refreshed = await RentalModel.findById(rental._id);
 
         res.status(201).send({
             success: true,
             message: "Rental request created successfully",
-            rental
+            rental: refreshed || rental
         });
     } catch (error) {
         console.error("Error in rental creation:", error);
@@ -75,9 +82,10 @@ export const getAllRental = async (req, res) => {
         // Get total count of documents matching the filters (before pagination)
         const totalCount = await RentalModel.countDocuments(findQuery);
         const rental = await RentalModel.find(findQuery);
+        const rentalWithPincode = await attachEnquiryPincodes(rental);
         res.status(200).send({
             success: true,
-            rental,
+            rental: rentalWithPincode,
             totalCount
         });
     } catch (error) {

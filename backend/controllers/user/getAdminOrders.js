@@ -65,7 +65,7 @@ const getAdminOrders = async (req, res) => {
             }
         }
 
-        // Search filter (searches in order ID, buyer name, or address)
+        // Search filter (searches in serial number, buyer name, or address)
         if (search) {
             const searchRegex = { $regex: search, $options: 'i' };
             
@@ -79,8 +79,8 @@ const getAdminOrders = async (req, res) => {
             // Build search query
             const searchQuery = {
                 $or: [
-                    { _id: { $regex: search, $options: 'i' } }, // Search in order ID
-                    { 'shippingInfo.address': searchRegex } // Search in address
+                    { orderReferenceNo: searchRegex },
+                    { 'shippingInfo.address': searchRegex }
                 ]
             };
 

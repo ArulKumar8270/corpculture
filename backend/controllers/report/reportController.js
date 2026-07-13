@@ -4,13 +4,88 @@ import Counter from "../../models/counterModel.js";
 import mongoose from "mongoose";
 import { normalizeSendDetailsTo } from "../../utils/normalizeSendDetailsTo.js";
 
-/** Match service/rental reports regardless of legacy reportFor vs reportType values. */
+const DELIVERY_CHALLAN_TYPES = ["Service_Delivery_Challan", "Rental_Delivery_Challan"];
+const VALID_CONTENT_SCOPES = ["Service", "Product", "Service + Product"];
+
+const validateContentScope = (reportType, contentScope) => {
+    if (DELIVERY_CHALLAN_TYPES.includes(reportType)) {
+        if (!contentScope || !VALID_CONTENT_SCOPES.includes(String(contentScope).trim())) {
+            return "Delivery Challan (DC Copy) requires Service/Product selection (Service, Product, or Service + Product).";
+        }
+    } else if (contentScope != null && contentScope !== "" && !VALID_CONTENT_SCOPES.includes(String(contentScope).trim())) {
+        return "Invalid Service/Product selection.";
+    }
+    return null;
+};
+
+/** Match service/rental reports or gate passes by URL scope (exact type, not combined). */
 const buildReportScopeFilter = (urlScope) => {
     if (!urlScope) return null;
     const scope = String(urlScope);
-    const lower = scope.toLowerCase();
 
-    if (lower === "service" || scope === "Service_Report") {
+    const exactScopeFilters = {
+        Service_Report: {
+            $or: [
+                { reportType: "Service_Report" },
+                {
+                    reportFor: { $in: ["service", "Service_Report"] },
+                    reportType: { $nin: ["Service_Gate_Pass", "Service_Delivery_Challan", "Service_Returnable_Challan"] },
+                },
+            ],
+        },
+        Service_Gate_Pass: {
+            $or: [
+                { reportType: "Service_Gate_Pass" },
+                { reportFor: "Service_Gate_Pass" },
+            ],
+        },
+        Service_Delivery_Challan: {
+            $or: [
+                { reportType: "Service_Delivery_Challan" },
+                { reportFor: "Service_Delivery_Challan" },
+            ],
+        },
+        Service_Returnable_Challan: {
+            $or: [
+                { reportType: "Service_Returnable_Challan" },
+                { reportFor: "Service_Returnable_Challan" },
+            ],
+        },
+        Rental_Report: {
+            $or: [
+                { reportType: "Rental_Report" },
+                {
+                    reportFor: { $in: ["rental", "Rental_Report"] },
+                    reportType: { $nin: ["Rental_Gate_Pass", "Rental_Delivery_Challan", "Rental_Returnable_Challan"] },
+                },
+            ],
+        },
+        Rental_Gate_Pass: {
+            $or: [
+                { reportType: "Rental_Gate_Pass" },
+                { reportFor: "Rental_Gate_Pass" },
+            ],
+        },
+        Rental_Delivery_Challan: {
+            $or: [
+                { reportType: "Rental_Delivery_Challan" },
+                { reportFor: "Rental_Delivery_Challan" },
+            ],
+        },
+        Rental_Returnable_Challan: {
+            $or: [
+                { reportType: "Rental_Returnable_Challan" },
+                { reportFor: "Rental_Returnable_Challan" },
+            ],
+        },
+    };
+
+    if (exactScopeFilters[scope]) {
+        return exactScopeFilters[scope];
+    }
+
+    const lower = scope.toLowerCase();
+    if (lower === "service") {
         return {
             $or: [
                 { reportFor: { $in: ["service", "Service_Report", "Service_Gate_Pass"] } },
@@ -18,7 +93,7 @@ const buildReportScopeFilter = (urlScope) => {
             ],
         };
     }
-    if (lower === "rental" || scope === "Rental_Report") {
+    if (lower === "rental") {
         return {
             $or: [
                 { reportFor: { $in: ["rental", "Rental_Report", "Rental_Gate_Pass"] } },
@@ -48,6 +123,7 @@ export const createReport = async (req, res) => {
             assignedTo,
             usageData,
             description,
+            contentScope,
             materialGroups // Changed from 'materials' to 'materialGroups'
         } = req.body;
 
@@ -57,6 +133,11 @@ export const createReport = async (req, res) => {
                 success: false,
                 message: 'Missing required fields: reportType, company, problemReport, branch.',
             });
+        }
+
+        const contentScopeError = validateContentScope(reportType, contentScope);
+        if (contentScopeError) {
+            return res.status(400).send({ success: false, message: contentScopeError });
         }
 
         // Validate Company ID
@@ -110,6 +191,7 @@ export const createReport = async (req, res) => {
             assignedTo,
             usageData,
             description,
+            contentScope: contentScope ? String(contentScope).trim() : undefined,
             materialGroups: validatedMaterialGroups, // Changed from 'materials'
         });
 
@@ -281,6 +363,7 @@ export const updateReport = async (req, res) => {
             assignedTo,
             usageData,
             description,
+            contentScope,
             materialGroups, // Changed from 'materials' to 'materialGroups'
             reportLink,
         } = req.body;
@@ -288,6 +371,13 @@ export const updateReport = async (req, res) => {
         const report = await Report.findById(id);
         if (!report) {
             return res.status(404).send({ success: false, message: 'Report not found.' });
+        }
+
+        const effectiveReportType = reportType || report.reportType;
+        const effectiveContentScope = contentScope !== undefined ? contentScope : report.contentScope;
+        const contentScopeError = validateContentScope(effectiveReportType, effectiveContentScope);
+        if (contentScopeError) {
+            return res.status(400).send({ success: false, message: contentScopeError });
         }
 
         // Validate Company ID if provided in the update
@@ -338,6 +428,9 @@ export const updateReport = async (req, res) => {
                 assignedTo,
                 usageData,
                 description,
+                ...(contentScope !== undefined
+                    ? { contentScope: contentScope ? String(contentScope).trim() : null }
+                    : {}),
                 materialGroups: validatedMaterialGroups, // Changed from 'materials'
                 ...(reportLink !== undefined ? { reportLink } : {}),
             },

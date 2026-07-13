@@ -20,6 +20,10 @@ import axios from 'axios';
 import { getApiBaseUrl } from '../../services/api';
 import Toast from 'react-native-toast-message';
 import TrackerScreen from '../Sales/TrackerScreen';
+import {
+  getStoredOrderProductBaseUnit,
+  getStoredOrderProductLineTotal,
+} from '../../utils/orderAmountUtil';
 
 const OrderUpdateScreen = () => {
   const navigation = useNavigation();
@@ -224,6 +228,14 @@ const OrderUpdateScreen = () => {
         </TouchableOpacity>
       </View>
 
+      {/* Order Total */}
+      <View style={styles.section}>
+        <View style={styles.totalRow}>
+          <Text style={styles.totalLabel}>Total Amount:</Text>
+          <Text style={styles.totalAmount}>₹{Number(amount || 0).toLocaleString()}</Text>
+        </View>
+      </View>
+
       {/* Order Items */}
       {orderItems.map((item: any) => {
         const {
@@ -261,7 +273,15 @@ const OrderUpdateScreen = () => {
                 <Text style={styles.productDetail}>
                   Installation: {isInstalation ? 'Requested' : 'Not Requested'}
                 </Text>
-                <Text style={styles.productPrice}>₹{price || discountPrice || 0}</Text>
+                <Text style={styles.productPrice}>
+                  ₹{getStoredOrderProductBaseUnit(item).toLocaleString()}
+                  {quantity > 1 ? (
+                    <Text style={styles.productLineTotal}>
+                      {' '}
+                      × {quantity} = ₹{getStoredOrderProductLineTotal(item).toLocaleString()}
+                    </Text>
+                  ) : null}
+                </Text>
                 {paymentId && (
                   <Text style={styles.paymentId}>Payment Id: {paymentId}</Text>
                 )}
@@ -474,6 +494,26 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#007AFF',
     marginTop: 6,
+  },
+  productLineTotal: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#666',
+  },
+  totalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  totalLabel: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  totalAmount: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#007AFF',
   },
   paymentId: {
     fontSize: 11,

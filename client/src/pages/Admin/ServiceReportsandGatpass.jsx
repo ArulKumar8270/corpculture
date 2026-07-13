@@ -52,8 +52,11 @@ import {
     getReportEditPath,
     getReportPageTitle,
     getReportSendWebhook,
-    isGatePassReportType,
 } from '../../utils/reportNavigation';
+import {
+    isOperationalDocumentReportType,
+    getDocumentTitle,
+} from '../../utils/reportDocumentTypes';
 
 const tableHeadCellSx = { fontWeight: 700, whiteSpace: 'nowrap', bgcolor: '#f5f7fa' };
 const companyCellSx = { minWidth: 160, maxWidth: 220, whiteSpace: 'normal', wordBreak: 'break-word' };
@@ -242,7 +245,8 @@ const ServiceReportsandGatpass = (props) => {
         const reportId = report?._id;
         const serviceId = report?.serviceId?._id || report?.serviceId;
         const reportType = report?.reportType || props?.reportType;
-        const isGatePass = isGatePassReportType(reportType);
+        const isOperationalDoc = isOperationalDocumentReportType(reportType);
+        const docTitle = getDocumentTitle(reportType);
         setOnSendn8n(true)
         try {
             const res = await axios.post(getReportSendWebhook(reportType), { reportId: reportId });
@@ -258,12 +262,12 @@ const ServiceReportsandGatpass = (props) => {
                 }
             }
             if (res) {
-                toast.success(isGatePass ? 'Gate pass sent successfully' : 'Report sent successfully');
+                toast.success(isOperationalDoc ? `${docTitle} sent successfully` : 'Report sent successfully');
                 fetchReports(fromDate, toDate, companyNameFilter, assignedToFilter, serialNoFilter, page, rowsPerPage);
             }
         } catch (webhookError) {
             console.error('Error triggering webhook:', webhookError);
-            toast.error(isGatePass ? 'Failed to send gate pass' : 'Failed to send report');
+            toast.error(isOperationalDoc ? `Failed to send ${docTitle.toLowerCase()}` : 'Failed to send report');
         } finally {
             setOnSendn8n(false)
         }

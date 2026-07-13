@@ -267,11 +267,15 @@ const ServiceReportsReport = ({ type = 'service' }) => {
                                     <>
                                         <MenuItem value="Rental_Report">Rental Report</MenuItem>
                                         <MenuItem value="Rental_Gate_Pass">Rental Gate Pass</MenuItem>
+                                        <MenuItem value="Rental_Delivery_Challan">Rental Delivery Challan (DC Copy)</MenuItem>
+                                        <MenuItem value="Rental_Returnable_Challan">Rental Returnable Challan</MenuItem>
                                     </>
                                 ) : (
                                     <>
                                         <MenuItem value="Service_Report">Service Report</MenuItem>
                                         <MenuItem value="Service_Gate_Pass">Service Gate Pass</MenuItem>
+                                        <MenuItem value="Service_Delivery_Challan">Service Delivery Challan (DC Copy)</MenuItem>
+                                        <MenuItem value="Service_Returnable_Challan">Service Returnable Challan</MenuItem>
                                     </>
                                 )}
                             </Select>

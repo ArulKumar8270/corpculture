@@ -148,10 +148,18 @@ const AdminDashboard = () => {
                             <Route path="addRentalReport/:id?" element={<AddServiceReport reportType={"Rental_Report"}/>} />
                             <Route path="addServiceGatePass/:id?" element={<AddServiceReport reportType={"Service_Gate_Pass"}/>} />
                             <Route path="addRentalGatePass/:id?" element={<AddServiceReport reportType={"Rental_Gate_Pass"}/>} />
+                            <Route path="addServiceDeliveryChallan/:id?" element={<AddServiceReport reportType={"Service_Delivery_Challan"}/>} />
+                            <Route path="addRentalDeliveryChallan/:id?" element={<AddServiceReport reportType={"Rental_Delivery_Challan"}/>} />
+                            <Route path="addServiceReturnableChallan/:id?" element={<AddServiceReport reportType={"Service_Returnable_Challan"}/>} />
+                            <Route path="addRentalReturnableChallan/:id?" element={<AddServiceReport reportType={"Rental_Returnable_Challan"}/>} />
                             <Route path="serviceReportlist" element={<ServiceReportsandGatpass reportType={"Service_Report"}/>} />
                             <Route path="rentalReportlist" element={<ServiceReportsandGatpass reportType={"Rental_Report"}/>} />
                             <Route path="serviceGatePassList" element={<ServiceReportsandGatpass reportType={"Service_Gate_Pass"}/>} />
                             <Route path="rentalGatePassList" element={<ServiceReportsandGatpass reportType={"Rental_Gate_Pass"}/>} />
+                            <Route path="serviceDeliveryChallanList" element={<ServiceReportsandGatpass reportType={"Service_Delivery_Challan"}/>} />
+                            <Route path="rentalDeliveryChallanList" element={<ServiceReportsandGatpass reportType={"Rental_Delivery_Challan"}/>} />
+                            <Route path="serviceReturnableChallanList" element={<ServiceReportsandGatpass reportType={"Service_Returnable_Challan"}/>} />
+                            <Route path="rentalReturnableChallanList" element={<ServiceReportsandGatpass reportType={"Rental_Returnable_Challan"}/>} />
                             <Route path="addRentalInvoice/:id?" element={<AddRentalInvoice />} />
                             <Route path="rentalInvoiceList" element={<RentalInvoiceList invoice={"invoice"}/>} />
                             <Route path="rentalQuotationList" element={<RentalInvoiceList invoice={"quotation"}/>} />

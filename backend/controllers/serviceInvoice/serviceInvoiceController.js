@@ -6,7 +6,22 @@ import cloudinary from "cloudinary";
 import CommonDetails from "../../models/commonDetailsModel.js";
 import Counter from "../../models/counterModel.js";
 import { enrichSendTo } from "../../utils/enrichSendTo.js";
-// Helper function to calculate totals
+import { syncServiceInvoiceCommissions } from "../../utils/syncServiceInvoiceCommissions.js";
+import {
+    generateInvoiceNumber,
+    isInvoiceType,
+    isQuotationType,
+    reserveNextInvoiceNumber,
+} from "../../utils/invoiceConversionUtil.js";
+
+/** Unpaid service invoices for a company (excludes Paid, Cancelled, quotations, TDS rows). */
+const buildCompanyUnpaidInvoiceFilter = (companyId) => ({
+    companyId,
+    invoiceType: { $regex: /^invoice$/i },
+    tdsAmount: { $eq: null },
+    status: "Unpaid",
+});
+
 const calculateInvoiceTotals = (products) => {
     let subtotal = 0;
     for (const item of products) {
@@ -17,34 +32,6 @@ const calculateInvoiceTotals = (products) => {
     const tax = 0; // Example: subtotal * 0.05 for 5% tax
     const grandTotal = subtotal + tax;
     return { subtotal, tax, grandTotal };
-};
-
-// Helper function to generate invoice number based on format
-// Preserves the format structure (year, prefix, etc.) and only replaces the sequential number part
-const generateInvoiceNumber = (invoiceCount, format) => {
-    if (!format || format.trim() === '') {
-        return invoiceCount.toString();
-    }
-
-    // DO NOT replace year patterns - preserve them as-is from the format template
-    // The format template (e.g., "CC/23-24/00001") should be used as-is, only the number part changes
-    
-    // Extract the last number sequence (sequential number part) from the original format
-    const lastNumberMatch = format.match(/(\d+)(?!.*\d)/);
-    
-    if (lastNumberMatch) {
-        // Get the number of digits in the template (e.g., "00001" has 5 digits)
-        const numberDigits = lastNumberMatch[1].length;
-        // Get the prefix (everything before the last number sequence)
-        const prefix = format.substring(0, format.lastIndexOf(lastNumberMatch[1]));
-        // Format the invoice count with the same number of digits (e.g., 6 → "00006")
-        const formattedNumber = invoiceCount.toString().padStart(numberDigits, '0');
-        // Return prefix + formatted number (e.g., "CC/23-24/" + "00006" = "CC/23-24/00006")
-        return prefix + formattedNumber;
-    }
-    
-    // Fallback: append count to format if no number pattern found
-    return format + invoiceCount.toString().padStart(5, '0');
 };
 
 /** Deduped trimmed emails; prefers array from body, else legacy single string. */
@@ -300,6 +287,17 @@ export const createServiceInvoice = async (req, res) => {
             })
             .populate('assignedTo'); // Populate assignedTo user details
 
+        if (req.user?._id && populatedInvoice.invoiceType !== 'quotation') {
+            try {
+                await syncServiceInvoiceCommissions({
+                    invoice: populatedInvoice,
+                    userId: req.user._id,
+                });
+            } catch (commissionError) {
+                console.error('[Commission Sync] Error syncing service invoice commissions:', commissionError);
+            }
+        }
+
         res.status(201).send({ success: true, message: 'Service Invoice created successfully', serviceInvoice: populatedInvoice });
 
     } catch (error) {
@@ -329,9 +327,9 @@ export const getAllServiceInvoices = async (req, res) => {
         if (status) {
             query.status = status;
         }
-        // Add invoiceType filter if provided
+        // Add invoiceType filter if provided (case-insensitive for legacy data)
         if (invoiceType) {
-            query.invoiceType = invoiceType;
+            query.invoiceType = { $regex: new RegExp(`^${String(invoiceType).trim()}$`, "i") };
         }
 
         // Add invoiceNumber filter if provided
@@ -431,7 +429,11 @@ export const getServiceInvoicesAssignedTo = async (req, res) => {
 
         let query = {};
         if (invoiceType && assignedTo) {
-            query = { invoiceType, assignedTo, tdsAmount: { $eq: null } };
+            query = {
+                invoiceType: { $regex: new RegExp(`^${String(invoiceType).trim()}$`, "i") },
+                assignedTo,
+                tdsAmount: { $eq: null },
+            };
         }
         const serviceInvoices = await ServiceInvoice.find(query)
             .populate('companyId') // Populate company name
@@ -494,7 +496,29 @@ export const getServiceInvoiceById = async (req, res) => {
             invoicePayload.companyId?.contactPersons
         );
 
-        res.status(200).send({ success: true, message: 'Service Invoice fetched', serviceInvoice: invoicePayload });
+        const companyId =
+            serviceInvoice.companyId?._id ?? serviceInvoice.companyId;
+
+        let companyPendingInvoicesTotal = 0;
+        if (companyId) {
+            const [pendingSummary] = await ServiceInvoice.aggregate([
+                { $match: buildCompanyUnpaidInvoiceFilter(companyId) },
+                {
+                    $group: {
+                        _id: null,
+                        total: { $sum: { $ifNull: ["$grandTotal", 0] } },
+                    },
+                },
+            ]);
+            companyPendingInvoicesTotal = Number(pendingSummary?.total) || 0;
+        }
+
+        res.status(200).send({
+            success: true,
+            message: 'Service Invoice fetched',
+            serviceInvoice: invoicePayload,
+            companyPendingInvoicesTotal,
+        });
     } catch (error) {
         console.error("Error in getServiceInvoiceById:", error);
         res.status(500).send({ success: false, message: 'Error in getting service invoice', error });
@@ -573,42 +597,24 @@ export const updateServiceInvoice = async (req, res) => {
         }
 
         // Check if moving from quotation to invoice BEFORE updating invoiceType
-        const wasQuotation = serviceInvoice.invoiceType === 'quotation';
-        const isMovingToInvoice = invoiceType === 'invoice' && wasQuotation;
+        const wasQuotation = isQuotationType(serviceInvoice.invoiceType);
+        const wantsInvoice = isInvoiceType(invoiceType);
+        const isMovingToInvoice = wantsInvoice && wasQuotation;
         console.log(`[Material Reduction] Invoice check - Current type: ${serviceInvoice.invoiceType}, New type: ${invoiceType}, isMovingToInvoice: ${isMovingToInvoice}`);
 
-        // Generate invoice number from global settings when moving from quotation to invoice
+        // Generate invoice number when converting quotation -> invoice (atomic global count)
         let finalInvoiceNumber = invoiceNumber;
-        if (isMovingToInvoice && !invoiceNumber) {
-            // Fetch global invoice count and format
-            const commonDetails = await CommonDetails.findOne({});
-            
-            if (!commonDetails) {
-                return res.status(500).send({ 
-                    success: false, 
-                    message: 'Global invoice settings not found. Please configure invoice settings first.' 
+        if (isMovingToInvoice) {
+            try {
+                finalInvoiceNumber = await reserveNextInvoiceNumber();
+                console.log(`[Move to Invoice] Reserved invoice number: ${finalInvoiceNumber}`);
+            } catch (reserveError) {
+                console.error("[Move to Invoice] Failed to reserve invoice number:", reserveError);
+                return res.status(500).send({
+                    success: false,
+                    message: reserveError.message || "Failed to generate invoice number.",
                 });
             }
-
-            const globalFormat = commonDetails.globalInvoiceFormat || '';
-            
-            // Use the stored invoiceCount from DB (this is the actual current count)
-            // The format is just a template - we preserve its structure (year, prefix) but use DB count
-            let currentCount = typeof commonDetails.invoiceCount === 'number' 
-                ? commonDetails.invoiceCount 
-                : parseInt(commonDetails.invoiceCount) || 0;
-            
-            console.log(`[Move to Invoice] Using stored invoiceCount from DB: ${currentCount}`);
-            console.log(`[Move to Invoice] Global format template: "${globalFormat}"`);
-            console.log(`[Move to Invoice] Format will be preserved (year, prefix) - only number will be replaced`);
-            
-            // Use currentCount + 1 for the next invoice number
-            const nextInvoiceCount = currentCount + 1;
-            
-            // Generate invoice number from global count and format
-            finalInvoiceNumber = generateInvoiceNumber(nextInvoiceCount, globalFormat);
-            
-            console.log(`[Move to Invoice] Global count: ${currentCount}, Next count: ${nextInvoiceCount}, Format: ${globalFormat}, Generated: ${finalInvoiceNumber}`);
         }
 
         // Update fields if provided
@@ -686,7 +692,9 @@ export const updateServiceInvoice = async (req, res) => {
         }
         if (sendTo) serviceInvoice.sendTo = sendTo;
         if (staus) serviceInvoice.staus = staus;
-        if (invoiceType) serviceInvoice.invoiceType = invoiceType;
+        if (wantsInvoice) serviceInvoice.invoiceType = "invoice";
+        else if (isQuotationType(invoiceType)) serviceInvoice.invoiceType = "quotation";
+        else if (invoiceType) serviceInvoice.invoiceType = invoiceType;
         if (serviceId) serviceInvoice.serviceId = serviceId;
         if (paymentAmount) serviceInvoice.paymentAmount = paymentAmount;
         // Use finalInvoiceNumber (generated from global count if moving to invoice) or provided invoiceNumber
@@ -710,21 +718,7 @@ export const updateServiceInvoice = async (req, res) => {
 
         await serviceInvoice.save();
 
-        // Increment global invoice count when moving from quotation to invoice
-        if (isMovingToInvoice && finalInvoiceNumber) {
-            try {
-                await CommonDetails.findOneAndUpdate(
-                    {},
-                    { $inc: { invoiceCount: 1 } },
-                    { new: true, upsert: true }
-                );
-            } catch (error) {
-                console.error('Error incrementing invoice count:', error);
-                // Don't fail the request if count increment fails
-            }
-        }
-
-        // Reduce material units when moving from quotation to invoice
+        // Invoice count already incremented atomically during reserveNextInvoiceNumber()
         if (isMovingToInvoice && serviceInvoice.products && serviceInvoice.products.length > 0) {
             console.log(`[Material Reduction] Starting material reduction for ${serviceInvoice.products.length} products`);
             try {
@@ -811,7 +805,18 @@ export const updateServiceInvoice = async (req, res) => {
                     // Material model doesn't have nested productName, so no further populate needed
                 },
             ],
-        })
+        });
+
+        if (req.user?._id && updatedInvoice.invoiceType !== 'quotation') {
+            try {
+                await syncServiceInvoiceCommissions({
+                    invoice: updatedInvoice,
+                    userId: req.user._id,
+                });
+            } catch (commissionError) {
+                console.error('[Commission Sync] Error syncing service invoice commissions:', commissionError);
+            }
+        }
 
         res.status(200).send({
             success: true,

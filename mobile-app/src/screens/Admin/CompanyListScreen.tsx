@@ -18,6 +18,15 @@ import axios from 'axios';
 import Toast from 'react-native-toast-message';
 import { usePermissions } from '../../hooks/usePermissions';
 import { getApiBaseUrl } from '../../services/api';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
+
+let XLSX: any;
+try {
+  XLSX = require('xlsx');
+} catch {
+  // xlsx optional
+}
 
 const CompanyListScreen = () => {
   const navigation = useNavigation();
@@ -31,6 +40,7 @@ const CompanyListScreen = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [totalCount, setTotalCount] = useState(0);
+  const [exportingExcel, setExportingExcel] = useState(false);
 
   useEffect(() => {
     setPage(0);
@@ -102,6 +112,102 @@ const CompanyListScreen = () => {
     setSearchQuery('');
     setAppliedSearch('');
     setPage(0);
+  };
+
+  const formatContactPersons = (contactPersons: any[] = []) => {
+    if (!contactPersons.length) return '';
+    return contactPersons
+      .map((cp) => [cp.name, cp.mobile, cp.email, cp.designation].filter(Boolean).join(' / '))
+      .join('; ');
+  };
+
+  const formatDeliveryAddresses = (addresses: any[] = []) => {
+    if (!addresses.length) return '';
+    return addresses
+      .map((addr) => [addr.address, addr.pincode].filter(Boolean).join(' - '))
+      .join('; ');
+  };
+
+  const fetchAllCompaniesForExport = async () => {
+    const queryParams = new URLSearchParams({
+      page: '1',
+      limit: '0',
+      search: appliedSearch || '',
+      skipCounts: 'true',
+    }).toString();
+
+    const response = await axios.get(`${getApiBaseUrl()}/company/all?${queryParams}`, {
+      headers: { Authorization: token || '' },
+      timeout: 60000,
+    });
+
+    if (!response.data?.success) {
+      throw new Error(response.data?.message || 'Failed to fetch companies for export.');
+    }
+
+    return response.data.companies || [];
+  };
+
+  const handleDownloadExcel = async () => {
+    if (!XLSX) {
+      Toast.show({ type: 'error', text1: 'Excel export requires the xlsx library.' });
+      return;
+    }
+    if (totalCount === 0) {
+      Toast.show({ type: 'error', text1: 'No companies to export.' });
+      return;
+    }
+
+    try {
+      setExportingExcel(true);
+      const allCompanies = await fetchAllCompaniesForExport();
+      if (!allCompanies.length) {
+        Toast.show({ type: 'error', text1: 'No companies to export.' });
+        return;
+      }
+
+      const rows = allCompanies.map((company: any, index: number) => ({
+        'S.No': index + 1,
+        'Company Name': company.companyName || '',
+        'Billing Address': company.billingAddress || '',
+        City: company.city || '',
+        State: company.state || '',
+        Pincode: company.pincode || '',
+        'GST No': company.gstNo || '',
+        'Contact Person': company.contactPersons?.[0]?.name || company.contactPerson || '',
+        'Company Mobile': company.phone || company.contactPersons?.[0]?.mobile || '',
+        'Customer Type': company.customerType || '',
+        'Invoice Type': company.invoiceType || '',
+        'All Contacts': formatContactPersons(company.contactPersons),
+        'Delivery Addresses': formatDeliveryAddresses(company.serviceDeliveryAddresses),
+        'Created At': company.createdAt
+          ? new Date(company.createdAt).toLocaleString()
+          : '',
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Companies');
+      const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      const stamp = new Date().toISOString().slice(0, 10);
+      const fileName = `companies_${stamp}.xlsx`;
+      const fileUri = `${FileSystem.cacheDirectory}${fileName}`;
+      const base64 = btoa(
+        new Uint8Array(excelBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+      );
+      await FileSystem.writeAsStringAsync(fileUri, base64, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri);
+      }
+      Toast.show({ type: 'success', text1: `Exported ${rows.length} company(ies) to Excel.` });
+    } catch (err) {
+      console.error('Excel export error:', err);
+      Toast.show({ type: 'error', text1: 'Failed to export Excel.' });
+    } finally {
+      setExportingExcel(false);
+    }
   };
 
   const renderCompany = ({ item }: { item: any }) => {
@@ -184,14 +290,33 @@ const CompanyListScreen = () => {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Company List</Text>
-        {canAdd && (
+        <View style={styles.headerActions}>
           <TouchableOpacity
-            style={styles.addButton}
-            onPress={() => (navigation as any).navigate('AddCompany')}
+            style={[
+              styles.exportButton,
+              (exportingExcel || totalCount === 0) && styles.exportButtonDisabled,
+            ]}
+            onPress={handleDownloadExcel}
+            disabled={exportingExcel || totalCount === 0}
           >
-            <Text style={styles.addButtonText}>Add New Company</Text>
+            {exportingExcel ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <>
+                <Icon name="download" size={20} color="#fff" />
+                <Text style={styles.exportButtonText}>Excel</Text>
+              </>
+            )}
           </TouchableOpacity>
-        )}
+          {canAdd && (
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={() => (navigation as any).navigate('AddCompany')}
+            >
+              <Text style={styles.addButtonText}>Add New Company</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* Search runs only after tapping Search (or keyboard search) — server matches name, GST, address, city, contacts, etc. */}
@@ -340,6 +465,28 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  exportButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#34C759',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 8,
+    gap: 6,
+  },
+  exportButtonDisabled: {
+    backgroundColor: '#ccc',
+  },
+  exportButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
   title: {
     fontSize: 24,

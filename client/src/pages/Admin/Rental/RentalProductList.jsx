@@ -8,8 +8,18 @@ import {
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import dayjs from 'dayjs';
 import { useAuth } from '../../../context/auth';
+import * as XLSX from 'xlsx';
+import { saveAs } from 'file-saver';
+
+const formatGstTypes = (gstType) => {
+    if (!Array.isArray(gstType) || gstType.length === 0) return 'N/A';
+    return gstType
+        .map((gst) => `${gst.gstType} (${gst.gstPercentage}%)`)
+        .join(', ');
+};
 
 const RentalProductList = () => {
     const navigate = useNavigate();
@@ -20,6 +30,7 @@ const RentalProductList = () => {
     const [rentalTypeFilter, setRentalTypeFilter] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
+    const [exportingExcel, setExportingExcel] = useState(false);
     const { auth, userPermissions } = useAuth();
 
     useEffect(() => {
@@ -171,6 +182,56 @@ const RentalProductList = () => {
         setCurrentPage(value);
     };
 
+    const getAssignedEmployeeName = (product) => {
+        if (product?.employeeId?.name) return product.employeeId.name;
+        const employeeId =
+            typeof product?.employeeId === 'object'
+                ? product?.employeeId?._id
+                : product?.employeeId;
+        if (!employeeId) return '';
+        return employees.find((emp) => emp._id === employeeId)?.name || '';
+    };
+
+    const handleDownloadExcel = () => {
+        if (!filteredProducts.length) {
+            toast.error('No rental products to export.');
+            return;
+        }
+        setExportingExcel(true);
+        try {
+            const rows = filteredProducts.map((product, index) => ({
+                'S.No': index + 1,
+                Company: product.company?.companyName || 'N/A',
+                'Model Name': product.modelName ?? '',
+                'Serial No': product.serialNo ?? '',
+                HSN: product.hsn ?? '',
+                'Base Price': product.basePrice ?? '',
+                'GST Type': formatGstTypes(product.gstType),
+                'Payment Date': product.paymentDate
+                    ? dayjs(product.paymentDate).format('DD/MM/YYYY')
+                    : '',
+                Commission: product.commission != null ? `${product.commission}%` : '',
+                'Assigned Employee': getAssignedEmployeeName(product) || 'None',
+                'Rental Type': product.rentalType ?? '',
+                Branch: product.branch ?? '',
+                Department: product.department ?? '',
+            }));
+            const ws = XLSX.utils.json_to_sheet(rows);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Rental Products');
+            const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+            const blob = new Blob([excelBuffer], { type: 'application/octet-stream' });
+            const stamp = new Date().toISOString().slice(0, 10);
+            saveAs(blob, `rental_products_${stamp}.xlsx`);
+            toast.success(`Exported ${rows.length} rental product(s) to Excel.`);
+        } catch (error) {
+            console.error('Excel export error:', error);
+            toast.error('Failed to export Excel.');
+        } finally {
+            setExportingExcel(false);
+        }
+    };
+
     const canEditRentalProducts = hasPermission("rentalAllProducts", "edit");
     const canDeleteRentalProducts = isAdmin || hasPermission("rentalAllProducts", "delete");
     const showActions = canEditRentalProducts || canDeleteRentalProducts;
@@ -179,14 +240,25 @@ const RentalProductList = () => {
         <div className="p-4" style={{ width: '91%' }}>
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-semibold">Rental Product List</h1>
-                {canEditRentalProducts ? <Button
-                    variant="contained"
-                    color="primary"
-                    onClick={() => navigate('../addRentalProduct')}
-                    className="bg-blue-500 hover:bg-blue-600"
-                >
-                    Add New Rental Product
-                </Button> : null}
+                <div className="flex gap-2">
+                    <Button
+                        variant="outlined"
+                        color="success"
+                        startIcon={<FileDownloadIcon />}
+                        onClick={handleDownloadExcel}
+                        disabled={exportingExcel || filteredProducts.length === 0}
+                    >
+                        {exportingExcel ? 'Preparing Excel…' : 'Download Excel'}
+                    </Button>
+                    {canEditRentalProducts ? <Button
+                        variant="contained"
+                        color="primary"
+                        onClick={() => navigate('../addRentalProduct')}
+                        className="bg-blue-500 hover:bg-blue-600"
+                    >
+                        Add New Rental Product
+                    </Button> : null}
+                </div>
             </div>
 
             {/* Search Input */}

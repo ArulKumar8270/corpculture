@@ -1,6 +1,10 @@
 import Credit from "../../models/creditModel.js";
 import Company from "../../models/companyModel.js";
 import mongoose from "mongoose";
+import {
+    computeCompanyCreditSummary,
+    userCanAccessCompany,
+} from "../../utils/companyCreditUtil.js";
 
 // Create Credit
 export const createCredit = async (req, res) => {
@@ -179,27 +183,7 @@ export const getCreditsByCompany = async (req, res) => {
             .limit(parseInt(limit));
 
         // Calculate total credit amount for the company
-        const totalCreditResult = await Credit.aggregate([
-            { $match: { companyId: new mongoose.Types.ObjectId(companyId) } },
-            {
-                $group: {
-                    _id: '$creditType',
-                    total: { $sum: '$amount' }
-                }
-            }
-        ]);
-
-        let totalGiven = 0;
-        let totalUsed = 0;
-        let totalAdjusted = 0;
-
-        totalCreditResult.forEach(item => {
-            if (item._id === 'Given') totalGiven = item.total;
-            else if (item._id === 'Used') totalUsed = item.total;
-            else if (item._id === 'Adjusted') totalAdjusted = item.total;
-        });
-
-        const availableCredit = totalGiven - totalUsed + totalAdjusted;
+        const summary = await computeCompanyCreditSummary(companyId);
 
         res.status(200).send({
             success: true,
@@ -208,12 +192,7 @@ export const getCreditsByCompany = async (req, res) => {
             page: parseInt(page),
             limit: parseInt(limit),
             totalPages: Math.ceil(totalCount / parseInt(limit)),
-            summary: {
-                totalGiven,
-                totalUsed,
-                totalAdjusted,
-                availableCredit
-            }
+            summary,
         });
     } catch (error) {
         console.error("Error in getting company credits:", error);
@@ -221,6 +200,43 @@ export const getCreditsByCompany = async (req, res) => {
             success: false,
             message: "Error in getting company credits",
             error: error.message
+        });
+    }
+};
+
+// Get available credit balance for logged-in user's company
+export const getMyCompanyCreditBalance = async (req, res) => {
+    try {
+        const { companyId } = req.query;
+
+        if (!companyId || !mongoose.Types.ObjectId.isValid(companyId)) {
+            return res.status(400).send({
+                success: false,
+                message: "Valid company ID is required",
+            });
+        }
+
+        const canAccess = await userCanAccessCompany(req.user, companyId);
+        if (!canAccess) {
+            return res.status(403).send({
+                success: false,
+                message: "You do not have access to this company's credit",
+            });
+        }
+
+        const summary = await computeCompanyCreditSummary(companyId);
+
+        res.status(200).send({
+            success: true,
+            companyId,
+            summary,
+        });
+    } catch (error) {
+        console.error("Error in getting company credit balance:", error);
+        res.status(500).send({
+            success: false,
+            message: "Error in getting company credit balance",
+            error: error.message,
         });
     }
 };

@@ -8,6 +8,10 @@ import { useAuth } from "../../context/auth";
 import ArrowBackIosIcon from "@mui/icons-material/ArrowBackIos";
 import { FormControl, InputLabel, MenuItem, Select } from "@mui/material";
 import SeoData from "../../SEO/SeoData";
+import {
+    getStoredOrderProductBaseUnit,
+    getStoredOrderProductLineTotal,
+} from "../../utils/functions";
 
 const UpdateOrders = () => {
     const params = useParams();
@@ -246,7 +250,14 @@ const UpdateOrders = () => {
                                                 </p>
                                                 <span className="font-medium">
                                                     ₹
-                                                    {price}
+                                                    {getStoredOrderProductBaseUnit(item).toLocaleString()}
+                                                    {quantity > 1 ? (
+                                                        <span className="text-xs text-gray-600">
+                                                            {" "}
+                                                            × {quantity} = ₹
+                                                            {getStoredOrderProductLineTotal(item).toLocaleString()}
+                                                        </span>
+                                                    ) : null}
                                                 </span>
                                                 <span className="text-xs text-gray-600">
                                                     Payment Id: {paymentId}

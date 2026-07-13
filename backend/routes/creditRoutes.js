@@ -5,6 +5,7 @@ import {
     getAllCredits,
     getCreditById,
     getCreditsByCompany,
+    getMyCompanyCreditBalance,
     updateCredit,
     deleteCredit
 } from "../controllers/credit/creditController.js";
@@ -13,6 +14,9 @@ const router = express.Router();
 
 // Create Credit || POST
 router.post("/create", requireSignIn, isAdminOrEmployee, createCredit);
+
+// Get available credit for logged-in company user || GET
+router.get("/balance", requireSignIn, getMyCompanyCreditBalance);
 
 // Get All Credits || GET
 router.get("/all", requireSignIn, isAdminOrEmployee, getAllCredits);

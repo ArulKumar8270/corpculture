@@ -28,7 +28,11 @@ export const collectReportSerialNumbers = (report) => {
     return serials.size > 0 ? Array.from(serials).join(', ') : '—';
 };
 
+import { REPORT_TYPE_LABELS } from './reportNavigation';
+
 export const formatReportTypeLabel = (type) =>
+    REPORT_TYPE_LABELS[type] ||
     String(type || '')
         .replace(/_/g, ' ')
-        .replace(/\b\w/g, (c) => c.toUpperCase()) || 'Report';
+        .replace(/\b\w/g, (c) => c.toUpperCase()) ||
+    'Report';

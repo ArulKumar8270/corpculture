@@ -1,13 +1,18 @@
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { CommonActions } from '@react-navigation/native';
 import api from './api';
+import type { RootNavigationRef } from '../context/RootNavigationContext';
 
 export type AssignmentNotificationType =
   | 'service_enquiry'
   | 'rental_enquiry'
   | 'sales_order';
+
+const PUSH_TOKEN_STORAGE_KEY = 'expoPushToken';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -66,17 +71,38 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
 }
 
 export async function registerPushTokenWithServer(pushToken: string): Promise<void> {
+  await api.post('/notification/register-token', { pushToken });
+}
+
+export async function unregisterPushTokenFromServer(pushToken: string): Promise<void> {
   try {
-    await api.post('/notification/register-token', { pushToken });
+    await api.post('/notification/remove-token', { pushToken });
   } catch (error) {
-    console.error('Failed to register push token with server:', error);
+    console.error('Failed to remove push token from server:', error);
   }
 }
 
 export async function setupPushNotificationsForUser(): Promise<void> {
-  const pushToken = await registerForPushNotificationsAsync();
-  if (pushToken) {
+  try {
+    const pushToken = await registerForPushNotificationsAsync();
+    if (!pushToken) return;
+
     await registerPushTokenWithServer(pushToken);
+    await AsyncStorage.setItem(PUSH_TOKEN_STORAGE_KEY, pushToken);
+  } catch (error) {
+    console.error('Push notification setup failed:', error);
+  }
+}
+
+export async function cleanupPushNotificationsOnLogout(): Promise<void> {
+  try {
+    const cached = await AsyncStorage.getItem(PUSH_TOKEN_STORAGE_KEY);
+    if (cached) {
+      await unregisterPushTokenFromServer(cached);
+      await AsyncStorage.removeItem(PUSH_TOKEN_STORAGE_KEY);
+    }
+  } catch (error) {
+    console.error('Push notification cleanup failed:', error);
   }
 }
 
@@ -119,18 +145,29 @@ export function getNavigationTarget(
   }
 }
 
-export function subscribeToNotificationResponses(
-  onNavigate: (screen: string, params?: Record<string, unknown>) => void
+export function navigateFromNotification(
+  navigationRef: RootNavigationRef,
+  screen: string,
+  params?: Record<string, unknown>
 ) {
+  const target = getNavigationTarget(screen, params);
+  navigationRef.current?.dispatch(
+    CommonActions.navigate({
+      name: target.name,
+      params: target.params,
+    })
+  );
+}
+
+export function subscribeToNotificationResponses(navigationRef: RootNavigationRef) {
   const handleResponse = (response: Notifications.NotificationResponse) => {
     const data = response.notification.request.content.data as Record<string, unknown>;
     const screen = getScreenFromNotificationData(data);
-    if (screen) {
-      const params =
-        data?.entityId != null ? { highlightId: String(data.entityId) } : undefined;
-      const target = getNavigationTarget(screen, params);
-      onNavigate(target.name, target.params);
-    }
+    if (!screen) return;
+
+    const params =
+      data?.entityId != null ? { highlightId: String(data.entityId) } : undefined;
+    navigateFromNotification(navigationRef, screen, params);
   };
 
   const subscription = Notifications.addNotificationResponseReceivedListener(handleResponse);
@@ -138,6 +175,34 @@ export function subscribeToNotificationResponses(
   Notifications.getLastNotificationResponseAsync().then((response) => {
     if (response) {
       handleResponse(response);
+    }
+  });
+
+  return () => subscription.remove();
+}
+
+export function subscribeToForegroundNotifications(
+  onNotification: (title: string, body: string) => void
+) {
+  const subscription = Notifications.addNotificationReceivedListener((notification) => {
+    const title = notification.request.content.title || 'New assignment';
+    const body = notification.request.content.body || '';
+    onNotification(title, body);
+  });
+
+  return () => subscription.remove();
+}
+
+/** Re-register push token when app returns to foreground (token can rotate). */
+export function subscribeToAppStatePushRefresh(
+  enabled: boolean,
+  onRefresh: () => void
+) {
+  if (!enabled) return () => undefined;
+
+  const subscription = AppState.addEventListener('change', (nextState) => {
+    if (nextState === 'active') {
+      onRefresh();
     }
   });
 

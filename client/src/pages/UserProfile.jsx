@@ -27,6 +27,11 @@ import {
     CircularProgress,
 } from "@mui/material";
 import qrCode from "../assets/images/qrCode.png";
+import {
+    formatCommissionAmount,
+    getCommissionReferenceLabel,
+    getCommissionProductLabel,
+} from "../utils/commissionDisplay";
 
 const UserProfile = () => {
     const { auth, setAuth } = useAuth();
@@ -54,6 +59,9 @@ const UserProfile = () => {
     const [selectedInvoiceId, setSelectedInvoiceId] = useState(null);
     const [balanceAmount, setBalanceAmount] = useState(0);
     const [pendingAmount, setPendingAmount] = useState(0);
+    const [commissions, setCommissions] = useState([]);
+    const [commissionSummary, setCommissionSummary] = useState(null);
+    const [loadingCommissions, setLoadingCommissions] = useState(false);
     const [paymentForm, setPaymentForm] = useState({
         modeOfPayment: "",
         bankName: "",
@@ -95,6 +103,28 @@ const UserProfile = () => {
         };
         fetchEmployeeData();
     }, [auth?.user?._id, auth?.token]);
+
+    useEffect(() => {
+        const fetchMyCommissions = async () => {
+            if (!auth?.token || Number(auth?.user?.role) !== 0) return;
+            try {
+                setLoadingCommissions(true);
+                const { data } = await axios.get(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/commissions/me`,
+                    { headers: { Authorization: auth.token } }
+                );
+                if (data?.success) {
+                    setCommissions(data.commissions || []);
+                    setCommissionSummary(data.summary || null);
+                }
+            } catch (error) {
+                console.error("Error fetching commissions:", error);
+            } finally {
+                setLoadingCommissions(false);
+            }
+        };
+        fetchMyCommissions();
+    }, [auth?.token, auth?.user?.role]);
 
     // Fetch companies
     useEffect(() => {
@@ -1349,6 +1379,86 @@ const UserProfile = () => {
                         )}
                     </div>
                 </div>
+
+                {/* My Commission */}
+                {Number(auth?.user?.role) === 0 ? (
+                    <div className="w-full bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                        <h3 className="text-xl font-bold text-gray-800 mb-4">My Commission</h3>
+                        {loadingCommissions ? (
+                            <div className="flex justify-center py-6">
+                                <CircularProgress size={28} />
+                            </div>
+                        ) : (
+                            <>
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                                    <div className="rounded-lg bg-green-50 border border-green-100 p-4">
+                                        <p className="text-sm text-gray-600">Total Earned</p>
+                                        <p className="text-2xl font-bold text-green-700">
+                                            {formatCommissionAmount(commissionSummary?.totalEarned)}
+                                        </p>
+                                    </div>
+                                    <div className="rounded-lg bg-blue-50 border border-blue-100 p-4">
+                                        <p className="text-sm text-gray-600">Paid</p>
+                                        <p className="text-2xl font-bold text-blue-700">
+                                            {formatCommissionAmount(commissionSummary?.totalPaid)}
+                                        </p>
+                                    </div>
+                                    <div className="rounded-lg bg-amber-50 border border-amber-100 p-4">
+                                        <p className="text-sm text-gray-600">Pending</p>
+                                        <p className="text-2xl font-bold text-amber-700">
+                                            {formatCommissionAmount(commissionSummary?.totalPending)}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {commissions.length === 0 ? (
+                                    <p className="text-center text-gray-500 py-4">
+                                        No commission records yet.
+                                    </p>
+                                ) : (
+                                    <TableContainer component={Paper} sx={{ maxHeight: 360 }}>
+                                        <Table stickyHeader size="small">
+                                            <TableHead>
+                                                <TableRow>
+                                                    <TableCell>Date</TableCell>
+                                                    <TableCell>Type</TableCell>
+                                                    <TableCell>Details</TableCell>
+                                                    <TableCell>Reference</TableCell>
+                                                    <TableCell align="right">Amount</TableCell>
+                                                    <TableCell>Status</TableCell>
+                                                </TableRow>
+                                            </TableHead>
+                                            <TableBody>
+                                                {commissions.map((commission) => (
+                                                    <TableRow key={commission._id} hover>
+                                                        <TableCell>
+                                                            {commission.createdAt
+                                                                ? new Date(commission.createdAt).toLocaleDateString()
+                                                                : "—"}
+                                                        </TableCell>
+                                                        <TableCell>{commission.commissionFrom || "—"}</TableCell>
+                                                        <TableCell>{getCommissionProductLabel(commission)}</TableCell>
+                                                        <TableCell>{getCommissionReferenceLabel(commission)}</TableCell>
+                                                        <TableCell align="right" sx={{ fontWeight: 600 }}>
+                                                            {formatCommissionAmount(commission.commissionAmount)}
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Chip
+                                                                size="small"
+                                                                label={commission.isPaid ? "Paid" : "Pending"}
+                                                                color={commission.isPaid ? "success" : "warning"}
+                                                            />
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    </TableContainer>
+                                )}
+                            </>
+                        )}
+                    </div>
+                ) : null}
 
                 {/* Payment Details Update Section */}
                 <div className="bg-white rounded-lg shadow-md p-6 mt-8 w-full">

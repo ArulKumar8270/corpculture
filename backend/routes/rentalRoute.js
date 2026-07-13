@@ -10,6 +10,7 @@ import {
     getRentalByType,
     getRentalAssignedTo
 } from "../controllers/rental/rentalController.js";
+import autoAssignRentalEnquiries from "../controllers/enquiry/autoAssignRentalEnquiries.js";
 
 const router = express.Router();
 
@@ -30,6 +31,9 @@ router.get("/assignedTo/:assignedTo", getRentalAssignedTo);
 
 // Update service
 router.put("/update/:id", isAdminOrEmployee, updateRental);
+
+// Auto-assign rental enquiries by pincode
+router.patch("/auto-assign", isAdminOrEmployee, autoAssignRentalEnquiries);
 
 // Delete service
 router.delete("/delete/:id", isAdminOrEmployee, updateRental);

@@ -52,12 +52,16 @@ const AdminMenu = ({ toggleMenu }) => {
         serviceQuotation: 0,
         serviceReport: 0,
         serviceGatePass: 0,
+        serviceDeliveryChallan: 0,
+        serviceReturnableChallan: 0,
         rentalEnquiries: 0,
         rentalProduct: 0,
         rentalInvoice: 0,
         rentalQuotation: 0,
         rentalReport: 0,
         rentalGatePass: 0,
+        rentalDeliveryChallan: 0,
+        rentalReturnableChallan: 0,
     });
 
     useEffect(() => {
@@ -133,6 +137,24 @@ const AdminMenu = ({ toggleMenu }) => {
                 const serviceGatePassCount =
                     serviceGatePassRes.data?.totalCount ?? serviceGatePassRes.data?.reports?.length ?? 0;
 
+                const fetchDocCount = async (reportTypeKey) => {
+                    const q = new URLSearchParams({ reportType: reportTypeKey, page: '1', limit: '1' }).toString();
+                    const url =
+                        auth?.user?.role === 3
+                            ? `${import.meta.env.VITE_SERVER_URL}/api/v1/report/getByassigned/${auth?.user?._id}/${reportTypeKey}?${q}`
+                            : `${import.meta.env.VITE_SERVER_URL}/api/v1/report/${reportTypeKey}?${q}`;
+                    const res = await axios.get(url, config);
+                    return res.data?.totalCount ?? res.data?.reports?.length ?? 0;
+                };
+
+                const [
+                    serviceDeliveryChallanCount,
+                    serviceReturnableChallanCount,
+                ] = await Promise.all([
+                    fetchDocCount('Service_Delivery_Challan'),
+                    fetchDocCount('Service_Returnable_Challan'),
+                ]);
+
                 // Fetch Rental Enquiries count
                 const rentalEnquiriesUrl = `${import.meta.env.VITE_SERVER_URL}/api/v1/rental/${auth?.user?.role === 3 ? `assignedTo/${auth?.user?._id}` : "all"}`;
                 const rentalEnquiriesRes = await axios.get(rentalEnquiriesUrl, config);
@@ -194,6 +216,11 @@ const AdminMenu = ({ toggleMenu }) => {
                 const rentalGatePassCount =
                     rentalGatePassRes.data?.totalCount ?? rentalGatePassRes.data?.reports?.length ?? 0;
 
+                const [rentalDeliveryChallanCount, rentalReturnableChallanCount] = await Promise.all([
+                    fetchDocCount('Rental_Delivery_Challan'),
+                    fetchDocCount('Rental_Returnable_Challan'),
+                ]);
+
 
                 setRecordCounts(prevCounts => ({
                     ...prevCounts,
@@ -203,12 +230,16 @@ const AdminMenu = ({ toggleMenu }) => {
                     serviceQuotation: quotationInvoiceCount,
                     serviceReport: serviceReportCount,
                     serviceGatePass: serviceGatePassCount,
+                    serviceDeliveryChallan: serviceDeliveryChallanCount,
+                    serviceReturnableChallan: serviceReturnableChallanCount,
                     rentalEnquiries: rentalEnquiriesCount,
                     rentalProduct: rentalProductCount,
                     rentalInvoice: rentalInvoiceCount,
                     rentalQuotation: rentalQuotationCount,
                     rentalReport: rentalReportCount,
                     rentalGatePass: rentalGatePassCount,
+                    rentalDeliveryChallan: rentalDeliveryChallanCount,
+                    rentalReturnableChallan: rentalReturnableChallanCount,
                     // serviceQuotation and rentalQuotation remain unchanged as APIs were not provided.
                 }));
 
@@ -562,6 +593,34 @@ const AdminMenu = ({ toggleMenu }) => {
                                                         Gate Pass <span className="ml-2 text-xs font-normal text-gray-500 bg-gray-200 px-2 py-1 rounded-full">{recordCounts?.serviceGatePass}</span>
                                                     </div>
                                                 </NavLink>)}
+                {hasPermission('serviceDeliveryChallan') && (<NavLink
+                                                    to="./serviceDeliveryChallanList"
+                                                    onClick={scrollToTop}
+                                                    className={({ isActive }) =>
+                                                        `rounded-lg mx-2 my-1 transition-all ${isActive
+                                                            ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
+                                                            : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
+                                                        }`
+                                                    }
+                                                >
+                                                    <div className="h-10 px-8 flex items-center">
+                                                        Delivery Challan (DC Copy) <span className="ml-2 text-xs font-normal text-gray-500 bg-gray-200 px-2 py-1 rounded-full">{recordCounts?.serviceDeliveryChallan}</span>
+                                                    </div>
+                                                </NavLink>)}
+                {hasPermission('serviceReturnableChallan') && (<NavLink
+                                                    to="./serviceReturnableChallanList"
+                                                    onClick={scrollToTop}
+                                                    className={({ isActive }) =>
+                                                        `rounded-lg mx-2 my-1 transition-all ${isActive
+                                                            ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
+                                                            : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
+                                                        }`
+                                                    }
+                                                >
+                                                    <div className="h-10 px-8 flex items-center">
+                                                        Returnable Challan <span className="ml-2 text-xs font-normal text-gray-500 bg-gray-200 px-2 py-1 rounded-full">{recordCounts?.serviceReturnableChallan}</span>
+                                                    </div>
+                                                </NavLink>)}
                                                 {/* Commission under Service */}
                                                 {hasPermission('servicePartner') && (
                                                     <NavLink
@@ -696,6 +755,34 @@ const AdminMenu = ({ toggleMenu }) => {
                                                 >
                                                     <div className="h-10 px-8 flex items-center">
                                                         Gate Pass <span className="ml-2 text-xs font-normal text-gray-500 bg-gray-200 px-2 py-1 rounded-full">{recordCounts?.rentalGatePass}</span>
+                                                    </div>
+                                                </NavLink>)}
+                                                {hasPermission('rentalDeliveryChallan') && (<NavLink
+                                                    to="./rentalDeliveryChallanList"
+                                                    onClick={scrollToTop}
+                                                    className={({ isActive }) =>
+                                                        `rounded-lg mx-2 my-1 transition-all ${isActive
+                                                            ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
+                                                            : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
+                                                        }`
+                                                    }
+                                                >
+                                                    <div className="h-10 px-8 flex items-center">
+                                                        Delivery Challan (DC Copy) <span className="ml-2 text-xs font-normal text-gray-500 bg-gray-200 px-2 py-1 rounded-full">{recordCounts?.rentalDeliveryChallan}</span>
+                                                    </div>
+                                                </NavLink>)}
+                                                {hasPermission('rentalReturnableChallan') && (<NavLink
+                                                    to="./rentalReturnableChallanList"
+                                                    onClick={scrollToTop}
+                                                    className={({ isActive }) =>
+                                                        `rounded-lg mx-2 my-1 transition-all ${isActive
+                                                            ? "font-semibold text-[#019ee3] bg-[#e6fbff]"
+                                                            : "hover:bg-[#e6fbff] hover:text-[#019ee3]"
+                                                        }`
+                                                    }
+                                                >
+                                                    <div className="h-10 px-8 flex items-center">
+                                                        Returnable Challan <span className="ml-2 text-xs font-normal text-gray-500 bg-gray-200 px-2 py-1 rounded-full">{recordCounts?.rentalReturnableChallan}</span>
                                                     </div>
                                                 </NavLink>)}
                                                 {hasPermission('rentalPartners') && (

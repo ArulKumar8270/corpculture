@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useDispatch } from 'react-redux';
 import { clearAuth } from '../../store/slices/authSlice';
+import { cleanupPushNotificationsOnLogout } from '../../services/pushNotifications';
 import { clearPermissions } from '../../store/slices/permissionsSlice';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Toast from 'react-native-toast-message';
@@ -26,6 +27,7 @@ const DeactivateScreen = () => {
           onPress: async () => {
             try {
               // TODO: Call API to deactivate account
+              await cleanupPushNotificationsOnLogout();
               await AsyncStorage.removeItem('authToken');
               await AsyncStorage.removeItem('auth');
               dispatch(clearAuth());

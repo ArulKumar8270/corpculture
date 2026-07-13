@@ -42,9 +42,28 @@ const OrderSuccessScreen = () => {
   };
 
   useEffect(() => {
-    if (sessionId && cartItems.length > 0 && !hasSavedPayment) {
-      savePayment();
-    }
+    const processOrder = async () => {
+      const skipOrderId = (await AsyncStorage.getItem('skipOrderId'))?.trim();
+      if (skipOrderId && cartItems.length > 0 && !hasSavedPayment) {
+        dispatch(clearCart());
+        await AsyncStorage.removeItem('cart');
+        await AsyncStorage.removeItem('shippingInfo');
+        await AsyncStorage.removeItem('orderReferenceNo');
+        await AsyncStorage.removeItem('skipOrderId');
+        await AsyncStorage.removeItem('sessionId');
+        await AsyncStorage.removeItem('paymentMethod');
+        setHasSavedPayment(true);
+        setLoading(false);
+        return;
+      }
+
+      if (sessionId && cartItems.length > 0 && !hasSavedPayment) {
+        savePayment();
+      } else if (!sessionId) {
+        setLoading(false);
+      }
+    };
+    processOrder();
   }, [sessionId, cartItems, hasSavedPayment]);
 
   const savePayment = async () => {

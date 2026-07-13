@@ -31,6 +31,17 @@ interface Commission {
   salesInvoiceId?: string | { _id: string };
   serviceInvoiceId?: string | { _id: string };
   rentalInvoiceId?: string | { _id: string };
+  productId?: {
+    _id: string;
+    sku?: string;
+    productName?: { name?: string };
+  };
+  rentalProductId?: {
+    _id: string;
+    modelName?: string;
+    serialNo?: string;
+    commission?: number;
+  };
   commissionAmount: number;
   isPaid?: boolean;
   createdAt: string;
@@ -323,6 +334,14 @@ const CommissionScreen = () => {
                           ) : (
                             <Text style={styles.cellValue}>—</Text>
                           )}
+                        </View>
+                        <View style={styles.cell}>
+                          <Text style={styles.cellLabel}>Product</Text>
+                          <Text style={styles.cellValue}>
+                            {c.rentalProductId?.modelName
+                              ? `${c.rentalProductId.modelName}${c.rentalProductId.serialNo ? ` (${c.rentalProductId.serialNo})` : ''}`
+                              : c.productId?.productName?.name || c.productId?.sku || '—'}
+                          </Text>
                         </View>
                         <View style={styles.cell}>
                           <Text style={styles.cellLabel}>Amount</Text>

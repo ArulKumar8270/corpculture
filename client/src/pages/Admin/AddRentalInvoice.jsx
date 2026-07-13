@@ -19,7 +19,7 @@ import toast from 'react-hot-toast';
 import { useAuth } from '../../context/auth';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import ImageIcon from "@mui/icons-material/Image";
-import { getTotalRentalInvoicePayment, parseSendDetailsToForForm } from '../../utils/functions';
+import { getTotalRentalInvoicePayment, getRentalLineCommission, parseSendDetailsToForForm } from '../../utils/functions';
 const MAX_IMAGE_SIZE = 500 * 1024;
 
 const RentalInvoiceForm = () => {
@@ -990,26 +990,43 @@ const RentalInvoiceForm = () => {
 
 
     const updateCommissionDetails = async (entry) => {
+        if (entry?.invoiceType === 'quotation') return;
+
         try {
-            const totalAmountIncludingGST = getTotalRentalInvoicePayment(entry);
-            const apiParams = {
-                commissionFrom: "Rental",
-                userId: auth?.user?._id,
-                companyId: entry?.companyId?._id,
-                rentalInvoiceId: entry?._id,
-                commissionAmount: totalAmountIncludingGST.commissionAmount,
-                percentageRate: totalAmountIncludingGST?.commissionRate,
-            };
+            const lines = entry?.products?.length
+                ? entry.products
+                : entry?.machineId
+                    ? [{
+                        machineId: entry.machineId,
+                        a3Config: entry.a3Config,
+                        a4Config: entry.a4Config,
+                        a5Config: entry.a5Config,
+                    }]
+                    : [];
 
-            // Send commission API
-            const payment = await axios.post(
-                `${import.meta.env.VITE_SERVER_URL}/api/v1/commissions`,
-                apiParams,
-                { headers: { Authorization: auth?.token } }
-            );
+            for (const line of lines) {
+                const machine = line.machineId;
+                const rentalProductId = machine?._id || machine;
+                if (!rentalProductId) continue;
 
+                const { commissionAmount, commissionRate } = getRentalLineCommission(machine, line);
+
+                await axios.post(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/commissions`,
+                    {
+                        commissionFrom: 'Rental',
+                        userId: auth?.user?._id,
+                        companyId: entry?.companyId?._id || entry?.companyId,
+                        rentalInvoiceId: entry?._id,
+                        rentalProductId,
+                        commissionAmount,
+                        percentageRate: commissionRate,
+                    },
+                    { headers: { Authorization: auth?.token } }
+                );
+            }
         } catch (error) {
-            console.error("Commission calc error ❌", error);
+            console.error('Commission calc error ❌', error);
         }
     };
 

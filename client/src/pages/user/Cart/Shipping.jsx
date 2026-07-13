@@ -10,6 +10,7 @@ import { useCart } from "../../../context/cart";
 import { useAuth } from "../../../context/auth";
 import { useFrontHomeSettings } from "../../../context/frontHomeSettings";
 import { getCompanyShippingDefaults } from "../../../utils/companyShipping";
+import { computeOrderAmountFromItems } from "../../../utils/functions";
 import axios from "axios";
 
 //payment using stripe
@@ -46,7 +47,17 @@ const Shipping = () => {
     const [pincode, setPincode] = useState(shippingInfo?.pincode);
     const [phoneNo, setPhoneNo] = useState(shippingInfo?.phoneNo);
     const [orderReferenceNo, setOrderReferenceNo] = useState(storedOrderRef);
+    const [availableCredit, setAvailableCredit] = useState(0);
     const lastAppliedCompanyRef = useRef(null);
+
+    const orderTotal = computeOrderAmountFromItems(cartItems);
+    const activeCompanyId =
+        selectedCompany && selectedCompany !== "new" ? selectedCompany : null;
+    const canUseCompanyCredit =
+        sales?.creditOptionEnabled &&
+        !!activeCompanyId &&
+        availableCredit > 0;
+    const creditCoversOrder = availableCredit >= orderTotal;
 
     const applyCompanyToShipping = (company) => {
         const defaults = getCompanyShippingDefaults(company, auth?.user?.phone);
@@ -74,6 +85,35 @@ const Shipping = () => {
         lastAppliedCompanyRef.current = selectedCompany;
         applyCompanyToShipping(company);
     }, [companyDetails, selectedCompany, auth?.user?.phone]);
+
+    useEffect(() => {
+        const fetchCreditBalance = async () => {
+            if (!auth?.token || !activeCompanyId) {
+                setAvailableCredit(0);
+                if (payOnCredit) setPayOnCredit(false);
+                return;
+            }
+            try {
+                const { data } = await axios.get(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/credit/balance`,
+                    {
+                        params: { companyId: activeCompanyId },
+                        headers: { Authorization: auth.token },
+                    }
+                );
+                const balance = Number(data?.summary?.availableCredit) || 0;
+                setAvailableCredit(balance);
+                if (balance <= 0 && payOnCredit) {
+                    setPayOnCredit(false);
+                }
+            } catch (error) {
+                console.error("Error fetching credit balance:", error);
+                setAvailableCredit(0);
+                if (payOnCredit) setPayOnCredit(false);
+            }
+        };
+        fetchCreditBalance();
+    }, [auth?.token, activeCompanyId]);
 
     //stripe details
     const publishKey = import.meta.env.VITE_STRIPE_PUBLISH_KEY;
@@ -148,6 +188,20 @@ const Shipping = () => {
     const handleSkipPayment = async () => {
         const ok = validateAndStoreCheckoutInfo();
         if (!ok) return;
+
+        if (payOnCredit) {
+            if (!activeCompanyId) {
+                toast.error("Select a company to use credit");
+                return;
+            }
+            if (!creditCoversOrder) {
+                toast.error(
+                    `Insufficient credit. Available: ₹${availableCredit.toLocaleString()}, order total: ₹${orderTotal.toLocaleString()}`
+                );
+                return;
+            }
+        }
+
         try {
             const ref = (localStorage.getItem("orderReferenceNo") || "").trim();
             const ship = JSON.parse(localStorage.getItem("shippingInfo") || "null");
@@ -159,7 +213,7 @@ const Shipping = () => {
                     shippingInfo: ship,
                     orderReferenceNo: ref,
                     paymentMethod,
-                    companyId: selectedCompany && selectedCompany !== "new" ? selectedCompany : undefined,
+                    companyId: activeCompanyId || undefined,
                 },
                 {
                     headers: { Authorization: auth?.token },
@@ -328,18 +382,38 @@ const Shipping = () => {
                                     </FormControl>
                                 </div>
 
-                                {sales?.creditOptionEnabled && (
-                                    <label className="flex items-center gap-2 mt-4 cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            checked={payOnCredit}
-                                            onChange={(e) => setPayOnCredit(e.target.checked)}
-                                            className="w-4 h-4"
-                                        />
-                                        <span className="text-gray-700 font-medium">
-                                            {sales?.creditLabel || "Pay on Company Credit"}
-                                        </span>
-                                    </label>
+                                {canUseCompanyCredit && (
+                                    <div className="mt-4 p-4 rounded-lg border border-[#019ee3]/30 bg-[#e6fbff]/50">
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={payOnCredit}
+                                                onChange={(e) => setPayOnCredit(e.target.checked)}
+                                                disabled={!creditCoversOrder}
+                                                className="w-4 h-4"
+                                            />
+                                            <span className="text-gray-700 font-medium">
+                                                {sales?.creditLabel || "Pay on Company Credit"}
+                                            </span>
+                                        </label>
+                                        <p className="text-sm text-gray-600 mt-2">
+                                            Available credit:{" "}
+                                            <span className="font-semibold text-[#019ee3]">
+                                                ₹{availableCredit.toLocaleString()}
+                                            </span>
+                                        </p>
+                                        {!creditCoversOrder && (
+                                            <p className="text-sm text-red-600 mt-1">
+                                                Order total (₹{orderTotal.toLocaleString()}) exceeds available credit.
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
+
+                                {!activeCompanyId && sales?.creditOptionEnabled && (
+                                    <p className="text-sm text-gray-500 mt-4">
+                                        Select your company in profile to pay with company credit.
+                                    </p>
                                 )}
 
                                 <button
@@ -354,7 +428,7 @@ const Shipping = () => {
                                     onClick={handleSkipPayment}
                                     className="bg-gray-900 hover:bg-gray-800 w-full sm:w-[40%] py-4 px-2 text-lg font-bold text-white shadow-lg rounded-xl uppercase outline-none transition"
                                 >
-                                    Place Order (Skip Payment)
+                                    {payOnCredit ? "Place Order (Use Credit)" : "Place Order (Skip Payment)"}
                                 </button>
                             </form>
                         </div>

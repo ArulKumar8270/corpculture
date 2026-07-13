@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -23,6 +23,11 @@ import axios from 'axios';
 import { getApiBaseUrl } from '../../services/api';
 import Toast from 'react-native-toast-message';
 import { normalizeMongoId } from '../../utils/normalizeMongoId';
+import {
+  getSuggestedEnquiryEmployee,
+  isEnquiryAssigned,
+  hasEmployeeType,
+} from '../../utils/enquiryEmployeeMatcher';
 
 const RentalEnquiriesScreen = () => {
   const navigation = useNavigation();
@@ -55,6 +60,17 @@ const RentalEnquiriesScreen = () => {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const ROWS_PER_PAGE_OPTIONS = [5, 10, 25, 50, 100];
   const LIST_BOTTOM_PADDING = Platform.OS === 'ios' ? 140 : 120;
+  const [autoAssigning, setAutoAssigning] = useState(false);
+  const autoAssignAttemptedRef = useRef(new Set<string>());
+  const isEmployee = user?.role === 3;
+
+  const rentalEmployees = useMemo(
+    () => (employees || []).filter((emp) => hasEmployeeType(emp, 'Rentals')),
+    [employees]
+  );
+
+  const getSuggestedEmployee = (enquiry: any) =>
+    getSuggestedEnquiryEmployee(enquiry, rentalEmployees, 'Rentals');
 
   useEffect(() => {
     fetchEmployees();
@@ -231,6 +247,85 @@ const RentalEnquiriesScreen = () => {
     }
   };
 
+  const handleAutoAssignEnquiries = async (
+    rentalIds: string[] = [],
+    { silent = false }: { silent?: boolean } = {}
+  ) => {
+    if (isEmployee) return;
+    if (!rentalIds.length) {
+      if (!silent) Alert.alert('Error', 'No unassigned rental enquiries to auto-assign.');
+      return;
+    }
+
+    setAutoAssigning(true);
+    try {
+      const response = await axios.patch(
+        `${getApiBaseUrl()}/rental/auto-assign`,
+        { rentalId: rentalIds },
+        { headers: { Authorization: token || '' } }
+      );
+
+      const assigned = response.data?.assigned || [];
+      const failed = response.data?.failed || [];
+
+      if (assigned.length > 0) {
+        if (!silent) {
+          Toast.show({
+            type: 'success',
+            text1: 'Success',
+            text2: `Auto-assigned ${assigned.length} enquiry(s)`,
+          });
+        }
+        setAllRentalsData((prev) =>
+          prev.map((enquiry) => {
+            const match = assigned.find((a: any) => a.enquiryId === enquiry._id);
+            return match ? { ...enquiry, employeeId: match.employeeId } : enquiry;
+          })
+        );
+      }
+
+      if (failed.length > 0 && !silent) {
+        Toast.show({
+          type: 'error',
+          text1: 'Partial failure',
+          text2: `${failed.length} enquiry(s) could not be auto-assigned`,
+        });
+      }
+
+      if (assigned.length === 0 && failed.length > 0 && !silent) {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: 'No matching Rentals employee for pincode',
+        });
+      }
+    } catch (error: any) {
+      if (!silent) {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: error.response?.data?.message || 'Failed to auto-assign rental enquiries',
+        });
+      }
+    } finally {
+      setAutoAssigning(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isEmployee || !hasPermission('rentalEnquiries') || !token || loading) return;
+
+    const unassignedIds = (allRentalsData || [])
+      .filter((e) => !isEnquiryAssigned(e) && !autoAssignAttemptedRef.current.has(e._id))
+      .map((e) => e._id);
+
+    if (unassignedIds.length === 0) return;
+
+    unassignedIds.forEach((id) => autoAssignAttemptedRef.current.add(id));
+    handleAutoAssignEnquiries(unassignedIds, { silent: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allRentalsData, loading, isEmployee, token]);
+
   const updateStatusToRental = async (rentalId: string, status: string) => {
     setUpdatingRentalId(rentalId);
     try {
@@ -335,6 +430,38 @@ const RentalEnquiriesScreen = () => {
     setActionMenuVisible(null);
   };
 
+  const handleDeliveryChallan = (enquiry: any) => {
+    const employee = employees.find((emp) => emp.userId === enquiry.employeeId);
+    const employeeName = employee?.name || enquiry.employeeId;
+    const employeeUserId = employee?.userId || enquiry.employeeId;
+    const companyIdStr = normalizeMongoId(enquiry?.companyId);
+    (navigation as any).navigate('AddRentalReport', {
+      employeeName,
+      employeeId: employeeUserId,
+      reportType: 'Rental_Delivery_Challan',
+      rentalId: enquiry._id,
+      companyId: companyIdStr || undefined,
+      companyName: enquiry?.companyName,
+    });
+    setActionMenuVisible(null);
+  };
+
+  const handleReturnableChallan = (enquiry: any) => {
+    const employee = employees.find((emp) => emp.userId === enquiry.employeeId);
+    const employeeName = employee?.name || enquiry.employeeId;
+    const employeeUserId = employee?.userId || enquiry.employeeId;
+    const companyIdStr = normalizeMongoId(enquiry?.companyId);
+    (navigation as any).navigate('AddRentalReport', {
+      employeeName,
+      employeeId: employeeUserId,
+      reportType: 'Rental_Returnable_Challan',
+      rentalId: enquiry._id,
+      companyId: companyIdStr || undefined,
+      companyName: enquiry?.companyName,
+    });
+    setActionMenuVisible(null);
+  };
+
   const handleMoveToUnwanted = (enquiry: any) => {
     updateStatusToRental(enquiry._id, 'Cancelled');
     setActionMenuVisible(null);
@@ -416,6 +543,20 @@ const RentalEnquiriesScreen = () => {
               <Icon name="badge" size={20} color="#007AFF" />
               <Text style={styles.actionMenuText}>Gate Pass</Text>
             </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.actionMenuItem}
+              onPress={() => handleDeliveryChallan(item)}
+            >
+              <Icon name="local-shipping" size={20} color="#007AFF" />
+              <Text style={styles.actionMenuText}>Delivery Challan (DC Copy)</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.actionMenuItem}
+              onPress={() => handleReturnableChallan(item)}
+            >
+              <Icon name="assignment-return" size={20} color="#007AFF" />
+              <Text style={styles.actionMenuText}>Returnable Challan</Text>
+            </TouchableOpacity>
             {Number(user?.role) === 1 ? (
               <TouchableOpacity
                 style={styles.actionMenuItem}
@@ -455,6 +596,19 @@ const RentalEnquiriesScreen = () => {
                 </TouchableOpacity>
               </View>
             )}
+            {!item.employeeId && (
+              <Text style={styles.suggestedText}>
+                Suggested
+                {getSuggestedEmployee(item)
+                  ? ` → ${getSuggestedEmployee(item)?.name}`
+                  : ' (no match)'}
+              </Text>
+            )}
+          </View>
+
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Pincode:</Text>
+            <Text style={styles.detailValue}>{item.pincode || 'N/A'}</Text>
           </View>
 
           <View style={styles.detailRow}>
@@ -574,6 +728,28 @@ const RentalEnquiriesScreen = () => {
         </ScrollView>
       </View>
 
+      {user?.role === 1 && hasPermission('rentalEnquiries') && activeTab === 'new' ? (
+        <TouchableOpacity
+          style={[
+            styles.autoAssignButton,
+            (filteredEnquiries.filter((e) => !isEnquiryAssigned(e)).length === 0 || autoAssigning) &&
+              styles.assignButtonDisabled,
+          ]}
+          onPress={() =>
+            handleAutoAssignEnquiries(
+              filteredEnquiries.filter((e) => !isEnquiryAssigned(e)).map((e) => e._id)
+            )
+          }
+          disabled={
+            filteredEnquiries.filter((e) => !isEnquiryAssigned(e)).length === 0 || autoAssigning
+          }
+        >
+          <Text style={styles.assignButtonText}>
+            {autoAssigning ? 'Assigning…' : 'Auto Assign'}
+          </Text>
+        </TouchableOpacity>
+      ) : null}
+
       {/* Enquiries List */}
       <FlatList
         data={paginatedEnquiries}
@@ -649,7 +825,7 @@ const RentalEnquiriesScreen = () => {
           <View style={styles.pickerModalContent}>
             <Text style={styles.pickerModalTitle}>Select Employee</Text>
             <FlatList
-              data={[{ userId: '', name: '-- Select Employee --' }, ...employees]}
+              data={[{ userId: '', name: '-- Select Employee --' }, ...rentalEmployees]}
               keyExtractor={(item) => item.userId || 'none'}
               renderItem={({ item }) => (
                 <TouchableOpacity
@@ -868,6 +1044,30 @@ const styles = StyleSheet.create({
     color: '#333',
     flex: 1,
     textAlign: 'right',
+  },
+  suggestedText: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+    textAlign: 'right',
+    flex: 1,
+  },
+  autoAssignButton: {
+    backgroundColor: '#34C759',
+    marginHorizontal: 15,
+    marginBottom: 10,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  assignButtonDisabled: {
+    backgroundColor: '#ccc',
+  },
+  assignButtonText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 16,
   },
   emptyContainer: {
     flex: 1,
