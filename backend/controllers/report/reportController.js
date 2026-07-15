@@ -1,11 +1,15 @@
 import Report from "../../models/reportModel.js";
 import Company from "../../models/companyModel.js"; // Assuming Company model path
+import Employee from "../../models/employeeModel.js";
 import Counter from "../../models/counterModel.js";
 import mongoose from "mongoose";
 import { normalizeSendDetailsTo } from "../../utils/normalizeSendDetailsTo.js";
 
 const DELIVERY_CHALLAN_TYPES = ["Service_Delivery_Challan", "Rental_Delivery_Challan"];
 const VALID_CONTENT_SCOPES = ["Service", "Product", "Service + Product"];
+
+const ASSIGNED_TO_USER_SELECT =
+    "-password -wishlist -expoPushTokens -commissionCategorys -serviceDeliveryAddresses";
 
 const validateContentScope = (reportType, contentScope) => {
     if (DELIVERY_CHALLAN_TYPES.includes(reportType)) {
@@ -16,6 +20,83 @@ const validateContentScope = (reportType, contentScope) => {
         return "Invalid Service/Product selection.";
     }
     return null;
+};
+
+/**
+ * Report.assignedTo refs User, but employee fields (idCradNo, designation, etc.)
+ * live on Employee (linked by userId). Merge those into assignedTo for API consumers.
+ */
+const enrichReportsWithEmployeeDetails = async (reports) => {
+    const list = Array.isArray(reports) ? reports : reports ? [reports] : [];
+    if (list.length === 0) return reports;
+
+    const userIds = [
+        ...new Set(
+            list
+                .map((r) => {
+                    const a = r?.assignedTo;
+                    if (!a) return null;
+                    return String(a._id || a);
+                })
+                .filter(Boolean)
+        ),
+    ];
+
+    if (userIds.length === 0) return reports;
+
+    const employees = await Employee.find({ userId: { $in: userIds } })
+        .select("-password")
+        .populate("department", "name")
+        .lean();
+
+    const employeeByUserId = new Map(
+        employees.map((e) => [String(e.userId), e])
+    );
+
+    const mergeOne = (report) => {
+        const obj = typeof report.toObject === "function" ? report.toObject() : { ...report };
+        if (!obj.assignedTo) return obj;
+
+        const assigned =
+            typeof obj.assignedTo === "object"
+                ? { ...obj.assignedTo }
+                : { _id: obj.assignedTo };
+
+        // Never expose password hash
+        delete assigned.password;
+
+        const emp = employeeByUserId.get(String(assigned._id || obj.assignedTo));
+        if (emp) {
+            assigned.idCradNo = emp.idCradNo || "";
+            assigned.designation = emp.designation || [];
+            assigned.employeeType = emp.employeeType || [];
+            assigned.department = emp.department || [];
+            assigned.image = emp.image || assigned.image || "";
+            assigned.pincode = emp.pincode || [];
+            assigned.employeeId = emp._id;
+            assigned.salary = emp.salary;
+            assigned.bikeAllowance = emp.bikeAllowance;
+            assigned.parentName = emp.parentName || "";
+            assigned.parentPhone = emp.parentPhone || "";
+            assigned.parentAddress = emp.parentAddress || "";
+            assigned.parentRelation = emp.parentRelation || "";
+            assigned.idProof = emp.idProof || "";
+            assigned.hireDate = emp.hireDate;
+            // Prefer employee profile name/phone/address when present
+            if (emp.name) assigned.name = emp.name;
+            if (emp.phone) assigned.phone = emp.phone;
+            if (emp.address) assigned.address = emp.address;
+            if (emp.email) assigned.email = emp.email;
+        }
+
+        obj.assignedTo = assigned;
+        return obj;
+    };
+
+    if (Array.isArray(reports)) {
+        return list.map(mergeOne);
+    }
+    return mergeOne(list[0]);
 };
 
 /** Match service/rental reports or gate passes by URL scope (exact type, not combined). */
@@ -214,14 +295,15 @@ export const getAllReports = async (req, res) => {
         if (maybeId && mongoose.Types.ObjectId.isValid(maybeId)) {
             const report = await Report.findById(maybeId)
                 .populate("company")
-                .populate("assignedTo");
+                .populate({ path: "assignedTo", select: ASSIGNED_TO_USER_SELECT });
             if (!report) {
                 return res.status(404).send({ success: false, message: "Report not found" });
             }
+            const enrichedReport = await enrichReportsWithEmployeeDetails(report);
             return res.status(200).send({
                 success: true,
                 message: "Report fetched successfully",
-                report,
+                report: enrichedReport,
             });
         }
 
@@ -315,12 +397,14 @@ export const getAllReports = async (req, res) => {
         // Fetch reports with pagination and populate necessary fields
         const reports = await Report.find(findQuery)
             .populate('company') // Populate company details
-            .populate('assignedTo') // Populate assignedTo user details
+            .populate({ path: 'assignedTo', select: ASSIGNED_TO_USER_SELECT })
             .sort({ createdAt: -1 }) // Sort by creation date, newest first
             .skip(skip)
             .limit(parseInt(limit));
 
-        res.status(200).send({ success: true, message: 'All Reports fetched', reports, totalCount });
+        const enrichedReports = await enrichReportsWithEmployeeDetails(reports);
+
+        res.status(200).send({ success: true, message: 'All Reports fetched', reports: enrichedReports, totalCount });
     } catch (error) {
         console.error("Error in getAllReports:", error);
         res.status(500).send({ success: false, message: 'Error in getting reports', error });
@@ -332,12 +416,14 @@ export const getReportById = async (req, res) => {
     try {
         const { id } = req.params;
         const report = await Report.findById(id)
-            .populate('company'); // Populate company details
+            .populate('company')
+            .populate({ path: 'assignedTo', select: ASSIGNED_TO_USER_SELECT });
 
         if (!report) {
             return res.status(404).send({ success: false, message: 'Report not found' });
         }
-        res.status(200).send({ success: true, message: 'Report fetched successfully', report });
+        const enrichedReport = await enrichReportsWithEmployeeDetails(report);
+        res.status(200).send({ success: true, message: 'Report fetched successfully', report: enrichedReport });
     } catch (error) {
         console.error("Error in getReportById:", error);
         res.status(500).send({ success: false, message: 'Error in getting report', error });
@@ -435,9 +521,13 @@ export const updateReport = async (req, res) => {
                 ...(reportLink !== undefined ? { reportLink } : {}),
             },
             { new: true, runValidators: true } // Return the updated document and run schema validators
-        ).populate('company');
+        )
+            .populate('company')
+            .populate({ path: 'assignedTo', select: ASSIGNED_TO_USER_SELECT });
 
-        res.status(200).send({ success: true, message: 'Report updated successfully', report: updatedReport });
+        const enrichedReport = await enrichReportsWithEmployeeDetails(updatedReport);
+
+        res.status(200).send({ success: true, message: 'Report updated successfully', report: enrichedReport });
 
     } catch (error) {
         console.error("Error in updateReport:", error);
