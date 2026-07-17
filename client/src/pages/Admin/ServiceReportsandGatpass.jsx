@@ -687,6 +687,12 @@ const ServiceReportsandGatpass = (props) => {
                                             <TableCell style={{ paddingBottom: 0, paddingTop: 0, width: "100%" }} colSpan={10}>
                                                 <Collapse in={expandedReportId === report._id} timeout="auto" unmountOnExit>
                                                     <Box sx={{ margin: 1 }}>
+                                                        {report.accessories ? (
+                                                            <Typography variant="body2" sx={{ mb: 1.5 }}>
+                                                                <Typography component="span" sx={{ fontWeight: 600 }}>Accessories: </Typography>
+                                                                {report.accessories}
+                                                            </Typography>
+                                                        ) : null}
                                                         <Typography variant="h6" gutterBottom component="div">
                                                             Materials
                                                         </Typography>

@@ -67,6 +67,7 @@ const AddRentalReportScreen = () => {
     problemReport: '',
     remarksPendingWorks: '',
     accessService: '',
+    accessories: '',
     modelNo: '',
     serialNo: '',
     branch: '',
@@ -152,6 +153,7 @@ const AddRentalReportScreen = () => {
             problemReport: fetchedReport.problemReport || '',
             remarksPendingWorks: fetchedReport.remarksPendingWorks || '',
             accessService: fetchedReport.accessService || '',
+            accessories: fetchedReport.accessories || '',
             modelNo: fetchedReport.modelNo || '',
             serialNo: fetchedReport.serialNo || '',
             branch: fetchedReport.branch || '',
@@ -513,6 +515,7 @@ const AddRentalReportScreen = () => {
         problemReport: formData.problemReport,
         remarksPendingWorks: formData.remarksPendingWorks,
         accessService: formData.accessService,
+        accessories: formData.accessories,
         modelNo: formData.modelNo,
         serialNo: formData.serialNo,
         branch: formData.branch,
@@ -627,6 +630,16 @@ const AddRentalReportScreen = () => {
           value={formData.accessService}
           onChangeText={(text) => handleChange('accessService', text)}
           placeholder="Enter Access Service"
+        />
+
+        <Text style={styles.label}>Accessories</Text>
+        <TextInput
+          style={[styles.input, styles.textArea]}
+          value={formData.accessories}
+          onChangeText={(text) => handleChange('accessories', text)}
+          placeholder="Enter Accessories"
+          multiline
+          numberOfLines={2}
         />
 
         <Text style={styles.label}>Model No</Text>

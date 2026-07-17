@@ -13,6 +13,14 @@ import {
     reserveNextInvoiceNumber,
 } from "../../utils/invoiceConversionUtil.js";
 
+/** Unpaid rental invoices for a company (excludes Paid, Cancelled, quotations, TDS rows). */
+const buildCompanyUnpaidInvoiceFilter = (companyId) => ({
+    companyId,
+    invoiceType: { $regex: /^invoice$/i },
+    tdsAmount: { $eq: null },
+    status: "Unpaid",
+});
+
 const resolveCommissionUserId = (req, entry) =>
     req.user?._id || entry?.assignedTo?._id || entry?.assignedTo;
 
@@ -691,10 +699,27 @@ export const getRentalPaymentEntryById = async (req, res) => {
             });
         }
 
+        const companyId = entry.companyId?._id ?? entry.companyId;
+
+        let companyPendingInvoicesTotal = 0;
+        if (companyId) {
+            const [pendingSummary] = await RentalPaymentEntry.aggregate([
+                { $match: buildCompanyUnpaidInvoiceFilter(companyId) },
+                {
+                    $group: {
+                        _id: null,
+                        total: { $sum: { $ifNull: ["$grandTotal", 0] } },
+                    },
+                },
+            ]);
+            companyPendingInvoicesTotal = Number(pendingSummary?.total) || 0;
+        }
+
         res.status(200).send({
             success: true,
             message: 'Rental Payment Entry fetched successfully',
-            entry
+            entry,
+            companyPendingInvoicesTotal,
         });
     } catch (error) {
         console.error("Error in getRentalPaymentEntryById:", error);

@@ -152,6 +152,7 @@ const ServiceReportsReport = ({ type = 'service' }) => {
             'Problem Report': report.problemReport || 'N/A',
             'Assigned To': report.assignedTo?.name || 'N/A',
             'Created Date': new Date(report.createdAt).toLocaleDateString(),
+            'Accessories': report.accessories || 'N/A',
             'Model No': report.modelNo || 'N/A',
             'Serial No': collectReportSerialNumbers(report),
             'Branch': report.branch || 'N/A',

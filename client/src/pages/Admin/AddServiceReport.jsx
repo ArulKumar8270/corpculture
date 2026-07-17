@@ -60,6 +60,7 @@ const AddServiceReport = (props) => {
         assignedTo: employeeName || '',
         problemReport: '',
         remarksPendingWorks: '',
+        accessories: '',
         branch: '', // This will store the branch name
         reference: '',
         contentScope: '',
@@ -115,6 +116,7 @@ const AddServiceReport = (props) => {
                                     : (fetchedReport.assignedTo || employeeName || ''),
                             problemReport: fetchedReport.problemReport || '',
                             remarksPendingWorks: fetchedReport.remarksPendingWorks || '',
+                            accessories: fetchedReport.accessories || '',
                             branch: fetchedReport.branch || '',
                             reference: fetchedReport.reference || '',
                             contentScope: fetchedReport.contentScope || '',
@@ -474,6 +476,7 @@ const AddServiceReport = (props) => {
             sendDetailsTo: reportData.sendDetailsTo,
             problemReport: reportData.problemReport,
             remarksPendingWorks: reportData.remarksPendingWorks,
+            accessories: reportData.accessories,
             branch: reportData.branch, // This is the branch name string
             reference: reportData.reference,
             contentScope: reportData.contentScope || undefined,
@@ -550,6 +553,7 @@ const AddServiceReport = (props) => {
             assignedTo: employeeName || '',
             problemReport: '',
             remarksPendingWorks: '',
+            accessories: '',
             branch: '',
             reference: '',
             contentScope: '',
@@ -684,6 +688,20 @@ const AddServiceReport = (props) => {
                             value={reportData.remarksPendingWorks}
                             onChange={handleChange}
                             placeholder="ENTER REMARKS / PENDING WORKS"
+                            multiline
+                            rows={2}
+                            size="small"
+                        />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                        <TextField
+                            fullWidth
+                            margin="normal"
+                            label="Accessories"
+                            name="accessories"
+                            value={reportData.accessories}
+                            onChange={handleChange}
+                            placeholder="ENTER ACCESSORIES"
                             multiline
                             rows={2}
                             size="small"
