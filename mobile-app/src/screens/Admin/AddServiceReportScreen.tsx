@@ -43,6 +43,7 @@ interface MaterialGroup {
     serialNo?: string;
     usageData?: string;
     description?: string;
+    accessService?: string;
     quantity: number;
     rate: number;
     totalAmount: number;
@@ -71,8 +72,6 @@ const AddServiceReportScreen = () => {
     company: '',
     problemReport: '',
     remarksPendingWorks: '',
-    accessService: '',
-    accessories: '',
     modelNo: '',
     branch: '',
     reference: '',
@@ -81,6 +80,7 @@ const AddServiceReportScreen = () => {
     materialQuantity: '',
     materialUsageData: '',
     materialDescription: '',
+    materialAccessService: '',
   });
 
   const [materialGroups, setMaterialGroups] = useState<MaterialGroup[]>([]);
@@ -156,8 +156,6 @@ const AddServiceReportScreen = () => {
             company: fetchedReport.company?._id || '',
             problemReport: fetchedReport.problemReport || '',
             remarksPendingWorks: fetchedReport.remarksPendingWorks || '',
-            accessService: fetchedReport.accessService || '',
-            accessories: fetchedReport.accessories || '',
             modelNo: fetchedReport.modelNo || '',
             branch: fetchedReport.branch || '',
             reference: fetchedReport.reference || '',
@@ -166,6 +164,7 @@ const AddServiceReportScreen = () => {
             materialQuantity: '',
             materialUsageData: '',
             materialDescription: '',
+            materialAccessService: '',
           });
           if (Array.isArray(fetchedReport.materialGroups) && fetchedReport.materialGroups.length > 0) {
             setMaterialGroups(
@@ -283,6 +282,7 @@ const AddServiceReportScreen = () => {
       materialQuantity: '',
       materialUsageData: '',
       materialDescription: '',
+      materialAccessService: '',
     }));
   };
 
@@ -304,6 +304,7 @@ const AddServiceReportScreen = () => {
       materialQuantity: '',
       materialUsageData: '',
       materialDescription: '',
+      materialAccessService: '',
     }));
   };
 
@@ -345,6 +346,7 @@ const AddServiceReportScreen = () => {
       productName: productName,
       usageData: formData.materialUsageData?.trim() || '',
       description: formData.materialDescription?.trim() || '',
+      accessService: formData.materialAccessService?.trim() || '',
       quantity: quantity,
       rate: productRate,
       totalAmount: quantity * productRate,
@@ -386,6 +388,7 @@ const AddServiceReportScreen = () => {
       materialQuantity: '',
       materialUsageData: '',
       materialDescription: '',
+      materialAccessService: '',
     }));
   };
 
@@ -402,6 +405,7 @@ const AddServiceReportScreen = () => {
       materialQuantity: product.quantity.toString(),
       materialUsageData: product.usageData || '',
       materialDescription: product.description || '',
+      materialAccessService: product.accessService || '',
     }));
   };
 
@@ -423,6 +427,9 @@ const AddServiceReportScreen = () => {
         ...prev,
         materialProductName: '',
         materialQuantity: '',
+        materialUsageData: '',
+        materialDescription: '',
+        materialAccessService: '',
       }));
     }
   };
@@ -505,6 +512,7 @@ const AddServiceReportScreen = () => {
             productName: productName,
             usageData: typeof rest.usageData === 'string' ? rest.usageData : '',
             description: typeof rest.description === 'string' ? rest.description : '',
+            accessService: typeof rest.accessService === 'string' ? rest.accessService : '',
             quantity: Number(rest.quantity) || 0,
             rate: Number(rest.rate) || 0,
             totalAmount: Number(rest.totalAmount) || 0,
@@ -518,8 +526,6 @@ const AddServiceReportScreen = () => {
         company: formData.company,
         problemReport: formData.problemReport,
         remarksPendingWorks: formData.remarksPendingWorks,
-        accessService: formData.accessService,
-        accessories: formData.accessories,
         modelNo: formData.modelNo,
         branch: formData.branch,
         reference: formData.reference,
@@ -621,24 +627,6 @@ const AddServiceReportScreen = () => {
           value={formData.remarksPendingWorks}
           onChangeText={(text) => handleChange('remarksPendingWorks', text)}
           placeholder="Enter Remarks / Pending Works"
-          multiline
-          numberOfLines={2}
-        />
-
-        <Text style={styles.label}>Access Service</Text>
-        <TextInput
-          style={styles.input}
-          value={formData.accessService}
-          onChangeText={(text) => handleChange('accessService', text)}
-          placeholder="Enter Access Service"
-        />
-
-        <Text style={styles.label}>Accessories</Text>
-        <TextInput
-          style={[styles.input, styles.textArea]}
-          value={formData.accessories}
-          onChangeText={(text) => handleChange('accessories', text)}
-          placeholder="Enter Accessories"
           multiline
           numberOfLines={2}
         />
@@ -763,21 +751,29 @@ const AddServiceReportScreen = () => {
               value={formData.materialUsageData}
               onChangeText={(text) => handleChange('materialUsageData', text)}
               placeholder="Optional"
-            />
+        />
 
-            <Text style={styles.label}>Description (per product)</Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              value={formData.materialDescription}
-              onChangeText={(text) => handleChange('materialDescription', text)}
-              placeholder="Optional"
-              multiline
-              numberOfLines={2}
-            />
+        <Text style={styles.label}>Access Service (per product)</Text>
+        <TextInput
+          style={styles.input}
+          value={formData.materialAccessService}
+          onChangeText={(text) => handleChange('materialAccessService', text)}
+          placeholder="Optional"
+        />
 
-            <TouchableOpacity
-              style={styles.saveProductButton}
-              onPress={handleSaveProduct}
+        <Text style={styles.label}>Description (per product)</Text>
+        <TextInput
+          style={[styles.input, styles.textArea]}
+          value={formData.materialDescription}
+          onChangeText={(text) => handleChange('materialDescription', text)}
+          placeholder="Optional"
+          multiline
+          numberOfLines={2}
+        />
+
+        <TouchableOpacity
+          style={styles.saveProductButton}
+          onPress={handleSaveProduct}
               disabled={!formData.materialProductName || !formData.materialQuantity}
             >
               <Text style={styles.saveProductButtonText}>
@@ -795,6 +791,7 @@ const AddServiceReportScreen = () => {
                     materialQuantity: '',
                     materialUsageData: '',
                     materialDescription: '',
+                    materialAccessService: '',
                   }));
                 }}
               >
@@ -833,6 +830,9 @@ const AddServiceReportScreen = () => {
                       <Text style={styles.productDetails} numberOfLines={2}>
                         Desc: {product.description}
                       </Text>
+                    ) : null}
+                    {product.accessService ? (
+                      <Text style={styles.productDetails}>Access Service: {product.accessService}</Text>
                     ) : null}
                     <Text style={styles.productDetails}>
                       Qty: {product.quantity || 0} | Rate: ₹{product.rate || 0} | Total: ₹{product.totalAmount || 0}

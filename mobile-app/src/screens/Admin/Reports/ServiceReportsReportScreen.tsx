@@ -159,7 +159,6 @@ const ServiceReportsReportScreen = () => {
         'Problem Report': report.problemReport || 'N/A',
         'Assigned To': report.assignedTo?.name || 'N/A',
         'Created Date': new Date(report.createdAt).toLocaleDateString(),
-        'Accessories': report.accessories || 'N/A',
         'Model No': report.modelNo || 'N/A',
         'Serial No': collectReportSerialNumbers(report),
         'Branch': report.branch || 'N/A',
@@ -234,12 +233,6 @@ const ServiceReportsReportScreen = () => {
             <Text style={styles.detailLabel}>Problem Report:</Text>
             <Text style={styles.detailValue}>{item.problemReport || 'N/A'}</Text>
           </View>
-          {item.accessories ? (
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Accessories:</Text>
-              <Text style={styles.detailValue}>{item.accessories}</Text>
-            </View>
-          ) : null}
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Assigned To:</Text>
             <Text style={styles.detailValue}>

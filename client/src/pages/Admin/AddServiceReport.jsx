@@ -60,7 +60,6 @@ const AddServiceReport = (props) => {
         assignedTo: employeeName || '',
         problemReport: '',
         remarksPendingWorks: '',
-        accessories: '',
         branch: '', // This will store the branch name
         reference: '',
         contentScope: '',
@@ -68,6 +67,7 @@ const AddServiceReport = (props) => {
         materialQuantity: '',    // For adding new material
         materialUsageData: '',
         materialDescription: '',
+        materialAccessService: '',
     });
 
     // State for material groups
@@ -116,7 +116,6 @@ const AddServiceReport = (props) => {
                                     : (fetchedReport.assignedTo || employeeName || ''),
                             problemReport: fetchedReport.problemReport || '',
                             remarksPendingWorks: fetchedReport.remarksPendingWorks || '',
-                            accessories: fetchedReport.accessories || '',
                             branch: fetchedReport.branch || '',
                             reference: fetchedReport.reference || '',
                             contentScope: fetchedReport.contentScope || '',
@@ -124,6 +123,7 @@ const AddServiceReport = (props) => {
                             materialQuantity: '',    // Reset for new material entry
                             materialUsageData: '',
                             materialDescription: '',
+                            materialAccessService: '',
                         });
                         if (Array.isArray(fetchedReport.materialGroups) && fetchedReport.materialGroups.length > 0) {
                             setMaterialGroups(fetchedReport.materialGroups.map((group) => {
@@ -326,6 +326,7 @@ const AddServiceReport = (props) => {
             materialQuantity: '',
             materialUsageData: '',
             materialDescription: '',
+            materialAccessService: '',
         }));
     };
 
@@ -348,6 +349,7 @@ const AddServiceReport = (props) => {
             productName: productName,
             usageData: reportData.materialUsageData?.trim() || '',
             description: reportData.materialDescription?.trim() || '',
+            accessService: reportData.materialAccessService?.trim() || '',
             quantity: quantity,
             rate: selectedProduct.rate,
             totalAmount: quantity * selectedProduct.rate,
@@ -389,6 +391,7 @@ const AddServiceReport = (props) => {
             materialQuantity: '',
             materialUsageData: '',
             materialDescription: '',
+            materialAccessService: '',
         }));
     };
 
@@ -406,6 +409,7 @@ const AddServiceReport = (props) => {
             materialQuantity: product.quantity.toString(),
             materialUsageData: product.usageData || '',
             materialDescription: product.description || '',
+            materialAccessService: product.accessService || '',
         }));
     };
 
@@ -429,6 +433,7 @@ const AddServiceReport = (props) => {
                 materialQuantity: '',
                 materialUsageData: '',
                 materialDescription: '',
+                materialAccessService: '',
             }));
         }
     };
@@ -476,7 +481,6 @@ const AddServiceReport = (props) => {
             sendDetailsTo: reportData.sendDetailsTo,
             problemReport: reportData.problemReport,
             remarksPendingWorks: reportData.remarksPendingWorks,
-            accessories: reportData.accessories,
             branch: reportData.branch, // This is the branch name string
             reference: reportData.reference,
             contentScope: reportData.contentScope || undefined,
@@ -553,7 +557,6 @@ const AddServiceReport = (props) => {
             assignedTo: employeeName || '',
             problemReport: '',
             remarksPendingWorks: '',
-            accessories: '',
             branch: '',
             reference: '',
             contentScope: '',
@@ -561,6 +564,7 @@ const AddServiceReport = (props) => {
             materialQuantity: '',
             materialUsageData: '',
             materialDescription: '',
+            materialAccessService: '',
         });
         setMaterialGroups([]); // Reset material groups
         setSelectedGroupIndex(null); // Reset selected group
@@ -688,20 +692,6 @@ const AddServiceReport = (props) => {
                             value={reportData.remarksPendingWorks}
                             onChange={handleChange}
                             placeholder="ENTER REMARKS / PENDING WORKS"
-                            multiline
-                            rows={2}
-                            size="small"
-                        />
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                        <TextField
-                            fullWidth
-                            margin="normal"
-                            label="Accessories"
-                            name="accessories"
-                            value={reportData.accessories}
-                            onChange={handleChange}
-                            placeholder="ENTER ACCESSORIES"
                             multiline
                             rows={2}
                             size="small"
@@ -856,12 +846,23 @@ const AddServiceReport = (props) => {
                                 placeholder="Optional"
                                 size="small"
                             />
-                        </Grid>
-                        <Grid item xs={12}>
-                            <TextField
-                                fullWidth
-                                label="Description (material wise)"
-                                name="materialDescription"
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                        <TextField
+                            fullWidth
+                            label="Access Service (per product)"
+                            name="materialAccessService"
+                            value={reportData.materialAccessService}
+                            onChange={handleChange}
+                            placeholder="Optional"
+                            size="small"
+                        />
+                    </Grid>
+                    <Grid item xs={12}>
+                        <TextField
+                            fullWidth
+                            label="Description (material wise)"
+                            name="materialDescription"
                                 value={reportData.materialDescription}
                                 onChange={handleChange}
                                 placeholder="Optional"
@@ -891,6 +892,7 @@ const AddServiceReport = (props) => {
                                             materialQuantity: '',
                                             materialUsageData: '',
                                             materialDescription: '',
+                                            materialAccessService: '',
                                         }));
                                     }}
                                     fullWidth
@@ -942,6 +944,7 @@ const AddServiceReport = (props) => {
                                 <TableCell>Product Name</TableCell>
                                 <TableCell>Material Usage Data</TableCell>
                                 <TableCell>Material Description</TableCell>
+                                <TableCell>Access Service</TableCell>
                                 <TableCell align="right">Quantity</TableCell>
                                 <TableCell align="right">Total Amount</TableCell>
                                 <TableCell align="center">Action</TableCell>
@@ -950,7 +953,7 @@ const AddServiceReport = (props) => {
                         <TableBody>
                             {group.products.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={7} align="center" sx={{ py: 3, color: 'text.secondary' }}>
+                                    <TableCell colSpan={8} align="center" sx={{ py: 3, color: 'text.secondary' }}>
                                         No products added to this group yet.
                                     </TableCell>
                                 </TableRow>
@@ -966,6 +969,7 @@ const AddServiceReport = (props) => {
                                             <TableCell>{productName}</TableCell>
                                             <TableCell>{product.usageData || '—'}</TableCell>
                                             <TableCell>{product.description || '—'}</TableCell>
+                                            <TableCell>{product.accessService || '—'}</TableCell>
                                             <TableCell align="right">{product.quantity}</TableCell>
                                             <TableCell align="right">{product.totalAmount}</TableCell>
                                             <TableCell align="center">

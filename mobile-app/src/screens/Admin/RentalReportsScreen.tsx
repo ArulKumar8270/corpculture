@@ -373,12 +373,6 @@ const RentalReportsScreen = () => {
             <Text style={styles.detailLabel}>Problem Report:</Text>
             <Text style={styles.detailValue}>{item.problemReport || 'N/A'}</Text>
           </View>
-          {item.accessories ? (
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Accessories:</Text>
-              <Text style={styles.detailValue}>{item.accessories}</Text>
-            </View>
-          ) : null}
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Branch:</Text>
             <Text style={styles.detailValue}>{item.branch || 'N/A'}</Text>
@@ -496,6 +490,9 @@ const RentalReportsScreen = () => {
                               Desc: {material.description}
                             </Text>
                           ) : null}
+                          {material.accessService ? (
+                            <Text style={styles.materialDetails}>Access Service: {material.accessService}</Text>
+                          ) : null}
                           <Text style={styles.materialDetails}>
                             Qty: {material.quantity} | Rate: ₹{material.rate} | Total: ₹
                             {material.totalAmount}
@@ -523,6 +520,9 @@ const RentalReportsScreen = () => {
                       <Text style={styles.materialDetails} numberOfLines={2}>
                         Desc: {material.description}
                       </Text>
+                    ) : null}
+                    {material.accessService ? (
+                      <Text style={styles.materialDetails}>Access Service: {material.accessService}</Text>
                     ) : null}
                     <Text style={styles.materialDetails}>
                       Qty: {material.quantity} | Rate: ₹{material.rate} | Total: ₹{material.totalAmount}

@@ -38,6 +38,7 @@ interface MaterialGroup {
   products: Array<{
     id?: string;
     productName: string;
+    accessService?: string;
     quantity: number;
     rate: number;
     totalAmount: number;
@@ -66,8 +67,6 @@ const AddRentalReportScreen = () => {
     company: '',
     problemReport: '',
     remarksPendingWorks: '',
-    accessService: '',
-    accessories: '',
     modelNo: '',
     serialNo: '',
     branch: '',
@@ -77,6 +76,7 @@ const AddRentalReportScreen = () => {
     description: '',
     materialProductName: '',
     materialQuantity: '',
+    materialAccessService: '',
   });
 
   const [materialGroups, setMaterialGroups] = useState<MaterialGroup[]>([]);
@@ -152,8 +152,6 @@ const AddRentalReportScreen = () => {
             company: fetchedReport.company?._id || '',
             problemReport: fetchedReport.problemReport || '',
             remarksPendingWorks: fetchedReport.remarksPendingWorks || '',
-            accessService: fetchedReport.accessService || '',
-            accessories: fetchedReport.accessories || '',
             modelNo: fetchedReport.modelNo || '',
             serialNo: fetchedReport.serialNo || '',
             branch: fetchedReport.branch || '',
@@ -163,6 +161,7 @@ const AddRentalReportScreen = () => {
             description: fetchedReport.description || '',
             materialProductName: '',
             materialQuantity: '',
+            materialAccessService: '',
           });
           if (Array.isArray(fetchedReport.materialGroups) && fetchedReport.materialGroups.length > 0) {
             setMaterialGroups(
@@ -262,6 +261,7 @@ const AddRentalReportScreen = () => {
       ...prev,
       materialProductName: '',
       materialQuantity: '',
+      materialAccessService: '',
     }));
   };
 
@@ -322,6 +322,7 @@ const AddRentalReportScreen = () => {
       ...prev,
       materialProductName: '',
       materialQuantity: '',
+      materialAccessService: '',
     }));
   };
 
@@ -362,6 +363,7 @@ const AddRentalReportScreen = () => {
     const productRate = selectedProduct.rate || selectedProduct.basePrice || 0;
     const productData = {
       productName: productName,
+      accessService: formData.materialAccessService?.trim() || '',
       quantity: quantity,
       rate: productRate,
       totalAmount: quantity * productRate,
@@ -401,6 +403,7 @@ const AddRentalReportScreen = () => {
       ...prev,
       materialProductName: '',
       materialQuantity: '',
+      materialAccessService: '',
     }));
   };
 
@@ -414,6 +417,7 @@ const AddRentalReportScreen = () => {
       ...prev,
       materialProductName: productToEdit ? productToEdit._id : '',
       materialQuantity: product.quantity.toString(),
+      materialAccessService: product.accessService || '',
     }));
   };
 
@@ -435,6 +439,7 @@ const AddRentalReportScreen = () => {
         ...prev,
         materialProductName: '',
         materialQuantity: '',
+        materialAccessService: '',
       }));
     }
   };
@@ -501,6 +506,7 @@ const AddRentalReportScreen = () => {
           // Ensure all numeric fields are numbers
           return {
             productName: productName, // Already a string from extractProductName
+            accessService: typeof rest.accessService === 'string' ? rest.accessService : '',
             quantity: Number(rest.quantity) || 0,
             rate: Number(rest.rate) || 0,
             totalAmount: Number(rest.totalAmount) || 0,
@@ -514,8 +520,6 @@ const AddRentalReportScreen = () => {
         company: formData.company,
         problemReport: formData.problemReport,
         remarksPendingWorks: formData.remarksPendingWorks,
-        accessService: formData.accessService,
-        accessories: formData.accessories,
         modelNo: formData.modelNo,
         serialNo: formData.serialNo,
         branch: formData.branch,
@@ -620,24 +624,6 @@ const AddRentalReportScreen = () => {
           value={formData.remarksPendingWorks}
           onChangeText={(text) => handleChange('remarksPendingWorks', text)}
           placeholder="Enter Remarks / Pending Works"
-          multiline
-          numberOfLines={2}
-        />
-
-        <Text style={styles.label}>Access Service</Text>
-        <TextInput
-          style={styles.input}
-          value={formData.accessService}
-          onChangeText={(text) => handleChange('accessService', text)}
-          placeholder="Enter Access Service"
-        />
-
-        <Text style={styles.label}>Accessories</Text>
-        <TextInput
-          style={[styles.input, styles.textArea]}
-          value={formData.accessories}
-          onChangeText={(text) => handleChange('accessories', text)}
-          placeholder="Enter Accessories"
           multiline
           numberOfLines={2}
         />
@@ -770,6 +756,14 @@ const AddRentalReportScreen = () => {
               keyboardType="numeric"
             />
 
+            <Text style={styles.label}>Access Service (per product)</Text>
+            <TextInput
+              style={styles.input}
+              value={formData.materialAccessService}
+              onChangeText={(text) => handleChange('materialAccessService', text)}
+              placeholder="Optional"
+            />
+
             <TouchableOpacity
               style={styles.saveProductButton}
               onPress={handleSaveProduct}
@@ -788,6 +782,7 @@ const AddRentalReportScreen = () => {
                     ...prev,
                     materialProductName: '',
                     materialQuantity: '',
+                    materialAccessService: '',
                   }));
                 }}
               >
@@ -812,6 +807,9 @@ const AddRentalReportScreen = () => {
                 <View key={product.id} style={styles.productRow}>
                   <View style={styles.productInfo}>
                     <Text style={styles.productName}>{product.productName}</Text>
+                    {product.accessService ? (
+                      <Text style={styles.productDetails}>Access Service: {product.accessService}</Text>
+                    ) : null}
                     <Text style={styles.productDetails}>
                       Qty: {product.quantity} | Rate: ₹{product.rate} | Total: ₹{product.totalAmount}
                     </Text>

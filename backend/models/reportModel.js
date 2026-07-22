@@ -21,6 +21,10 @@ const materialSchema = new mongoose.Schema({
         type: String,
         trim: true,
     },
+    accessService: {
+        type: String,
+        trim: true,
+    },
     quantity: {
         type: Number,
         required: true,
@@ -92,10 +96,6 @@ const reportSchema = new mongoose.Schema({
         trim: true,
     },
     accessService: {
-        type: String,
-        trim: true,
-    },
-    accessories: {
         type: String,
         trim: true,
     },

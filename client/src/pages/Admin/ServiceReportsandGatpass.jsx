@@ -687,12 +687,6 @@ const ServiceReportsandGatpass = (props) => {
                                             <TableCell style={{ paddingBottom: 0, paddingTop: 0, width: "100%" }} colSpan={10}>
                                                 <Collapse in={expandedReportId === report._id} timeout="auto" unmountOnExit>
                                                     <Box sx={{ margin: 1 }}>
-                                                        {report.accessories ? (
-                                                            <Typography variant="body2" sx={{ mb: 1.5 }}>
-                                                                <Typography component="span" sx={{ fontWeight: 600 }}>Accessories: </Typography>
-                                                                {report.accessories}
-                                                            </Typography>
-                                                        ) : null}
                                                         <Typography variant="h6" gutterBottom component="div">
                                                             Materials
                                                         </Typography>
@@ -716,6 +710,7 @@ const ServiceReportsandGatpass = (props) => {
                                                                                     <TableCell>Serial No</TableCell>
                                                                                     <TableCell>Usage Data</TableCell>
                                                                                     <TableCell>Description</TableCell>
+                                                                                    <TableCell>Access Service</TableCell>
                                                                                     <TableCell align="right">Quantity</TableCell>
                                                                                     <TableCell align="right">Rate</TableCell>
                                                                                     <TableCell align="right">Total Amount</TableCell>
@@ -730,6 +725,7 @@ const ServiceReportsandGatpass = (props) => {
                                                                                         <TableCell>{material.serialNo || '—'}</TableCell>
                                                                                         <TableCell>{material.usageData || '—'}</TableCell>
                                                                                         <TableCell>{material.description || '—'}</TableCell>
+                                                                                        <TableCell>{material.accessService || '—'}</TableCell>
                                                                                         <TableCell align="right">{material.quantity}</TableCell>
                                                                                         <TableCell align="right">{material.rate}</TableCell>
                                                                                         <TableCell align="right">{material.totalAmount}</TableCell>

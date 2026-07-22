@@ -392,14 +392,6 @@ const ServiceReportsScreen = () => {
               {item.problemReport || 'N/A'}
             </Text>
           </View>
-          {item.accessories ? (
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Accessories:</Text>
-              <Text style={styles.detailValue} numberOfLines={2}>
-                {item.accessories}
-              </Text>
-            </View>
-          ) : null}
           {item.branch ? (
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Branch:</Text>
@@ -505,22 +497,6 @@ const ServiceReportsScreen = () => {
               </View>
             )}
 
-            {/* Access Service */}
-            {item.accessService && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Access Service</Text>
-                <Text style={styles.sectionText}>{item.accessService}</Text>
-              </View>
-            )}
-
-            {/* Accessories */}
-            {item.accessories && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Accessories</Text>
-                <Text style={styles.sectionText}>{item.accessories}</Text>
-              </View>
-            )}
-
             {/* Branch */}
             {item.branch && (
               <View style={styles.section}>
@@ -562,6 +538,9 @@ const ServiceReportsScreen = () => {
                                 Desc: {material.description}
                               </Text>
                             ) : null}
+                            {material.accessService ? (
+                              <Text style={styles.materialDetails}>Access Service: {material.accessService}</Text>
+                            ) : null}
                             <Text style={styles.materialDetails}>
                               Qty: {material.quantity} | Rate: ₹{material.rate} | Total: ₹
                               {material.totalAmount}
@@ -589,6 +568,9 @@ const ServiceReportsScreen = () => {
                         <Text style={styles.materialDetails} numberOfLines={2}>
                           Desc: {material.description}
                         </Text>
+                      ) : null}
+                      {material.accessService ? (
+                        <Text style={styles.materialDetails}>Access Service: {material.accessService}</Text>
                       ) : null}
                       <Text style={styles.materialDetails}>
                         Qty: {material.quantity} | Rate: ₹{material.rate} | Total: ₹{material.totalAmount}
