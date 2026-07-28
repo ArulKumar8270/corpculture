@@ -354,18 +354,6 @@ export const getTodaysRentalProducts = async (req, res) => {
             req.query?.groupByCompany === "1" ||
             req.query?.groupByCompany === "true";
 
-        if (!groupByCompany) {
-            return res.status(200).json({
-                success: true,
-                paymentDateIst,
-                totalRentalProducts,
-                products: rentalProducts.map((p) => ({
-                    ...p,
-                    rentalProductIds: [p._id],
-                })),
-            });
-        }
-
         const byCompany = new Map();
         for (const p of rentalProducts) {
             const companyId = p.company?._id ? String(p.company._id) : String(p.company || "");
@@ -374,6 +362,24 @@ export const getTodaysRentalProducts = async (req, res) => {
                 byCompany.set(key, []);
             }
             byCompany.get(key).push(p);
+        }
+
+        // Flat: one row per product, but rentalProductIds = all of that company's products due today.
+        if (!groupByCompany) {
+            return res.status(200).json({
+                success: true,
+                paymentDateIst,
+                totalRentalProducts,
+                products: rentalProducts.map((p) => {
+                    const companyId = p.company?._id ? String(p.company._id) : String(p.company || "");
+                    const key = companyId || `unknown-${p._id}`;
+                    const group = byCompany.get(key) || [p];
+                    return {
+                        ...p,
+                        rentalProductIds: group.map((x) => x._id),
+                    };
+                }),
+            });
         }
 
         const products = [];
