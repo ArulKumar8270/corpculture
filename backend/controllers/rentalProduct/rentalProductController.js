@@ -359,7 +359,10 @@ export const getTodaysRentalProducts = async (req, res) => {
                 success: true,
                 paymentDateIst,
                 totalRentalProducts,
-                products: rentalProducts,
+                products: rentalProducts.map((p) => ({
+                    ...p,
+                    rentalProductIds: [p._id],
+                })),
             });
         }
 
