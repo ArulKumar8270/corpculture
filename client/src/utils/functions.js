@@ -511,3 +511,37 @@ export const computeOrderAmountFromStoredProducts = (products) => {
         products.reduce((sum, p) => sum + getStoredOrderProductLineTotal(p), 0)
     );
 };
+
+const RENTAL_PAYMENT_TZ = 'Asia/Kolkata';
+
+/** Rental payment date in IST — matches /payment/today API calendar day. */
+export const formatRentalPaymentDateIst = (date) => {
+    if (!date) return '';
+    return new Intl.DateTimeFormat('en-GB', {
+        timeZone: RENTAL_PAYMENT_TZ,
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+    }).format(new Date(date));
+};
+
+/** Current calendar year in IST (for DD/MM search without year). */
+export const getIstCurrentYear = () =>
+    new Intl.DateTimeFormat('en-CA', {
+        timeZone: RENTAL_PAYMENT_TZ,
+        year: 'numeric',
+    }).format(new Date());
+
+/** Match payment-date search; DD/MM alone uses current IST year (same as payment/today). */
+export const rentalPaymentDateMatchesSearch = (paymentDate, searchTerm) => {
+    const formatted = formatRentalPaymentDateIst(paymentDate).toLowerCase();
+    const term = String(searchTerm || '').trim().toLowerCase();
+    if (!term) return true;
+    const partial = term.match(/^(\d{1,2})\/(\d{1,2})$/);
+    if (partial) {
+        const dd = partial[1].padStart(2, '0');
+        const mm = partial[2].padStart(2, '0');
+        return formatted === `${dd}/${mm}/${getIstCurrentYear()}`;
+    }
+    return formatted.includes(term);
+};

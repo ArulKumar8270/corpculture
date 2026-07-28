@@ -9,10 +9,13 @@ import {
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
-import dayjs from 'dayjs';
 import { useAuth } from '../../../context/auth';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
+import {
+    formatRentalPaymentDateIst,
+    rentalPaymentDateMatchesSearch,
+} from '../../../utils/functions';
 
 const formatGstTypes = (gstType) => {
     if (!Array.isArray(gstType) || gstType.length === 0) return 'N/A';
@@ -147,14 +150,13 @@ const RentalProductList = () => {
         const modelName = product.modelName?.toLowerCase() || '';
         const serialNo = product.serialNo?.toLowerCase() || '';
         const rentalType = String(product.rentalType || '').toLowerCase();
-        const paymentDate = product.paymentDate ? dayjs(product.paymentDate).format('DD/MM/YYYY').toLowerCase() : '';
         const lowerCaseSearchTerm = searchTerm.toLowerCase();
 
         const matchesSearch =
             companyName.includes(lowerCaseSearchTerm) ||
             modelName.includes(lowerCaseSearchTerm) ||
             serialNo.includes(lowerCaseSearchTerm) ||
-            paymentDate.includes(lowerCaseSearchTerm);
+            rentalPaymentDateMatchesSearch(product.paymentDate, searchTerm);
 
         const matchesCompany = !companyFilter || product.company?._id === companyFilter;
         const matchesType = !rentalTypeFilter || rentalType === rentalTypeFilter.toLowerCase();
@@ -207,9 +209,7 @@ const RentalProductList = () => {
                 HSN: product.hsn ?? '',
                 'Base Price': product.basePrice ?? '',
                 'GST Type': formatGstTypes(product.gstType),
-                'Payment Date': product.paymentDate
-                    ? dayjs(product.paymentDate).format('DD/MM/YYYY')
-                    : '',
+                'Payment Date': formatRentalPaymentDateIst(product.paymentDate),
                 Commission: product.commission != null ? `${product.commission}%` : '',
                 'Assigned Employee': getAssignedEmployeeName(product) || 'None',
                 'Rental Type': product.rentalType ?? '',
@@ -264,7 +264,7 @@ const RentalProductList = () => {
             {/* Search Input */}
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 3 }}>
                 <TextField
-                    label="Search by Company, Model, Serial No, or Payment Date"
+                    label="Search by Company, Model, Serial No, or Payment Date (DD/MM/YYYY)"
                     variant="outlined"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
@@ -342,7 +342,7 @@ const RentalProductList = () => {
                                             'N/A'
                                         )}
                                         </TableCell>
-                                        <TableCell>{product.paymentDate ? dayjs(product.paymentDate).format('DD/MM/YYYY') : 'N/A'}</TableCell>
+                                        <TableCell>{product.paymentDate ? formatRentalPaymentDateIst(product.paymentDate) : 'N/A'}</TableCell>
                                         <TableCell>{product.commission ? `${product.commission}%` : 'N/A'}</TableCell> {/* Display Commission */}
                                         <TableCell>
                                             <FormControl variant="outlined" size="small" fullWidth>
