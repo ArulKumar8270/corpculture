@@ -134,6 +134,7 @@ const AddServiceReport = (props) => {
                                 const legacyProductSerial = group.products?.find((p) => p?.serialNo?.trim())?.serialNo?.trim();
                                 return {
                                     ...group,
+                                    modelNo: group.modelNo?.trim() || '',
                                     serialNo: group.serialNo?.trim() || legacyProductSerial || '',
                                     products,
                                 };
@@ -143,6 +144,7 @@ const AddServiceReport = (props) => {
                             setMaterialGroups([
                                 {
                                     name: 'Materials1',
+                                    modelNo: '',
                                     serialNo: legacySerial,
                                     products: fetchedReport.materials.map((mat, index) => {
                                         const { serialNo, ...rest } = mat;
@@ -251,7 +253,7 @@ const AddServiceReport = (props) => {
     // Add new material group
     const handleAddGroup = () => {
         const newGroupName = `Materials${materialGroups.length + 1}`;
-        setMaterialGroups([...materialGroups, { name: newGroupName, serialNo: '', products: [] }]);
+        setMaterialGroups([...materialGroups, { name: newGroupName, modelNo: '', serialNo: '', products: [] }]);
         setSelectedGroupIndex(materialGroups.length); // Select the newly added group
         setEditingProductId(null); // Clear any product editing state
         setReportData(prev => ({
@@ -306,6 +308,14 @@ const AddServiceReport = (props) => {
         }
         
         return 'Unknown Product';
+    };
+
+    const handleGroupModelChange = (groupIdx, value) => {
+        setMaterialGroups((prevGroups) =>
+            prevGroups.map((group, idx) =>
+                idx === groupIdx ? { ...group, modelNo: value } : group
+            )
+        );
     };
 
     const handleGroupSerialChange = (groupIdx, value) => {
@@ -490,6 +500,7 @@ const AddServiceReport = (props) => {
             // Ensure productName is always a string, not an object
             materialGroups: materialGroups.map(group => ({
                 name: group.name,
+                modelNo: group.modelNo?.trim() || '',
                 serialNo: group.serialNo?.trim() || '',
                 products: group.products.map(({ id, serialNo, ...rest }) => {
                     // Ensure productName is a string
@@ -778,7 +789,17 @@ const AddServiceReport = (props) => {
 
                 {selectedGroupIndex !== null && (
                     <Grid container spacing={2} alignItems="center" sx={{ mt: 2 }}>
-                        <Grid item xs={12}>
+                        <Grid item xs={12} sm={6}>
+                            <TextField
+                                fullWidth
+                                label="Model No (for this material group)"
+                                value={materialGroups[selectedGroupIndex]?.modelNo || ''}
+                                onChange={(e) => handleGroupModelChange(selectedGroupIndex, e.target.value)}
+                                placeholder="Enter model number for this group"
+                                size="small"
+                            />
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
                             <TextField
                                 fullWidth
                                 label="Serial No (for this material group)"
@@ -923,15 +944,12 @@ const AddServiceReport = (props) => {
                             <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: '#019ee3' }}>
                                 {group.name}
                             </Typography>
-                            {group.serialNo ? (
-                                <Typography variant="body2" sx={{ color: '#019ee3', fontWeight: 600, mt: 0.5 }}>
-                                    Serial No: {group.serialNo}
-                                </Typography>
-                            ) : (
-                                <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
-                                    Serial No: —
-                                </Typography>
-                            )}
+                            <Typography variant="body2" sx={{ color: group.modelNo ? '#019ee3' : 'text.secondary', fontWeight: group.modelNo ? 600 : 400, mt: 0.5 }}>
+                                Model No: {group.modelNo || '—'}
+                            </Typography>
+                            <Typography variant="body2" sx={{ color: group.serialNo ? '#019ee3' : 'text.secondary', fontWeight: group.serialNo ? 600 : 400, mt: 0.5 }}>
+                                Serial No: {group.serialNo || '—'}
+                            </Typography>
                         </Box>
                         <Button color="error" onClick={() => handleDeleteGroup(groupIdx)}>
                             Delete Group

@@ -522,6 +522,12 @@ const ServiceReportsScreen = () => {
                 item.materialGroups.map((group: any, groupIndex: number) => (
                   <View key={groupIndex} style={styles.materialGroup}>
                     <Text style={styles.groupName}>{group.name}</Text>
+                    {group.modelNo ? (
+                      <Text style={styles.materialDetails}>Model: {group.modelNo}</Text>
+                    ) : null}
+                    {group.serialNo ? (
+                      <Text style={styles.materialDetails}>Serial: {group.serialNo}</Text>
+                    ) : null}
                     {group.products && group.products.length > 0 ? (
                       group.products.map((material: any, matIndex: number) => (
                         <View key={matIndex} style={styles.materialRow}>

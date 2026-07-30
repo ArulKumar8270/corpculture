@@ -36,6 +36,7 @@ import {
 
 interface MaterialGroup {
   name: string;
+  modelNo?: string;
   serialNo?: string;
   products: Array<{
     id?: string;
@@ -176,6 +177,7 @@ const AddServiceReportScreen = () => {
                 const legacyProductSerial = group.products?.find((p: any) => p?.serialNo?.trim())?.serialNo?.trim();
                 return {
                   ...group,
+                  modelNo: group.modelNo?.trim() || '',
                   serialNo: group.serialNo?.trim() || legacyProductSerial || '',
                   products,
                 };
@@ -186,6 +188,7 @@ const AddServiceReportScreen = () => {
             setMaterialGroups([
               {
                 name: 'Materials1',
+                modelNo: '',
                 serialNo: legacySerial,
                 products: fetchedReport.materials.map((mat: any, index: number) => {
                   const { serialNo, ...rest } = mat;
@@ -273,7 +276,7 @@ const AddServiceReportScreen = () => {
 
   const handleAddGroup = () => {
     const newGroupName = `Materials${materialGroups.length + 1}`;
-    setMaterialGroups([...materialGroups, { name: newGroupName, serialNo: '', products: [] }]);
+    setMaterialGroups([...materialGroups, { name: newGroupName, modelNo: '', serialNo: '', products: [] }]);
     setSelectedGroupIndex(materialGroups.length);
     setEditingProductId(null);
     setFormData((prev) => ({
@@ -284,6 +287,15 @@ const AddServiceReportScreen = () => {
       materialDescription: '',
       materialAccessService: '',
     }));
+  };
+
+  const handleGroupModelChange = (value: string) => {
+    if (selectedGroupIndex === null) return;
+    setMaterialGroups((prevGroups) =>
+      prevGroups.map((group, idx) =>
+        idx === selectedGroupIndex ? { ...group, modelNo: value } : group
+      )
+    );
   };
 
   const handleGroupSerialChange = (value: string) => {
@@ -505,6 +517,7 @@ const AddServiceReportScreen = () => {
       // Validate and clean materialGroups before sending
       const cleanedMaterialGroups = materialGroups.map((group) => ({
         name: group.name,
+        modelNo: group.modelNo?.trim() || '',
         serialNo: group.serialNo?.trim() || '',
         products: group.products.map(({ id, serialNo, ...rest }: any) => {
           const productName = extractProductName(rest);
@@ -708,6 +721,15 @@ const AddServiceReportScreen = () => {
 
         {selectedGroupIndex !== null && (
           <View style={styles.productForm}>
+            <Text style={styles.label}>Model No (for this material group)</Text>
+            <TextInput
+              style={styles.input}
+              value={materialGroups[selectedGroupIndex]?.modelNo || ''}
+              onChangeText={handleGroupModelChange}
+              placeholder="Enter model number for this group"
+              autoCapitalize="characters"
+            />
+
             <Text style={styles.label}>Serial No (for this material group)</Text>
             <TextInput
               style={styles.input}
@@ -806,6 +828,9 @@ const AddServiceReportScreen = () => {
             <View style={styles.groupHeader}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.groupTitle}>{group.name}</Text>
+                <Text style={styles.groupSerial}>
+                  Model No: {group.modelNo?.trim() || '—'}
+                </Text>
                 <Text style={styles.groupSerial}>
                   Serial No: {group.serialNo?.trim() || '—'}
                 </Text>

@@ -696,6 +696,11 @@ const ServiceReportsandGatpass = (props) => {
                                                                 <Box key={groupIndex} sx={{ mb: 2 }}>
                                                                     <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mt: 1 }}>
                                                                         {group.name}
+                                                                        {group.modelNo ? (
+                                                                            <Typography component="span" variant="body2" sx={{ ml: 1, color: '#019ee3', fontWeight: 600 }}>
+                                                                                (Model: {group.modelNo})
+                                                                            </Typography>
+                                                                        ) : null}
                                                                         {group.serialNo ? (
                                                                             <Typography component="span" variant="body2" sx={{ ml: 1, color: '#019ee3', fontWeight: 600 }}>
                                                                                 (Serial: {group.serialNo})

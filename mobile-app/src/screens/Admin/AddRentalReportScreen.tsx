@@ -35,6 +35,8 @@ import {
 
 interface MaterialGroup {
   name: string;
+  modelNo?: string;
+  serialNo?: string;
   products: Array<{
     id?: string;
     productName: string;
@@ -167,6 +169,8 @@ const AddRentalReportScreen = () => {
             setMaterialGroups(
               fetchedReport.materialGroups.map((group: any) => ({
                 ...group,
+                modelNo: group.modelNo?.trim() || '',
+                serialNo: group.serialNo?.trim() || '',
                 products: group.products.map((prod: any, index: number) => ({
                   ...prod,
                   id: `initial-${group.name}-${index}-${Date.now()}`,
@@ -177,6 +181,8 @@ const AddRentalReportScreen = () => {
             setMaterialGroups([
               {
                 name: 'Materials1',
+                modelNo: '',
+                serialNo: '',
                 products: fetchedReport.materials.map((mat: any, index: number) => ({
                   ...mat,
                   id: `initial-Materials1-${index}-${Date.now()}`,
@@ -254,7 +260,7 @@ const AddRentalReportScreen = () => {
 
   const handleAddGroup = () => {
     const newGroupName = `Materials${materialGroups.length + 1}`;
-    setMaterialGroups([...materialGroups, { name: newGroupName, products: [] }]);
+    setMaterialGroups([...materialGroups, { name: newGroupName, modelNo: '', serialNo: '', products: [] }]);
     setSelectedGroupIndex(materialGroups.length);
     setEditingProductId(null);
     setFormData((prev) => ({
@@ -263,6 +269,24 @@ const AddRentalReportScreen = () => {
       materialQuantity: '',
       materialAccessService: '',
     }));
+  };
+
+  const handleGroupModelChange = (value: string) => {
+    if (selectedGroupIndex === null) return;
+    setMaterialGroups((prevGroups) =>
+      prevGroups.map((group, idx) =>
+        idx === selectedGroupIndex ? { ...group, modelNo: value } : group
+      )
+    );
+  };
+
+  const handleGroupSerialChange = (value: string) => {
+    if (selectedGroupIndex === null) return;
+    setMaterialGroups((prevGroups) =>
+      prevGroups.map((group, idx) =>
+        idx === selectedGroupIndex ? { ...group, serialNo: value } : group
+      )
+    );
   };
 
   // Helper function to safely extract productName from various structures
@@ -499,6 +523,8 @@ const AddRentalReportScreen = () => {
       // Validate and clean materialGroups before sending
       const cleanedMaterialGroups = materialGroups.map((group) => ({
         name: group.name,
+        modelNo: group.modelNo?.trim() || '',
+        serialNo: group.serialNo?.trim() || '',
         products: group.products.map(({ id, ...rest }: any) => {
           // Use helper function to extract productName safely
           const productName = extractProductName(rest);
@@ -730,6 +756,24 @@ const AddRentalReportScreen = () => {
 
         {selectedGroupIndex !== null && (
           <View style={styles.productForm}>
+            <Text style={styles.label}>Model No (for this material group)</Text>
+            <TextInput
+              style={styles.input}
+              value={materialGroups[selectedGroupIndex]?.modelNo || ''}
+              onChangeText={handleGroupModelChange}
+              placeholder="Enter model number for this group"
+              autoCapitalize="characters"
+            />
+
+            <Text style={styles.label}>Serial No (for this material group)</Text>
+            <TextInput
+              style={styles.input}
+              value={materialGroups[selectedGroupIndex]?.serialNo || ''}
+              onChangeText={handleGroupSerialChange}
+              placeholder="Enter serial number for this group"
+              autoCapitalize="characters"
+            />
+
             <Text style={styles.label}>Select Product</Text>
             <TouchableOpacity
               style={styles.pickerButton}
@@ -795,7 +839,15 @@ const AddRentalReportScreen = () => {
         {materialGroups.map((group, groupIdx) => (
           <View key={group.name} style={styles.materialGroupCard}>
             <View style={styles.groupHeader}>
-              <Text style={styles.groupTitle}>{group.name}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.groupTitle}>{group.name}</Text>
+                <Text style={styles.groupSerial}>
+                  Model No: {group.modelNo?.trim() || '—'}
+                </Text>
+                <Text style={styles.groupSerial}>
+                  Serial No: {group.serialNo?.trim() || '—'}
+                </Text>
+              </View>
               <TouchableOpacity onPress={() => handleDeleteGroup(groupIdx)}>
                 <Icon name="delete" size={24} color="#FF3B30" />
               </TouchableOpacity>
@@ -1178,6 +1230,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#019ee3',
+  },
+  groupSerial: {
+    fontSize: 12,
+    color: '#019ee3',
+    fontWeight: '600',
+    marginTop: 2,
   },
   productRow: {
     flexDirection: 'row',

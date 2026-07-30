@@ -380,7 +380,9 @@ export const getAllReports = async (req, res) => {
             andConditions.push({
                 $or: [
                     { serialNo: serialRegex },
+                    { modelNo: serialRegex },
                     { "materialGroups.serialNo": serialRegex },
+                    { "materialGroups.modelNo": serialRegex },
                     { "materialGroups.products.serialNo": serialRegex },
                 ],
             });

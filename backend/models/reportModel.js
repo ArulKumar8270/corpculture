@@ -49,6 +49,10 @@ const materialGroupSchema = new mongoose.Schema({
         required: true,
         trim: true,
     },
+    modelNo: {
+        type: String,
+        trim: true,
+    },
     serialNo: {
         type: String,
         trim: true,
