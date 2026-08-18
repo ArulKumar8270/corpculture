@@ -19,11 +19,12 @@ router.post("/", createRemainder);
 // Get all Remainders
 router.get("/", getAllRemainders);
 
-// Get Remainder by ID
-router.get("/:id", getRemainderById);
+// Get remainders for a payload/IST date (before /:id so path is not captured)
+router.get("/getByToday/remainder", getRemaindersByTodayDate);
+router.post("/getByToday/remainder", getRemaindersByTodayDate);
 
 // Get Remainder by ID
-router.get("/getByToday/remainder", getRemaindersByTodayDate);
+router.get("/:id", getRemainderById);
 
 // Get Remainders by Company ID
 router.get("/company/:companyId/:type", getRemaindersByCompany);

@@ -3,6 +3,38 @@ import Company from "../../models/companyModel.js"; // Assuming you have a Compa
 import ServiceInvoice from "../../models/serviceInvoiceModel.js"; // Import ServiceInvoice model
 import RentalPaymentEntry from "../../models/rentalPaymentEntryModel.js"; // Import RentalPaymentEntry model
 
+const IST = "Asia/Kolkata";
+
+function getIstDayOfMonth(referenceDate = new Date()) {
+    const day = new Intl.DateTimeFormat("en-GB", {
+        timeZone: IST,
+        day: "numeric",
+    }).format(referenceDate);
+    return Number(day);
+}
+
+function parseDayOfMonth(req) {
+    const query = req.query || {};
+    const rawBody = Array.isArray(req.body) ? req.body[0] : req.body;
+    const body = rawBody && typeof rawBody === "object" ? rawBody : {};
+    const source = { ...query, ...body };
+
+    const dayFromPayload = Number(source["Day of month"] ?? source.dayOfMonth ?? source.day);
+    if (Number.isInteger(dayFromPayload) && dayFromPayload >= 1 && dayFromPayload <= 31) {
+        return dayFromPayload;
+    }
+
+    const timestamp = source.timestamp || source.date || source.Date;
+    if (timestamp) {
+        const parsed = new Date(timestamp);
+        if (!Number.isNaN(parsed.getTime())) {
+            return getIstDayOfMonth(parsed);
+        }
+    }
+
+    return getIstDayOfMonth(new Date());
+}
+
 // Create a new remainder
 export const createRemainder = async (req, res) => {
     try {
@@ -210,24 +242,21 @@ export const deleteRemainder = async (req, res) => {
     }
 };
 
-// Get remainders by today's date
+// Get remainders by today's date (or a payload date in IST)
 export const getRemaindersByTodayDate = async (req, res) => {
     try {
-        const today = new Date();
-        const { remainderType } = req.query;
-
-        // Today's date as a number (day of the month)
-        const todayDayOfMonth = today.getDate();
+        const dayOfMonth = parseDayOfMonth(req);
+        const remainderType = req.query.remainderType || req.body?.remainderType;
 
         const query = {
-            remainderDates: { $in: [todayDayOfMonth] }
+            remainderDates: { $in: [dayOfMonth] }
         };
 
         if (remainderType) {
             query.remainderType = remainderType;
         }
 
-        // Find remainders where today's date is inside remainderDates array
+        // Match remainders by date only (day of month), ignore time
         const remainders = await Remainder.find(query)
             .populate('companyId', '_id')
             .sort({ createdAt: -1 });
@@ -239,27 +268,20 @@ export const getRemaindersByTodayDate = async (req, res) => {
             });
         }
 
-        // Attach unpaid invoices for each remainder’s company
         const remaindersWithInvoices = await Promise.all(
             remainders.map(async (remainder) => {
-                const companyObjectId = remainder.companyId._id;
-
-                const today = new Date();
-                const startOfDay = new Date(today.setHours(0, 0, 0, 0));
-                const endOfDay = new Date(today.setHours(23, 59, 59, 999));
+                const companyObjectId = remainder.companyId?._id || remainder.companyId;
 
                 const unpaidServiceInvoices = await ServiceInvoice.find({
                     companyId: companyObjectId,
                     status: "Unpaid",
-                    invoiceType: "invoice",
-                    invoiceDate: { $gte: startOfDay, $lte: endOfDay }
+                    invoiceType: "invoice"
                 }, { _id: 1 });
 
                 const unpaidRentalInvoices = await RentalPaymentEntry.find({
                     companyId: companyObjectId,
                     status: "Unpaid",
-                    invoiceType: "invoice",
-                    invoiceDate: { $gte: startOfDay, $lte: endOfDay }
+                    invoiceType: "invoice"
                 }, { _id: 1 });
 
                 return {
