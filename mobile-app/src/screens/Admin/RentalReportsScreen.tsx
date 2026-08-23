@@ -21,6 +21,7 @@ import axios from 'axios';
 import { getApiBaseUrl } from '../../services/api';
 import Toast from 'react-native-toast-message';
 import ReportListFilters from '../../components/ReportListFilters';
+import ReportPagination from '../../components/ReportPagination';
 import {
   getReportSendWebhook,
   isOperationalDocumentReportType,
@@ -32,6 +33,7 @@ import {
 } from '../../utils/reportListApi';
 import { collectReportSerialNumbers } from '../../utils/reportSerialNumbers';
 import { openReportDownload } from '../../utils/reportDownload';
+import { getServiceProductDisplayName } from '../../utils/serviceProductDisplayName';
 
 function companyIdFromReport(report: any): string | undefined {
   const c = report?.company;
@@ -68,8 +70,6 @@ const RentalReportsScreen = () => {
     assignedTo: '',
     serialNo: '',
   });
-  const ROWS_PER_PAGE_OPTIONS = [5, 10, 25, 50, 100];
-
   const fetchReports = useCallback(
     async (filterValues = filters, currentPage = page, currentRowsPerPage = rowsPerPage) => {
       if (!token) return;
@@ -310,12 +310,22 @@ const RentalReportsScreen = () => {
     try {
       const url = await openReportDownload(report);
       if (!url) {
-        Toast.show({ type: 'error', text1: 'Error', text2: 'Report id missing' });
+        Toast.show({ type: 'error', text1: 'Error', text2: 'Report file not available' });
+        return;
+      }
+      const canOpen = await Linking.canOpenURL(url);
+      if (!canOpen) {
+        Toast.show({ type: 'error', text1: 'Error', text2: 'Unable to open download link' });
         return;
       }
       await Linking.openURL(url);
-    } catch {
-      Toast.show({ type: 'error', text1: 'Error', text2: 'Unable to open download link' });
+    } catch (error: any) {
+      console.error('Rental report download failed:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: error?.message || 'Unable to open download link',
+      });
     } finally {
       setDownloadingReportId(null);
     }
@@ -333,8 +343,6 @@ const RentalReportsScreen = () => {
       collectReportSerialNumbers(report).toLowerCase().includes(q)
     );
   });
-
-  const totalPages = Math.max(1, Math.ceil(totalCount / rowsPerPage));
 
   useEffect(() => {
     setPage(0);
@@ -484,7 +492,11 @@ const RentalReportsScreen = () => {
                     group.products.map((material: any, matIndex: number) => (
                       <View key={matIndex} style={styles.materialRow}>
                         <View style={styles.materialInfo}>
-                          <Text style={styles.materialName}>{material.productName}</Text>
+                          <Text style={styles.materialName}>
+                            {typeof material.productName === 'string' && material.productName.trim()
+                              ? material.productName
+                              : material.modelName || getServiceProductDisplayName(material)}
+                          </Text>
                           {material.serialNo ? (
                             <Text style={styles.materialDetails}>Serial: {material.serialNo}</Text>
                           ) : null}
@@ -515,7 +527,11 @@ const RentalReportsScreen = () => {
               item.materials.map((material: any, matIndex: number) => (
                 <View key={matIndex} style={styles.materialRow}>
                   <View style={styles.materialInfo}>
-                    <Text style={styles.materialName}>{material.productName}</Text>
+                    <Text style={styles.materialName}>
+                      {typeof material.productName === 'string' && material.productName.trim()
+                        ? material.productName
+                        : material.modelName || getServiceProductDisplayName(material)}
+                    </Text>
                     {material.serialNo ? (
                       <Text style={styles.materialDetails}>Serial: {material.serialNo}</Text>
                     ) : null}
@@ -597,53 +613,21 @@ const RentalReportsScreen = () => {
               <Text style={styles.emptyText}>No Rental_Reports found</Text>
             </View>
           }
-          ListFooterComponent={
-            <View style={styles.paginationWrapper}>
-              {totalCount > 0 && (
-                <View style={styles.rowsPerPageRow}>
-                  <Text style={styles.rowsPerPageLabel}>Rows per page:</Text>
-                  <View style={styles.rowsPerPageOptions}>
-                    {ROWS_PER_PAGE_OPTIONS.map((opt) => (
-                      <TouchableOpacity
-                        key={opt}
-                        style={[styles.rowsPerPageBtn, rowsPerPage === opt && styles.rowsPerPageBtnActive]}
-                        onPress={() => setRowsPerPage(opt)}
-                      >
-                        <Text style={[styles.rowsPerPageBtnText, rowsPerPage === opt && styles.rowsPerPageBtnTextActive]}>{opt}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-              )}
-              {totalCount > rowsPerPage ? (
-                <View style={styles.pagination}>
-                  <TouchableOpacity
-                    style={[styles.pageBtn, page === 0 && styles.pageBtnDisabled]}
-                    onPress={() => setPage((p) => Math.max(0, p - 1))}
-                    disabled={page === 0}
-                  >
-                    <Text style={styles.pageBtnText}>Previous</Text>
-                  </TouchableOpacity>
-                  <Text style={styles.pageInfo}>
-                    Page {page + 1} of {totalPages} ({totalCount} total)
-                  </Text>
-                  <TouchableOpacity
-                    style={[styles.pageBtn, page >= totalPages - 1 && styles.pageBtnDisabled]}
-                    onPress={() => setPage((p) => p + 1)}
-                    disabled={page >= totalPages - 1}
-                  >
-                    <Text style={styles.pageBtnText}>Next</Text>
-                  </TouchableOpacity>
-                </View>
-              ) : null}
-            </View>
-          }
         />
       )}
+      <ReportPagination
+        page={page}
+        rowsPerPage={rowsPerPage}
+        totalCount={totalCount}
+        onPageChange={(p) => setPage(p)}
+        onRowsPerPageChange={(r) => {
+          setRowsPerPage(r);
+          setPage(0);
+        }}
+      />
     </View>
   );
 };
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,

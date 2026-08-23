@@ -129,11 +129,59 @@ const AddCompanyScreen = () => {
   };
 
   const handleSubmit = async () => {
-    if (!formData.companyName || !formData.billingAddress) {
+    if (!formData.companyName?.trim() || !formData.billingAddress?.trim()) {
       Toast.show({
         type: 'error',
         text1: 'Validation Error',
-        text2: 'Please fill in all required fields',
+        text2: 'Please fill company name and billing address',
+      });
+      return;
+    }
+    if (!formData.city?.trim() || !formData.state?.trim() || !formData.pincode?.trim()) {
+      Toast.show({
+        type: 'error',
+        text1: 'Validation Error',
+        text2: 'Please fill city, state and pincode',
+      });
+      return;
+    }
+    if (!user?._id) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Please login again to create a company',
+      });
+      return;
+    }
+
+    const filledAddresses = serviceDeliveryAddresses.filter(
+      (addr) => addr.address.trim() !== '' && addr.pincode.trim() !== ''
+    );
+    const partialAddress = serviceDeliveryAddresses.some(
+      (addr) => (addr.address.trim() !== '') !== (addr.pincode.trim() !== '')
+    );
+    if (partialAddress) {
+      Toast.show({
+        type: 'error',
+        text1: 'Validation Error',
+        text2: 'Each delivery address needs both address and pincode, or leave both empty',
+      });
+      return;
+    }
+
+    const filledContacts = contactPersons.filter(
+      (person) => person.name.trim() !== '' && person.mobile.trim() !== ''
+    );
+    const partialContact = contactPersons.some(
+      (person) =>
+        (person.name.trim() !== '' || person.mobile.trim() !== '' || person.email.trim() !== '') &&
+        (!person.name.trim() || !person.mobile.trim())
+    );
+    if (partialContact) {
+      Toast.show({
+        type: 'error',
+        text1: 'Validation Error',
+        text2: 'Each contact person needs name and mobile, or leave the row empty',
       });
       return;
     }
@@ -147,8 +195,9 @@ const AddCompanyScreen = () => {
 
       const payload = {
         ...formData,
-        serviceDeliveryAddresses,
-        contactPersons,
+        userId: user._id,
+        serviceDeliveryAddresses: filledAddresses,
+        contactPersons: filledContacts,
       };
 
       const { data } = await axios[method](url, payload, {
@@ -161,8 +210,13 @@ const AddCompanyScreen = () => {
           text1: 'Success',
           text2: isEditMode ? 'Company updated successfully' : 'Company created successfully',
         });
-        // Navigate back to CompanyList screen explicitly
         (navigation as any).navigate('CompanyList');
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: data?.message || 'Failed to save company',
+        });
       }
     } catch (error: any) {
       Toast.show({
@@ -222,7 +276,7 @@ const AddCompanyScreen = () => {
           />
         </View>
 
-        <Text style={styles.label}>City</Text>
+        <Text style={styles.label}>City *</Text>
         <TextInput
           style={styles.input}
           value={formData.city}
@@ -230,7 +284,7 @@ const AddCompanyScreen = () => {
           placeholder="Enter city"
         />
 
-        <Text style={styles.label}>State</Text>
+        <Text style={styles.label}>State *</Text>
         <TextInput
           style={styles.input}
           value={formData.state}
@@ -238,7 +292,7 @@ const AddCompanyScreen = () => {
           placeholder="Enter state"
         />
 
-        <Text style={styles.label}>Pincode</Text>
+        <Text style={styles.label}>Pincode *</Text>
         <TextInput
           style={styles.input}
           value={formData.pincode}

@@ -112,11 +112,12 @@ const AdminDashboardScreen = () => {
       'ServiceReportsReport': 'Reports',
       'ActivityLogReport': 'Reports',
       'LeaveReport': 'Reports',
+      'EmployeeBenefitsReport': 'Reports',
     };
     const reportStackScreens = [
       'ReportsDashboard', 'CompanyReports', 'ServiceReportsSummary', 'RentalReportsSummary',
       'SalesReportsSummary', 'RentalInvoiceReport', 'ServiceEnquiriesReport', 'ServiceInvoicesReport',
-      'ServiceReportsReport', 'ActivityLogReport', 'LeaveReport',
+      'ServiceReportsReport', 'ActivityLogReport', 'LeaveReport', 'EmployeeBenefitsReport',
     ];
     let parentStack = nestedScreens[screen];
     if (!parentStack && reportStackScreens.includes(screen)) {

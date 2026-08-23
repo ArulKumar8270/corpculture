@@ -3,10 +3,38 @@ import ServiceInvoice from "../../models/serviceInvoiceModel.js"; // Import Serv
 import Report from "../../models/reportModel.js"; // Import Report model
 import RentalPaymentEntry from "../../models/rentalPaymentEntryModel.js"; // Import RentalPaymentEntry model
 
+const sanitizeCompanyPayload = (body = {}) => {
+    const payload = { ...body };
+    if (Array.isArray(payload.serviceDeliveryAddresses)) {
+        payload.serviceDeliveryAddresses = payload.serviceDeliveryAddresses.filter(
+            (addr) => addr && String(addr.address || "").trim() && String(addr.pincode || "").trim()
+        );
+    }
+    if (Array.isArray(payload.contactPersons)) {
+        payload.contactPersons = payload.contactPersons
+            .filter((person) => person && String(person.name || "").trim() && String(person.mobile || "").trim())
+            .map((person) => ({
+                ...person,
+                name: String(person.name).trim(),
+                mobile: String(person.mobile).trim(),
+                email: String(person.email || "").trim(),
+            }));
+    }
+    return payload;
+};
+
+const companyValidationMessage = (error) => {
+    if (error?.name === "ValidationError" && error.errors) {
+        return Object.values(error.errors).map((e) => e.message).join(", ");
+    }
+    return error?.message || "Error in company creation";
+};
+
 // Create Company
 export const createCompany = async (req, res) => {
     try {
-        const company = new companyModel(req.body);
+        const payload = sanitizeCompanyPayload(req.body);
+        const company = new companyModel(payload);
         await company.save();
 
         res.status(201).send({
@@ -16,9 +44,9 @@ export const createCompany = async (req, res) => {
         });
     } catch (error) {
         console.error("Error in company creation:", error);
-        res.status(500).send({
+        res.status(400).send({
             success: false,
-            message: "Error in company creation",
+            message: companyValidationMessage(error),
             error
         });
     }
@@ -178,8 +206,8 @@ export const updateCompany = async (req, res) => {
 
         const updatedcompany = await companyModel.findByIdAndUpdate(
             companyId,
-            req.body,
-            { new: true }
+            sanitizeCompanyPayload(req.body),
+            { new: true, runValidators: true }
         );
 
         res.status(200).send({

@@ -19,6 +19,7 @@ import { RootState } from '../../../store';
 import axios from 'axios';
 import { getApiBaseUrl } from '../../../services/api';
 import Toast from 'react-native-toast-message';
+import ReportPagination from '../../../components/ReportPagination';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 // @ts-ignore - xlsx may need to be installed: npm install xlsx
@@ -275,62 +276,15 @@ const ServiceEnquiriesReportScreen = () => {
     }
   };
 
-  const renderPagination = () => {
-    const totalPages = Math.ceil(totalCount / rowsPerPage);
-    const startItem = page * rowsPerPage + 1;
-    const endItem = Math.min((page + 1) * rowsPerPage, totalCount);
-
-    return (
-      <View style={styles.paginationContainer}>
-        <Text style={styles.paginationText}>
-          Showing {startItem}-{endItem} of {totalCount}
-        </Text>
-        <View style={styles.paginationButtons}>
-          <TouchableOpacity
-            style={[styles.paginationButton, page === 0 && styles.paginationButtonDisabled]}
-            onPress={() => handleChangePage(page - 1)}
-            disabled={page === 0}
-          >
-            <Icon name="chevron-left" size={24} color={page === 0 ? '#ccc' : '#007AFF'} />
-          </TouchableOpacity>
-          <Text style={styles.paginationPageText}>
-            Page {page + 1} of {totalPages || 1}
-          </Text>
-          <TouchableOpacity
-            style={[
-              styles.paginationButton,
-              page >= totalPages - 1 && styles.paginationButtonDisabled,
-            ]}
-            onPress={() => handleChangePage(page + 1)}
-            disabled={page >= totalPages - 1}
-          >
-            <Icon name="chevron-right" size={24} color={page >= totalPages - 1 ? '#ccc' : '#007AFF'} />
-          </TouchableOpacity>
-        </View>
-        <View style={styles.rowsPerPageContainer}>
-          <Text style={styles.rowsPerPageLabel}>Rows per page:</Text>
-          <TouchableOpacity
-            style={styles.rowsPerPageButton}
-            onPress={() => {
-              Alert.alert(
-                'Rows per page',
-                'Select number of rows',
-                [
-                  { text: '5', onPress: () => handleChangeRowsPerPage(5) },
-                  { text: '10', onPress: () => handleChangeRowsPerPage(10) },
-                  { text: '25', onPress: () => handleChangeRowsPerPage(25) },
-                  { text: 'Cancel', style: 'cancel' },
-                ]
-              );
-            }}
-          >
-            <Text style={styles.rowsPerPageText}>{rowsPerPage}</Text>
-            <Icon name="arrow-drop-down" size={20} color="#666" />
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  };
+  const renderPagination = () => (
+    <ReportPagination
+      page={page}
+      rowsPerPage={rowsPerPage}
+      totalCount={totalCount}
+      onPageChange={handleChangePage}
+      onRowsPerPageChange={handleChangeRowsPerPage}
+    />
+  );
 
   if (loading && enquiries.length === 0) {
     return (

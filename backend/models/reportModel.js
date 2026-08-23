@@ -103,7 +103,7 @@ const reportSchema = new mongoose.Schema({
         type: String,
         trim: true,
     },
-    /** Service / Product / Service + Product — required for DC Copy; optional for Gate Pass */
+    /** Service / Product / Service + Product — optional for reports, gate pass, DC, returnable */
     contentScope: {
         type: String,
         enum: ['Service', 'Product', 'Service + Product'],

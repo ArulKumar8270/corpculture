@@ -440,11 +440,6 @@ const RentalInvoiceListScreen = () => {
     });
   };
 
-  const handleView = (entry: any) => {
-    const docId = normalizeMongoId(entry?._id) || String(entry?._id ?? '').trim();
-    (navigation as any).navigate('RentalInvoiceDetail', { id: docId });
-  };
-
   const handleUploadSignedInvoice = async (entry: any) => {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -1192,13 +1187,6 @@ const RentalInvoiceListScreen = () => {
 
         {/* Action Buttons */}
         <View style={styles.actionButtons}>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.viewButton]}
-            onPress={() => handleView(item)}
-          >
-            <Icon name="visibility" size={18} color="#019ee3" />
-            <Text style={[styles.actionButtonText, { color: '#019ee3' }]}>View</Text>
-          </TouchableOpacity>
           {hasPermission('rentalInvoice', 'edit') && (
             <TouchableOpacity
               style={[styles.actionButton, styles.editButton]}

@@ -29,20 +29,38 @@ try {
 }
 
 const formatListField = (value: unknown): string => {
-  if (Array.isArray(value)) return value.filter(Boolean).join(', ');
-  return value != null && value !== '' ? String(value) : '';
+  if (value == null || value === '') return '';
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => {
+        if (typeof item === 'object' && item !== null) {
+          return String((item as { name?: string }).name ?? '').trim();
+        }
+        return String(item ?? '').trim();
+      })
+      .filter(Boolean)
+      .join(', ');
+  }
+  if (typeof value === 'object') {
+    return String((value as { name?: string }).name ?? '').trim();
+  }
+  return String(value);
 };
 
 const formatDepartments = (department: unknown): string => {
   if (!department) return '';
   if (Array.isArray(department)) {
     return department
-      .map((d) => (typeof d === 'object' && d !== null ? (d as { name?: string }).name : d))
+      .map((d) =>
+        typeof d === 'object' && d !== null
+          ? String((d as { name?: string }).name || '').trim()
+          : String(d ?? '').trim()
+      )
       .filter(Boolean)
       .join(', ');
   }
   if (typeof department === 'object' && department !== null) {
-    return (department as { name?: string }).name || '';
+    return String((department as { name?: string }).name || '').trim();
   }
   return String(department);
 };
@@ -55,10 +73,17 @@ interface Employee {
   address: string;
   employeeType: string | string[];
   designation?: string | string[];
-  department?: {
-    _id: string;
-    name: string;
-  };
+  department?:
+    | {
+        _id: string;
+        name: string;
+      }
+    | Array<{
+        _id: string;
+        name: string;
+        commission?: number;
+      } | string>
+    | string;
   pincode?: string | string[];
   idCradNo?: string;
   salary?: number | string;
@@ -296,14 +321,14 @@ const EmployeeListScreen = () => {
         </View>
         <View style={styles.detailRow}>
           <Icon name="work" size={16} color="#666" />
-          <Text style={styles.detailText}>{formatListField(item.employeeType)}</Text>
+          <Text style={styles.detailText}>{formatListField(item.employeeType) || '—'}</Text>
         </View>
-        {item.department && (
+        {formatDepartments(item.department) ? (
           <View style={styles.detailRow}>
             <Icon name="business" size={16} color="#666" />
-            <Text style={styles.detailText}>{item.department.name}</Text>
+            <Text style={styles.detailText}>{formatDepartments(item.department)}</Text>
           </View>
-        )}
+        ) : null}
         {formatListField(item.designation) ? (
           <View style={styles.detailRow}>
             <Icon name="badge" size={16} color="#666" />

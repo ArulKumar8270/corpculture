@@ -158,8 +158,8 @@ const SalesReportsSummaryScreen = () => {
                 const ordersCount = ordersRes?.value?.data?.totalCount ?? 0;
 
                 setReportData([
-                  { id: 'salesProducts', name: 'All Sales Products', count: productsCount, screen: 'AllProducts' },
-                  { id: 'salesOrders', name: 'Sales Orders', count: ordersCount, screen: 'AdminOrders' },
+                  { id: 'salesProducts', name: 'All Sales Products', count: productsCount, screen: 'Products' },
+                  { id: 'salesOrders', name: 'Sales Orders', count: ordersCount, screen: 'Orders' },
                 ]);
               } catch (err) {
                 console.error('Error loading sales overview data:', err);

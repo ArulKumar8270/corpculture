@@ -221,24 +221,39 @@ const AddRentalReportScreen = () => {
         });
         setBranches(Array.from(extractedBranches));
       }
-
-      const { data: productsData } = await axios.get(
-        `${getApiBaseUrl()}/rental-products/getServiceProductsByCompany/${formData.company}`,
-        { headers: { Authorization: token || '' } }
-      );
-      if (productsData?.success) {
-        // Filter and validate products to ensure they have required fields
-        const validProducts = (productsData.rentalProducts || []).filter(
-          (product: any) => 
-            product && 
-            typeof product === 'object' && 
-            product._id && 
-            (product.productName || product.modelName || product.name)
-        );
-        setAvailableProducts(validProducts);
-      }
     } catch (error) {
-      console.error('Error fetching company related data:', error);
+      console.error('Error fetching company details:', error);
+    }
+
+    try {
+      let list: any[] = [];
+      try {
+        const { data: productsData } = await axios.get(
+          `${getApiBaseUrl()}/rental-products/getServiceProductsByCompany/${formData.company}`,
+          { headers: { Authorization: token || '' } }
+        );
+        list = productsData?.rentalProducts ?? productsData?.data?.rentalProducts ?? [];
+      } catch {
+        list = [];
+      }
+      if (!Array.isArray(list) || list.length === 0) {
+        const allRes = await axios.get(`${getApiBaseUrl()}/rental-products`, {
+          headers: { Authorization: token || '' },
+        });
+        list = allRes.data?.rentalProducts ?? allRes.data?.data?.rentalProducts ?? [];
+      }
+      setAvailableProducts(
+        (Array.isArray(list) ? list : []).filter(
+          (product: any) =>
+            product &&
+            typeof product === 'object' &&
+            product._id &&
+            (product.productName || product.modelName || product.name)
+        )
+      );
+    } catch (error) {
+      console.error('Error fetching products:', error);
+      setAvailableProducts([]);
     }
   };
 
@@ -499,23 +514,6 @@ const AddRentalReportScreen = () => {
       });
       return;
     }
-    const hasProducts = materialGroups.some((group) => group.products.length > 0);
-    if (materialGroups.length === 0 || !hasProducts) {
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: 'Please add at least one material group with products',
-      });
-      return;
-    }
-    if (isContentScopeRequired(formData.reportType || resolvedReportType) && !formData.contentScope) {
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: 'Please select Service / Product for Delivery Challan (DC Copy)',
-      });
-      return;
-    }
 
     try {
       setSubmitting(true);
@@ -727,7 +725,7 @@ const AddRentalReportScreen = () => {
           numberOfLines={2}
         />
 
-        <Text style={styles.sectionTitle}>Material Groups</Text>
+        <Text style={styles.sectionTitle}>Material Groups (optional)</Text>
         <View style={styles.groupButtons}>
           <TouchableOpacity style={styles.addGroupButton} onPress={handleAddGroup}>
             <Icon name="add" size={20} color="#fff" />
@@ -1049,11 +1047,20 @@ const AddRentalReportScreen = () => {
             <FlatList
               data={availableProducts}
               keyExtractor={(item) => item?._id || String(item)}
+              ListEmptyComponent={
+                <Text style={styles.pickerOptionText}>
+                  {formData.company ? 'No products found' : 'Select a company first'}
+                </Text>
+              }
               renderItem={({ item }) => {
                 if (!item || typeof item !== 'object') {
                   return null;
                 }
-                const productName = item.productName || item.modelName || 'Unknown Product';
+                const productName =
+                  (typeof item.productName === 'string' && item.productName) ||
+                  item.modelName ||
+                  item.name ||
+                  'Unknown Product';
                 const productId = item._id;
                 if (!productId) {
                   return null;

@@ -20,11 +20,18 @@ import axios from 'axios';
 import { getApiBaseUrl } from '../../../services/api';
 import Toast from 'react-native-toast-message';
 import { openSignedCopyDownload } from '../../../utils/functions';
+import ReportPagination from '../../../components/ReportPagination';
+import {
+  buildRentalInvoiceGstrWorksheet,
+  excelBufferToBase64,
+} from '../../../utils/gstrExport';
+import {
+  openRentalInvoicePdf,
+  openPaymentCopyPdf,
+} from '../../../utils/invoiceDownload';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 // @ts-ignore - xlsx may need to be installed: npm install xlsx
-// For React Native, you may need: npm install xlsx react-native-fs
-// Or use CSV export as an alternative
 let XLSX: any;
 try {
   XLSX = require('xlsx');
@@ -136,74 +143,71 @@ const RentalInvoiceReportScreen = () => {
   };
 
   const handleExportExcel = async () => {
-    if (rentalInvoices.length === 0) {
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: 'No data to export.',
-      });
+    if (!token) {
+      Toast.show({ type: 'error', text1: 'You must be signed in to export.' });
       return;
     }
-
+    if (totalCount === 0 && rentalInvoices.length === 0) {
+      Toast.show({ type: 'error', text1: 'No data to export for the current filters.' });
+      return;
+    }
     if (!XLSX) {
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: 'Excel export requires xlsx library. Please install: npm install xlsx',
-      });
+      Toast.show({ type: 'error', text1: 'Excel export requires xlsx library.' });
       return;
     }
 
     try {
       setExporting(true);
-      const dataToExport = rentalInvoices.map((invoice) => ({
-        'Invoice No.': invoice.invoiceNumber || 'N/A',
-        'Company': invoice.companyId?.companyName || 'N/A',
-        'Machine Model': invoice.machineId?.modelName || invoice.products?.[0]?.machineId?.modelName || 'N/A',
-        'Machine Serial No.': invoice.machineId?.serialNo || invoice.products?.[0]?.machineId?.serialNo || 'N/A',
-        'Invoice Date': new Date(invoice.createdAt).toLocaleDateString(),
-        'Grand Total': invoice.grandTotal?.toFixed(2) || 'N/A',
-        'Mode of Payment': invoice.modeOfPayment || 'N/A',
-        'Bank Name': invoice.bankName || 'N/A',
-        'Cheque Date': invoice.chequeDate ? new Date(invoice.chequeDate).toLocaleDateString() : 'N/A',
-        'Other Payment Mode': invoice.otherPaymentMode || 'N/A',
-        'Transaction Details': invoice.transactionDetails || 'N/A',
-        'Transfer Date': invoice.transferDate ? new Date(invoice.transferDate).toLocaleDateString() : 'N/A',
-        'Status': invoice.status || 'N/A',
-      }));
+      const exportLimit = Math.min(Math.max(totalCount || rentalInvoices.length, 1), 100000);
+      const requestBody = {
+        invoiceType: reportType,
+        fromDate,
+        toDate,
+        ...(filterCompanyId ? { companyId: filterCompanyId } : {}),
+        companyName: companyNameFilter,
+        invoiceNumber: invoiceNumberFilter,
+        paymentStatus: paymentStatusFilter,
+        page: 1,
+        limit: exportLimit,
+      };
+      const response = await axios.post(
+        `${getApiBaseUrl()}/rental-payment/all/`,
+        requestBody,
+        { headers: { Authorization: token || '' } }
+      );
+      if (!response.data?.success) {
+        Toast.show({ type: 'error', text1: response.data?.message || 'Failed to fetch export data' });
+        return;
+      }
+      const rows = response.data.entries || [];
+      if (!rows.length) {
+        Toast.show({ type: 'error', text1: 'No data to export.' });
+        return;
+      }
 
-      const ws = XLSX.utils.json_to_sheet(dataToExport);
+      const ws = buildRentalInvoiceGstrWorksheet(XLSX, rows);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Rental Invoices');
       const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-
-      const fileName = `rental_invoices_report_${Date.now()}.xlsx`;
-      const fileUri = `${FileSystem.documentDirectory}${fileName}`;
-
-      await FileSystem.writeAsStringAsync(fileUri, btoa(String.fromCharCode(...excelBuffer)), {
+      const fileName = `rental_invoices_gstr_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      const fileUri = `${FileSystem.cacheDirectory}${fileName}`;
+      await FileSystem.writeAsStringAsync(fileUri, excelBufferToBase64(excelBuffer), {
         encoding: FileSystem.EncodingType.Base64,
       });
-
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(fileUri);
         Toast.show({
           type: 'success',
-          text1: 'Success',
-          text2: 'Exported to Excel successfully!',
+          text1: `Exported ${rows.length} row(s) (GSTR layout)`,
         });
       } else {
-        Toast.show({
-          type: 'error',
-          text1: 'Error',
-          text2: 'Sharing is not available on this device.',
-        });
+        Toast.show({ type: 'error', text1: 'Sharing is not available on this device.' });
       }
     } catch (error: any) {
       console.error('Error exporting to Excel:', error);
       Toast.show({
         type: 'error',
-        text1: 'Error',
-        text2: error.message || 'Failed to export to Excel.',
+        text1: error.response?.data?.message || error.message || 'Export failed.',
       });
     } finally {
       setExporting(false);
@@ -229,10 +233,36 @@ const RentalInvoiceReportScreen = () => {
     }
   };
 
+  const handleDownloadInvoicePdf = async (invoice: any) => {
+    try {
+      const ok = await openRentalInvoicePdf(invoice);
+      if (!ok) Toast.show({ type: 'error', text1: 'Invoice PDF not available' });
+    } catch {
+      Toast.show({ type: 'error', text1: 'Could not open invoice PDF' });
+    }
+  };
+
+  const handleDownloadPaymentCopy = async (invoice: any) => {
+    try {
+      const ok = await openPaymentCopyPdf(invoice);
+      if (!ok) Toast.show({ type: 'error', text1: 'Payment copy not available' });
+    } catch {
+      Toast.show({ type: 'error', text1: 'Could not open payment copy' });
+    }
+  };
+
+  const handleEditPayment = (invoice: any) => {
+    (navigation as any).navigate('Rentals', {
+      screen: 'RentalInvoiceList',
+      params: { highlightInvoiceId: invoice?._id, openPayment: true },
+    });
+  };
+
   const renderInvoice = ({ item, index }: { item: any; index: number }) => {
     const firstProduct = item.products && item.products.length > 0
       ? item.products[0]
       : item.machineId ? { machineId: item.machineId } : null;
+    const dateVal = item.invoiceDate || item.entryDate || item.createdAt;
 
     return (
       <View style={styles.invoiceCard}>
@@ -249,6 +279,10 @@ const RentalInvoiceReportScreen = () => {
             <Text style={styles.detailValue}>{item.companyId?.companyName || 'N/A'}</Text>
           </View>
           <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>GST:</Text>
+            <Text style={styles.detailValue}>{item.companyId?.gstNo || 'N/A'}</Text>
+          </View>
+          <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Machine:</Text>
             <Text style={styles.detailValue}>
               {firstProduct?.machineId?.modelName || item.machineId?.modelName || 'N/A'} / {firstProduct?.machineId?.serialNo || item.machineId?.serialNo || 'N/A'}
@@ -257,47 +291,66 @@ const RentalInvoiceReportScreen = () => {
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Invoice Date:</Text>
             <Text style={styles.detailValue}>
-              {new Date(item.createdAt).toLocaleDateString()}
+              {dateVal ? new Date(dateVal).toLocaleDateString() : 'N/A'}
             </Text>
           </View>
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Grand Total:</Text>
             <Text style={styles.detailValue}>
-              ₹{item.grandTotal?.toFixed(2) || 'N/A'}
+              ₹{Number(item.grandTotal || 0).toFixed(2)}
+            </Text>
+          </View>
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Paid / TDS:</Text>
+            <Text style={styles.detailValue}>
+              ₹{Number(item.paymentAmount || 0).toFixed(2)} / ₹{Number(item.tdsAmount || 0).toFixed(2)}
             </Text>
           </View>
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Payment Mode:</Text>
             <Text style={styles.detailValue}>{item.modeOfPayment || 'N/A'}</Text>
           </View>
-          {item.bankName && (
+          {item.bankName ? (
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Bank Name:</Text>
               <Text style={styles.detailValue}>{item.bankName}</Text>
             </View>
-          )}
-          {item.chequeDate && (
+          ) : null}
+          {item.chequeDate ? (
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Cheque Date:</Text>
               <Text style={styles.detailValue}>
                 {new Date(item.chequeDate).toLocaleDateString()}
               </Text>
             </View>
-          )}
-          {item.transactionDetails && (
+          ) : null}
+          {item.transactionDetails ? (
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Transaction:</Text>
               <Text style={styles.detailValue}>{item.transactionDetails}</Text>
             </View>
-          )}
+          ) : null}
         </View>
-        <TouchableOpacity
-          style={styles.signedCopyBtn}
-          onPress={() => handleDownloadSignedCopy(item)}
-        >
-          <Icon name="attachment" size={18} color="#019ee3" />
-          <Text style={styles.signedCopyBtnText}>Download Signed Copy</Text>
-        </TouchableOpacity>
+        <View style={styles.downloadRow}>
+          <TouchableOpacity style={styles.pdfBtn} onPress={() => handleDownloadInvoicePdf(item)}>
+            <Icon name="picture-as-pdf" size={16} color="#019ee3" />
+            <Text style={styles.pdfBtnText}>Invoice</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.pdfBtn} onPress={() => handleDownloadPaymentCopy(item)}>
+            <Icon name="receipt" size={16} color="#019ee3" />
+            <Text style={styles.pdfBtnText}>Payment</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.pdfBtn} onPress={() => handleDownloadSignedCopy(item)}>
+            <Icon name="attachment" size={16} color="#019ee3" />
+            <Text style={styles.pdfBtnText}>Signed</Text>
+          </TouchableOpacity>
+          {reportType !== 'quotation' ? (
+            <TouchableOpacity style={styles.pdfBtn} onPress={() => handleEditPayment(item)}>
+              <Icon name="edit" size={16} color="#6a1b9a" />
+              <Text style={[styles.pdfBtnText, { color: '#6a1b9a' }]}>Pay</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
       </View>
     );
   };
@@ -316,62 +369,15 @@ const RentalInvoiceReportScreen = () => {
     }
   };
 
-  const renderPagination = () => {
-    const totalPages = Math.ceil(totalCount / rowsPerPage);
-    const startItem = page * rowsPerPage + 1;
-    const endItem = Math.min((page + 1) * rowsPerPage, totalCount);
-
-    return (
-      <View style={styles.paginationContainer}>
-        <Text style={styles.paginationText}>
-          Showing {startItem}-{endItem} of {totalCount}
-        </Text>
-        <View style={styles.paginationButtons}>
-          <TouchableOpacity
-            style={[styles.paginationButton, page === 0 && styles.paginationButtonDisabled]}
-            onPress={() => handleChangePage(page - 1)}
-            disabled={page === 0}
-          >
-            <Icon name="chevron-left" size={24} color={page === 0 ? '#ccc' : '#007AFF'} />
-          </TouchableOpacity>
-          <Text style={styles.paginationPageText}>
-            Page {page + 1} of {totalPages || 1}
-          </Text>
-          <TouchableOpacity
-            style={[
-              styles.paginationButton,
-              page >= totalPages - 1 && styles.paginationButtonDisabled,
-            ]}
-            onPress={() => handleChangePage(page + 1)}
-            disabled={page >= totalPages - 1}
-          >
-            <Icon name="chevron-right" size={24} color={page >= totalPages - 1 ? '#ccc' : '#007AFF'} />
-          </TouchableOpacity>
-        </View>
-        <View style={styles.rowsPerPageContainer}>
-          <Text style={styles.rowsPerPageLabel}>Rows per page:</Text>
-          <TouchableOpacity
-            style={styles.rowsPerPageButton}
-            onPress={() => {
-              Alert.alert(
-                'Rows per page',
-                'Select number of rows',
-                [
-                  { text: '5', onPress: () => handleChangeRowsPerPage(5) },
-                  { text: '10', onPress: () => handleChangeRowsPerPage(10) },
-                  { text: '25', onPress: () => handleChangeRowsPerPage(25) },
-                  { text: 'Cancel', style: 'cancel' },
-                ]
-              );
-            }}
-          >
-            <Text style={styles.rowsPerPageText}>{rowsPerPage}</Text>
-            <Icon name="arrow-drop-down" size={20} color="#666" />
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  };
+  const renderPagination = () => (
+    <ReportPagination
+      page={page}
+      rowsPerPage={rowsPerPage}
+      totalCount={totalCount}
+      onPageChange={handleChangePage}
+      onRowsPerPageChange={handleChangeRowsPerPage}
+    />
+  );
 
   if (loading && rentalInvoices.length === 0) {
     return (
@@ -420,7 +426,7 @@ const RentalInvoiceReportScreen = () => {
           ) : (
             <>
               <Icon name="file-download" size={20} color="#fff" />
-              <Text style={styles.exportButtonText}>Export Excel</Text>
+              <Text style={styles.exportButtonText}>Export GSTR Excel</Text>
             </>
           )}
         </TouchableOpacity>
@@ -693,6 +699,29 @@ const styles = StyleSheet.create({
     color: '#019ee3',
     fontWeight: '600',
     fontSize: 14,
+  },
+  downloadRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingBottom: 12,
+  },
+  pdfBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderWidth: 1,
+    borderColor: '#cfe8f5',
+    backgroundColor: '#f3faff',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  pdfBtnText: {
+    color: '#019ee3',
+    fontSize: 12,
+    fontWeight: '600',
   },
   invoiceHeader: {
     flexDirection: 'row',

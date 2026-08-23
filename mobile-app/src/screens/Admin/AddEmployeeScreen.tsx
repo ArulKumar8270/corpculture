@@ -126,10 +126,22 @@ const AddEmployeeScreen = () => {
             : data.employee.pincode
               ? [data.employee.pincode]
               : [],
-          employeeType: data.employee.employeeType || '',
-          designation: data.employee.designation || '',
+          employeeType: Array.isArray(data.employee.employeeType)
+            ? data.employee.employeeType.filter(Boolean).join(', ')
+            : data.employee.employeeType || '',
+          designation: Array.isArray(data.employee.designation)
+            ? data.employee.designation.filter(Boolean).join(', ')
+            : data.employee.designation || '',
           idCradNo: data.employee.idCradNo || '',
-          department: data.employee.department?._id || data.employee.department || '',
+          department: Array.isArray(data.employee.department)
+            ? String(
+                data.employee.department[0]?._id ||
+                  data.employee.department[0] ||
+                  ''
+              )
+            : String(
+                data.employee.department?._id || data.employee.department || ''
+              ),
           salary: data.employee.salary?.toString() || '',
           orderPriceFrom: data.employee.orderPriceFrom?.toString() || '',
           orderPriceTo: data.employee.orderPriceTo?.toString() || '',
@@ -247,6 +259,19 @@ const AddEmployeeScreen = () => {
   const buildEmployeePayload = () => ({
     ...formData,
     pincode: formData.pincode,
+    employeeType: formData.employeeType
+      ? String(formData.employeeType)
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : [],
+    designation: formData.designation
+      ? String(formData.designation)
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : [],
+    department: formData.department ? [formData.department] : [],
     salary: formData.salary ? Number(formData.salary) : undefined,
     orderPriceFrom: formData.orderPriceFrom ? Number(formData.orderPriceFrom) : 0,
     orderPriceTo: formData.orderPriceTo ? Number(formData.orderPriceTo) : 0,

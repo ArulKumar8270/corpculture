@@ -472,16 +472,6 @@ const AddServiceReport = (props) => {
             toast.error('Please select a company.');
             return;
         }
-        if (isContentScopeRequired(reportData.reportType) && !reportData.contentScope) {
-            toast.error('Please select Service / Product for Delivery Challan (DC Copy).');
-            return;
-        }
-        // Validate at least one material group exists and has products
-        const hasProducts = materialGroups.some(group => group.products.length > 0);
-        if (materialGroups.length === 0 || !hasProducts) {
-            toast.error('Please add at least one material group with products.');
-            return;
-        }
 
         // Construct the payload for the backend
         const payload = {
@@ -769,7 +759,7 @@ const AddServiceReport = (props) => {
                 </Grid>
 
                 <Typography variant="h6" component="h2" gutterBottom sx={{ mt: 4, mb: 2, color: '#019ee3' }}>
-                    Material Groups
+                    Material Groups <Typography component="span" variant="body2" sx={{ color: 'text.secondary' }}>(optional)</Typography>
                 </Typography>
                 <Box sx={{ mb: 2, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                     <Button variant="outlined" onClick={handleAddGroup}>

@@ -72,6 +72,9 @@ const EmployeeDashboardScreen = () => {
       'ServiceInvoicesReport': 'Reports',
       'ServiceReportsReport': 'Reports',
       'EmployeeList': 'Reports',
+      'EmployeeBenefitsReport': 'Reports',
+      'ActivityLogReport': 'Reports',
+      'LeaveReport': 'Reports',
       'ReportsDashboard': 'Reports',
     };
     
@@ -87,7 +90,7 @@ const EmployeeDashboardScreen = () => {
     const reportStackScreens = [
       'ReportsDashboard', 'CompanyReports', 'ServiceReportsSummary', 'RentalReportsSummary',
       'SalesReportsSummary', 'RentalInvoiceReport', 'ServiceEnquiriesReport', 'ServiceInvoicesReport',
-      'ServiceReportsReport', 'ActivityLogReport', 'LeaveReport', 'EmployeeList',
+      'ServiceReportsReport', 'ActivityLogReport', 'LeaveReport', 'EmployeeList', 'EmployeeBenefitsReport',
     ];
     let parentStack = nestedScreens[screen];
     if (!parentStack && reportStackScreens.includes(screen)) {

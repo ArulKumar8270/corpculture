@@ -5,18 +5,13 @@ import Counter from "../../models/counterModel.js";
 import mongoose from "mongoose";
 import { normalizeSendDetailsTo } from "../../utils/normalizeSendDetailsTo.js";
 
-const DELIVERY_CHALLAN_TYPES = ["Service_Delivery_Challan", "Rental_Delivery_Challan"];
 const VALID_CONTENT_SCOPES = ["Service", "Product", "Service + Product"];
 
 const ASSIGNED_TO_USER_SELECT =
     "-password -wishlist -expoPushTokens -commissionCategorys -serviceDeliveryAddresses";
 
 const validateContentScope = (reportType, contentScope) => {
-    if (DELIVERY_CHALLAN_TYPES.includes(reportType)) {
-        if (!contentScope || !VALID_CONTENT_SCOPES.includes(String(contentScope).trim())) {
-            return "Delivery Challan (DC Copy) requires Service/Product selection (Service, Product, or Service + Product).";
-        }
-    } else if (contentScope != null && contentScope !== "" && !VALID_CONTENT_SCOPES.includes(String(contentScope).trim())) {
+    if (contentScope != null && contentScope !== "" && !VALID_CONTENT_SCOPES.includes(String(contentScope).trim())) {
         return "Invalid Service/Product selection.";
     }
     return null;

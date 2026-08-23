@@ -44,44 +44,37 @@ const CreateCompanyScreen = () => {
   ]);
 
   const handleSubmit = async () => {
-    if (!formData.companyName || !formData.billingAddress) {
+    if (!formData.companyName?.trim() || !formData.billingAddress?.trim()) {
       Toast.show({
         type: 'error',
         text1: 'Validation Error',
-        text2: 'Please fill in all required fields',
+        text2: 'Please fill company name and billing address',
+      });
+      return;
+    }
+    if (!formData.city?.trim() || !formData.state?.trim() || !formData.pincode?.trim()) {
+      Toast.show({
+        type: 'error',
+        text1: 'Validation Error',
+        text2: 'Please fill city, state and pincode',
       });
       return;
     }
 
-    // Validate service delivery addresses
-    if (serviceDeliveryAddresses.length > 0 && serviceDeliveryAddresses.some(addr => !addr.address.trim() || !addr.pincode.trim())) {
-      Toast.show({
-        type: 'error',
-        text1: 'Validation Error',
-        text2: 'Please fill in all service delivery addresses and pincodes or remove empty ones',
-      });
-      return;
-    }
-
-    // Validate contact persons
-    if (contactPersons.length > 0 && contactPersons.some(person => !person.name.trim() || !person.mobile.trim() || !person.email.trim())) {
-      Toast.show({
-        type: 'error',
-        text1: 'Validation Error',
-        text2: 'Please fill in all contact person details or remove empty ones',
-      });
-      return;
-    }
+    const filledAddresses = serviceDeliveryAddresses.filter(
+      (addr) => addr.address.trim() !== '' && addr.pincode.trim() !== ''
+    );
+    const filledContacts = contactPersons.filter(
+      (person) => person.name.trim() !== '' && person.mobile.trim() !== ''
+    );
 
     setLoading(true);
     try {
       const payload = {
         ...formData,
         userId: user?._id,
-        // Filter out empty address objects
-        serviceDeliveryAddresses: serviceDeliveryAddresses.filter(addr => addr.address.trim() !== '' && addr.pincode.trim() !== ''),
-        // Filter out empty contact person objects
-        contactPersons: contactPersons.filter(person => person.name.trim() !== '' && person.mobile.trim() !== '' && person.email.trim() !== ''),
+        serviceDeliveryAddresses: filledAddresses,
+        contactPersons: filledContacts,
       };
 
       const { data } = await axios.post(
@@ -184,7 +177,7 @@ const CreateCompanyScreen = () => {
           numberOfLines={3}
         />
 
-        <Text style={styles.label}>City</Text>
+        <Text style={styles.label}>City *</Text>
         <TextInput
           style={styles.input}
           value={formData.city}
@@ -192,7 +185,7 @@ const CreateCompanyScreen = () => {
           placeholder="Enter city"
         />
 
-        <Text style={styles.label}>State</Text>
+        <Text style={styles.label}>State *</Text>
         <TextInput
           style={styles.input}
           value={formData.state}
@@ -200,7 +193,7 @@ const CreateCompanyScreen = () => {
           placeholder="Enter state"
         />
 
-        <Text style={styles.label}>Pincode</Text>
+        <Text style={styles.label}>Pincode *</Text>
         <TextInput
           style={styles.input}
           value={formData.pincode}

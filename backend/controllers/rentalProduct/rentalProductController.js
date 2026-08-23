@@ -167,11 +167,11 @@ export const getRentalProductsByCompany = async (req, res) => {
             .populate('gstType')
             .sort({ createdAt: -1 });
 
-        if (rentalProducts.length === 0) {
-            return res.status(404).send({ success: false, message: 'No rental products found for this company.' });
-        }
-
-        res.status(200).send({ success: true, message: 'Rental Products fetched successfully for the company', rentalProducts });
+        res.status(200).send({
+            success: true,
+            message: 'Rental Products fetched successfully for the company',
+            rentalProducts: rentalProducts || [],
+        });
     } catch (error) {
         console.error("Error in getRentalProductsByCompany:", error);
         res.status(500).send({ success: false, message: 'Error in getting rental products by company', error });

@@ -1,4 +1,5 @@
 import React from "react";
+import { Link } from "react-router-dom";
 import logo from "../../assets/images/logo.png";
 
 const Footer = () => (
@@ -71,6 +72,9 @@ const Footer = () => (
                     <a href="#" className="hover:underline">About</a>
                     <a href="#" className="hover:underline">Products</a>
                     <a href="#" className="hover:underline">Testimonials</a>
+                    <Link to="/terms-and-conditions" className="hover:underline">Terms &amp; Conditions</Link>
+                    <Link to="/refund-and-return-policy" className="hover:underline">Refund &amp; Return Policy</Link>
+                    <Link to="/privacy-policy" className="hover:underline">Privacy Policy</Link>
                 </nav>
                 <div className="text-cyan-100 text-xs">
                     Copyright &copy; {new Date().getFullYear()} Corpculture. All Rights Reserved.

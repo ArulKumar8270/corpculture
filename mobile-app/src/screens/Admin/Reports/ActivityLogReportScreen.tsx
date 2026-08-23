@@ -19,8 +19,7 @@ import { RootState } from '../../../store';
 import axios from 'axios';
 import Toast from 'react-native-toast-message';
 import { getApiBaseUrl } from '../../../services/api';
-
-const ROWS_PER_PAGE = 10;
+import ReportPagination from '../../../components/ReportPagination';
 
 const ActivityLogReportScreen = () => {
   const { token } = useSelector((state: RootState) => state.auth);
@@ -34,13 +33,12 @@ const ActivityLogReportScreen = () => {
   const [employeeId, setEmployeeId] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
   const [totalCount, setTotalCount] = useState(0);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [employeePickerVisible, setEmployeePickerVisible] = useState(false);
   // Report shows stored amount from DB (petrolAmount); no need to fetch petrol price here.
-
-  const totalPages = Math.ceil(totalCount / ROWS_PER_PAGE) || 1;
 
   const fetchEmployees = useCallback(async () => {
     try {
@@ -60,7 +58,7 @@ const ActivityLogReportScreen = () => {
         setLoading(true);
         const params = new URLSearchParams({
           page: String(pageNum + 1),
-          limit: String(ROWS_PER_PAGE),
+          limit: String(rowsPerPage),
         });
         if (fromDate) params.append('fromDate', fromDate);
         if (toDate) params.append('toDate', toDate);
@@ -86,7 +84,7 @@ const ActivityLogReportScreen = () => {
         setLoading(false);
       }
     },
-    [token, fromDate, toDate, employeeId, statusFilter]
+    [token, fromDate, toDate, employeeId, statusFilter, rowsPerPage]
   );
 
   useFocusEffect(
@@ -224,6 +222,24 @@ const ActivityLogReportScreen = () => {
             {displayAmount(item)}
           </Text>
         </View>
+        <View style={styles.cardRow}>
+          <Text style={styles.cardLabel}>In Time</Text>
+          <Text style={styles.cardValue}>{item.inTime || 'N/A'}</Text>
+        </View>
+        <View style={styles.cardRow}>
+          <Text style={styles.cardLabel}>Out Time</Text>
+          <Text style={styles.cardValue}>{item.outTime || 'N/A'}</Text>
+        </View>
+        <View style={styles.cardRow}>
+          <Text style={styles.cardLabel}>Call Type</Text>
+          <Text style={styles.cardValue}>{item.callType || 'N/A'}</Text>
+        </View>
+        {item.remarks ? (
+          <View style={styles.cardRow}>
+            <Text style={styles.cardLabel}>Remarks</Text>
+            <Text style={styles.cardValue}>{item.remarks}</Text>
+          </View>
+        ) : null}
         <View style={styles.cardRow}>
           <Text style={styles.cardLabel}>Status</Text>
           <TouchableOpacity
@@ -366,27 +382,16 @@ const ActivityLogReportScreen = () => {
         />
       )}
 
-      {totalCount > 0 && (
-        <View style={styles.pagination}>
-          <TouchableOpacity
-            style={[styles.pageBtn, page === 0 && styles.pageBtnDisabled]}
-            onPress={() => setPage((p) => Math.max(0, p - 1))}
-            disabled={page === 0}
-          >
-            <Text style={styles.pageBtnText}>Previous</Text>
-          </TouchableOpacity>
-          <Text style={styles.pageInfo}>
-            Page {page + 1} of {totalPages}
-          </Text>
-          <TouchableOpacity
-            style={[styles.pageBtn, page >= totalPages - 1 && styles.pageBtnDisabled]}
-            onPress={() => setPage((p) => p + 1)}
-            disabled={page >= totalPages - 1}
-          >
-            <Text style={styles.pageBtnText}>Next</Text>
-          </TouchableOpacity>
-        </View>
-      )}
+      <ReportPagination
+        page={page}
+        rowsPerPage={rowsPerPage}
+        totalCount={totalCount}
+        onPageChange={(p) => setPage(p)}
+        onRowsPerPageChange={(r) => {
+          setRowsPerPage(r);
+          setPage(0);
+        }}
+      />
     </View>
   );
 };

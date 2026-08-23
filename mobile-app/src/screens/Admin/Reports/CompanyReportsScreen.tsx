@@ -19,6 +19,7 @@ import { RootState } from '../../../store';
 import axios from 'axios';
 import { getApiBaseUrl } from '../../../services/api';
 import Toast from 'react-native-toast-message';
+import ReportPagination from '../../../components/ReportPagination';
 
 interface Company {
   _id: string;
@@ -40,6 +41,8 @@ const CompanyReportsScreen = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
   
   // Reminder Modal States
   const [openReminderModal, setOpenReminderModal] = useState(false);
@@ -282,6 +285,15 @@ const CompanyReportsScreen = () => {
     );
   });
 
+  useEffect(() => {
+    setPage(0);
+  }, [searchTerm, rowsPerPage]);
+
+  const pagedCompanies = filteredCompanies.slice(
+    page * rowsPerPage,
+    page * rowsPerPage + rowsPerPage
+  );
+
   const renderCompanyItem = ({ item }: { item: Company }) => (
     <View style={styles.companyCard}>
       <View style={styles.companyHeader}>
@@ -463,7 +475,8 @@ const CompanyReportsScreen = () => {
       </View>
 
       <FlatList
-        data={filteredCompanies}
+        style={{ flex: 1 }}
+        data={pagedCompanies}
         renderItem={renderCompanyItem}
         keyExtractor={(item) => item._id}
         contentContainerStyle={styles.listContent}
@@ -475,6 +488,16 @@ const CompanyReportsScreen = () => {
             </Text>
           </View>
         }
+      />
+      <ReportPagination
+        page={page}
+        rowsPerPage={rowsPerPage}
+        totalCount={filteredCompanies.length}
+        onPageChange={setPage}
+        onRowsPerPageChange={(r) => {
+          setRowsPerPage(r);
+          setPage(0);
+        }}
       />
 
       {/* Reminder Modal */}

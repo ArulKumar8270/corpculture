@@ -61,11 +61,9 @@ export const isReturnableChallanReportType = (reportType?: string) =>
 export const isOperationalDocumentReportType = (reportType?: string) =>
   !!reportType && OPERATIONAL_DOCUMENT_TYPES.includes(reportType);
 
-export const isContentScopeRequired = (reportType?: string) =>
-  isDeliveryChallanReportType(reportType);
+export const isContentScopeRequired = (_reportType?: string) => false;
 
-export const showsContentScopeField = (reportType?: string) =>
-  isOperationalDocumentReportType(reportType);
+export const showsContentScopeField = (_reportType?: string) => true;
 
 export const getDocumentTitle = (reportType?: string) =>
   (reportType && DOCUMENT_META[reportType]?.title) || 'Report';

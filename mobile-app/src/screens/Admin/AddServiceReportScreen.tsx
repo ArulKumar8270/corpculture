@@ -228,31 +228,35 @@ const AddServiceReportScreen = () => {
         });
         setBranches(Array.from(extractedBranches));
       }
-
-      const { data: productsData } = await axios.get(
-        `${getApiBaseUrl()}/service-products/getServiceProductsByCompany/${formData.company}`,
-        { headers: { Authorization: token || '' } }
-      );
-      if (productsData?.success) {
-        // Filter and validate products to ensure they have required fields
-        // Note: productName might be a populated object, so we need to handle it
-        const validProducts = (productsData.serviceProducts || []).filter(
-          (product: any) => {
-            if (!product || typeof product !== 'object' || !product._id) {
-              return false;
-            }
-            // Check if productName exists (could be string or populated object)
-            const hasProductName = product.productName && (
-              typeof product.productName === 'string' || 
-              (typeof product.productName === 'object' && product.productName.productName)
-            );
-            return hasProductName || product.name;
-          }
-        );
-        setAvailableProducts(validProducts);
-      }
     } catch (error) {
-      console.error('Error fetching company related data:', error);
+      console.error('Error fetching company details:', error);
+    }
+
+    try {
+      let list: any[] = [];
+      try {
+        const { data: productsData } = await axios.get(
+          `${getApiBaseUrl()}/service-products/getServiceProductsByCompany/${formData.company}`,
+          { headers: { Authorization: token || '' } }
+        );
+        list = productsData?.serviceProducts ?? productsData?.data?.serviceProducts ?? [];
+      } catch {
+        list = [];
+      }
+      if (!Array.isArray(list) || list.length === 0) {
+        const allRes = await axios.get(`${getApiBaseUrl()}/service-products`, {
+          headers: { Authorization: token || '' },
+        });
+        list = allRes.data?.serviceProducts ?? allRes.data?.data?.serviceProducts ?? [];
+      }
+      setAvailableProducts(
+        (Array.isArray(list) ? list : []).filter(
+          (product: any) => product && typeof product === 'object' && product._id
+        )
+      );
+    } catch (error) {
+      console.error('Error fetching products:', error);
+      setAvailableProducts([]);
     }
   };
 
@@ -493,27 +497,10 @@ const AddServiceReportScreen = () => {
       });
       return;
     }
-    if (isContentScopeRequired(formData.reportType || resolvedReportType) && !formData.contentScope) {
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: 'Please select Service / Product for Delivery Challan (DC Copy)',
-      });
-      return;
-    }
-    const hasProducts = materialGroups.some((group) => group.products.length > 0);
-    if (materialGroups.length === 0 || !hasProducts) {
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: 'Please add at least one material group with products',
-      });
-      return;
-    }
 
     try {
       setSubmitting(true);
-      
+
       // Validate and clean materialGroups before sending
       const cleanedMaterialGroups = materialGroups.map((group) => ({
         name: group.name,
@@ -692,7 +679,7 @@ const AddServiceReportScreen = () => {
         />
         {/* serialNo / usageData / description are now entered per-product in Materials */}
 
-        <Text style={styles.sectionTitle}>Material Groups</Text>
+        <Text style={styles.sectionTitle}>Material Groups (optional)</Text>
         <View style={styles.groupButtons}>
           <TouchableOpacity style={styles.addGroupButton} onPress={handleAddGroup}>
             <Icon name="add" size={20} color="#fff" />
@@ -1046,6 +1033,11 @@ const AddServiceReportScreen = () => {
             <FlatList
               data={availableProducts}
               keyExtractor={(item) => item?._id || String(item)}
+              ListEmptyComponent={
+                <Text style={styles.pickerOptionText}>
+                  {formData.company ? 'No products found' : 'Select a company first'}
+                </Text>
+              }
               renderItem={({ item }) => {
                 if (!item || typeof item !== 'object') {
                   return null;

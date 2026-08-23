@@ -9,6 +9,8 @@ import {
   FlatList,
   RefreshControl,
   Alert,
+  Modal,
+  ScrollView,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 // @ts-ignore
@@ -18,8 +20,7 @@ import { RootState } from '../../../store';
 import axios from 'axios';
 import Toast from 'react-native-toast-message';
 import { getApiBaseUrl } from '../../../services/api';
-
-const ROWS_PER_PAGE = 10;
+import ReportPagination from '../../../components/ReportPagination';
 
 const LeaveReportScreen = () => {
   const { token } = useSelector((state: RootState) => state.auth);
@@ -32,12 +33,20 @@ const LeaveReportScreen = () => {
   const [employeeId, setEmployeeId] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
   const [totalCount, setTotalCount] = useState(0);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [employeePickerVisible, setEmployeePickerVisible] = useState(false);
-
-  const totalPages = Math.ceil(totalCount / ROWS_PER_PAGE) || 1;
+  const [detailLeave, setDetailLeave] = useState<any | null>(null);
+  const [officeFields, setOfficeFields] = useState({
+    managerRemarks: '',
+    hrRemarks: '',
+    reportingManagerName: '',
+    reportingManagerSignDate: '',
+    hrApproverName: '',
+    hrApproverSignDate: '',
+  });
 
   const fetchEmployees = useCallback(async () => {
     try {
@@ -57,7 +66,7 @@ const LeaveReportScreen = () => {
         setLoading(true);
         const params = new URLSearchParams({
           page: String(pageNum + 1),
-          limit: String(ROWS_PER_PAGE),
+          limit: String(rowsPerPage),
         });
         if (fromDate) params.append('fromDate', fromDate);
         if (toDate) params.append('toDate', toDate);
@@ -83,7 +92,7 @@ const LeaveReportScreen = () => {
         setLoading(false);
       }
     },
-    [token, fromDate, toDate, employeeId, statusFilter]
+    [token, fromDate, toDate, employeeId, statusFilter, rowsPerPage]
   );
 
   useFocusEffect(
@@ -118,7 +127,40 @@ const LeaveReportScreen = () => {
     setShowFilters(false);
   };
 
-  const handleStatusUpdate = (leaveId: string, newStatus: 'Approved' | 'Rejected') => {
+  const buildOfficePayload = () => ({
+    managerRemarks: officeFields.managerRemarks,
+    hrRemarks: officeFields.hrRemarks,
+    reportingManagerName: officeFields.reportingManagerName,
+    ...(officeFields.reportingManagerSignDate
+      ? { reportingManagerSignDate: officeFields.reportingManagerSignDate }
+      : {}),
+    hrApproverName: officeFields.hrApproverName,
+    ...(officeFields.hrApproverSignDate
+      ? { hrApproverSignDate: officeFields.hrApproverSignDate }
+      : {}),
+  });
+
+  const openLeaveDetail = (row: any) => {
+    setDetailLeave(row);
+    setOfficeFields({
+      managerRemarks: row.managerRemarks || '',
+      hrRemarks: row.hrRemarks || '',
+      reportingManagerName: row.reportingManagerName || '',
+      reportingManagerSignDate: row.reportingManagerSignDate
+        ? String(row.reportingManagerSignDate).slice(0, 10)
+        : '',
+      hrApproverName: row.hrApproverName || '',
+      hrApproverSignDate: row.hrApproverSignDate
+        ? String(row.hrApproverSignDate).slice(0, 10)
+        : '',
+    });
+  };
+
+  const handleStatusUpdate = (
+    leaveId: string,
+    newStatus: 'Approved' | 'Rejected',
+    withOffice = false
+  ) => {
     Alert.alert(
       'Update Status',
       `Set status to ${newStatus}?`,
@@ -129,16 +171,21 @@ const LeaveReportScreen = () => {
           onPress: async () => {
             try {
               setUpdatingId(leaveId);
+              const body = withOffice
+                ? { status: newStatus, ...buildOfficePayload() }
+                : { status: newStatus };
               const { data } = await axios.put(
                 `${getApiBaseUrl()}/employee-leave/admin/status/${leaveId}`,
-                { status: newStatus },
+                body,
                 { headers: { Authorization: token || '' } }
               );
               if (data?.success) {
                 setLeaves((prev) =>
                   prev.map((l) => (l._id === leaveId ? data.leave : l))
                 );
-                Toast.show({ type: 'success', text1: 'Status updated' });
+                setDetailLeave((prev) => (prev?._id === leaveId ? data.leave : prev));
+                setDetailLeave(null);
+                Toast.show({ type: 'success', text1: 'Leave record updated' });
               } else {
                 Toast.show({ type: 'error', text1: data?.message || 'Failed to update' });
               }
@@ -197,6 +244,14 @@ const LeaveReportScreen = () => {
             {item.reason || 'N/A'}
           </Text>
         </View>
+        <View style={styles.cardRow}>
+          <Text style={styles.cardLabel}>Contact</Text>
+          <Text style={styles.cardValue}>{item.contactDuringLeave || item.phone || 'N/A'}</Text>
+        </View>
+        <TouchableOpacity style={styles.viewBtn} onPress={() => openLeaveDetail(item)}>
+          <Icon name="visibility" size={16} color="#019ee3" />
+          <Text style={styles.viewBtnText}>View Details</Text>
+        </TouchableOpacity>
         {item.status === 'Pending' && (
           <View style={styles.actionRow}>
             <TouchableOpacity
@@ -336,27 +391,120 @@ const LeaveReportScreen = () => {
         />
       )}
 
-      {totalCount > 0 && (
-        <View style={styles.pagination}>
-          <TouchableOpacity
-            style={[styles.pageBtn, page === 0 && styles.pageBtnDisabled]}
-            onPress={() => setPage((p) => Math.max(0, p - 1))}
-            disabled={page === 0}
-          >
-            <Text style={styles.pageBtnText}>Previous</Text>
-          </TouchableOpacity>
-          <Text style={styles.pageInfo}>
-            Page {page + 1} of {totalPages}
-          </Text>
-          <TouchableOpacity
-            style={[styles.pageBtn, page >= totalPages - 1 && styles.pageBtnDisabled]}
-            onPress={() => setPage((p) => p + 1)}
-            disabled={page >= totalPages - 1}
-          >
-            <Text style={styles.pageBtnText}>Next</Text>
-          </TouchableOpacity>
+      <ReportPagination
+        page={page}
+        rowsPerPage={rowsPerPage}
+        totalCount={totalCount}
+        onPageChange={(p) => setPage(p)}
+        onRowsPerPageChange={(r) => {
+          setRowsPerPage(r);
+          setPage(0);
+        }}
+      />
+
+      <Modal visible={!!detailLeave} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Leave Details</Text>
+              <TouchableOpacity onPress={() => setDetailLeave(null)}>
+                <Icon name="close" size={22} color="#333" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={{ maxHeight: 480 }}>
+              <Text style={styles.modalLine}>
+                Employee: {detailLeave?.employeeId?.name || detailLeave?.userId?.name || 'N/A'}
+              </Text>
+              <Text style={styles.modalLine}>Type: {detailLeave?.leaveType || 'N/A'}</Text>
+              <Text style={styles.modalLine}>
+                Dates: {formatDate(detailLeave?.leaveFrom)} – {formatDate(detailLeave?.leaveTo)}
+              </Text>
+              <Text style={styles.modalLine}>Days: {detailLeave?.totalDays ?? 'N/A'}</Text>
+              <Text style={styles.modalLine}>Reason: {detailLeave?.reason || 'N/A'}</Text>
+              <Text style={styles.modalLine}>
+                Contact: {detailLeave?.contactDuringLeave || detailLeave?.phone || 'N/A'}
+              </Text>
+              <Text style={styles.modalLine}>Company: {detailLeave?.companyName || 'N/A'}</Text>
+              <Text style={styles.modalLine}>Status: {detailLeave?.status || 'N/A'}</Text>
+
+              <Text style={styles.officeHeading}>Office use (RM / HR)</Text>
+              <Text style={styles.label}>Manager Remarks</Text>
+              <TextInput
+                style={styles.input}
+                value={officeFields.managerRemarks}
+                onChangeText={(t) => setOfficeFields((o) => ({ ...o, managerRemarks: t }))}
+                placeholder="Manager remarks"
+              />
+              <Text style={styles.label}>Reporting Manager Name</Text>
+              <TextInput
+                style={styles.input}
+                value={officeFields.reportingManagerName}
+                onChangeText={(t) => setOfficeFields((o) => ({ ...o, reportingManagerName: t }))}
+                placeholder="RM name"
+              />
+              <Text style={styles.label}>RM Sign Date (YYYY-MM-DD)</Text>
+              <TextInput
+                style={styles.input}
+                value={officeFields.reportingManagerSignDate}
+                onChangeText={(t) => setOfficeFields((o) => ({ ...o, reportingManagerSignDate: t }))}
+                placeholder="YYYY-MM-DD"
+              />
+              <Text style={styles.label}>HR Remarks</Text>
+              <TextInput
+                style={styles.input}
+                value={officeFields.hrRemarks}
+                onChangeText={(t) => setOfficeFields((o) => ({ ...o, hrRemarks: t }))}
+                placeholder="HR remarks"
+              />
+              <Text style={styles.label}>HR Approver Name</Text>
+              <TextInput
+                style={styles.input}
+                value={officeFields.hrApproverName}
+                onChangeText={(t) => setOfficeFields((o) => ({ ...o, hrApproverName: t }))}
+                placeholder="HR name"
+              />
+              <Text style={styles.label}>HR Sign Date (YYYY-MM-DD)</Text>
+              <TextInput
+                style={styles.input}
+                value={officeFields.hrApproverSignDate}
+                onChangeText={(t) => setOfficeFields((o) => ({ ...o, hrApproverSignDate: t }))}
+                placeholder="YYYY-MM-DD"
+              />
+            </ScrollView>
+
+            {detailLeave?.status === 'Pending' ? (
+              <View style={styles.actionRow}>
+                <TouchableOpacity
+                  style={[styles.actionBtn, styles.approveBtn]}
+                  onPress={() => handleStatusUpdate(detailLeave._id, 'Approved', true)}
+                >
+                  <Text style={styles.actionBtnText}>Approve</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.actionBtn, styles.rejectBtn]}
+                  onPress={() => handleStatusUpdate(detailLeave._id, 'Rejected', true)}
+                >
+                  <Text style={styles.actionBtnText}>Reject</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={[styles.actionBtn, styles.approveBtn, { marginTop: 12 }]}
+                onPress={() => {
+                  if (!detailLeave?._id) return;
+                  handleStatusUpdate(
+                    detailLeave._id,
+                    detailLeave.status === 'Rejected' ? 'Rejected' : 'Approved',
+                    true
+                  );
+                }}
+              >
+                <Text style={styles.actionBtnText}>Save Office Fields</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
-      )}
+      </Modal>
     </View>
   );
 };
@@ -438,6 +586,42 @@ const styles = StyleSheet.create({
   cardLabel: { fontSize: 12, color: '#666' },
   cardValue: { fontSize: 14, color: '#333', flex: 1, textAlign: 'right' },
   reasonText: { textAlign: 'left' },
+  viewBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    marginTop: 6,
+    marginBottom: 4,
+  },
+  viewBtnText: { color: '#019ee3', fontWeight: '600', fontSize: 13 },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+  modalCard: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    padding: 16,
+    maxHeight: '90%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  modalTitle: { fontSize: 18, fontWeight: '700', color: '#019ee3' },
+  modalLine: { fontSize: 14, color: '#333', marginBottom: 6 },
+  officeHeading: {
+    marginTop: 12,
+    marginBottom: 4,
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#333',
+  },
   actionRow: { flexDirection: 'row', marginTop: 10, gap: 10 },
   actionBtn: { flex: 1, paddingVertical: 8, borderRadius: 8, alignItems: 'center' },
   approveBtn: { backgroundColor: '#28a745' },

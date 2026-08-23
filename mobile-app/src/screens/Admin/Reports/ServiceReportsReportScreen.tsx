@@ -19,6 +19,7 @@ import { RootState } from '../../../store';
 import axios from 'axios';
 import { getApiBaseUrl } from '../../../services/api';
 import Toast from 'react-native-toast-message';
+import ReportPagination from '../../../components/ReportPagination';
 import { collectReportSerialNumbers } from '../../../utils/reportSerialNumbers';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
@@ -45,6 +46,7 @@ const ServiceReportsReportScreen = () => {
   const [companyNameFilter, setCompanyNameFilter] = useState('');
   const [assignedToFilter, setAssignedToFilter] = useState('');
   const [serialNoFilter, setSerialNoFilter] = useState(routeParams.serialNo || '');
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [totalCount, setTotalCount] = useState(0);
@@ -272,62 +274,15 @@ const ServiceReportsReportScreen = () => {
     );
   };
 
-  const renderPagination = () => {
-    const totalPages = Math.ceil(totalCount / rowsPerPage);
-    const startItem = page * rowsPerPage + 1;
-    const endItem = Math.min((page + 1) * rowsPerPage, totalCount);
-
-    return (
-      <View style={styles.paginationContainer}>
-        <Text style={styles.paginationText}>
-          Showing {startItem}-{endItem} of {totalCount}
-        </Text>
-        <View style={styles.paginationButtons}>
-          <TouchableOpacity
-            style={[styles.paginationButton, page === 0 && styles.paginationButtonDisabled]}
-            onPress={() => handleChangePage(page - 1)}
-            disabled={page === 0}
-          >
-            <Icon name="chevron-left" size={24} color={page === 0 ? '#ccc' : '#007AFF'} />
-          </TouchableOpacity>
-          <Text style={styles.paginationPageText}>
-            Page {page + 1} of {totalPages || 1}
-          </Text>
-          <TouchableOpacity
-            style={[
-              styles.paginationButton,
-              page >= totalPages - 1 && styles.paginationButtonDisabled,
-            ]}
-            onPress={() => handleChangePage(page + 1)}
-            disabled={page >= totalPages - 1}
-          >
-            <Icon name="chevron-right" size={24} color={page >= totalPages - 1 ? '#ccc' : '#007AFF'} />
-          </TouchableOpacity>
-        </View>
-        <View style={styles.rowsPerPageContainer}>
-          <Text style={styles.rowsPerPageLabel}>Rows per page:</Text>
-          <TouchableOpacity
-            style={styles.rowsPerPageButton}
-            onPress={() => {
-              Alert.alert(
-                'Rows per page',
-                'Select number of rows',
-                [
-                  { text: '5', onPress: () => handleChangeRowsPerPage(5) },
-                  { text: '10', onPress: () => handleChangeRowsPerPage(10) },
-                  { text: '25', onPress: () => handleChangeRowsPerPage(25) },
-                  { text: 'Cancel', style: 'cancel' },
-                ]
-              );
-            }}
-          >
-            <Text style={styles.rowsPerPageText}>{rowsPerPage}</Text>
-            <Icon name="arrow-drop-down" size={20} color="#666" />
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  };
+  const renderPagination = () => (
+    <ReportPagination
+      page={page}
+      rowsPerPage={rowsPerPage}
+      totalCount={totalCount}
+      onPageChange={handleChangePage}
+      onRowsPerPageChange={handleChangeRowsPerPage}
+    />
+  );
 
   if (loading && reports.length === 0) {
     return (
@@ -357,9 +312,30 @@ const ServiceReportsReportScreen = () => {
         <Text style={styles.headerTitle}>{pageTitle}</Text>
       </View>
 
-      <ScrollView style={styles.filterSection} nestedScrollEnabled>
-        <Text style={styles.filterTitle}>Filters</Text>
+      <TouchableOpacity
+        style={styles.filterHeader}
+        onPress={() => setFiltersExpanded((v) => !v)}
+        activeOpacity={0.7}
+      >
+        <View>
+          <Text style={styles.filterTitle}>Filters</Text>
+          {!filtersExpanded ? (
+            <Text style={styles.filterSummary} numberOfLines={1}>
+              {[fromDate && `From ${fromDate}`, toDate && `To ${toDate}`, companyNameFilter, assignedToFilter, serialNoFilter && `S/N ${serialNoFilter}`]
+                .filter(Boolean)
+                .join(' · ') || 'No filters applied'}
+            </Text>
+          ) : null}
+        </View>
+        <Icon
+          name={filtersExpanded ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
+          size={24}
+          color="#019ee3"
+        />
+      </TouchableOpacity>
 
+      {filtersExpanded ? (
+      <ScrollView style={styles.filterSection} nestedScrollEnabled>
         <View style={styles.filterRow}>
           <Text style={styles.filterLabel}>From Date</Text>
           <TextInput
@@ -425,6 +401,7 @@ const ServiceReportsReportScreen = () => {
           </TouchableOpacity>
         </View>
       </ScrollView>
+      ) : null}
 
       <View style={styles.actionBar}>
         <TouchableOpacity
@@ -497,18 +474,37 @@ const styles = StyleSheet.create({
   },
   filterSection: {
     backgroundColor: '#fff',
-    padding: 15,
+    paddingHorizontal: 12,
+    paddingBottom: 10,
     marginHorizontal: 15,
-    marginTop: 10,
+    maxHeight: 320,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#e8e8e8',
   },
+  filterHeader: {
+    marginHorizontal: 15,
+    marginTop: 10,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e8e8e8',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  filterSummary: {
+    marginTop: 2,
+    fontSize: 12,
+    color: '#666',
+    maxWidth: 280,
+  },
   filterTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#019ee3',
-    marginBottom: 12,
   },
   filterRow: {
     marginBottom: 12,
@@ -780,12 +776,6 @@ const styles = StyleSheet.create({
   },
   filterInputGroup: {
     marginBottom: 15,
-  },
-  filterLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
   },
   filterInput: {
     backgroundColor: '#fff',

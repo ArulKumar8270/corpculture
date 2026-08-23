@@ -1,3 +1,5 @@
+import { Linking } from 'react-native';
+
 export const REPORT_DOWNLOAD_BASE_URL =
   'https://pub-109709bff58d46faa2a7782c9bf60324.r2.dev';
 
@@ -6,8 +8,22 @@ function isLikelyImageLink(url: string): boolean {
   return /\.(jpe?g|png|gif|webp|bmp|heic|heif)(\/)?$/i.test(path);
 }
 
-export function collectReportDownloadCandidates(report: any): string[] {
-  const id = report?.serviceId ? String(report.serviceId) : '';
+function reportDocumentId(report: any): string {
+  // Match web: official R2 path is `/{report._id}` (service + rental reports).
+  const raw = report?._id ?? report?.id;
+  if (raw == null || raw === '') return '';
+  if (typeof raw === 'object') {
+    return String((raw as { _id?: string })._id || raw).trim();
+  }
+  return String(raw).trim();
+}
+
+/** Official service/rental report PDF download URLs (R2 by report id, then stored links). */
+export function collectReportDownloadCandidates(
+  report: any,
+  downloadBaseUrl: string = REPORT_DOWNLOAD_BASE_URL
+): string[] {
+  const id = reportDocumentId(report);
   const ordered: string[] = [];
   const push = (url: string) => {
     const trimmed = String(url || '').trim();
@@ -16,8 +32,8 @@ export function collectReportDownloadCandidates(report: any): string[] {
   };
 
   if (id) {
-    push(`${REPORT_DOWNLOAD_BASE_URL}/${id}`);
-    push(`${REPORT_DOWNLOAD_BASE_URL}/${id}.pdf`);
+    push(`${downloadBaseUrl}/${id}`);
+    push(`${downloadBaseUrl}/${id}.pdf`);
   }
 
   const links: string[] = Array.isArray(report?.reportLink)
@@ -51,4 +67,11 @@ export async function openReportDownload(report: any): Promise<string | null> {
   }
 
   return candidates[0];
+}
+
+export async function downloadReportAndOpen(report: any): Promise<boolean> {
+  const url = await openReportDownload(report);
+  if (!url) return false;
+  await Linking.openURL(url);
+  return true;
 }

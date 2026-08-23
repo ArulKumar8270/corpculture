@@ -444,11 +444,19 @@ const ProfileScreen = () => {
     }
   };
 
-  // Get department name (handle both string and populated object)
+  // Get department name (string, populated Category, or array of Categories)
   const getDepartmentName = () => {
     if (!employee?.department) return 'N/A';
     if (typeof employee.department === 'string') return employee.department;
-    return employee.department.name || employee.department._id || 'N/A';
+    if (Array.isArray(employee.department)) {
+      const names = employee.department
+        .map((d: any) =>
+          typeof d === 'object' && d !== null ? d.name || '' : String(d || '')
+        )
+        .filter(Boolean);
+      return names.length ? names.join(', ') : 'N/A';
+    }
+    return employee.department.name || 'N/A';
   };
 
   return (

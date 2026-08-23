@@ -20,12 +20,13 @@ router.post("/", createRentalProduct); // Consider adding isAdmin middleware her
 // Get all Rental Products
 router.get("/", getAllRentalProducts);
 
-// Get Rental Product by ID
-router.get("/:id", getRentalProductById);
 router.get("/getServiceProductsByCompany/:companyId", getRentalProductsByCompany);
 
 // Get Today's Rental Products
 router.get("/payment/today", getTodaysRentalProducts);
+
+// Get Rental Product by ID
+router.get("/:id", getRentalProductById);
 
 // Normalize existing payment dates (run once after deploy)
 router.post("/normalize-payment-dates", normalizeExistingRentalPaymentDates);

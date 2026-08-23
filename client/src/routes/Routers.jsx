@@ -28,6 +28,9 @@ import DeleteAllOrder from "../pages/DeleteAllOrder.jsx";
 import CreditManagement from "../pages/Admin/CreditManagement";
 import QrEntryPage from "../pages/Public/QrEntryPage";
 import QrDemoPage from "../pages/Public/QrDemoPage";
+import TermsAndConditions from "../pages/Legal/TermsAndConditions";
+import RefundAndReturnPolicy from "../pages/Legal/RefundAndReturnPolicy";
+import PrivacyPolicy from "../pages/Legal/PrivacyPolicy";
 
 const Routers = () => {
     return (
@@ -41,6 +44,9 @@ const Routers = () => {
             <Route path="/cart" element={<Cart />} />
             <Route path="/qr" element={<QrEntryPage />} />
             <Route path="/qr-demo" element={<QrDemoPage />} />
+            <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
+            <Route path="/refund-and-return-policy" element={<RefundAndReturnPolicy />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
             <Route path="/shipping" element={<PrivateRoute />}>
                 <Route path="" element={<Shipping />} />
                 <Route path="confirm" element={<OrderSuccess />} />

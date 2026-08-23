@@ -117,11 +117,11 @@ export const getServiceProductsByCompany = async (req, res) => {
             .populate('productName', 'name unit description') // Populate Material details
             .sort({ createdAt: -1 });
 
-        if (!serviceProducts || serviceProducts.length === 0) {
-            return res.status(404).send({ success: false, message: 'No service products found for this company.' });
-        }
-
-        res.status(200).send({ success: true, message: 'Service Products fetched by company successfully', serviceProducts });
+        res.status(200).send({
+            success: true,
+            message: 'Service Products fetched by company successfully',
+            serviceProducts: serviceProducts || [],
+        });
     } catch (error) {
         console.error("Error in getServiceProductsByCompany:", error);
         res.status(500).send({ success: false, message: 'Error in getting service products by company', error });

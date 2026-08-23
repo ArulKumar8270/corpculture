@@ -16,6 +16,26 @@ import axios from 'axios';
 import { getApiBaseUrl } from '../../services/api';
 import Toast from 'react-native-toast-message';
 
+const formatField = (value: unknown): string => {
+  if (value == null || value === '') return 'N/A';
+  if (Array.isArray(value)) {
+    const parts = value
+      .map((item) => {
+        if (typeof item === 'object' && item !== null) {
+          return String((item as { name?: string }).name || '').trim();
+        }
+        return String(item ?? '').trim();
+      })
+      .filter(Boolean);
+    return parts.length ? parts.join(', ') : 'N/A';
+  }
+  if (typeof value === 'object') {
+    const name = (value as { name?: string }).name;
+    return name ? String(name) : 'N/A';
+  }
+  return String(value);
+};
+
 const EmployeeDetailsScreen = () => {
   const route = useRoute();
   const navigation = useNavigation();
@@ -96,17 +116,15 @@ const EmployeeDetailsScreen = () => {
         </View>
         <View style={styles.infoRow}>
           <Text style={styles.label}>Employee Type:</Text>
-          <Text style={styles.value}>{employee.employeeType || 'N/A'}</Text>
+          <Text style={styles.value}>{formatField(employee.employeeType)}</Text>
         </View>
         <View style={styles.infoRow}>
           <Text style={styles.label}>Designation:</Text>
-          <Text style={styles.value}>{employee.designation || 'N/A'}</Text>
+          <Text style={styles.value}>{formatField(employee.designation)}</Text>
         </View>
         <View style={styles.infoRow}>
           <Text style={styles.label}>Department:</Text>
-          <Text style={styles.value}>
-            {employee.department?.name || employee.department || 'N/A'}
-          </Text>
+          <Text style={styles.value}>{formatField(employee.department)}</Text>
         </View>
         <View style={styles.infoRow}>
           <Text style={styles.label}>Salary:</Text>

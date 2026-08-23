@@ -18,8 +18,31 @@ import { RootState } from '../../../store';
 import axios from 'axios';
 import Toast from 'react-native-toast-message';
 import { getApiBaseUrl } from '../../../services/api';
+import ReportPagination from '../../../components/ReportPagination';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 
-const ROWS_PER_PAGE = 10;
+let XLSX: any;
+try {
+  XLSX = require('xlsx');
+} catch {
+  console.warn('xlsx library not found. Excel export will not work.');
+}
+
+const excelBufferToBase64 = (excelBuffer: ArrayBuffer | Uint8Array | number[]): string => {
+  const bytes =
+    excelBuffer instanceof ArrayBuffer
+      ? new Uint8Array(excelBuffer)
+      : excelBuffer instanceof Uint8Array
+        ? excelBuffer
+        : new Uint8Array(excelBuffer);
+  let binary = '';
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
+};
 
 const EmployeeBenefitsReportScreen = () => {
   const { token } = useSelector((state: RootState) => state.auth);
@@ -27,12 +50,13 @@ const EmployeeBenefitsReportScreen = () => {
   const [employees, setEmployees] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [employeeFilter, setEmployeeFilter] = useState<any | null>(null);
   const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
   const [totalCount, setTotalCount] = useState(0);
   const [employeePickerVisible, setEmployeePickerVisible] = useState(false);
 
-  const totalPages = Math.ceil(totalCount / ROWS_PER_PAGE) || 1;
   const employeeId = employeeFilter?._id || '';
 
   const calcAmount = (b: any) => {
@@ -40,6 +64,18 @@ const EmployeeBenefitsReportScreen = () => {
     const rate = Number(b?.productId?.employeeCommission ?? b?.productId?.commission ?? 0);
     if (!Number.isFinite(qty) || !Number.isFinite(rate)) return 0;
     return qty * rate;
+  };
+
+  const productLabel = (product: any): string => {
+    if (!product) return '—';
+    const name = product.productName;
+    if (name && typeof name === 'object') {
+      return String(name.name || name.title || name.sku || '—');
+    }
+    if (typeof name === 'string' && name.trim()) return name;
+    if (typeof product.name === 'string' && product.name.trim()) return product.name;
+    if (typeof product.sku === 'string' && product.sku.trim()) return product.sku;
+    return '—';
   };
 
   const fetchEmployees = useCallback(async () => {
@@ -60,7 +96,7 @@ const EmployeeBenefitsReportScreen = () => {
         setLoading(true);
         const params = new URLSearchParams({
           page: String(pageNum + 1),
-          limit: String(ROWS_PER_PAGE),
+          limit: String(rowsPerPage),
           _ts: String(Date.now()),
         });
         if (empId) params.append('employeeId', empId);
@@ -90,14 +126,14 @@ const EmployeeBenefitsReportScreen = () => {
         setLoading(false);
       }
     },
-    [token, employeeId]
+    [token, employeeId, rowsPerPage]
   );
 
   useFocusEffect(
     useCallback(() => {
       fetchEmployees();
       fetchBenefits(0, employeeId);
-    }, [fetchEmployees])
+    }, [fetchEmployees, fetchBenefits, employeeId])
   );
 
   useEffect(() => {
@@ -121,6 +157,103 @@ const EmployeeBenefitsReportScreen = () => {
     fetchBenefits(0, '');
   };
 
+  const fetchAllBenefitsForExport = async (): Promise<any[]> => {
+    const limit = Math.max(totalCount || rowsPerPage, rowsPerPage);
+    const params = new URLSearchParams({
+      page: '1',
+      limit: String(Math.min(limit, 5000)),
+      _ts: String(Date.now()),
+    });
+    if (employeeId) params.append('employeeId', employeeId);
+
+    const { data } = await axios.get(
+      `${getApiBaseUrl()}/employee-benefits?${params.toString()}`,
+      {
+        headers: {
+          Authorization: token || '',
+          'Cache-Control': 'no-cache',
+          Pragma: 'no-cache',
+        },
+      }
+    );
+    if (!data?.success) {
+      throw new Error(data?.message || 'Failed to fetch benefits for export');
+    }
+    return data.benefits || [];
+  };
+
+  const handleExportExcel = async () => {
+    if (!XLSX) {
+      Toast.show({
+        type: 'error',
+        text1: 'Excel export unavailable',
+        text2: 'Please install xlsx library',
+      });
+      return;
+    }
+    if (!totalCount && benefits.length === 0) {
+      Toast.show({ type: 'error', text1: 'No benefits to export' });
+      return;
+    }
+
+    try {
+      setExporting(true);
+      const rowsSource =
+        totalCount > benefits.length ? await fetchAllBenefitsForExport() : benefits;
+
+      if (!rowsSource.length) {
+        Toast.show({ type: 'error', text1: 'No benefits to export' });
+        return;
+      }
+
+      const rows = rowsSource.map((b: any, index: number) => ({
+        'S.No': index + 1,
+        Date: b.createdAt ? new Date(b.createdAt).toLocaleDateString('en-IN') : '—',
+        Employee: b.employeeId?.name || '—',
+        Invoice: b.invoiceId?.invoiceNumber || b.invoiceNumber || '—',
+        Product: productLabel(b.productId),
+        Qty: b.quantity ?? '—',
+        Amount: Number(calcAmount(b).toFixed(2)),
+        'Re-Install': b.reInstall ? 'Yes' : 'No',
+        'Other Products': b.otherProducts || '—',
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Employee Benefits');
+      const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+
+      const stamp = new Date().toISOString().slice(0, 10);
+      const fileName = `employee_benefits_${stamp}.xlsx`;
+      const fileUri = `${FileSystem.cacheDirectory}${fileName}`;
+      await FileSystem.writeAsStringAsync(fileUri, excelBufferToBase64(excelBuffer), {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri, {
+          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          dialogTitle: 'Download Employee Benefits',
+        });
+        Toast.show({
+          type: 'success',
+          text1: `Exported ${rows.length} benefit(s)`,
+        });
+      } else {
+        Toast.show({ type: 'error', text1: 'Sharing is not available on this device' });
+      }
+    } catch (error: any) {
+      console.error('Employee benefits Excel export error:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Failed to export Excel',
+        text2: error?.message || 'Please try again',
+      });
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const renderItem = ({ item }: { item: any }) => (
     <View style={styles.card}>
       <Text style={styles.cardDate}>
@@ -130,9 +263,7 @@ const EmployeeBenefitsReportScreen = () => {
       <Text style={styles.cardRow}>
         Invoice: {item.invoiceId?.invoiceNumber || item.invoiceNumber || '—'}
       </Text>
-      <Text style={styles.cardRow}>
-        Product: {item.productId?.productName || item.productId?.name || '—'}
-      </Text>
+      <Text style={styles.cardRow}>Product: {productLabel(item.productId)}</Text>
       <Text style={styles.cardRow}>Qty: {item.quantity ?? '—'}</Text>
       <Text style={styles.cardAmount}>₹{calcAmount(item).toFixed(2)}</Text>
       {item.reInstall ? (
@@ -146,7 +277,26 @@ const EmployeeBenefitsReportScreen = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Employee Benefits Report</Text>
+      <View style={styles.header}>
+        <Text style={styles.title}>Employee Benefits Report</Text>
+        <TouchableOpacity
+          style={[
+            styles.exportButton,
+            (exporting || (!totalCount && !benefits.length)) && styles.exportButtonDisabled,
+          ]}
+          onPress={handleExportExcel}
+          disabled={exporting || (!totalCount && !benefits.length)}
+        >
+          {exporting ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <>
+              <Icon name="file-download" size={18} color="#fff" />
+              <Text style={styles.exportButtonText}>Excel</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      </View>
 
       <View style={styles.filterRow}>
         <TouchableOpacity
@@ -170,36 +320,26 @@ const EmployeeBenefitsReportScreen = () => {
         <ActivityIndicator size="large" color="#019ee3" style={{ marginTop: 40 }} />
       ) : (
         <FlatList
+          style={styles.list}
           data={benefits}
           keyExtractor={(item) => String(item._id)}
           renderItem={renderItem}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-          contentContainerStyle={benefits.length === 0 ? styles.emptyList : undefined}
-          ListEmptyComponent={
-            <Text style={styles.emptyText}>No benefits found.</Text>
-          }
+          contentContainerStyle={benefits.length === 0 ? styles.emptyList : styles.listContent}
+          ListEmptyComponent={<Text style={styles.emptyText}>No benefits found.</Text>}
         />
       )}
 
-      <View style={styles.pagination}>
-        <TouchableOpacity
-          disabled={page <= 0}
-          onPress={() => setPage((p) => Math.max(0, p - 1))}
-          style={[styles.pageBtn, page <= 0 && styles.pageBtnDisabled]}
-        >
-          <Icon name="chevron-left" size={28} color={page <= 0 ? '#ccc' : '#019ee3'} />
-        </TouchableOpacity>
-        <Text style={styles.pageText}>
-          Page {page + 1} of {totalPages} ({totalCount} total)
-        </Text>
-        <TouchableOpacity
-          disabled={page + 1 >= totalPages}
-          onPress={() => setPage((p) => p + 1)}
-          style={[styles.pageBtn, page + 1 >= totalPages && styles.pageBtnDisabled]}
-        >
-          <Icon name="chevron-right" size={28} color={page + 1 >= totalPages ? '#ccc' : '#019ee3'} />
-        </TouchableOpacity>
-      </View>
+      <ReportPagination
+        page={page}
+        rowsPerPage={rowsPerPage}
+        totalCount={totalCount}
+        onPageChange={(p) => setPage(p)}
+        onRowsPerPageChange={(r) => {
+          setRowsPerPage(r);
+          setPage(0);
+        }}
+      />
 
       <Modal visible={employeePickerVisible} transparent animationType="slide">
         <View style={styles.modalOverlay}>
@@ -243,12 +383,39 @@ const EmployeeBenefitsReportScreen = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f5f5' },
+  list: { flex: 1 },
+  listContent: { paddingBottom: 16 },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#fff',
+    gap: 12,
+  },
   title: {
+    flex: 1,
     fontSize: 20,
     fontWeight: 'bold',
     color: '#019ee3',
-    padding: 16,
-    backgroundColor: '#fff',
+  },
+  exportButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#28a745',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    gap: 6,
+  },
+  exportButtonDisabled: {
+    opacity: 0.6,
+  },
+  exportButtonText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 13,
   },
   filterRow: {
     flexDirection: 'row',
