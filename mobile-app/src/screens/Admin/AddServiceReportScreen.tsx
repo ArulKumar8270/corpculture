@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useLayoutEffect } from 'react';
 import {
   View,
   Text,
@@ -25,11 +25,14 @@ import { normalizeMongoId } from '../../utils/normalizeMongoId';
 import { getServiceProductDisplayName } from '../../utils/serviceProductDisplayName';
 import {
   getServiceListScreen,
+  getServicePayloadReportFor,
   resolveServiceReportType,
 } from '../../utils/reportNavigation';
 import {
   CONTENT_SCOPE_OPTIONS,
   getDocumentTitle,
+  getDocumentFormTitle,
+  getDocumentSuccessMessage,
   showsContentScopeField,
   isContentScopeRequired,
 } from '../../utils/reportDocumentTypes';
@@ -59,8 +62,9 @@ const AddServiceReportScreen = () => {
   const reportId = params?.id;
   const employeeName = params?.employeeName;
   const employeeId = params?.employeeId; // Employee ID for assignedTo field
-  const reportFor = params?.reportType || 'service';
-  const resolvedReportType = resolveServiceReportType(reportFor);
+  const reportTypeParam = params?.reportType || 'service';
+  const resolvedReportType = resolveServiceReportType(reportTypeParam);
+  const payloadReportFor = getServicePayloadReportFor(resolvedReportType);
   const serviceId = params?.serviceId;
   const paramCompanyId = normalizeMongoId(params?.companyId);
   const paramCompanyName =
@@ -69,7 +73,7 @@ const AddServiceReportScreen = () => {
 
   const [formData, setFormData] = useState({
     reportType: resolvedReportType,
-    reportFor: reportFor,
+    reportFor: payloadReportFor,
     company: '',
     problemReport: '',
     remarksPendingWorks: '',
@@ -97,6 +101,12 @@ const AddServiceReportScreen = () => {
   const [productPickerVisible, setProductPickerVisible] = useState(false);
   const [contentScopePickerVisible, setContentScopePickerVisible] = useState(false);
 
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      title: getDocumentFormTitle(resolvedReportType, isEditMode),
+    });
+  }, [navigation, resolvedReportType, isEditMode]);
+
   useEffect(() => {
     fetchInitialData();
   }, [token]);
@@ -121,7 +131,17 @@ const AddServiceReportScreen = () => {
   useFocusEffect(
     useCallback(() => {
       applyCompanyFromRouteParams();
-    }, [applyCompanyFromRouteParams])
+      setFormData((prev) => {
+        if (prev.reportType === resolvedReportType && prev.reportFor === payloadReportFor) {
+          return prev;
+        }
+        return {
+          ...prev,
+          reportType: resolvedReportType,
+          reportFor: payloadReportFor,
+        };
+      });
+    }, [applyCompanyFromRouteParams, resolvedReportType, payloadReportFor])
   );
 
   useEffect(() => {
@@ -152,8 +172,8 @@ const AddServiceReportScreen = () => {
         if (reportResponse.data.success) {
           const fetchedReport = reportResponse.data.report;
           setFormData({
-            reportType: fetchedReport.reportType || resolvedReportType,
-            reportFor: fetchedReport.reportFor || 'service',
+            reportType: resolvedReportType,
+            reportFor: payloadReportFor,
             company: fetchedReport.company?._id || '',
             problemReport: fetchedReport.problemReport || '',
             remarksPendingWorks: fetchedReport.remarksPendingWorks || '',
@@ -334,32 +354,26 @@ const AddServiceReportScreen = () => {
       return;
     }
     const selectedProduct = availableProducts.find((p) => p._id === formData.materialProductName);
-    if (!selectedProduct || !formData.materialQuantity || parseInt(formData.materialQuantity) <= 0) {
+    const parsedQty = parseInt(formData.materialQuantity, 10);
+    const quantity = Number.isFinite(parsedQty) && parsedQty >= 0 ? parsedQty : 0;
+    const hasDetails = Boolean(
+      formData.materialUsageData?.trim() ||
+      formData.materialDescription?.trim() ||
+      formData.materialAccessService?.trim()
+    );
+    if (!selectedProduct && quantity <= 0 && !hasDetails) {
       Toast.show({
         type: 'error',
         text1: 'Error',
-        text2: 'Please select a product and enter a valid quantity',
+        text2: 'Enter a quantity or product details',
       });
       return;
     }
 
-    // Debug: Log the selected product structure
-    console.log('Selected product:', JSON.stringify(selectedProduct, null, 2));
-
-    const quantity = parseInt(formData.materialQuantity);
-    
-    // Use helper function to safely extract productName
-    const productName = extractProductName(selectedProduct);
-    
-    // Final validation - ensure it's a string
-    if (typeof productName !== 'string') {
-      console.error('productName extraction failed, got:', productName);
-      throw new Error('Failed to extract product name');
-    }
-    
-    const productRate = selectedProduct.rate || 0;
+    const productName = selectedProduct ? extractProductName(selectedProduct) : '';
+    const productRate = selectedProduct?.rate || 0;
     const productData = {
-      productName: productName,
+      productName: productName || '',
       usageData: formData.materialUsageData?.trim() || '',
       description: formData.materialDescription?.trim() || '',
       accessService: formData.materialAccessService?.trim() || '',
@@ -367,9 +381,6 @@ const AddServiceReportScreen = () => {
       rate: productRate,
       totalAmount: quantity * productRate,
     };
-    
-    // Debug log to verify productName is a string
-    console.log('Product data being saved:', JSON.stringify(productData, null, 2));
 
     setMaterialGroups((prevGroups) =>
       prevGroups.map((group, idx) => {
@@ -507,9 +518,10 @@ const AddServiceReportScreen = () => {
         modelNo: group.modelNo?.trim() || '',
         serialNo: group.serialNo?.trim() || '',
         products: group.products.map(({ id, serialNo, ...rest }: any) => {
-          const productName = extractProductName(rest);
+          const productName =
+            typeof rest.productName === 'string' ? rest.productName : extractProductName(rest);
           return {
-            productName: productName,
+            productName: productName === 'N/A' || productName === 'Unknown Product' ? '' : productName,
             usageData: typeof rest.usageData === 'string' ? rest.usageData : '',
             description: typeof rest.description === 'string' ? rest.description : '',
             accessService: typeof rest.accessService === 'string' ? rest.accessService : '',
@@ -522,7 +534,7 @@ const AddServiceReportScreen = () => {
 
       const payload = {
         serviceId: serviceId,
-        reportType: formData.reportType || resolvedReportType,
+        reportType: resolvedReportType,
         company: formData.company,
         problemReport: formData.problemReport,
         remarksPendingWorks: formData.remarksPendingWorks,
@@ -531,7 +543,7 @@ const AddServiceReportScreen = () => {
         reference: formData.reference,
         contentScope: formData.contentScope || undefined,
         assignedTo: employeeId || user?._id,
-        reportFor: reportFor,
+        reportFor: payloadReportFor,
         materialGroups: cleanedMaterialGroups,
       };
 
@@ -553,7 +565,7 @@ const AddServiceReportScreen = () => {
         Toast.show({
           type: 'success',
           text1: 'Success',
-          text2: response.data.message || (reportId ? 'Report updated successfully' : 'Report created successfully'),
+          text2: getDocumentSuccessMessage(resolvedReportType, reportId ? 'updated' : 'submitted'),
         });
         (navigation as any).navigate(getServiceListScreen(resolvedReportType));
       } else {
@@ -679,7 +691,7 @@ const AddServiceReportScreen = () => {
         />
         {/* serialNo / usageData / description are now entered per-product in Materials */}
 
-        <Text style={styles.sectionTitle}>Material Groups (optional)</Text>
+        <Text style={styles.sectionTitle}>Material Groups</Text>
         <View style={styles.groupButtons}>
           <TouchableOpacity style={styles.addGroupButton} onPress={handleAddGroup}>
             <Icon name="add" size={20} color="#fff" />
@@ -783,8 +795,7 @@ const AddServiceReportScreen = () => {
         <TouchableOpacity
           style={styles.saveProductButton}
           onPress={handleSaveProduct}
-              disabled={!formData.materialProductName || !formData.materialQuantity}
-            >
+        >
               <Text style={styles.saveProductButtonText}>
                 {editingProductId ? 'Update Product' : 'Add Product'}
               </Text>
@@ -1033,6 +1044,17 @@ const AddServiceReportScreen = () => {
             <FlatList
               data={availableProducts}
               keyExtractor={(item) => item?._id || String(item)}
+              ListHeaderComponent={
+                <TouchableOpacity
+                  style={styles.pickerOption}
+                  onPress={() => {
+                    handleChange('materialProductName', '');
+                    setProductPickerVisible(false);
+                  }}
+                >
+                  <Text style={styles.pickerOptionText}>None</Text>
+                </TouchableOpacity>
+              }
               ListEmptyComponent={
                 <Text style={styles.pickerOptionText}>
                   {formData.company ? 'No products found' : 'Select a company first'}

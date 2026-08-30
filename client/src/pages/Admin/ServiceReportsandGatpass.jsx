@@ -261,6 +261,17 @@ const ServiceReportsandGatpass = (props) => {
                     console.error('Failed to mark service enquiry completed:', statusErr);
                 }
             }
+            if (res && serviceId && props?.reportType === 'Rental_Report') {
+                try {
+                    await axios.put(
+                        `${import.meta.env.VITE_SERVER_URL}/api/v1/rental/update/${serviceId}`,
+                        { status: 'Completed' },
+                        { headers: { Authorization: auth.token } }
+                    );
+                } catch (statusErr) {
+                    console.error('Failed to mark rental enquiry completed:', statusErr);
+                }
+            }
             if (res) {
                 toast.success(isOperationalDoc ? `${docTitle} sent successfully` : 'Report sent successfully');
                 fetchReports(fromDate, toDate, companyNameFilter, assignedToFilter, serialNoFilter, page, rowsPerPage);
@@ -574,7 +585,7 @@ const ServiceReportsandGatpass = (props) => {
                             {reports.length === 0 ? (
                                 <TableRow>
                                     <TableCell colSpan={12} align="center" sx={{ py: 3, color: 'text.secondary' }}>
-                                        No Service_Reports found.
+                                        No {getDocumentTitle(props?.reportType)} entries found.
                                     </TableCell>
                                 </TableRow>
                             ) : (

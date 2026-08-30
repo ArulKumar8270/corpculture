@@ -49,10 +49,31 @@ const ServiceMonitoringScreen = () => {
     },
     {
       id: 'reports',
-      title: 'Service Reports',
+      title: 'Reports',
       icon: 'assessment',
       screen: 'ServiceReports',
       permissionKey: 'serviceReport',
+    },
+    {
+      id: 'gatePass',
+      title: 'Gate Pass',
+      icon: 'badge',
+      screen: 'ServiceGatePass',
+      permissionKey: 'serviceGatePass',
+    },
+    {
+      id: 'deliveryChallan',
+      title: 'Delivery Challan (DC Copy)',
+      icon: 'local-shipping',
+      screen: 'ServiceDeliveryChallan',
+      permissionKey: 'serviceDeliveryChallan',
+    },
+    {
+      id: 'returnableChallan',
+      title: 'Returnable Challan',
+      icon: 'assignment-return',
+      screen: 'ServiceReturnableChallan',
+      permissionKey: 'serviceReturnableChallan',
     },
     {
       id: 'partners',

@@ -26,6 +26,7 @@ import PaymentCardsScreen from '../screens/Common/PaymentCardsScreen';
 import ReviewsScreen from '../screens/Common/ReviewsScreen';
 import AddressScreen from '../screens/Common/AddressScreen';
 import PanCardScreen from '../screens/Common/PanCardScreen';
+import LegalDocumentScreen from '../screens/Legal/LegalDocumentScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -60,6 +61,18 @@ const HomeStack = () => (
         title: 'Create Company',
         headerRight: () => <CompanyToggleHeader />,
       }}
+    />
+    <Stack.Screen
+      name="LegalDocument"
+      component={LegalDocumentScreen}
+      options={({ route }: any) => ({
+        title:
+          route.params?.documentType === 'terms'
+            ? 'Terms & Conditions'
+            : route.params?.documentType === 'refund'
+              ? 'Refund & Return Policy'
+              : 'Privacy Policy',
+      })}
     />
   </Stack.Navigator>
 );
@@ -155,6 +168,18 @@ const ProfileStack = () => (
     />
     <Stack.Screen name="Address" component={AddressScreen} options={{ title: 'Address' }} />
     <Stack.Screen name="PanCard" component={PanCardScreen} options={{ title: 'PAN Card' }} />
+    <Stack.Screen
+      name="LegalDocument"
+      component={LegalDocumentScreen}
+      options={({ route }: any) => ({
+        title:
+          route.params?.documentType === 'terms'
+            ? 'Terms & Conditions'
+            : route.params?.documentType === 'refund'
+              ? 'Refund & Return Policy'
+              : 'Privacy Policy',
+      })}
+    />
   </Stack.Navigator>
 );
 

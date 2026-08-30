@@ -65,6 +65,35 @@ export async function sendPushToUser(userId, { title, body, data = {} }) {
     }
 }
 
+function screenForAssignmentType(type) {
+    switch (type) {
+        case "service_enquiry":
+            return "ServiceEnquiries";
+        case "rental_enquiry":
+            return "RentalEnquiries";
+        case "sales_order":
+            return "OrderList";
+        case "service_report":
+            return "ServiceReports";
+        case "rental_report":
+            return "RentalReports";
+        case "service_gate_pass":
+            return "ServiceGatePass";
+        case "rental_gate_pass":
+            return "RentalGatePass";
+        case "service_delivery_challan":
+            return "ServiceDeliveryChallan";
+        case "rental_delivery_challan":
+            return "RentalDeliveryChallan";
+        case "service_returnable_challan":
+            return "ServiceReturnableChallan";
+        case "rental_returnable_challan":
+            return "RentalReturnableChallan";
+        default:
+            return undefined;
+    }
+}
+
 export async function notifyAssignment(userId, { type, title, body, entityId }) {
     const userIdStr = userId ? String(userId) : null;
     if (!userIdStr) return;
@@ -75,14 +104,7 @@ export async function notifyAssignment(userId, { type, title, body, entityId }) 
         data: {
             type,
             entityId: entityId ? String(entityId) : undefined,
-            screen:
-                type === "service_enquiry"
-                    ? "ServiceEnquiries"
-                    : type === "rental_enquiry"
-                      ? "RentalEnquiries"
-                      : type === "sales_order"
-                        ? "OrderList"
-                        : undefined,
+            screen: screenForAssignmentType(type),
         },
     });
 }

@@ -67,15 +67,12 @@ const productSchema = new mongoose.Schema({
         {
             from: {
                 type: String,
-                required: true,
             },
             to: {
                 type: String,
-                required: true,
             },
             price: {
                 type: String,
-                required: true,
             },
             commission: {
                 type: String,
@@ -88,7 +85,7 @@ const productSchema = new mongoose.Schema({
     },
     discountPrice: {
         type: Number,
-        required: [true, "Please enter offer price"],
+        default: 0,
     },
     images: [
         {

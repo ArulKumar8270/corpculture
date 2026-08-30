@@ -21,6 +21,12 @@ import {
   RENTAL_RETURNABLE_CHALLAN_TYPE,
 } from './reportListApi';
 
+export const getServicePayloadReportFor = (resolvedType?: string) =>
+  isOperationalDocumentReportType(resolvedType) ? resolvedType : 'service';
+
+export const getRentalPayloadReportFor = (resolvedType?: string) =>
+  isOperationalDocumentReportType(resolvedType) ? resolvedType : 'rental';
+
 export const resolveServiceReportType = (reportFor?: string) => {
   if (reportFor === SERVICE_GATE_PASS_TYPE || reportFor === SERVICE_GATE_PASS) {
     return SERVICE_GATE_PASS_TYPE;

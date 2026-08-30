@@ -45,6 +45,26 @@ const RentalReportsSummary = () => {
         return data?.totalCount ?? 0;
     }, [auth.token]);
 
+    const fetchRentalDeliveryChallanCount = useCallback(async (serialNo = '') => {
+        const params = new URLSearchParams({ page: '1', limit: '1', reportType: 'Rental_Delivery_Challan' });
+        if (serialNo.trim()) params.set('serialNo', serialNo.trim());
+        const { data } = await axios.get(
+            `${import.meta.env.VITE_SERVER_URL}/api/v1/report/Rental_Delivery_Challan?${params.toString()}`,
+            { headers: { Authorization: auth.token } }
+        );
+        return data?.totalCount ?? 0;
+    }, [auth.token]);
+
+    const fetchRentalReturnableChallanCount = useCallback(async (serialNo = '') => {
+        const params = new URLSearchParams({ page: '1', limit: '1', reportType: 'Rental_Returnable_Challan' });
+        if (serialNo.trim()) params.set('serialNo', serialNo.trim());
+        const { data } = await axios.get(
+            `${import.meta.env.VITE_SERVER_URL}/api/v1/report/Rental_Returnable_Challan?${params.toString()}`,
+            { headers: { Authorization: auth.token } }
+        );
+        return data?.totalCount ?? 0;
+    }, [auth.token]);
+
     const fetchData = useCallback(async (serialNo = '') => {
         setLoading(true);
         setError(null);
@@ -54,6 +74,8 @@ const RentalReportsSummary = () => {
                 rentalQuotationsRes,
                 rentalReportsCount,
                 rentalGatePassCount,
+                rentalDeliveryChallanCount,
+                rentalReturnableChallanCount,
                 rentalEnquiriesRes
             ] = await Promise.allSettled([
                 axios.post(
@@ -68,6 +90,8 @@ const RentalReportsSummary = () => {
                 ),
                 fetchRentalReportsCount(serialNo),
                 fetchRentalGatePassCount(serialNo),
+                fetchRentalDeliveryChallanCount(serialNo),
+                fetchRentalReturnableChallanCount(serialNo),
                 axios.get(
                     `${import.meta.env.VITE_SERVER_URL}/api/v1/rental/all`,
                     { headers: { Authorization: auth.token } }
@@ -79,6 +103,8 @@ const RentalReportsSummary = () => {
                 { id: 'rentalQuotations', name: 'Rental Quotations', count: rentalQuotationsRes?.value?.data?.totalCount ?? 0, path: '../rentalQuotationsReport' },
                 { id: 'rentalReports', name: 'Rental Reports', count: rentalReportsCount?.status === 'fulfilled' ? (rentalReportsCount.value ?? 0) : 0, path: '../rentalReportsReport', supportsSerialFilter: true },
                 { id: 'rentalGatePass', name: 'Rental Gate Pass', count: rentalGatePassCount?.status === 'fulfilled' ? (rentalGatePassCount.value ?? 0) : 0, path: '../rentalGatePassList', supportsSerialFilter: true },
+                { id: 'rentalDeliveryChallan', name: 'Delivery Challan (DC Copy)', count: rentalDeliveryChallanCount?.status === 'fulfilled' ? (rentalDeliveryChallanCount.value ?? 0) : 0, path: '../rentalDeliveryChallanList', supportsSerialFilter: true },
+                { id: 'rentalReturnableChallan', name: 'Returnable Challan', count: rentalReturnableChallanCount?.status === 'fulfilled' ? (rentalReturnableChallanCount.value ?? 0) : 0, path: '../rentalReturnableChallanList', supportsSerialFilter: true },
                 { id: 'rentalEnquiries', name: 'Rental Enquiries', count: rentalEnquiriesRes?.value?.data?.totalCount ?? 0, path: '../rentalEnquiriesReport' },
             ];
             setReportData(data);
@@ -88,7 +114,7 @@ const RentalReportsSummary = () => {
         } finally {
             setLoading(false);
         }
-    }, [auth.token, fetchRentalReportsCount, fetchRentalGatePassCount]);
+    }, [auth.token, fetchRentalReportsCount, fetchRentalGatePassCount, fetchRentalDeliveryChallanCount, fetchRentalReturnableChallanCount]);
 
     useEffect(() => {
         if (auth?.token) fetchData('');

@@ -66,6 +66,7 @@ import AllOrdersAdminScreen from '../screens/Admin/AllOrdersAdminScreen';
 import AddressScreen from '../screens/Common/AddressScreen';
 import PanCardScreen from '../screens/Common/PanCardScreen';
 import DeactivateScreen from '../screens/Common/DeactivateScreen';
+import LegalDocumentScreen from '../screens/Legal/LegalDocumentScreen';
 import PayslipListScreen from '../screens/Common/PayslipListScreen';
 import PayslipViewScreen from '../screens/Common/PayslipViewScreen';
 import EmployeeActivityLogListScreen from '../screens/Common/EmployeeActivityLogListScreen';
@@ -368,6 +369,18 @@ const ProfileStack = () => (
     <Stack.Screen name="Payslips" component={PayslipListScreen} options={{ title: 'My Payslips' }} />
     <Stack.Screen name="PayslipView" component={PayslipViewScreen} options={{ title: 'Payslip' }} />
     <Stack.Screen name="ActivityLogList" component={EmployeeActivityLogListScreen} options={{ title: 'My Petrol Forms' }} />
+    <Stack.Screen
+      name="LegalDocument"
+      component={LegalDocumentScreen}
+      options={({ route }: any) => ({
+        title:
+          route.params?.documentType === 'terms'
+            ? 'Terms & Conditions'
+            : route.params?.documentType === 'refund'
+              ? 'Refund & Return Policy'
+              : 'Privacy Policy',
+      })}
+    />
   </Stack.Navigator>
 );
 

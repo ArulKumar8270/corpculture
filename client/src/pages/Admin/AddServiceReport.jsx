@@ -30,12 +30,13 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'; // I
 import toast from 'react-hot-toast';
 import axios from 'axios'; // Assuming axios is used for API calls
 import { useAuth } from '../../context/auth'; // Import useAuth to get the token
-import { getReportListPath } from '../../utils/reportNavigation';
+import { getReportListPath, getPayloadReportFor } from '../../utils/reportNavigation';
 import {
     CONTENT_SCOPE_OPTIONS,
     getDocumentTitle,
     showsContentScopeField,
     isContentScopeRequired,
+    isRentalReportDomain,
 } from '../../utils/reportDocumentTypes';
 
 const defaultReportType = (props, reportFor) =>
@@ -49,6 +50,8 @@ const AddServiceReport = (props) => {
     const employeeName = searchParams.get("employeeName");
     const reportFor = searchParams.get("reportType");
     const serviceId = searchParams.get("serviceId");
+    const rentalId = searchParams.get("rentalId");
+    const sourceEnquiryId = serviceId || rentalId;
     const companyId = searchParams.get("companyId");
     // State for form fields
     const [reportData, setReportData] = useState({
@@ -224,13 +227,21 @@ const AddServiceReport = (props) => {
                     }
 
                     // Fetch products for the selected company
-                    const { data: productsData } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/service-products/getServiceProductsByCompany/${reportData?.company}`, {
+                    const isRental = isRentalReportDomain(reportData.reportType);
+                    const productsUrl = isRental
+                        ? `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-products/getServiceProductsByCompany/${reportData?.company}`
+                        : `${import.meta.env.VITE_SERVER_URL}/api/v1/service-products/getServiceProductsByCompany/${reportData?.company}`;
+                    const { data: productsData } = await axios.get(productsUrl, {
                         headers: {
                             Authorization: auth.token,
                         },
                     });
                     if (productsData?.success) {
-                        setAvailableProducts(productsData.serviceProducts);
+                        setAvailableProducts(
+                            isRental
+                                ? (productsData.rentalProducts || productsData.data?.rentalProducts || [])
+                                : (productsData.serviceProducts || productsData.data?.serviceProducts || [])
+                        );
                     } else {
                         toast.error(productsData?.message || 'Failed to fetch products for the selected company.');
                         setAvailableProducts([]);
@@ -347,22 +358,27 @@ const AddServiceReport = (props) => {
             return;
         }
         const selectedProduct = availableProducts.find(p => p._id === reportData.materialProductName);
-        if (!selectedProduct || !reportData.materialQuantity || parseInt(reportData.materialQuantity) <= 0) {
-            toast.error('Please select a product and enter a valid quantity.');
+        const parsedQty = parseInt(reportData.materialQuantity, 10);
+        const quantity = Number.isFinite(parsedQty) && parsedQty >= 0 ? parsedQty : 0;
+        const hasDetails = Boolean(
+            reportData.materialUsageData?.trim() ||
+            reportData.materialDescription?.trim() ||
+            reportData.materialAccessService?.trim()
+        );
+        if (!selectedProduct && quantity <= 0 && !hasDetails) {
+            toast.error('Enter a quantity or product details.');
             return;
         }
 
-        const quantity = parseInt(reportData.materialQuantity);
-        // Use helper function to safely extract productName
-        const productName = extractProductName(selectedProduct);
+        const productName = selectedProduct ? extractProductName(selectedProduct) : '';
         const productData = {
-            productName: productName,
+            productName: productName || '',
             usageData: reportData.materialUsageData?.trim() || '',
             description: reportData.materialDescription?.trim() || '',
             accessService: reportData.materialAccessService?.trim() || '',
             quantity: quantity,
-            rate: selectedProduct.rate,
-            totalAmount: quantity * selectedProduct.rate,
+            rate: selectedProduct?.rate || 0,
+            totalAmount: quantity * (selectedProduct?.rate || 0),
         };
 
         setMaterialGroups(prevGroups => prevGroups.map((group, idx) => {
@@ -475,7 +491,7 @@ const AddServiceReport = (props) => {
 
         // Construct the payload for the backend
         const payload = {
-            serviceId: serviceId,
+            serviceId: sourceEnquiryId,
             reportType: reportData.reportType,
             company: reportData.company, // This is the company _id
             sendDetailsTo: reportData.sendDetailsTo,
@@ -485,7 +501,7 @@ const AddServiceReport = (props) => {
             reference: reportData.reference,
             contentScope: reportData.contentScope || undefined,
             assignedTo: reportData.assignedTo || employeeName,
-            reportFor: reportFor,
+            reportFor: getPayloadReportFor(reportData.reportType),
             // Send materialGroups as array of objects, without temporary 'id' field from products
             // Ensure productName is always a string, not an object
             materialGroups: materialGroups.map(group => ({
@@ -494,8 +510,8 @@ const AddServiceReport = (props) => {
                 serialNo: group.serialNo?.trim() || '',
                 products: group.products.map(({ id, serialNo, ...rest }) => {
                     // Ensure productName is a string
-                    const productName = typeof rest.productName === 'string' 
-                        ? rest.productName 
+                    const productName = typeof rest.productName === 'string'
+                        ? rest.productName
                         : extractProductName(rest);
                     return {
                         ...rest,
@@ -759,7 +775,7 @@ const AddServiceReport = (props) => {
                 </Grid>
 
                 <Typography variant="h6" component="h2" gutterBottom sx={{ mt: 4, mb: 2, color: '#019ee3' }}>
-                    Material Groups <Typography component="span" variant="body2" sx={{ color: 'text.secondary' }}>(optional)</Typography>
+                    Material Groups
                 </Typography>
                 <Box sx={{ mb: 2, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                     <Button variant="outlined" onClick={handleAddGroup}>
@@ -886,7 +902,6 @@ const AddServiceReport = (props) => {
                             <Button
                                 variant="outlined"
                                 onClick={handleSaveProduct}
-                                disabled={!reportData.materialProductName || !reportData.materialQuantity}
                                 fullWidth
                             >
                                 {editingProductId ? 'Update Product' : 'Add Product'} {/* Dynamic button text */}

@@ -114,6 +114,7 @@ const createOrderWithoutPayment = async (req, res) => {
       shippingInfo,
       amount,
       paymentMethod: isCreditPayment ? "credit" : "cash",
+      paymentStatus: isCreditPayment ? "Paid" : "Unpaid",
       ...(resolvedCompanyId ? { companyId: resolvedCompanyId } : {}),
     };
 

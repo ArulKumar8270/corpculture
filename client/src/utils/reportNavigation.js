@@ -53,6 +53,9 @@ export const GATE_PASS_SEND_N8N_WEBHOOK =
 export const getReportSendWebhook = (reportType) =>
     isOperationalDocumentReportType(reportType) ? GATE_PASS_SEND_N8N_WEBHOOK : REPORT_SEND_N8N_WEBHOOK;
 
+export const getPayloadReportFor = (reportType) =>
+    isOperationalDocumentReportType(reportType) ? reportType : (String(reportType || '').startsWith('Rental_') ? 'rental' : 'service');
+
 export const getReportPageTitle = (reportType) => {
     if (isOperationalDocumentReportType(reportType)) {
         return getDocumentTitle(reportType);

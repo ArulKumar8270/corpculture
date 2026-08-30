@@ -579,7 +579,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                                         Reports <span className="ml-2 text-xs font-normal text-gray-500 bg-gray-200 px-2 py-1 rounded-full">{recordCounts?.serviceReport}</span>
                                                     </div>
                                                 </NavLink>)}
-                {hasPermission('serviceReport') && (<NavLink
+                {hasPermission('serviceGatePass') && (<NavLink
                                                     to="./serviceGatePassList"
                                                     onClick={scrollToTop}
                                                     className={({ isActive }) =>
@@ -743,7 +743,7 @@ const AdminMenu = ({ toggleMenu }) => {
                                                         Reports <span className="ml-2 text-xs font-normal text-gray-500 bg-gray-200 px-2 py-1 rounded-full">{recordCounts?.rentalReport}</span>
                                                     </div>
                                                 </NavLink>)}
-                                                {hasPermission('rentalReport') && (<NavLink
+                                                {hasPermission('rentalGatePass') && (<NavLink
                                                     to="./rentalGatePassList"
                                                     onClick={scrollToTop}
                                                     className={({ isActive }) =>

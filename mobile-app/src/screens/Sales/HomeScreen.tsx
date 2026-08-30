@@ -950,11 +950,10 @@ const HomeScreen = () => {
         {/* Contact Info */}
         <View style={styles.contactContainer}>
           <Text style={styles.contactTitle}>Contact Us</Text>
-          <Text style={styles.contactText}>Phone: 9830010031</Text>
-          <Text style={styles.contactText}>Email: corp.culture@gmail.com</Text>
+          <Text style={styles.contactText}>Phone: 9003240001</Text>
+          <Text style={styles.contactText}>Email: customer@corpculture.in</Text>
           <Text style={styles.contactText}>
-            A Block, Sunny Plaza No. 15/18, Kaka Ayyan Road, Metro Nagar, Selaiyur, Chennai -
-            600 073
+            A Block, Liberty Plaza, No. 12/30, Vada Agaram Road, Mehta Nagar, Aminjikarai, Chennai - 600 002
           </Text>
           <TouchableOpacity style={styles.directionsButton}>
             <Text style={styles.directionsText}>Get Directions +</Text>
@@ -965,28 +964,28 @@ const HomeScreen = () => {
         <View style={styles.hoursContainer}>
           <Text style={styles.hoursTitle}>Hours of Operation</Text>
           <Text style={styles.hoursText}>Open 7 Days a Week</Text>
-          <Text style={styles.hoursText}>9:00 AM - 7:00 PM</Text>
+          <Text style={styles.hoursText}>8:00 AM - 7:00 PM</Text>
           <Text style={styles.hoursText}>
-            Closed On: New Year's Day, Diwali, Thanksgiving Day, Christmas Day
+            Closed On: New Year's Day, Easter, Thanksgiving Day, Christmas Day
           </Text>
         </View>
 
         {/* Footer Links */}
         <View style={styles.footerLinks}>
-          <TouchableOpacity>
-            <Text style={styles.footerLink}>About</Text>
+          <TouchableOpacity onPress={() => (navigation as any).navigate('LegalDocument', { documentType: 'terms' })}>
+            <Text style={styles.footerLink}>Terms & Conditions</Text>
           </TouchableOpacity>
-          <TouchableOpacity>
-            <Text style={styles.footerLink}>Products</Text>
+          <TouchableOpacity onPress={() => (navigation as any).navigate('LegalDocument', { documentType: 'refund' })}>
+            <Text style={styles.footerLink}>Refund & Return</Text>
           </TouchableOpacity>
-          <TouchableOpacity>
-            <Text style={styles.footerLink}>Feedback</Text>
+          <TouchableOpacity onPress={() => (navigation as any).navigate('LegalDocument', { documentType: 'privacy' })}>
+            <Text style={styles.footerLink}>Privacy Policy</Text>
           </TouchableOpacity>
         </View>
 
         {/* Copyright */}
         <Text style={styles.copyright}>
-          Corp Culture © 2023. All Rights Reserved.
+          Copyright © {new Date().getFullYear()} Corpculture. All Rights Reserved.
         </Text>
         <Text style={styles.designCredit}>Designed by Nickname Infotech</Text>
       </View>
@@ -2136,8 +2135,9 @@ const styles = StyleSheet.create({
   },
   footerLinks: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'center',
-    gap: 20,
+    gap: 16,
     marginBottom: 20,
   },
   footerLink: {

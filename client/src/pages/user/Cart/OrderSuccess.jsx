@@ -10,7 +10,7 @@ import SeoData from "../../../SEO/SeoData";
 const OrderSuccess = () => {
     const navigate = useNavigate();
     const [time, setTime] = useState(3);
-    const [cartItems, setCartItems] = useCart();
+    const [cartItems, setCartItems, , , , , , , clearCart] = useCart();
     const { auth } = useAuth();
     const [sessionId, setSessionId] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -54,13 +54,16 @@ const OrderSuccess = () => {
                     if (auth?.user?.isCommissionEnabled) {
                         afterPaymentSuccess(payment?.data?.order, cartItems);
                     }
-                    setCartItems([]);
-                    localStorage.removeItem("cart");
+                    if (typeof clearCart === "function") clearCart();
+                    else {
+                        setCartItems([]);
+                        localStorage.removeItem("cart");
+                    }
                     localStorage.removeItem("sessionId");
                     localStorage.removeItem("shippingInfo");
                     localStorage.removeItem("orderReferenceNo");
                     setLoading(false);
-                    setHasSavedPayment(true); // Mark the payment as saved to prevent further API calls
+                    setHasSavedPayment(true);
                 }
 
             } catch (error) {
@@ -69,23 +72,36 @@ const OrderSuccess = () => {
         };
 
         const skipOrderId = (localStorage.getItem("skipOrderId") || "").trim();
-        if (skipOrderId && cartItems.length > 0 && !hasSavedPayment) {
-            // Skip Stripe flow: order already created
-            setCartItems([]);
-            localStorage.removeItem("cart");
+        if (!skipOrderId && !sessionId) {
+            if (!hasSavedPayment) {
+                setLoading(false);
+                setHasSavedPayment(true);
+                navigate("/shipping/failed", { replace: true });
+            }
+            return;
+        }
+        if ((skipOrderId || sessionId) && !hasSavedPayment) {
+            if (sessionId && !skipOrderId && cartItems.length > 0) {
+                savePayment();
+                return;
+            }
+            if (typeof clearCart === "function") clearCart();
+            else {
+                setCartItems([]);
+                localStorage.removeItem("cart");
+            }
             localStorage.removeItem("shippingInfo");
             localStorage.removeItem("orderReferenceNo");
             localStorage.removeItem("skipOrderId");
             localStorage.removeItem("sessionId");
+            localStorage.removeItem("hdfcOrderId");
+            localStorage.removeItem("hdfcPaymentUrl");
+            localStorage.removeItem("paymentMethod");
             setLoading(false);
             setHasSavedPayment(true);
             return;
         }
-
-        if (sessionId && cartItems.length > 0 && !hasSavedPayment) {
-            savePayment(); // Ensure the API call is only triggered once
-        }
-    }, [sessionId, auth?.token, cartItems, hasSavedPayment, setCartItems]);
+    }, [sessionId, auth?.token, cartItems, hasSavedPayment, setCartItems, clearCart, navigate]);
 
     const commissionCalculation = (cartItems, amount) => {
         const totalCommission = cartItems.reduce((sum, item) => {

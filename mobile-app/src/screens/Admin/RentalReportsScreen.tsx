@@ -8,7 +8,6 @@ import {
   ActivityIndicator,
   TextInput,
   Alert,
-  Linking,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
@@ -26,14 +25,18 @@ import {
   getReportSendWebhook,
   isOperationalDocumentReportType,
   getDocumentTitle,
+  getDocumentListScreen,
+  getDocumentSuccessMessage,
+  getDocumentPermissionKey,
   RENTAL_REPORT_TYPE,
   buildReportListQueryParams,
   getReportsListUrl,
   ReportListFilterValues,
 } from '../../utils/reportListApi';
 import { collectReportSerialNumbers } from '../../utils/reportSerialNumbers';
-import { openReportDownload } from '../../utils/reportDownload';
+import { downloadReportAndOpen } from '../../utils/reportDownload';
 import { getServiceProductDisplayName } from '../../utils/serviceProductDisplayName';
+import { presentDocumentSentNotification } from '../../services/pushNotifications';
 
 function companyIdFromReport(report: any): string | undefined {
   const c = report?.company;
@@ -60,6 +63,7 @@ const RentalReportsScreen = () => {
   const [sendingReport, setSendingReport] = useState<string | null>(null);
   const [uploadingReportId, setUploadingReportId] = useState<string | null>(null);
   const [downloadingReportId, setDownloadingReportId] = useState<string | null>(null);
+  const docPermissionKey = getDocumentPermissionKey(reportTypeKey);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [totalCount, setTotalCount] = useState(0);
@@ -112,7 +116,7 @@ const RentalReportsScreen = () => {
         setLoading(false);
       }
     },
-    [token, user?.role, user?._id]
+    [token, user?.role, user?._id, reportTypeKey]
   );
 
   useEffect(() => {
@@ -150,7 +154,7 @@ const RentalReportsScreen = () => {
   const handleEdit = (report: any) => {
     (navigation as any).navigate('AddRentalReport', {
       id: report._id || report,
-      reportType: report.reportType || reportTypeKey,
+      reportType: reportTypeKey,
       reportFor: report.reportFor || 'rental',
     });
   };
@@ -215,25 +219,55 @@ const RentalReportsScreen = () => {
     }
   };
 
-  const handleSendReport = async (reportId: string, reportType?: string) => {
-    const type = reportType || reportTypeKey;
-    const isOperationalDoc = isOperationalDocumentReportType(type);
-    const docTitle = getDocumentTitle(type);
+  const handleSendReport = async (report: any) => {
+    const sendType = reportTypeKey;
+    const isOperationalDoc = isOperationalDocumentReportType(sendType);
+    const docTitle = getDocumentTitle(sendType);
+    const reportId = report?._id || report;
     setSendingReport(reportId);
     try {
-      await axios.post(getReportSendWebhook(type), {
-        reportId: reportId,
+      if (report?.reportType && report.reportType !== sendType) {
+        try {
+          await axios.put(
+            `${getApiBaseUrl()}/report/${reportId}`,
+            { reportType: sendType, reportFor: sendType },
+            { headers: { Authorization: token || '' } }
+          );
+        } catch (fixErr) {
+          console.error('Failed to correct document type before send:', fixErr);
+        }
+      }
+      await axios.post(getReportSendWebhook(sendType), {
+        reportId,
       });
+      const enquiryId = report?.serviceId?._id || report?.serviceId;
+      if (enquiryId && sendType === RENTAL_REPORT_TYPE) {
+        try {
+          await axios.put(
+            `${getApiBaseUrl()}/rental/update/${enquiryId}`,
+            { status: 'Completed' },
+            { headers: { Authorization: token || '' } }
+          );
+        } catch (statusErr) {
+          console.error('Failed to mark rental enquiry completed:', statusErr);
+        }
+      }
       Toast.show({
         type: 'success',
         text1: 'Success',
-        text2: isOperationalDoc ? `${docTitle} sent successfully!` : 'Report sent successfully!',
+        text2: getDocumentSuccessMessage(sendType, 'sent'),
       });
+      presentDocumentSentNotification(
+        isOperationalDoc ? docTitle : 'Report',
+        isOperationalDoc ? getDocumentListScreen(sendType) : 'RentalReports',
+        reportId
+      );
+      fetchReports();
     } catch (error: any) {
       Toast.show({
         type: 'error',
         text1: 'Error',
-        text2: isOperationalDoc ? `Failed to send ${docTitle.toLowerCase()}` : 'Failed to send report',
+        text2: isOperationalDoc ? `Failed to send ${docTitle}` : 'Failed to send report',
       });
     } finally {
       setSendingReport(null);
@@ -306,19 +340,17 @@ const RentalReportsScreen = () => {
   };
 
   const handleDownloadReport = async (report: any) => {
+    const docTitle = getDocumentTitle(reportTypeKey);
     setDownloadingReportId(report._id);
     try {
-      const url = await openReportDownload(report);
-      if (!url) {
-        Toast.show({ type: 'error', text1: 'Error', text2: 'Report file not available' });
-        return;
+      const opened = await downloadReportAndOpen(report);
+      if (!opened) {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: `${docTitle === 'Report' ? 'Report' : docTitle} PDF is not ready yet. Send the document first, or upload a file.`,
+        });
       }
-      const canOpen = await Linking.canOpenURL(url);
-      if (!canOpen) {
-        Toast.show({ type: 'error', text1: 'Error', text2: 'Unable to open download link' });
-        return;
-      }
-      await Linking.openURL(url);
     } catch (error: any) {
       console.error('Rental report download failed:', error);
       Toast.show({
@@ -365,7 +397,11 @@ const RentalReportsScreen = () => {
           onPress={() => toggleExpand(item._id)}
         >
           <View style={styles.reportHeaderLeft}>
-            <Text style={styles.reportType}>{item.reportType || 'Rental_Report'}</Text>
+            <Text style={styles.reportType}>
+              {isOperationalDocumentReportType(reportTypeKey)
+                ? getDocumentTitle(reportTypeKey)
+                : item.reportType || 'Rental Report'}
+            </Text>
             <Text style={styles.companyName}>{item.company?.companyName || 'N/A'}</Text>
             {/* Model/Serial/Usage/Description are now per-product (inside Materials) */}
           </View>
@@ -406,7 +442,7 @@ const RentalReportsScreen = () => {
         <View style={styles.actionButtons}>
           <TouchableOpacity
             style={[styles.actionButton, styles.sendButton]}
-            onPress={() => handleSendReport(item._id, item.reportType)}
+            onPress={() => handleSendReport(item)}
             disabled={isSendingThis}
           >
             {isSendingThis ? (
@@ -414,7 +450,11 @@ const RentalReportsScreen = () => {
             ) : (
               <>
                 <Icon name="send" size={18} color="#fff" />
-                <Text style={[styles.actionButtonText, styles.sendButtonText]}>Send</Text>
+                <Text style={[styles.actionButtonText, styles.sendButtonText]}>
+                  {isOperationalDocumentReportType(reportTypeKey)
+                    ? `Send ${getDocumentTitle(reportTypeKey)}`
+                    : 'Send'}
+                </Text>
               </>
             )}
           </TouchableOpacity>
@@ -455,7 +495,7 @@ const RentalReportsScreen = () => {
               <Text style={styles.actionButtonText}>Petrol Form</Text>
             </TouchableOpacity>
           ) : null}
-          {(hasPermission('rentalReport', 'edit') || user?.role === 1) && (
+          {(hasPermission(docPermissionKey, 'edit') || user?.role === 1) && (
             <TouchableOpacity
               style={[styles.actionButton, styles.editButton]}
               onPress={() => handleEdit(item)}
@@ -464,7 +504,7 @@ const RentalReportsScreen = () => {
               <Text style={styles.actionButtonText}>Edit</Text>
             </TouchableOpacity>
           )}
-          {(hasPermission('rentalReport', 'delete') || user?.role === 1) && (
+          {(hasPermission(docPermissionKey, 'delete') || user?.role === 1) && (
             <TouchableOpacity
               style={[styles.actionButton, styles.deleteButton]}
               onPress={() => handleDelete(item._id)}
@@ -477,6 +517,24 @@ const RentalReportsScreen = () => {
 
         {isExpanded && (
           <View style={styles.expandedContent}>
+            {item.problemReport && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Problem Report</Text>
+                <Text style={styles.sectionText}>{item.problemReport}</Text>
+              </View>
+            )}
+            {item.remarksPendingWorks && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Remarks / Pending Works</Text>
+                <Text style={styles.sectionText}>{item.remarksPendingWorks}</Text>
+              </View>
+            )}
+            {item.reference && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Reference</Text>
+                <Text style={styles.sectionText}>{item.reference}</Text>
+              </View>
+            )}
             <Text style={styles.materialsTitle}>Materials</Text>
             {(item.materialGroups && item.materialGroups.length > 0) ? (
               item.materialGroups.map((group: any, groupIndex: number) => (
@@ -565,7 +623,7 @@ const RentalReportsScreen = () => {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>{screenTitle}</Text>
-        {(hasPermission('rentalReport', 'edit') || user?.role === 1) && (
+        {(hasPermission(docPermissionKey, 'edit') || user?.role === 1) && (
           <TouchableOpacity
             style={styles.addButton}
             onPress={() =>
@@ -610,7 +668,7 @@ const RentalReportsScreen = () => {
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Icon name="description" size={64} color="#ccc" />
-              <Text style={styles.emptyText}>No Rental_Reports found</Text>
+              <Text style={styles.emptyText}>No {getDocumentTitle(reportTypeKey)} entries found</Text>
             </View>
           }
         />
@@ -793,6 +851,20 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#e0e0e0',
     backgroundColor: '#f9f9f9',
+  },
+  section: {
+    marginBottom: 15,
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 5,
+  },
+  sectionText: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 20,
   },
   materialsTitle: {
     fontSize: 16,

@@ -13,8 +13,6 @@ import { getCompanyShippingDefaults } from "../../../utils/companyShipping";
 import { computeOrderAmountFromItems } from "../../../utils/functions";
 import axios from "axios";
 
-//payment using stripe
-import { loadStripe } from "@stripe/stripe-js";
 import SeoData from "../../../SEO/SeoData";
 import PriceCard from "./PriceCard";
 import { useNavigate } from "react-router-dom";
@@ -48,6 +46,7 @@ const Shipping = () => {
     const [phoneNo, setPhoneNo] = useState(shippingInfo?.phoneNo);
     const [orderReferenceNo, setOrderReferenceNo] = useState(storedOrderRef);
     const [availableCredit, setAvailableCredit] = useState(0);
+    const [paying, setPaying] = useState(false);
     const lastAppliedCompanyRef = useRef(null);
 
     const orderTotal = computeOrderAmountFromItems(cartItems);
@@ -115,11 +114,6 @@ const Shipping = () => {
         fetchCreditBalance();
     }, [auth?.token, activeCompanyId]);
 
-    //stripe details
-    const publishKey = import.meta.env.VITE_STRIPE_PUBLISH_KEY;
-    const secretKey = import.meta.env.VITE_STRIPE_SECRET_KEY;
-    let frontendURL = window.location.origin; // Get the frontend URL
-
     const validateAndStoreCheckoutInfo = () => {
         const ref = String(orderReferenceNo || "").trim();
         if (!ref) {
@@ -145,36 +139,45 @@ const Shipping = () => {
         return true;
     };
 
-    //PAYMENT USING STRIPE
+    //PAYMENT USING HDFC SMARTGATEWAY
     const handlePayment = async () => {
-        const stripe = await loadStripe(publishKey);
-
-        const response = await axios.post(
-            `${
-                import.meta.env.VITE_SERVER_URL
-            }/api/v1/user/create-checkout-session`,
-            {
-                products: cartItems,
-                frontendURL: frontendURL,
-                customerEmail: auth?.user?.email,
-            },
-            {
-                headers: {
-                    Authorization: auth?.token,
+        try {
+            setPaying(true);
+            const { data } = await axios.post(
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/user/hdfc/session`,
+                {
+                    orderItems: cartItems,
+                    shippingInfo: JSON.parse(localStorage.getItem("shippingInfo") || "null"),
+                    orderReferenceNo: (localStorage.getItem("orderReferenceNo") || "").trim(),
+                    companyId: activeCompanyId || undefined,
+                    frontendURL: window.location.origin,
+                    customerEmail: auth?.user?.email,
+                    customerPhone: phoneNo,
+                    customerName: auth?.user?.name,
                 },
+                {
+                    headers: {
+                        Authorization: auth?.token,
+                    },
+                }
+            );
+            const payUrl =
+                data?.paymentUrl ||
+                data?.paymentLinks?.web ||
+                data?.paymentLinks?.mobile;
+            if (!data?.success || !payUrl || !data?.hdfcOrderId) {
+                toast.error(data?.message || "Could not start payment");
+                return;
             }
-        );
-        const session = response.data.session;
-        console.log("session: ", session);
-        //storing session id to retrieve payment details after successful
-        localStorage.setItem("sessionId", session.id);
-        const result = stripe.redirectToCheckout({
-            sessionId: session.id,
-        });
-        console.log("result: ", result);
-
-        if (result.error) {
-            console.log(result.error);
+            localStorage.setItem("hdfcOrderId", data.hdfcOrderId);
+            localStorage.setItem("hdfcPaymentUrl", payUrl);
+            localStorage.setItem("paymentMethod", "online");
+            window.location.assign(payUrl);
+        } catch (error) {
+            console.error(error);
+            toast.error(error.response?.data?.message || "Could not start payment");
+        } finally {
+            setPaying(false);
         }
     };
 
@@ -418,9 +421,10 @@ const Shipping = () => {
 
                                 <button
                                     type="submit"
-                                    className="bg-gradient-to-r from-[#fb641b] to-[#ff9f00] hover:from-[#ff7f54] hover:to-[#ffe066] w-full sm:w-[40%] mt-6 py-4 px-2 text-lg font-bold text-white shadow-lg rounded-xl uppercase outline-none transition"
+                                    disabled={paying}
+                                    className="bg-gradient-to-r from-[#fb641b] to-[#ff9f00] hover:from-[#ff7f54] hover:to-[#ffe066] w-full sm:w-[40%] mt-6 py-4 px-2 text-lg font-bold text-white shadow-lg rounded-xl uppercase outline-none transition disabled:opacity-60"
                                 >
-                                    Make Payment
+                                    {paying ? "Starting Payment..." : "Make Payment"}
                                 </button>
 
                                 <button

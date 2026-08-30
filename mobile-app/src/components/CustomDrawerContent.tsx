@@ -126,15 +126,23 @@ const CustomDrawerContent = (props: CustomDrawerContentProps) => {
       'ServiceInvoiceList': 'Services',
       'ServiceQuotationList': 'Services',
       'ServiceReports': 'Services',
+      'ServiceGatePass': 'Services',
+      'ServiceDeliveryChallan': 'Services',
+      'ServiceReturnableChallan': 'Services',
       'RentalEnquiries': 'Rentals',
       'RentalProductList': 'Rentals',
       'RentalInvoiceList': 'Rentals',
       'RentalQuotationList': 'Rentals',
+      'RentalReports': 'Rentals',
+      'RentalGatePass': 'Rentals',
+      'RentalDeliveryChallan': 'Rentals',
+      'RentalReturnableChallan': 'Rentals',
       'Address': 'Profile',
       'PanCard': 'Profile',
       'Deactivate': 'Profile',
       'Payslips': 'Profile',
       'PayslipView': 'Profile',
+      'LegalDocument': 'Profile',
       // Admin has an "Employees" drawer; employees have forms under Profile stack.
       'ActivityLogForm': isAdmin ? 'Employees' : 'Profile',
       'LeaveForm': isAdmin ? 'Employees' : 'Profile',
@@ -246,6 +254,42 @@ const CustomDrawerContent = (props: CustomDrawerContentProps) => {
               onPress={() => navigateToScreen('ActivityLogList')}
             >
               <Text style={styles.menuItemText}>My Petrol Forms</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
+                (props.navigation as any).navigate('Profile', {
+                  screen: 'LegalDocument',
+                  params: { documentType: 'terms' },
+                });
+                props.navigation.closeDrawer();
+              }}
+            >
+              <Text style={styles.menuItemText}>Terms & Conditions</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
+                (props.navigation as any).navigate('Profile', {
+                  screen: 'LegalDocument',
+                  params: { documentType: 'refund' },
+                });
+                props.navigation.closeDrawer();
+              }}
+            >
+              <Text style={styles.menuItemText}>Refund & Return Policy</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
+                (props.navigation as any).navigate('Profile', {
+                  screen: 'LegalDocument',
+                  params: { documentType: 'privacy' },
+                });
+                props.navigation.closeDrawer();
+              }}
+            >
+              <Text style={styles.menuItemText}>Privacy Policy</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -377,12 +421,28 @@ const CustomDrawerContent = (props: CustomDrawerContentProps) => {
                 <Text style={styles.menuItemText}>Reports</Text>
               </TouchableOpacity>
             )}
-            {(isAdmin || hasPermission('serviceReport', 'view')) && (
+            {(isAdmin || hasPermission('serviceGatePass', 'view')) && (
               <TouchableOpacity
                 style={styles.menuItem}
                 onPress={() => navigateToScreen('ServiceGatePass')}
               >
                 <Text style={styles.menuItemText}>Gate Pass</Text>
+              </TouchableOpacity>
+            )}
+            {(isAdmin || hasPermission('serviceDeliveryChallan', 'view')) && (
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => navigateToScreen('ServiceDeliveryChallan')}
+              >
+                <Text style={styles.menuItemText}>Delivery Challan (DC Copy)</Text>
+              </TouchableOpacity>
+            )}
+            {(isAdmin || hasPermission('serviceReturnableChallan', 'view')) && (
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => navigateToScreen('ServiceReturnableChallan')}
+              >
+                <Text style={styles.menuItemText}>Returnable Challan</Text>
               </TouchableOpacity>
             )}
             {(isAdmin || hasPermission('servicePartner', 'view')) && (
@@ -462,12 +522,28 @@ const CustomDrawerContent = (props: CustomDrawerContentProps) => {
                 <Text style={styles.menuItemText}>Reports</Text>
               </TouchableOpacity>
             )}
-            {(isAdmin || hasPermission('rentalReport', 'view')) && (
+            {(isAdmin || hasPermission('rentalGatePass', 'view')) && (
               <TouchableOpacity
                 style={styles.menuItem}
                 onPress={() => navigateToScreen('RentalGatePass')}
               >
                 <Text style={styles.menuItemText}>Gate Pass</Text>
+              </TouchableOpacity>
+            )}
+            {(isAdmin || hasPermission('rentalDeliveryChallan', 'view')) && (
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => navigateToScreen('RentalDeliveryChallan')}
+              >
+                <Text style={styles.menuItemText}>Delivery Challan (DC Copy)</Text>
+              </TouchableOpacity>
+            )}
+            {(isAdmin || hasPermission('rentalReturnableChallan', 'view')) && (
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => navigateToScreen('RentalReturnableChallan')}
+              >
+                <Text style={styles.menuItemText}>Returnable Challan</Text>
               </TouchableOpacity>
             )}
             {(isAdmin || hasPermission('rentalPartners', 'view')) && (

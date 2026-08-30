@@ -54,6 +54,24 @@ const ServiceReportsSummaryScreen = () => {
     return data?.totalCount ?? 0;
   }, [token]);
 
+  const fetchServiceDeliveryChallanCount = useCallback(async (serialNo = '') => {
+    const params = new URLSearchParams({ page: '1', limit: '1', reportType: 'Service_Delivery_Challan' });
+    if (serialNo.trim()) params.set('serialNo', serialNo.trim());
+    const { data } = await axios.get(`${getApiBaseUrl()}/report/Service_Delivery_Challan?${params.toString()}`, {
+      headers: { Authorization: token || '' },
+    });
+    return data?.totalCount ?? 0;
+  }, [token]);
+
+  const fetchServiceReturnableChallanCount = useCallback(async (serialNo = '') => {
+    const params = new URLSearchParams({ page: '1', limit: '1', reportType: 'Service_Returnable_Challan' });
+    if (serialNo.trim()) params.set('serialNo', serialNo.trim());
+    const { data } = await axios.get(`${getApiBaseUrl()}/report/Service_Returnable_Challan?${params.toString()}`, {
+      headers: { Authorization: token || '' },
+    });
+    return data?.totalCount ?? 0;
+  }, [token]);
+
   const fetchSummaryData = useCallback(async (serialNo = '') => {
     setLoading(true);
     setError(null);
@@ -87,6 +105,8 @@ const ServiceReportsSummaryScreen = () => {
 
       const serviceReportsCount = await fetchServiceReportsCount(serialNo);
       const serviceGatePassCount = await fetchServiceGatePassCount(serialNo);
+      const serviceDeliveryChallanCount = await fetchServiceDeliveryChallanCount(serialNo);
+      const serviceReturnableChallanCount = await fetchServiceReturnableChallanCount(serialNo);
 
       const newReportData: ReportData[] = [
         {
@@ -123,6 +143,22 @@ const ServiceReportsSummaryScreen = () => {
           supportsSerialFilter: true,
         },
         {
+          id: 'serviceDeliveryChallan',
+          name: 'Delivery Challan (DC Copy)',
+          count: serviceDeliveryChallanCount,
+          screen: 'ServiceDeliveryChallan',
+          parentStack: 'Services',
+          supportsSerialFilter: true,
+        },
+        {
+          id: 'serviceReturnableChallan',
+          name: 'Returnable Challan',
+          count: serviceReturnableChallanCount,
+          screen: 'ServiceReturnableChallan',
+          parentStack: 'Services',
+          supportsSerialFilter: true,
+        },
+        {
           id: 'serviceEnquiries',
           name: 'Service Enquiries',
           count: serviceEnquiriesRes.status === 'fulfilled' && serviceEnquiriesRes.value.data.success
@@ -145,7 +181,7 @@ const ServiceReportsSummaryScreen = () => {
     } finally {
       setLoading(false);
     }
-  }, [token, fetchServiceReportsCount, fetchServiceGatePassCount]);
+  }, [token, fetchServiceReportsCount, fetchServiceGatePassCount, fetchServiceDeliveryChallanCount, fetchServiceReturnableChallanCount]);
 
   useFocusEffect(
     useCallback(() => {

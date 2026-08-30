@@ -17,6 +17,7 @@ import PayslipViewScreen from '../screens/Common/PayslipViewScreen';
 import EmployeeActivityLogListScreen from '../screens/Common/EmployeeActivityLogListScreen';
 import EmployeeActivityLogFormScreen from '../screens/Admin/EmployeeActivityLogFormScreen';
 import EmployeeLeaveFormScreen from '../screens/Admin/EmployeeLeaveFormScreen';
+import LegalDocumentScreen from '../screens/Legal/LegalDocumentScreen';
 
 // Product Management
 import ProductManagementScreen from '../screens/Admin/ProductManagementScreen';
@@ -338,6 +339,18 @@ const ProfileStack = () => (
     <Stack.Screen name="ActivityLogList" component={EmployeeActivityLogListScreen} options={{ title: 'My Petrol Forms' }} />
     <Stack.Screen name="ActivityLogForm" component={EmployeeActivityLogFormScreen} options={{ title: 'Petrol Form' }} />
     <Stack.Screen name="LeaveForm" component={EmployeeLeaveFormScreen} options={{ title: 'Leave Application' }} />
+    <Stack.Screen
+      name="LegalDocument"
+      component={LegalDocumentScreen}
+      options={({ route }: any) => ({
+        title:
+          route.params?.documentType === 'terms'
+            ? 'Terms & Conditions'
+            : route.params?.documentType === 'refund'
+              ? 'Refund & Return Policy'
+              : 'Privacy Policy',
+      })}
+    />
   </Stack.Navigator>
 );
 

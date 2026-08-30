@@ -45,6 +45,26 @@ const ServiceReportsSummary = () => {
         return data?.totalCount ?? 0;
     }, [auth.token]);
 
+    const fetchServiceDeliveryChallanCount = useCallback(async (serialNo = '') => {
+        const params = new URLSearchParams({ page: '1', limit: '1', reportType: 'Service_Delivery_Challan' });
+        if (serialNo.trim()) params.set('serialNo', serialNo.trim());
+        const { data } = await axios.get(
+            `${import.meta.env.VITE_SERVER_URL}/api/v1/report/Service_Delivery_Challan?${params.toString()}`,
+            { headers: { Authorization: auth.token } }
+        );
+        return data?.totalCount ?? 0;
+    }, [auth.token]);
+
+    const fetchServiceReturnableChallanCount = useCallback(async (serialNo = '') => {
+        const params = new URLSearchParams({ page: '1', limit: '1', reportType: 'Service_Returnable_Challan' });
+        if (serialNo.trim()) params.set('serialNo', serialNo.trim());
+        const { data } = await axios.get(
+            `${import.meta.env.VITE_SERVER_URL}/api/v1/report/Service_Returnable_Challan?${params.toString()}`,
+            { headers: { Authorization: auth.token } }
+        );
+        return data?.totalCount ?? 0;
+    }, [auth.token]);
+
     const fetchSummaryData = useCallback(async (serialNo = '') => {
         setLoading(true);
         setError(null);
@@ -61,6 +81,8 @@ const ServiceReportsSummary = () => {
                 serviceQuotationsRes,
                 serviceReportsCount,
                 serviceGatePassCount,
+                serviceDeliveryChallanCount,
+                serviceReturnableChallanCount,
                 serviceEnquiriesRes
             ] = await Promise.allSettled([
                 axios.post(
@@ -75,6 +97,8 @@ const ServiceReportsSummary = () => {
                 ),
                 fetchServiceReportsCount(serialNo),
                 fetchServiceGatePassCount(serialNo),
+                fetchServiceDeliveryChallanCount(serialNo),
+                fetchServiceReturnableChallanCount(serialNo),
                 axios.get(
                     `${import.meta.env.VITE_SERVER_URL}/api/v1/service/all`,
                     { headers: { Authorization: auth.token } }
@@ -109,6 +133,20 @@ const ServiceReportsSummary = () => {
                     supportsSerialFilter: true,
                 },
                 {
+                    id: 'serviceDeliveryChallan',
+                    name: 'Delivery Challan (DC Copy)',
+                    count: serviceDeliveryChallanCount?.status === 'fulfilled' ? (serviceDeliveryChallanCount.value ?? 0) : 0,
+                    path: '../serviceDeliveryChallanList',
+                    supportsSerialFilter: true,
+                },
+                {
+                    id: 'serviceReturnableChallan',
+                    name: 'Returnable Challan',
+                    count: serviceReturnableChallanCount?.status === 'fulfilled' ? (serviceReturnableChallanCount.value ?? 0) : 0,
+                    path: '../serviceReturnableChallanList',
+                    supportsSerialFilter: true,
+                },
+                {
                     id: 'serviceEnquiries',
                     name: 'Service Enquiries',
                     count: serviceEnquiriesRes?.value?.data?.totalCount ?? 0,
@@ -121,7 +159,7 @@ const ServiceReportsSummary = () => {
         } finally {
             setLoading(false);
         }
-    }, [auth?.token, fetchServiceReportsCount, fetchServiceGatePassCount]);
+    }, [auth?.token, fetchServiceReportsCount, fetchServiceGatePassCount, fetchServiceDeliveryChallanCount, fetchServiceReturnableChallanCount]);
 
     useEffect(() => {
         if (auth?.token) fetchSummaryData('');

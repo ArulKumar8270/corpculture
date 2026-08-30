@@ -16,6 +16,9 @@ export {
   isOperationalDocumentReportType,
   getDocumentTitle,
   getDocumentListScreen,
+  getDocumentSuccessMessage,
+  getDocumentFormTitle,
+  getDocumentPermissionKey,
 } from './reportDocumentTypes';
 
 export const REPORT_SEND_N8N_WEBHOOK =

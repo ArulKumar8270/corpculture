@@ -228,22 +228,25 @@ const EditProduct = () => {
             formData.append("name", name);
             formData.append("description", description);
             formData.append("price", price);
-            formData.append("discountPrice", discountPrice);
             formData.append("category", category);
             formData.append("stock", stock);
-            formData.append("warranty", warranty);
             formData.append("corpcultureWarranty", corpcultureWarranty);
             formData.append("orderReferenceNo", orderReferenceNo);
             formData.append("brandName", brand);
             formData.append("logo", logo);
             formData.append("oldLogo", JSON.stringify(oldLogo));
-            // Append new fields to formData
-            formData.append("installationCost", installationCost);
-            formData.append("deliveryCharge", deliveryCharge);
-            formData.append("weight", weight);
-            formData.append("length", length);
-            formData.append("width", width);
-            formData.append("height", height);
+            const appendOptional = (key, value) => {
+                if (value === undefined || value === null || value === "") return;
+                formData.append(key, value);
+            };
+            appendOptional("discountPrice", discountPrice);
+            appendOptional("warranty", warranty);
+            appendOptional("installationCost", installationCost);
+            appendOptional("deliveryCharge", deliveryCharge);
+            appendOptional("weight", weight);
+            appendOptional("length", length);
+            appendOptional("width", width);
+            appendOptional("height", height);
 
             images.forEach((image) => {
                 formData.append("images", image);

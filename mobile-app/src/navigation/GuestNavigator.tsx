@@ -12,6 +12,7 @@ import CartScreen from '../screens/Sales/CartScreen';
 import LoginScreen from '../screens/Auth/LoginScreen';
 import RegisterScreen from '../screens/Auth/RegisterScreen';
 import ForgotPasswordScreen from '../screens/Auth/ForgotPasswordScreen';
+import LegalDocumentScreen from '../screens/Legal/LegalDocumentScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -22,6 +23,18 @@ const HomeStack = () => (
       name="HomeMain"
       component={HomeScreen}
       options={{ headerShown: false }}
+    />
+    <Stack.Screen
+      name="LegalDocument"
+      component={LegalDocumentScreen}
+      options={({ route }: any) => ({
+        title:
+          route.params?.documentType === 'terms'
+            ? 'Terms & Conditions'
+            : route.params?.documentType === 'refund'
+              ? 'Refund & Return Policy'
+              : 'Privacy Policy',
+      })}
     />
   </Stack.Navigator>
 );
@@ -67,6 +80,18 @@ const AuthStack = () => (
       name="ForgotPassword"
       component={ForgotPasswordScreen}
       options={{ title: 'Forgot Password' }}
+    />
+    <Stack.Screen
+      name="LegalDocument"
+      component={LegalDocumentScreen}
+      options={({ route }: any) => ({
+        title:
+          route.params?.documentType === 'terms'
+            ? 'Terms & Conditions'
+            : route.params?.documentType === 'refund'
+              ? 'Refund & Return Policy'
+              : 'Privacy Policy',
+      })}
     />
   </Stack.Navigator>
 );

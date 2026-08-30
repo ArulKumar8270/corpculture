@@ -8,7 +8,6 @@ import {
   ActivityIndicator,
   TextInput,
   Alert,
-  Linking,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
@@ -26,14 +25,18 @@ import {
   getReportSendWebhook,
   isOperationalDocumentReportType,
   getDocumentTitle,
+  getDocumentListScreen,
+  getDocumentSuccessMessage,
+  getDocumentPermissionKey,
   SERVICE_REPORT_TYPE,
   buildReportListQueryParams,
   getReportsListUrl,
   ReportListFilterValues,
 } from '../../utils/reportListApi';
 import { collectReportSerialNumbers } from '../../utils/reportSerialNumbers';
-import { openReportDownload } from '../../utils/reportDownload';
+import { downloadReportAndOpen } from '../../utils/reportDownload';
 import { getServiceProductDisplayName } from '../../utils/serviceProductDisplayName';
+import { presentDocumentSentNotification } from '../../services/pushNotifications';
 
 function companyIdFromReport(report: any): string | undefined {
   const c = report?.company;
@@ -62,6 +65,8 @@ const ServiceReportsScreen = () => {
   const [totalCount, setTotalCount] = useState(0);
   const [uploadingReportId, setUploadingReportId] = useState<string | null>(null);
   const [downloadingReportId, setDownloadingReportId] = useState<string | null>(null);
+  const [sendingReport, setSendingReport] = useState<string | null>(null);
+  const docPermissionKey = getDocumentPermissionKey(reportTypeKey);
   const [filters, setFilters] = useState<ReportListFilterValues>({
     fromDate: '',
     toDate: '',
@@ -112,7 +117,7 @@ const ServiceReportsScreen = () => {
         setLoading(false);
       }
     },
-    [token, user?.role, user?._id]
+    [token, user?.role, user?._id, reportTypeKey]
   );
 
   useEffect(() => {
@@ -150,7 +155,7 @@ const ServiceReportsScreen = () => {
   const handleEdit = (report: any) => {
     (navigation as any).navigate('AddServiceReport', {
       id: report._id,
-      reportType: report.reportType || reportTypeKey,
+      reportType: reportTypeKey,
       reportFor: report.reportFor || 'service',
     });
   };
@@ -221,15 +226,27 @@ const ServiceReportsScreen = () => {
   };
 
   const handleSendReport = async (report: any) => {
-    const reportType = report?.reportType || reportTypeKey;
-    const isOperationalDoc = isOperationalDocumentReportType(reportType);
-    const docTitle = getDocumentTitle(reportType);
+    const sendType = reportTypeKey;
+    const isOperationalDoc = isOperationalDocumentReportType(sendType);
+    const docTitle = getDocumentTitle(sendType);
+    setSendingReport(report._id);
     try {
-      const res = await axios.post(getReportSendWebhook(reportType), {
+      if (report?.reportType && report.reportType !== sendType) {
+        try {
+          await axios.put(
+            `${getApiBaseUrl()}/report/${report._id}`,
+            { reportType: sendType, reportFor: sendType },
+            { headers: { Authorization: token || '' } }
+          );
+        } catch (fixErr) {
+          console.error('Failed to correct document type before send:', fixErr);
+        }
+      }
+      const res = await axios.post(getReportSendWebhook(sendType), {
         reportId: report._id,
       });
       const serviceId = report?.serviceId?._id || report?.serviceId;
-      if (res && serviceId && reportType === SERVICE_REPORT_TYPE) {
+      if (res && serviceId && sendType === SERVICE_REPORT_TYPE) {
         try {
           await axios.put(
             `${getApiBaseUrl()}/service/update/${serviceId}`,
@@ -243,15 +260,22 @@ const ServiceReportsScreen = () => {
       Toast.show({
         type: 'success',
         text1: 'Success',
-        text2: isOperationalDoc ? `${docTitle} sent successfully!` : 'Report sent successfully!',
+        text2: getDocumentSuccessMessage(sendType, 'sent'),
       });
+      presentDocumentSentNotification(
+        isOperationalDoc ? docTitle : 'Report',
+        getDocumentListScreen(sendType),
+        report._id
+      );
       fetchReports();
     } catch (error: any) {
       Toast.show({
         type: 'error',
         text1: 'Error',
-        text2: 'Failed to send report',
+        text2: isOperationalDoc ? `Failed to send ${docTitle}` : 'Failed to send report',
       });
+    } finally {
+      setSendingReport(null);
     }
   };
 
@@ -321,19 +345,17 @@ const ServiceReportsScreen = () => {
   };
 
   const handleDownloadReport = async (report: any) => {
+    const docTitle = getDocumentTitle(reportTypeKey);
     setDownloadingReportId(report._id);
     try {
-      const url = await openReportDownload(report);
-      if (!url) {
-        Toast.show({ type: 'error', text1: 'Error', text2: 'Report file not available' });
-        return;
+      const opened = await downloadReportAndOpen(report);
+      if (!opened) {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: `${docTitle === 'Report' ? 'Report' : docTitle} PDF is not ready yet. Send the document first, or upload a file.`,
+        });
       }
-      const canOpen = await Linking.canOpenURL(url);
-      if (!canOpen) {
-        Toast.show({ type: 'error', text1: 'Error', text2: 'Unable to open download link' });
-        return;
-      }
-      await Linking.openURL(url);
     } catch (error: any) {
       console.error('Service report download failed:', error);
       Toast.show({
@@ -370,6 +392,7 @@ const ServiceReportsScreen = () => {
 
   const renderReport = ({ item }: { item: any }) => {
     const isExpanded = expandedReports.has(item._id);
+    const isSendingThis = sendingReport === item._id;
     const isUploadingThis = uploadingReportId === item._id;
     const isDownloadingThis = downloadingReportId === item._id;
 
@@ -381,7 +404,11 @@ const ServiceReportsScreen = () => {
         >
           <View style={styles.reportHeaderLeft}>
             <Text style={styles.companyName}>{item.company?.companyName || 'N/A'}</Text>
-            <Text style={styles.reportType}>{item.reportType || 'Service Report'}</Text>
+            <Text style={styles.reportType}>
+              {isOperationalDocumentReportType(reportTypeKey)
+                ? getDocumentTitle(reportTypeKey)
+                : item.reportType || 'Service Report'}
+            </Text>
             <Text style={styles.reportDate}>
               {new Date(item.createdAt).toLocaleDateString()}
             </Text>
@@ -422,7 +449,7 @@ const ServiceReportsScreen = () => {
 
         {/* Action Buttons */}
         <View style={styles.actionButtons}>
-          {hasPermission('serviceReport', 'edit') && (
+          {hasPermission(docPermissionKey, 'edit') && (
             <>
               <TouchableOpacity
                 style={[styles.actionButton, styles.editButton]}
@@ -443,9 +470,20 @@ const ServiceReportsScreen = () => {
           <TouchableOpacity
             style={[styles.actionButton, styles.sendButton]}
             onPress={() => handleSendReport(item)}
+            disabled={isSendingThis}
           >
-            <Icon name="send" size={18} color="#fff" />
-            <Text style={[styles.actionButtonText, styles.sendButtonText]}>Send Report</Text>
+            {isSendingThis ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <>
+                <Icon name="send" size={18} color="#fff" />
+                <Text style={[styles.actionButtonText, styles.sendButtonText]}>
+                  {isOperationalDocumentReportType(reportTypeKey)
+                    ? `Send ${getDocumentTitle(reportTypeKey)}`
+                    : 'Send Report'}
+                </Text>
+              </>
+            )}
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.actionButton, styles.uploadButton]}
@@ -606,7 +644,7 @@ const ServiceReportsScreen = () => {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>{screenTitle}</Text>
-        {hasPermission('serviceReport', 'edit') && (
+        {hasPermission(docPermissionKey, 'edit') && (
           <TouchableOpacity
             style={styles.addButton}
             onPress={() =>
@@ -651,7 +689,7 @@ const ServiceReportsScreen = () => {
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Icon name="description" size={64} color="#ccc" />
-              <Text style={styles.emptyText}>No service reports found</Text>
+              <Text style={styles.emptyText}>No {getDocumentTitle(reportTypeKey)} entries found</Text>
             </View>
           }
         />

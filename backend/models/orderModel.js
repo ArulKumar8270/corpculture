@@ -110,6 +110,15 @@ const orderSchema = new mongoose.Schema({
         enum: ["cash", "credit", "online"],
         default: "cash",
     },
+    paymentStatus: {
+        type: String,
+        enum: ["Paid", "Unpaid", "Failed", "Pending"],
+        default: "Unpaid",
+    },
+    hdfcOrderId: {
+        type: String,
+        trim: true,
+    },
     companyId: {
         type: mongoose.Schema.ObjectId,
         ref: "Company",

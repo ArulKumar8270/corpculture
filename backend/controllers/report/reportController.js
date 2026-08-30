@@ -4,11 +4,93 @@ import Employee from "../../models/employeeModel.js";
 import Counter from "../../models/counterModel.js";
 import mongoose from "mongoose";
 import { normalizeSendDetailsTo } from "../../utils/normalizeSendDetailsTo.js";
+import { notifyAssignment } from "../../utils/expoPushNotification.js";
+import { resolveNotificationUserId } from "../../utils/resolveNotificationUserId.js";
 
 const VALID_CONTENT_SCOPES = ["Service", "Product", "Service + Product"];
 
 const ASSIGNED_TO_USER_SELECT =
     "-password -wishlist -expoPushTokens -commissionCategorys -serviceDeliveryAddresses";
+
+const DOCUMENT_TITLES = {
+    Service_Gate_Pass: "Gate Pass",
+    Rental_Gate_Pass: "Gate Pass",
+    Service_Delivery_Challan: "Delivery Challan (DC Copy)",
+    Rental_Delivery_Challan: "Delivery Challan (DC Copy)",
+    Service_Returnable_Challan: "Returnable Challan",
+    Rental_Returnable_Challan: "Returnable Challan",
+    Service_Report: "Service Report",
+    Rental_Report: "Rental Report",
+};
+
+const DOCUMENT_NOTIFICATION_META = {
+    Service_Gate_Pass: { type: "service_gate_pass" },
+    Rental_Gate_Pass: { type: "rental_gate_pass" },
+    Service_Delivery_Challan: { type: "service_delivery_challan" },
+    Rental_Delivery_Challan: { type: "rental_delivery_challan" },
+    Service_Returnable_Challan: { type: "service_returnable_challan" },
+    Rental_Returnable_Challan: { type: "rental_returnable_challan" },
+    Service_Report: { type: "service_report" },
+    Rental_Report: { type: "rental_report" },
+};
+
+const documentTitle = (reportType) => DOCUMENT_TITLES[reportType] || "Report";
+
+function toNonNegativeNumber(value, fallback = 0) {
+    if (value === undefined || value === null || value === "") return fallback;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : fallback;
+}
+
+/** Product selection is optional; groups may have empty or unnamed product lines. */
+function normalizeMaterialGroups(materialGroups) {
+    if (materialGroups == null) return { groups: [] };
+    if (!Array.isArray(materialGroups)) {
+        return { error: "Material groups must be a valid array." };
+    }
+    const groups = [];
+    for (const group of materialGroups) {
+        if (!group?.name || !Array.isArray(group.products)) {
+            return { error: "Each material group must have a name and a products array." };
+        }
+        const products = [];
+        for (const item of group.products) {
+            const quantity = toNonNegativeNumber(item.quantity, 0);
+            const rate = toNonNegativeNumber(item.rate, 0);
+            const totalAmount = toNonNegativeNumber(item.totalAmount, quantity * rate);
+            if (quantity < 0 || rate < 0 || totalAmount < 0) {
+                return { error: "Quantity, rate, and totalAmount for materials must be non-negative numbers." };
+            }
+            products.push({
+                ...item,
+                productName: String(item.productName || "").trim(),
+                quantity,
+                rate,
+                totalAmount,
+            });
+        }
+        groups.push({ ...group, products });
+    }
+    return { groups };
+}
+
+async function notifyReportAssignment(assignedTo, reportType, reportId, actorUserId) {
+    if (!assignedTo || !reportId) return;
+    try {
+        const userId = await resolveNotificationUserId(assignedTo);
+        if (!userId || (actorUserId && String(userId) === String(actorUserId))) return;
+        const title = documentTitle(reportType);
+        const meta = DOCUMENT_NOTIFICATION_META[reportType] || { type: "service_report" };
+        await notifyAssignment(userId, {
+            type: meta.type,
+            title: `New ${title} assigned`,
+            body: `You have been assigned a ${title}.`,
+            entityId: reportId,
+        });
+    } catch (err) {
+        console.error("Report assignment push failed:", err);
+    }
+}
 
 const validateContentScope = (reportType, contentScope) => {
     if (contentScope != null && contentScope !== "" && !VALID_CONTENT_SCOPES.includes(String(contentScope).trim())) {
@@ -224,23 +306,11 @@ export const createReport = async (req, res) => {
 
         let validatedMaterialGroups = [];
         if (materialGroups) {
-            if (!Array.isArray(materialGroups)) {
-                return res.status(400).send({ success: false, message: 'Material groups must be a valid array.' });
+            const normalized = normalizeMaterialGroups(materialGroups);
+            if (normalized.error) {
+                return res.status(400).send({ success: false, message: normalized.error });
             }
-            for (const group of materialGroups) {
-                if (!group.name || !Array.isArray(group.products)) {
-                    return res.status(400).send({ success: false, message: 'Each material group must have a name and a products array.' });
-                }
-                for (const item of group.products) {
-                    if (!item.productName || item.quantity === undefined || item.rate === undefined || item.totalAmount === undefined) {
-                        return res.status(400).send({ success: false, message: 'Each material item must have productName, quantity, rate, and totalAmount.' });
-                    }
-                    if (isNaN(item.quantity) || item.quantity < 0 || isNaN(item.rate) || item.rate < 0 || isNaN(item.totalAmount) || item.totalAmount < 0) {
-                        return res.status(400).send({ success: false, message: 'Quantity, rate, and totalAmount for materials must be non-negative numbers.' });
-                    }
-                }
-                validatedMaterialGroups.push(group); // Add validated group
-            }
+            validatedMaterialGroups = normalized.groups;
         }
 
         const counter = await Counter.findOneAndUpdate(
@@ -273,7 +343,13 @@ export const createReport = async (req, res) => {
 
         await newReport.save();
 
-        res.status(201).send({ success: true, message: 'Report created successfully', report: newReport });
+        notifyReportAssignment(assignedTo, reportType, newReport._id, req.user?._id);
+
+        res.status(201).send({
+            success: true,
+            message: `${documentTitle(reportType)} submitted successfully`,
+            report: newReport,
+        });
 
     } catch (error) {
         console.error("Error in createReport:", error);
@@ -473,25 +549,11 @@ export const updateReport = async (req, res) => {
 
         let validatedMaterialGroups = report.materialGroups || []; // Default to existing groups or empty array
         if (materialGroups !== undefined) { // Only process if materialGroups is explicitly provided in the update payload
-            if (!Array.isArray(materialGroups)) {
-                return res.status(400).send({ success: false, message: 'Material groups must be a valid array.' });
+            const normalized = normalizeMaterialGroups(materialGroups);
+            if (normalized.error) {
+                return res.status(400).send({ success: false, message: normalized.error });
             }
-            const tempValidatedGroups = [];
-            for (const group of materialGroups) {
-                if (!group.name || !Array.isArray(group.products)) {
-                    return res.status(400).send({ success: false, message: 'Each material group must have a name and a products array.' });
-                }
-                for (const item of group.products) {
-                    if (!item.productName || item.quantity === undefined || item.rate === undefined || item.totalAmount === undefined) {
-                        return res.status(400).send({ success: false, message: 'Each material item must have productName, quantity, rate, and totalAmount.' });
-                    }
-                    if (isNaN(item.quantity) || item.quantity < 0 || isNaN(item.rate) || item.rate < 0 || isNaN(item.totalAmount) || item.totalAmount < 0) {
-                        return res.status(400).send({ success: false, message: 'Quantity, rate, and totalAmount for materials must be non-negative numbers.' });
-                    }
-                }
-                tempValidatedGroups.push(group); // Add validated group
-            }
-            validatedMaterialGroups = tempValidatedGroups; // Use the directly received materialGroups array
+            validatedMaterialGroups = normalized.groups;
         }
 
         const updatedReport = await Report.findByIdAndUpdate(
@@ -524,7 +586,17 @@ export const updateReport = async (req, res) => {
 
         const enrichedReport = await enrichReportsWithEmployeeDetails(updatedReport);
 
-        res.status(200).send({ success: true, message: 'Report updated successfully', report: enrichedReport });
+        const previousAssignee = report.assignedTo ? String(report.assignedTo) : "";
+        const nextAssignee = assignedTo ? String(assignedTo) : previousAssignee;
+        if (nextAssignee && nextAssignee !== previousAssignee) {
+            notifyReportAssignment(nextAssignee, effectiveReportType, updatedReport._id, req.user?._id);
+        }
+
+        res.status(200).send({
+            success: true,
+            message: `${documentTitle(effectiveReportType)} updated successfully`,
+            report: enrichedReport,
+        });
 
     } catch (error) {
         console.error("Error in updateReport:", error);

@@ -54,6 +54,24 @@ const RentalReportsSummaryScreen = () => {
     return data?.totalCount ?? 0;
   }, [token]);
 
+  const fetchRentalDeliveryChallanCount = useCallback(async (serialNo = '') => {
+    const params = new URLSearchParams({ page: '1', limit: '1', reportType: 'Rental_Delivery_Challan' });
+    if (serialNo.trim()) params.set('serialNo', serialNo.trim());
+    const { data } = await axios.get(`${getApiBaseUrl()}/report/Rental_Delivery_Challan?${params.toString()}`, {
+      headers: { Authorization: token || '' },
+    });
+    return data?.totalCount ?? 0;
+  }, [token]);
+
+  const fetchRentalReturnableChallanCount = useCallback(async (serialNo = '') => {
+    const params = new URLSearchParams({ page: '1', limit: '1', reportType: 'Rental_Returnable_Challan' });
+    if (serialNo.trim()) params.set('serialNo', serialNo.trim());
+    const { data } = await axios.get(`${getApiBaseUrl()}/report/Rental_Returnable_Challan?${params.toString()}`, {
+      headers: { Authorization: token || '' },
+    });
+    return data?.totalCount ?? 0;
+  }, [token]);
+
   const fetchSummaryData = useCallback(async (serialNo = '') => {
     setLoading(true);
     setError(null);
@@ -87,6 +105,8 @@ const RentalReportsSummaryScreen = () => {
 
       const rentalReportsCount = await fetchRentalReportsCount(serialNo);
       const rentalGatePassCount = await fetchRentalGatePassCount(serialNo);
+      const rentalDeliveryChallanCount = await fetchRentalDeliveryChallanCount(serialNo);
+      const rentalReturnableChallanCount = await fetchRentalReturnableChallanCount(serialNo);
 
       const newReportData: ReportData[] = [
         {
@@ -124,6 +144,22 @@ const RentalReportsSummaryScreen = () => {
           supportsSerialFilter: true,
         },
         {
+          id: 'rentalDeliveryChallan',
+          name: 'Delivery Challan (DC Copy)',
+          count: rentalDeliveryChallanCount,
+          screen: 'RentalDeliveryChallan',
+          parentStack: 'Rentals',
+          supportsSerialFilter: true,
+        },
+        {
+          id: 'rentalReturnableChallan',
+          name: 'Returnable Challan',
+          count: rentalReturnableChallanCount,
+          screen: 'RentalReturnableChallan',
+          parentStack: 'Rentals',
+          supportsSerialFilter: true,
+        },
+        {
           id: 'rentalEnquiries',
           name: 'Rental Enquiries',
           count: rentalEnquiriesRes.status === 'fulfilled' && rentalEnquiriesRes.value.data.success
@@ -146,7 +182,7 @@ const RentalReportsSummaryScreen = () => {
     } finally {
       setLoading(false);
     }
-  }, [token, fetchRentalReportsCount, fetchRentalGatePassCount]);
+  }, [token, fetchRentalReportsCount, fetchRentalGatePassCount, fetchRentalDeliveryChallanCount, fetchRentalReturnableChallanCount]);
 
   useFocusEffect(
     useCallback(() => {

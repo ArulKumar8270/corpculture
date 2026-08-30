@@ -10,7 +10,16 @@ import type { RootNavigationRef } from '../context/RootNavigationContext';
 export type AssignmentNotificationType =
   | 'service_enquiry'
   | 'rental_enquiry'
-  | 'sales_order';
+  | 'sales_order'
+  | 'service_report'
+  | 'rental_report'
+  | 'service_gate_pass'
+  | 'rental_gate_pass'
+  | 'service_delivery_challan'
+  | 'rental_delivery_challan'
+  | 'service_returnable_challan'
+  | 'rental_returnable_challan'
+  | 'document_sent';
 
 const PUSH_TOKEN_STORAGE_KEY = 'expoPushToken';
 
@@ -123,6 +132,22 @@ export function getScreenFromNotificationData(
       return 'RentalEnquiries';
     case 'sales_order':
       return 'OrderList';
+    case 'service_report':
+      return 'ServiceReports';
+    case 'rental_report':
+      return 'RentalReports';
+    case 'service_gate_pass':
+      return 'ServiceGatePass';
+    case 'rental_gate_pass':
+      return 'RentalGatePass';
+    case 'service_delivery_challan':
+      return 'ServiceDeliveryChallan';
+    case 'rental_delivery_challan':
+      return 'RentalDeliveryChallan';
+    case 'service_returnable_challan':
+      return 'ServiceReturnableChallan';
+    case 'rental_returnable_challan':
+      return 'RentalReturnableChallan';
     default:
       return null;
   }
@@ -136,12 +161,48 @@ export function getNavigationTarget(
   switch (screen) {
     case 'ServiceEnquiries':
       return { name: 'Services', params: { screen: 'ServiceEnquiries', params } };
+    case 'ServiceReports':
+    case 'ServiceGatePass':
+    case 'ServiceDeliveryChallan':
+    case 'ServiceReturnableChallan':
+      return { name: 'Services', params: { screen, params } };
     case 'RentalEnquiries':
       return { name: 'Rentals', params: { screen: 'RentalEnquiries', params } };
+    case 'RentalReports':
+    case 'RentalGatePass':
+    case 'RentalDeliveryChallan':
+    case 'RentalReturnableChallan':
+      return { name: 'Rentals', params: { screen, params } };
     case 'OrderList':
       return { name: 'Orders', params: { screen: 'OrderList', params } };
     default:
       return { name: screen, params };
+  }
+}
+
+export async function presentDocumentSentNotification(
+  docTitle: string,
+  screen: string,
+  entityId?: string
+): Promise<void> {
+  try {
+    await ensureAndroidChannel();
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: `${docTitle} sent`,
+        body: `${docTitle} sent successfully.`,
+        data: {
+          screen,
+          entityId,
+          type: 'document_sent',
+        },
+        sound: 'default',
+        channelId: 'assignments',
+      },
+      trigger: null,
+    });
+  } catch (error) {
+    console.error('Failed to show document sent notification:', error);
   }
 }
 

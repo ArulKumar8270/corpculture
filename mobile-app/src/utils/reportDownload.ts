@@ -53,20 +53,34 @@ export function collectReportDownloadCandidates(
   return ordered;
 }
 
+async function urlLooksAvailable(url: string): Promise<boolean> {
+  try {
+    const head = await fetch(url, { method: 'HEAD' });
+    if (head.ok) return true;
+  } catch {
+    /* some R2/public buckets reject HEAD; try a ranged GET */
+  }
+
+  try {
+    const ranged = await fetch(url, {
+      method: 'GET',
+      headers: { Range: 'bytes=0-0' },
+    });
+    return ranged.ok || ranged.status === 206;
+  } catch {
+    return false;
+  }
+}
+
 export async function openReportDownload(report: any): Promise<string | null> {
   const candidates = collectReportDownloadCandidates(report);
   if (candidates.length === 0) return null;
 
   for (const url of candidates) {
-    try {
-      const res = await fetch(url, { method: 'HEAD' });
-      if (res.ok) return url;
-    } catch {
-      /* try next */
-    }
+    if (await urlLooksAvailable(url)) return url;
   }
 
-  return candidates[0];
+  return null;
 }
 
 export async function downloadReportAndOpen(report: any): Promise<boolean> {

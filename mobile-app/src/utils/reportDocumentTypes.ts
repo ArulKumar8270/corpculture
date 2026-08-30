@@ -25,6 +25,8 @@ export const OPERATIONAL_DOCUMENT_TYPES = [
 ];
 
 const DOCUMENT_META: Record<string, { title: string; listScreen: string; permissionKey: string }> = {
+  Service_Report: { title: 'Service Report', listScreen: 'ServiceReports', permissionKey: 'serviceReport' },
+  Rental_Report: { title: 'Rental Report', listScreen: 'RentalReports', permissionKey: 'rentalReport' },
   [SERVICE_GATE_PASS]: { title: 'Gate Pass', listScreen: 'ServiceGatePass', permissionKey: 'serviceGatePass' },
   [SERVICE_DELIVERY_CHALLAN]: {
     title: 'Delivery Challan (DC Copy)',
@@ -70,6 +72,32 @@ export const getDocumentTitle = (reportType?: string) =>
 
 export const getDocumentListScreen = (reportType?: string) =>
   (reportType && DOCUMENT_META[reportType]?.listScreen) || 'ServiceReports';
+
+export const getDocumentPermissionKey = (reportType?: string) =>
+  (reportType && DOCUMENT_META[reportType]?.permissionKey) ||
+  (reportType?.startsWith('Rental_') ? 'rentalReport' : 'serviceReport');
+
+export const isRentalReportDomain = (reportType?: string) =>
+  !!reportType && reportType.startsWith('Rental_');
+
+export const getDocumentSuccessMessage = (
+  reportType?: string,
+  action: 'submitted' | 'updated' | 'sent' = 'submitted'
+) => {
+  const title = getDocumentTitle(reportType);
+  if (action === 'updated') return `${title} updated successfully`;
+  if (action === 'sent') return `${title} sent successfully`;
+  return `${title} submitted successfully`;
+};
+
+export const getDocumentFormTitle = (reportType?: string, isEdit = false) => {
+  const title = getDocumentTitle(reportType);
+  const prefix = isEdit ? 'Edit' : 'Add';
+  if (title === 'Report') {
+    return isEdit ? 'Edit Report' : 'Add Report';
+  }
+  return `${prefix} ${title}`;
+};
 
 export const isValidContentScope = (value?: string) =>
   CONTENT_SCOPE_OPTIONS.includes(String(value || '').trim() as (typeof CONTENT_SCOPE_OPTIONS)[number]);

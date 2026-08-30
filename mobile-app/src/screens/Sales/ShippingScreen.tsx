@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  Linking,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
@@ -21,6 +22,7 @@ import { useFrontHomeSettings } from '../../hooks/useFrontHomeSettings';
 import { getCompanyShippingDefaults } from '../../utils/companyShipping';
 import { getApiBaseUrl } from '../../services/api';
 import { computeOrderAmountFromItems } from '../../utils/orderAmountUtil';
+import * as WebBrowser from 'expo-web-browser';
 
 // States data
 const states = [
@@ -81,6 +83,7 @@ const ShippingScreen = () => {
   const [availableCredit, setAvailableCredit] = useState(0);
   const [statePickerVisible, setStatePickerVisible] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [paying, setPaying] = useState(false);
   const lastAppliedCompanyRef = useRef<string | null>(null);
 
   const applyCompanyToShipping = async (company: any) => {
@@ -229,14 +232,14 @@ const ShippingScreen = () => {
 
   const totalAmount = subtotal + totalDeliveryCharges + totalInstallationCharges;
 
-  const handlePayment = async () => {
+  const getCheckoutPayload = () => {
     if (!user || !token) {
       Toast.show({
         type: 'error',
         text1: 'Login Required',
         text2: 'Please log in to place an order',
       });
-      return;
+      return null;
     }
 
     const ref = String(orderReferenceNo || '').trim();
@@ -246,7 +249,7 @@ const ShippingScreen = () => {
         text1: 'Reference Required',
         text2: 'Please enter an order reference number',
       });
-      return;
+      return null;
     }
 
     if (!address || !city || !state || !pincode || !phoneNo) {
@@ -255,8 +258,135 @@ const ShippingScreen = () => {
         text1: 'Missing Information',
         text2: 'Please fill all required fields',
       });
+      return null;
+    }
+
+    if (String(phoneNo).replace(/\D/g, '').length !== 10) {
+      Toast.show({
+        type: 'error',
+        text1: 'Invalid Mobile Number',
+        text2: 'Please enter a valid 10-digit mobile number',
+      });
+      return null;
+    }
+
+    return {
+      shippingInfo: {
+        address,
+        city,
+        country,
+        state,
+        landmark,
+        pincode,
+        phoneNo,
+      },
+      orderReferenceNo: ref,
+    };
+  };
+
+  const pollHdfcPayment = async (hdfcOrderId: string) => {
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+      const { data } = await axios.post(
+        `${getApiBaseUrl()}/user/hdfc/verify`,
+        { hdfcOrderId },
+        { headers: { Authorization: token } }
+      );
+      if (data?.paid && data?.order?._id) return data;
+      if (!data?.pending) return data;
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+    }
+    return { pending: true };
+  };
+
+  const openHdfcPaymentPage = async (payUrl: string) => {
+    // Open in the system browser so UPI apps can return to the payment page.
+    const opened = await Linking.canOpenURL(payUrl);
+    if (opened) {
+      await Linking.openURL(payUrl);
       return;
     }
+    await WebBrowser.openBrowserAsync(payUrl, {
+      dismissButtonStyle: 'done',
+      enableBarCollapsing: false,
+      showInRecents: true,
+    });
+  };
+
+  const handleOnlinePayment = async () => {
+    const checkout = getCheckoutPayload();
+    if (!checkout) return;
+
+    setPaying(true);
+    try {
+      await AsyncStorage.setItem('shippingInfo', JSON.stringify(checkout.shippingInfo));
+      await AsyncStorage.setItem('orderReferenceNo', checkout.orderReferenceNo);
+      await AsyncStorage.setItem('paymentMethod', 'online');
+
+      const { data } = await axios.post(
+        `${getApiBaseUrl()}/user/hdfc/session`,
+        {
+          orderItems: cartItems,
+          shippingInfo: checkout.shippingInfo,
+          orderReferenceNo: checkout.orderReferenceNo,
+          companyId: activeCompanyId || undefined,
+        },
+        { headers: { Authorization: token } }
+      );
+
+      const payUrl =
+        data?.paymentUrl ||
+        data?.paymentLinks?.mobile ||
+        data?.paymentLinks?.web;
+      if (!data?.success || !payUrl || !data?.hdfcOrderId) {
+        Toast.show({
+          type: 'error',
+          text1: 'Payment Failed',
+          text2: data?.message || 'Could not start payment',
+        });
+        return;
+      }
+
+      await AsyncStorage.setItem('hdfcOrderId', data.hdfcOrderId);
+      await AsyncStorage.setItem('hdfcPaymentUrl', payUrl);
+      Toast.show({
+        type: 'info',
+        text1: 'Complete UPI in your app',
+        text2: 'Keep this screen open and approve the UPI request. Do not close the payment page until you pay.',
+      });
+      await openHdfcPaymentPage(payUrl);
+
+      const result = await pollHdfcPayment(data.hdfcOrderId);
+      if (result?.paid && result?.order?._id) {
+        await AsyncStorage.setItem('skipOrderId', String(result.order._id));
+        await AsyncStorage.removeItem('hdfcOrderId');
+        await AsyncStorage.removeItem('hdfcPaymentUrl');
+        navigation.navigate('OrderSuccess' as never);
+        return;
+      }
+      if (result?.pending || result?.resumePayment || result?.awaitingUpi) {
+        Toast.show({
+          type: 'info',
+          text1: 'Payment not completed',
+          text2: 'Approve UPI in PhonePe/GPay, or tap Make Payment again to reopen the page.',
+        });
+        return;
+      }
+      navigation.navigate('OrderFailed' as never);
+    } catch (error: any) {
+      console.error('HDFC payment error:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: error.response?.data?.message || 'Could not start payment',
+      });
+    } finally {
+      setPaying(false);
+    }
+  };
+
+  const handleSkipPayment = async () => {
+    const checkout = getCheckoutPayload();
+    if (!checkout) return;
 
     if (payOnCredit) {
       if (!activeCompanyId) {
@@ -279,17 +409,8 @@ const ShippingScreen = () => {
 
     setLoading(true);
     try {
-      const shippingInfo = {
-        address,
-        city,
-        country,
-        state,
-        landmark,
-        pincode,
-        phoneNo,
-      };
-      await AsyncStorage.setItem('shippingInfo', JSON.stringify(shippingInfo));
-      await AsyncStorage.setItem('orderReferenceNo', ref);
+      await AsyncStorage.setItem('shippingInfo', JSON.stringify(checkout.shippingInfo));
+      await AsyncStorage.setItem('orderReferenceNo', checkout.orderReferenceNo);
       const paymentMethod = payOnCredit ? 'credit' : 'cash';
       await AsyncStorage.setItem('paymentMethod', paymentMethod);
 
@@ -297,8 +418,8 @@ const ShippingScreen = () => {
         `${getApiBaseUrl()}/user/create-order`,
         {
           orderItems: cartItems,
-          shippingInfo,
-          orderReferenceNo: ref,
+          shippingInfo: checkout.shippingInfo,
+          orderReferenceNo: checkout.orderReferenceNo,
           paymentMethod,
           companyId: activeCompanyId || undefined,
         },
@@ -496,15 +617,27 @@ const ShippingScreen = () => {
         )}
 
         <TouchableOpacity
-          style={[styles.paymentButton, loading && styles.paymentButtonDisabled]}
-          onPress={handlePayment}
-          disabled={loading}
+          style={[styles.onlinePaymentButton, (loading || paying) && styles.paymentButtonDisabled]}
+          onPress={handleOnlinePayment}
+          disabled={loading || paying}
+        >
+          {paying ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.paymentButtonText}>Make Payment</Text>
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.paymentButton, (loading || paying) && styles.paymentButtonDisabled]}
+          onPress={handleSkipPayment}
+          disabled={loading || paying}
         >
           {loading ? (
             <ActivityIndicator color="#fff" />
           ) : (
             <Text style={styles.paymentButtonText}>
-              {payOnCredit ? 'Place Order (Use Credit)' : 'Place Order'}
+              {payOnCredit ? 'Place Order (Use Credit)' : 'Place Order (Skip Payment)'}
             </Text>
           )}
         </TouchableOpacity>
@@ -706,12 +839,19 @@ const styles = StyleSheet.create({
     color: '#019ee3',
     flex: 1,
   },
-  paymentButton: {
-    backgroundColor: '#007AFF',
+  onlinePaymentButton: {
+    backgroundColor: '#fb641b',
     borderRadius: 8,
     padding: 16,
     alignItems: 'center',
     marginTop: 8,
+  },
+  paymentButton: {
+    backgroundColor: '#111827',
+    borderRadius: 8,
+    padding: 16,
+    alignItems: 'center',
+    marginTop: 12,
   },
   paymentButtonDisabled: {
     opacity: 0.6,

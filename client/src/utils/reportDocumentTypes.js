@@ -25,6 +25,18 @@ export const OPERATIONAL_DOCUMENT_TYPES = [
 ];
 
 const DOCUMENT_META = {
+    Service_Report: {
+        title: 'Service Report',
+        listPath: '../serviceReportlist',
+        formPath: '../addServiceReport',
+        permissionKey: 'serviceReport',
+    },
+    Rental_Report: {
+        title: 'Rental Report',
+        listPath: '../rentalReportlist',
+        formPath: '../addRentalReport',
+        permissionKey: 'rentalReport',
+    },
     [SERVICE_GATE_PASS]: {
         title: 'Gate Pass',
         listPath: '../serviceGatePassList',
@@ -84,6 +96,12 @@ export const getDocumentMeta = (reportType) =>
 
 export const getDocumentTitle = (reportType) =>
     getDocumentMeta(reportType)?.title || 'Report';
+
+export const getDocumentPermissionKey = (reportType) =>
+    getDocumentMeta(reportType)?.permissionKey || 'serviceReport';
+
+export const isRentalReportDomain = (reportType) =>
+    String(reportType || '').startsWith('Rental_');
 
 export const isValidContentScope = (value) =>
     CONTENT_SCOPE_OPTIONS.includes(String(value || '').trim());

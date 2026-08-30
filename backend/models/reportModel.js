@@ -5,8 +5,9 @@ import { normalizeSendDetailsTo } from "../utils/normalizeSendDetailsTo.js";
 const materialSchema = new mongoose.Schema({
     productName: {
         type: String,
-        required: true,
+        required: false,
         trim: true,
+        default: '',
     },
     // Per-product fields (requested): keep optional for backward compatibility
     serialNo: {

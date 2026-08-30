@@ -16,6 +16,7 @@ import Cart from "../pages/user/Cart/Cart";
 import Shipping from "../pages/user/Cart/Shipping";
 import OrderSuccess from "../pages/user/Cart/OrderSuccess";
 import OrderFailed from "../pages/user/Cart/OrderFailed";
+import PaymentReturn from "../pages/user/Cart/PaymentReturn";
 import OrderDetails from "../pages/user/Orders/OrderDetails";
 import AdminOrders from "../pages/Admin/AdminOrders";
 import AdminCommission from "../pages/Admin/AdminCommission";
@@ -47,6 +48,7 @@ const Routers = () => {
             <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
             <Route path="/refund-and-return-policy" element={<RefundAndReturnPolicy />} />
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="/shipping/payment-return" element={<PaymentReturn />} />
             <Route path="/shipping" element={<PrivateRoute />}>
                 <Route path="" element={<Shipping />} />
                 <Route path="confirm" element={<OrderSuccess />} />

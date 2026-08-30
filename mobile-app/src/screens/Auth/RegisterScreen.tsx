@@ -101,6 +101,24 @@ const RegisterScreen = () => {
         )}
       </TouchableOpacity>
 
+      <Text style={styles.legalNote}>
+        By registering, you agree to our{' '}
+        <Text
+          style={styles.legalLink}
+          onPress={() => (navigation as any).navigate('LegalDocument', { documentType: 'terms' })}
+        >
+          Terms & Conditions
+        </Text>
+        {' '}and{' '}
+        <Text
+          style={styles.legalLink}
+          onPress={() => (navigation as any).navigate('LegalDocument', { documentType: 'privacy' })}
+        >
+          Privacy Policy
+        </Text>
+        .
+      </Text>
+
       <TouchableOpacity
         onPress={() => navigation.navigate('Login' as never)}
         style={styles.linkButton}
@@ -160,6 +178,17 @@ const styles = StyleSheet.create({
   linkText: {
     color: '#007AFF',
     fontSize: 14,
+  },
+  legalNote: {
+    marginTop: 16,
+    textAlign: 'center',
+    color: '#666',
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  legalLink: {
+    color: '#007AFF',
+    fontWeight: '600',
   },
 });
 

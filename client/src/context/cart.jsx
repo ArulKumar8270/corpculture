@@ -10,16 +10,27 @@ const CartProvider = ({ children }) => {
     const [reload, setReload] = useState(false);
 
     useEffect(() => {
-        // localStorage.clear();
-        const cartItems = localStorage.getItem("cart");
-        if (cartItems) {
-            setCartItems(JSON.parse(cartItems));
+        const storedCart = localStorage.getItem("cart");
+        if (storedCart) {
+            try {
+                const parsed = JSON.parse(storedCart);
+                setCartItems(Array.isArray(parsed) ? parsed : []);
+            } catch {
+                setCartItems([]);
+            }
+        } else {
+            setCartItems([]);
         }
-        const saveLaterItems = localStorage.getItem("saveLater");
-        if (saveLaterItems) {
-            setSaveLaterItems(JSON.parse(saveLaterItems));
+        const storedLater = localStorage.getItem("saveLater");
+        if (storedLater) {
+            setSaveLaterItems(JSON.parse(storedLater));
         }
     }, [reload]);
+
+    const clearCart = () => {
+        setCartItems([]);
+        localStorage.setItem("cart", JSON.stringify([]));
+    };
 
     const addItems = async (product, quantity = 1, sendInvoice, isInstalation) => {
         const existingItemIndex = cartItems.findIndex(
@@ -100,6 +111,7 @@ const CartProvider = ({ children }) => {
                 addLater,
                 moveToCart,
                 removeLater,
+                clearCart,
             ]}
         >
             {children}

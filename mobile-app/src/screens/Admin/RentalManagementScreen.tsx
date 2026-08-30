@@ -49,10 +49,31 @@ const RentalManagementScreen = () => {
     },
     {
       id: 'reports',
-      title: 'Rental Reports',
+      title: 'Reports',
       icon: 'assessment',
       screen: 'RentalReports' as never,
       permissionKey: 'rentalReport',
+    },
+    {
+      id: 'gatePass',
+      title: 'Gate Pass',
+      icon: 'badge',
+      screen: 'RentalGatePass' as never,
+      permissionKey: 'rentalGatePass',
+    },
+    {
+      id: 'deliveryChallan',
+      title: 'Delivery Challan (DC Copy)',
+      icon: 'local-shipping',
+      screen: 'RentalDeliveryChallan' as never,
+      permissionKey: 'rentalDeliveryChallan',
+    },
+    {
+      id: 'returnableChallan',
+      title: 'Returnable Challan',
+      icon: 'assignment-return',
+      screen: 'RentalReturnableChallan' as never,
+      permissionKey: 'rentalReturnableChallan',
     },
     {
       id: 'partners',

@@ -971,6 +971,31 @@ const ProfileScreen = () => {
         </>
       ) : null}
 
+      <View style={styles.legalSection}>
+        <Text style={styles.legalTitle}>Legal</Text>
+        <TouchableOpacity
+          style={styles.legalLink}
+          onPress={() => (navigation as any).navigate('LegalDocument', { documentType: 'terms' })}
+        >
+          <Text style={styles.legalLinkText}>Terms & Conditions</Text>
+          <Icon name="chevron-right" size={22} color="#999" />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.legalLink}
+          onPress={() => (navigation as any).navigate('LegalDocument', { documentType: 'refund' })}
+        >
+          <Text style={styles.legalLinkText}>Refund & Return Policy</Text>
+          <Icon name="chevron-right" size={22} color="#999" />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.legalLink, styles.legalLinkLast]}
+          onPress={() => (navigation as any).navigate('LegalDocument', { documentType: 'privacy' })}
+        >
+          <Text style={styles.legalLinkText}>Privacy Policy</Text>
+          <Icon name="chevron-right" size={22} color="#999" />
+        </TouchableOpacity>
+      </View>
+
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
         <Icon name="logout" size={24} color="#FF3B30" />
         <Text style={styles.logoutText}>Logout</Text>
@@ -1516,6 +1541,38 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     marginLeft: 12,
+    color: '#333',
+  },
+  legalSection: {
+    backgroundColor: '#fff',
+    marginHorizontal: 20,
+    marginTop: 10,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  legalTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#666',
+    letterSpacing: 0.4,
+    paddingHorizontal: 15,
+    paddingTop: 12,
+    paddingBottom: 4,
+  },
+  legalLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 15,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  legalLinkLast: {
+    borderBottomWidth: 0,
+  },
+  legalLinkText: {
+    fontSize: 16,
     color: '#333',
   },
   logoutButton: {

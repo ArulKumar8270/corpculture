@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useLayoutEffect } from 'react';
 import {
   View,
   Text,
@@ -22,13 +22,17 @@ import axios from 'axios';
 import { getApiBaseUrl, companyAllPickerQuery } from '../../services/api';
 import Toast from 'react-native-toast-message';
 import { normalizeMongoId } from '../../utils/normalizeMongoId';
+import { getServiceProductDisplayName } from '../../utils/serviceProductDisplayName';
 import {
   getRentalListScreen,
+  getRentalPayloadReportFor,
   resolveRentalReportType,
 } from '../../utils/reportNavigation';
 import {
   CONTENT_SCOPE_OPTIONS,
   getDocumentTitle,
+  getDocumentFormTitle,
+  getDocumentSuccessMessage,
   showsContentScopeField,
   isContentScopeRequired,
 } from '../../utils/reportDocumentTypes';
@@ -40,6 +44,8 @@ interface MaterialGroup {
   products: Array<{
     id?: string;
     productName: string;
+    usageData?: string;
+    description?: string;
     accessService?: string;
     quantity: number;
     rate: number;
@@ -55,8 +61,9 @@ const AddRentalReportScreen = () => {
   const reportId = params?.id;
   const employeeName = params?.employeeName;
   const employeeId = params?.employeeId; // Employee ID for assignedTo field
-  const reportFor = params?.reportType || 'rental';
-  const resolvedReportType = resolveRentalReportType(reportFor);
+  const reportTypeParam = params?.reportType || 'rental';
+  const resolvedReportType = resolveRentalReportType(reportTypeParam);
+  const payloadReportFor = getRentalPayloadReportFor(resolvedReportType);
   const rentalId = params?.rentalId;
   const paramCompanyId = normalizeMongoId(params?.companyId);
   const paramCompanyName =
@@ -65,19 +72,18 @@ const AddRentalReportScreen = () => {
 
   const [formData, setFormData] = useState({
     reportType: resolvedReportType,
-    reportFor: reportFor,
+    reportFor: payloadReportFor,
     company: '',
     problemReport: '',
     remarksPendingWorks: '',
     modelNo: '',
-    serialNo: '',
     branch: '',
     reference: '',
     contentScope: '',
-    usageData: '',
-    description: '',
     materialProductName: '',
     materialQuantity: '',
+    materialUsageData: '',
+    materialDescription: '',
     materialAccessService: '',
   });
 
@@ -93,6 +99,12 @@ const AddRentalReportScreen = () => {
   const [branchPickerVisible, setBranchPickerVisible] = useState(false);
   const [productPickerVisible, setProductPickerVisible] = useState(false);
   const [contentScopePickerVisible, setContentScopePickerVisible] = useState(false);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      title: getDocumentFormTitle(resolvedReportType, isEditMode),
+    });
+  }, [navigation, resolvedReportType, isEditMode]);
 
   useEffect(() => {
     fetchInitialData();
@@ -118,7 +130,17 @@ const AddRentalReportScreen = () => {
   useFocusEffect(
     useCallback(() => {
       applyCompanyFromRouteParams();
-    }, [applyCompanyFromRouteParams])
+      setFormData((prev) => {
+        if (prev.reportType === resolvedReportType && prev.reportFor === payloadReportFor) {
+          return prev;
+        }
+        return {
+          ...prev,
+          reportType: resolvedReportType,
+          reportFor: payloadReportFor,
+        };
+      });
+    }, [applyCompanyFromRouteParams, resolvedReportType, payloadReportFor])
   );
 
   useEffect(() => {
@@ -149,20 +171,19 @@ const AddRentalReportScreen = () => {
         if (reportResponse.data.success) {
           const fetchedReport = reportResponse.data.report;
           setFormData({
-            reportType: fetchedReport.reportType || resolvedReportType,
-            reportFor: fetchedReport.reportFor || 'rental',
+            reportType: resolvedReportType,
+            reportFor: payloadReportFor,
             company: fetchedReport.company?._id || '',
             problemReport: fetchedReport.problemReport || '',
             remarksPendingWorks: fetchedReport.remarksPendingWorks || '',
             modelNo: fetchedReport.modelNo || '',
-            serialNo: fetchedReport.serialNo || '',
             branch: fetchedReport.branch || '',
             reference: fetchedReport.reference || '',
             contentScope: fetchedReport.contentScope || '',
-            usageData: fetchedReport.usageData || '',
-            description: fetchedReport.description || '',
             materialProductName: '',
             materialQuantity: '',
+            materialUsageData: '',
+            materialDescription: '',
             materialAccessService: '',
           });
           if (Array.isArray(fetchedReport.materialGroups) && fetchedReport.materialGroups.length > 0) {
@@ -273,6 +294,8 @@ const AddRentalReportScreen = () => {
     }
   };
 
+  const extractProductName = (product: any): string => getServiceProductDisplayName(product);
+
   const handleAddGroup = () => {
     const newGroupName = `Materials${materialGroups.length + 1}`;
     setMaterialGroups([...materialGroups, { name: newGroupName, modelNo: '', serialNo: '', products: [] }]);
@@ -282,6 +305,8 @@ const AddRentalReportScreen = () => {
       ...prev,
       materialProductName: '',
       materialQuantity: '',
+      materialUsageData: '',
+      materialDescription: '',
       materialAccessService: '',
     }));
   };
@@ -304,56 +329,6 @@ const AddRentalReportScreen = () => {
     );
   };
 
-  // Helper function to safely extract productName from various structures
-  const extractProductName = (product: any): string => {
-    if (!product) return 'Unknown Product';
-    
-    // If productName is a string, return it directly
-    if (typeof product.productName === 'string') {
-      return product.productName;
-    }
-    
-    // If productName is an object, try to extract the actual name
-    if (typeof product.productName === 'object' && product.productName !== null) {
-      const productNameObj = product.productName as any;
-      
-      // Try productName.productName (nested structure - could be Purchase -> VendorProduct)
-      if (productNameObj.productName) {
-        // If productName.productName is a string, return it
-        if (typeof productNameObj.productName === 'string') {
-          return productNameObj.productName;
-        }
-        // If it's still an object, go one level deeper (Purchase -> VendorProduct -> productName)
-        if (typeof productNameObj.productName === 'object' && productNameObj.productName !== null) {
-          const nested = productNameObj.productName as any;
-          // Check if nested.productName is a string (the actual product name)
-          if (typeof nested.productName === 'string') {
-            return nested.productName;
-          }
-          // Fallback to nested.name
-          if (typeof nested.name === 'string') {
-            return nested.name;
-          }
-        }
-      }
-      
-      // Try productName.name
-      if (productNameObj.name && typeof productNameObj.name === 'string') {
-        return productNameObj.name;
-      }
-    }
-    
-    // Fallback to product.modelName (for rental products) or product.name
-    if (product.modelName && typeof product.modelName === 'string') {
-      return product.modelName;
-    }
-    if (product.name && typeof product.name === 'string') {
-      return product.name;
-    }
-    
-    return 'Unknown Product';
-  };
-
   const handleSelectGroup = (idx: number) => {
     setSelectedGroupIndex(idx);
     setEditingProductId(null);
@@ -361,6 +336,8 @@ const AddRentalReportScreen = () => {
       ...prev,
       materialProductName: '',
       materialQuantity: '',
+      materialUsageData: '',
+      materialDescription: '',
       materialAccessService: '',
     }));
   };
@@ -375,41 +352,33 @@ const AddRentalReportScreen = () => {
       return;
     }
     const selectedProduct = availableProducts.find((p) => p._id === formData.materialProductName);
-    if (!selectedProduct || !formData.materialQuantity || parseInt(formData.materialQuantity) <= 0) {
+    const parsedQty = parseInt(formData.materialQuantity, 10);
+    const quantity = Number.isFinite(parsedQty) && parsedQty >= 0 ? parsedQty : 0;
+    const hasDetails = Boolean(
+      formData.materialUsageData?.trim() ||
+      formData.materialDescription?.trim() ||
+      formData.materialAccessService?.trim()
+    );
+    if (!selectedProduct && quantity <= 0 && !hasDetails) {
       Toast.show({
         type: 'error',
         text1: 'Error',
-        text2: 'Please select a product and enter a valid quantity',
+        text2: 'Enter a quantity or product details',
       });
       return;
     }
 
-    const quantity = parseInt(formData.materialQuantity);
-    // Use helper function to safely extract productName
-    const productName = extractProductName(selectedProduct);
-    
-    // Final validation - ensure it's a string
-    if (typeof productName !== 'string') {
-      console.error('productName extraction failed, got:', productName);
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: 'Failed to extract product name',
-      });
-      return;
-    }
-    
-    const productRate = selectedProduct.rate || selectedProduct.basePrice || 0;
+    const productName = selectedProduct ? extractProductName(selectedProduct) : '';
+    const productRate = selectedProduct?.rate || selectedProduct?.basePrice || 0;
     const productData = {
-      productName: productName,
+      productName: productName || '',
+      usageData: formData.materialUsageData?.trim() || '',
+      description: formData.materialDescription?.trim() || '',
       accessService: formData.materialAccessService?.trim() || '',
       quantity: quantity,
       rate: productRate,
       totalAmount: quantity * productRate,
     };
-    
-    // Debug log to verify productName is a string
-    console.log('Product data being saved:', JSON.stringify(productData, null, 2));
 
     setMaterialGroups((prevGroups) =>
       prevGroups.map((group, idx) => {
@@ -442,6 +411,8 @@ const AddRentalReportScreen = () => {
       ...prev,
       materialProductName: '',
       materialQuantity: '',
+      materialUsageData: '',
+      materialDescription: '',
       materialAccessService: '',
     }));
   };
@@ -449,13 +420,16 @@ const AddRentalReportScreen = () => {
   const handleEditProduct = (groupIdx: number, product: any) => {
     setSelectedGroupIndex(groupIdx);
     setEditingProductId(product.id || null);
-    const productToEdit = availableProducts.find(
-      (p) => (p.productName || p.modelName) === product.productName
-    );
+    const productToEdit = availableProducts.find((p) => {
+      const pName = getServiceProductDisplayName(p);
+      return pName === product.productName;
+    });
     setFormData((prev) => ({
       ...prev,
       materialProductName: productToEdit ? productToEdit._id : '',
       materialQuantity: product.quantity.toString(),
+      materialUsageData: product.usageData || '',
+      materialDescription: product.description || '',
       materialAccessService: product.accessService || '',
     }));
   };
@@ -514,6 +488,22 @@ const AddRentalReportScreen = () => {
       });
       return;
     }
+    if (!formData.problemReport?.trim()) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Please enter a problem report',
+      });
+      return;
+    }
+    if (!formData.branch?.trim()) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Please select a branch',
+      });
+      return;
+    }
 
     try {
       setSubmitting(true);
@@ -524,12 +514,12 @@ const AddRentalReportScreen = () => {
         modelNo: group.modelNo?.trim() || '',
         serialNo: group.serialNo?.trim() || '',
         products: group.products.map(({ id, ...rest }: any) => {
-          // Use helper function to extract productName safely
-          const productName = extractProductName(rest);
-          
-          // Ensure all numeric fields are numbers
+          const productName =
+            typeof rest.productName === 'string' ? rest.productName : extractProductName(rest);
           return {
-            productName: productName, // Already a string from extractProductName
+            productName: productName === 'N/A' || productName === 'Unknown Product' ? '' : productName,
+            usageData: typeof rest.usageData === 'string' ? rest.usageData : '',
+            description: typeof rest.description === 'string' ? rest.description : '',
             accessService: typeof rest.accessService === 'string' ? rest.accessService : '',
             quantity: Number(rest.quantity) || 0,
             rate: Number(rest.rate) || 0,
@@ -540,19 +530,16 @@ const AddRentalReportScreen = () => {
 
       const payload = {
         serviceId: rentalId,
-        reportType: formData.reportType || resolvedReportType,
+        reportType: resolvedReportType,
         company: formData.company,
         problemReport: formData.problemReport,
         remarksPendingWorks: formData.remarksPendingWorks,
         modelNo: formData.modelNo,
-        serialNo: formData.serialNo,
         branch: formData.branch,
         reference: formData.reference,
         contentScope: formData.contentScope || undefined,
-        usageData: formData.usageData,
-        description: formData.description,
         assignedTo: employeeId || user?._id,
-        reportFor: reportFor,
+        reportFor: payloadReportFor,
         materialGroups: cleanedMaterialGroups,
       };
 
@@ -574,7 +561,7 @@ const AddRentalReportScreen = () => {
         Toast.show({
           type: 'success',
           text1: 'Success',
-          text2: response.data.message || (reportId ? 'Report updated successfully' : 'Report created successfully'),
+          text2: getDocumentSuccessMessage(resolvedReportType, reportId ? 'updated' : 'submitted'),
         });
         (navigation as any).navigate(getRentalListScreen(resolvedReportType));
       } else {
@@ -660,15 +647,7 @@ const AddRentalReportScreen = () => {
           placeholder="Enter Model No"
         />
 
-        <Text style={styles.label}>Serial No</Text>
-        <TextInput
-          style={styles.input}
-          value={formData.serialNo}
-          onChangeText={(text) => handleChange('serialNo', text)}
-          placeholder="Enter Serial No"
-        />
-
-        <Text style={styles.label}>Branch</Text>
+        <Text style={styles.label}>Branch *</Text>
         <TouchableOpacity
           style={styles.pickerButton}
           onPress={() => setBranchPickerVisible(true)}
@@ -707,25 +686,9 @@ const AddRentalReportScreen = () => {
           placeholder="Enter Reference"
         />
 
-        <Text style={styles.label}>Usage Data</Text>
-        <TextInput
-          style={styles.input}
-          value={formData.usageData}
-          onChangeText={(text) => handleChange('usageData', text)}
-          placeholder="Enter Usage Data"
-        />
+        {/* serialNo / usageData / description are entered per-product in Materials */}
 
-        <Text style={styles.label}>Description</Text>
-        <TextInput
-          style={[styles.input, styles.textArea]}
-          value={formData.description}
-          onChangeText={(text) => handleChange('description', text)}
-          placeholder="Enter Description"
-          multiline
-          numberOfLines={2}
-        />
-
-        <Text style={styles.sectionTitle}>Material Groups (optional)</Text>
+        <Text style={styles.sectionTitle}>Material Groups</Text>
         <View style={styles.groupButtons}>
           <TouchableOpacity style={styles.addGroupButton} onPress={handleAddGroup}>
             <Icon name="add" size={20} color="#fff" />
@@ -782,7 +745,8 @@ const AddRentalReportScreen = () => {
                 {formData.materialProductName
                   ? (() => {
                       const selected = availableProducts.find((p) => p._id === formData.materialProductName);
-                      return selected?.productName || selected?.modelName || 'Select Product';
+                      if (!selected) return 'Select Product';
+                      return extractProductName(selected);
                     })()
                   : 'Select Product'}
               </Text>
@@ -798,6 +762,14 @@ const AddRentalReportScreen = () => {
               keyboardType="numeric"
             />
 
+            <Text style={styles.label}>Usage Data (per product)</Text>
+            <TextInput
+              style={styles.input}
+              value={formData.materialUsageData}
+              onChangeText={(text) => handleChange('materialUsageData', text)}
+              placeholder="Optional"
+            />
+
             <Text style={styles.label}>Access Service (per product)</Text>
             <TextInput
               style={styles.input}
@@ -806,10 +778,19 @@ const AddRentalReportScreen = () => {
               placeholder="Optional"
             />
 
+            <Text style={styles.label}>Description (per product)</Text>
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              value={formData.materialDescription}
+              onChangeText={(text) => handleChange('materialDescription', text)}
+              placeholder="Optional"
+              multiline
+              numberOfLines={2}
+            />
+
             <TouchableOpacity
               style={styles.saveProductButton}
               onPress={handleSaveProduct}
-              disabled={!formData.materialProductName || !formData.materialQuantity}
             >
               <Text style={styles.saveProductButtonText}>
                 {editingProductId ? 'Update Product' : 'Add Product'}
@@ -1047,6 +1028,17 @@ const AddRentalReportScreen = () => {
             <FlatList
               data={availableProducts}
               keyExtractor={(item) => item?._id || String(item)}
+              ListHeaderComponent={
+                <TouchableOpacity
+                  style={styles.pickerOption}
+                  onPress={() => {
+                    handleChange('materialProductName', '');
+                    setProductPickerVisible(false);
+                  }}
+                >
+                  <Text style={styles.pickerOptionText}>None</Text>
+                </TouchableOpacity>
+              }
               ListEmptyComponent={
                 <Text style={styles.pickerOptionText}>
                   {formData.company ? 'No products found' : 'Select a company first'}

@@ -1,5 +1,6 @@
 import productModel from "../../models/productModel.js";
 import cloudinary from "cloudinary";
+import { sanitizeProductBody } from "../../utils/sanitizeProductBody.js";
 
 const updateProduct = async (req, res) => {
     try {
@@ -14,8 +15,10 @@ const updateProduct = async (req, res) => {
             });
         }
 
+        const body = sanitizeProductBody(req.body);
+
         // Handle removed images
-        let publicIdToDelete = req.body.removedImages;
+        let publicIdToDelete = body.removedImages;
         if (typeof publicIdToDelete === "string") {
             await cloudinary.v2.uploader.destroy(publicIdToDelete);
         } else if (
@@ -29,10 +32,10 @@ const updateProduct = async (req, res) => {
 
         // Handle images upload
         let imagesLink = [];
-        const images = Array.isArray(req.body.images)
-            ? req.body.images
-            : req.body.images
-            ? [req.body.images]
+        const images = Array.isArray(body.images)
+            ? body.images
+            : body.images
+            ? [body.images]
             : []; // Default to an empty array if no images are provided
 
         if (images && images.length > 0) {
@@ -49,9 +52,9 @@ const updateProduct = async (req, res) => {
 
         // Update brand logo
         let brandLogo = null;
-        const oldLogo = req.body.oldLogo ? JSON.parse(req.body.oldLogo) : null;
-        if (req.body.logo && req.body.logo !== "null") {
-            const result = await cloudinary.v2.uploader.upload(req.body.logo, {
+        const oldLogo = body.oldLogo ? JSON.parse(body.oldLogo) : null;
+        if (body.logo && body.logo !== "null") {
+            const result = await cloudinary.v2.uploader.upload(body.logo, {
                 folder: "brands",
             });
             brandLogo = {
@@ -62,49 +65,39 @@ const updateProduct = async (req, res) => {
 
         // Update product fields
         product.brand = {
-            name: req.body.brandName,
+            name: body.brandName,
             logo: brandLogo || oldLogo,
         };
 
-        // Preserve existing images and append new ones
-        const oldImages = req.body.oldImages
-            ? JSON.parse(req.body.oldImages)
+        const oldImages = body.oldImages
+            ? JSON.parse(body.oldImages)
             : [];
         product.images = [...oldImages, ...imagesLink];
 
-        // Update other product fields
-        product.name = req.body.name || product.name;
-        product.warranty = req.body.warranty !== undefined ? req.body.warranty : product.warranty;
-        product.corpcultureWarranty = req.body.corpcultureWarranty !== undefined ? req.body.corpcultureWarranty : product.corpcultureWarranty;
-        product.orderReferenceNo = req.body.orderReferenceNo !== undefined ? req.body.orderReferenceNo : product.orderReferenceNo;
-        product.stock = req.body.stock || product.stock;
-        product.category = req.body.category || product.category;
-        product.description = req.body.description || product.description;
-        product.price = req.body.price || product.price;
-        product.discountPrice = req.body.discountPrice || product.discountPrice;
-        product.installationCost = req.body.installationCost !== undefined ? req.body.installationCost : product.installationCost;
-        product.deliveryCharge = req.body.deliveryCharge !== undefined ? req.body.deliveryCharge : product.deliveryCharge;
-        product.weight = req.body.weight !== undefined ? req.body.weight : product.weight;
-        product.length = req.body.length !== undefined ? req.body.length : product.length;
-        product.width = req.body.width !== undefined ? req.body.width : product.width;
-        product.height = req.body.height !== undefined ? req.body.height : product.height;
-        product.ratings = req.body.ratings || product.ratings;
-        product.highlights = req.body.highlights || product.highlights;
+        product.name = body.name || product.name;
+        if (body.warranty !== undefined) product.warranty = body.warranty;
+        if (body.corpcultureWarranty !== undefined) product.corpcultureWarranty = body.corpcultureWarranty;
+        if (body.orderReferenceNo !== undefined) product.orderReferenceNo = body.orderReferenceNo;
+        product.stock = body.stock || product.stock;
+        product.category = body.category || product.category;
+        product.description = body.description || product.description;
+        product.price = body.price || product.price;
+        if (body.discountPrice !== undefined) product.discountPrice = body.discountPrice;
+        if (body.installationCost !== undefined) product.installationCost = body.installationCost;
+        if (body.deliveryCharge !== undefined) product.deliveryCharge = body.deliveryCharge;
+        if (body.weight !== undefined) product.weight = body.weight;
+        if (body.length !== undefined) product.length = body.length;
+        if (body.width !== undefined) product.width = body.width;
+        if (body.height !== undefined) product.height = body.height;
+        product.ratings = body.ratings || product.ratings;
+        product.highlights = body.highlights || product.highlights;
 
-        // Update specifications
-        if (Array.isArray(req.body.specifications)) {
-            product.specifications = req.body.specifications.map((s) =>
-                JSON.parse(s)
-            );
+        if (Array.isArray(body.specifications)) {
+            product.specifications = body.specifications;
         }
 
-        // Update priceRange
-        if (Array.isArray(req.body.priceRange)) {
-            let priceRange = [];
-            req.body.priceRange.forEach((s) => {
-                priceRange.push(JSON.parse(s));
-            });
-            product.priceRange = priceRange;
+        if (Array.isArray(body.priceRange)) {
+            product.priceRange = body.priceRange;
         }
 
         // Save the updated product

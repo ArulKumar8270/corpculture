@@ -7,7 +7,6 @@ import ScrollToTopOnRouteChange from "./../../../utils/ScrollToTopOnRouteChange"
 import SeoData from "../../../SEO/SeoData";
 import PriceCard from "./PriceCard";
 import { useAuth } from "../../../context/auth";
-import { loadStripe } from "@stripe/stripe-js";
 import axios from "axios";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -20,10 +19,6 @@ import { storeCompanyShippingInfo } from '../../../utils/companyShipping';
 
 const Cart = () => {
     const { auth, isCompanyEnabled, setSelectedCompany, companyDetails, setRefetch, refetch, selectedCompany } = useAuth();
-    //stripe details
-    const publishKey = import.meta.env.VITE_STRIPE_PUBLISH_KEY;
-    const secretKey = import.meta.env.VITE_STRIPE_SECRET_KEY;
-    let frontendURL = window.location.origin; // Get the frontend URL
     const [cartItems, setCartItems, , , saveLaterItems] = useCart();
     const navigate = useNavigate();
     // Sample data for existing users
@@ -76,35 +71,6 @@ const Cart = () => {
 
     const handleRemoveEmail = (email) => {
         setAdditionalEmails(additionalEmails.filter((e) => e !== email));
-    };
-
-    //PAYMENT USING STRIPE
-    const handlePayment = async () => {
-        const stripe = await loadStripe(publishKey);
-
-        const response = await axios.post(
-            `${import.meta.env.VITE_SERVER_URL
-            }/api/v1/user/create-checkout-session`,
-            {
-                products: cartItems,
-                frontendURL: frontendURL,
-                customerEmail: auth?.user?.email,
-            },
-            {
-                headers: {
-                    Authorization: auth?.token,
-                },
-            }
-        );
-        const session = response.data.session;
-        //storing session id to retrieve payment details after successful
-        localStorage.setItem("sessionId", session.id);
-        const result = stripe.redirectToCheckout({
-            sessionId: session.id,
-        });
-        if (result.error) {
-            console.log(result.error);
-        }
     };
 
     const placeOrderHandler = async () => {
