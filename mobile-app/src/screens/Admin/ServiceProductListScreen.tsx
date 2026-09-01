@@ -90,12 +90,12 @@ const ServiceProductListScreen = () => {
 
   const handleDelete = async (productId: string) => {
     Alert.alert(
-      'Delete Product',
-      'Are you sure you want to delete this product?',
+      'Trash Product',
+      'Are you sure you want to move this product to trash?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Delete',
+          text: 'Trash',
           style: 'destructive',
           onPress: async () => {
             try {
@@ -111,14 +111,14 @@ const ServiceProductListScreen = () => {
                 Toast.show({
                   type: 'success',
                   text1: 'Success',
-                  text2: data.message || 'Product deleted successfully!',
+                  text2: data.message || 'Product moved to trash successfully!',
                 });
                 loadProducts();
               } else {
                 Toast.show({
                   type: 'error',
                   text1: 'Error',
-                  text2: data?.message || 'Failed to delete product.',
+                  text2: data?.message || 'Failed to move to trash product.',
                 });
               }
             } catch (error: any) {

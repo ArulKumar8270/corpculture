@@ -48,19 +48,19 @@ const PayslipList = () => {
         if (auth?.token) fetchPayslips();
     }, [auth?.token]);
 
-    const handleDelete = async (p) => {
-        if (!window.confirm(`Delete payslip for ${p.employeeName || p.employeeId?.name || "this employee"}?`)) return;
+    const handleTrash = async (p) => {
+        if (!window.confirm(`Move payslip for ${p.employeeName || p.employeeId?.name || "this employee"} to trash?`)) return;
         try {
             const { data } = await axios.delete(
                 `${import.meta.env.VITE_SERVER_URL}/api/v1/payslip/${p._id}`,
                 { headers: { Authorization: auth?.token } }
             );
             if (data?.success) {
-                toast.success("Payslip deleted.");
+                toast.success("Payslip moved to trash.");
                 fetchPayslips();
-            } else toast.error(data?.message || "Delete failed.");
+            } else toast.error(data?.message || "Failed to move to trash.");
         } catch (err) {
-            toast.error(err.response?.data?.message || "Delete failed.");
+            toast.error(err.response?.data?.message || "Failed to move to trash.");
         }
     };
 
@@ -125,10 +125,8 @@ const PayslipList = () => {
                                                     <button
                                                         type="button"
                                                         className="text-red-600 font-medium hover:underline"
-                                                        onClick={() => handleDelete(p)}
-                                                    >
-                                                        Delete
-                                                    </button>
+                                                        onClick={() => handleTrash(p)}
+                                                    >Trash</button>
                                                 )}
                                             </div>
                                         </TableCell>

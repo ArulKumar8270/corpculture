@@ -73,21 +73,21 @@ const CompanyList = () => {
         return userPermissions.some(p => p.key === key && p.actions.includes('edit')) || auth?.user?.role === 1;
     };
 
-    const handleDeleteCompany = async (companyId) => {
-        if (!window.confirm('Are you sure you want to delete this company?')) return;
+    const handleTrashCompany = async (companyId) => {
+        if (!window.confirm('Are you sure you want to move this company to trash?')) return;
         try {
             const { data } = await axios.delete(
                 `${import.meta.env.VITE_SERVER_URL}/api/v1/company/delete/${companyId}`,
                 { headers: { Authorization: auth?.token } }
             );
             if (data?.success) {
-                toast.success(data.message || 'Company deleted successfully.');
+                toast.success(data.message || 'Company moved to trash successfully.');
                 await fetchCompanies();
             } else {
-                toast.error(data?.message || 'Failed to delete company.');
+                toast.error(data?.message || 'Failed to move to trash company.');
             }
         } catch (err) {
-            console.error('Error deleting company:', err);
+            console.error('Error moving to trash company:', err);
             toast.error(err.response?.data?.message || 'Something went wrong while deleting the company.');
         }
     };
@@ -339,12 +339,10 @@ const CompanyList = () => {
                                                     variant="contained"
                                                     size="small"
                                                     color="error"
-                                                    onClick={() => handleDeleteCompany(company._id)}
+                                                    onClick={() => handleTrashCompany(company._id)}
                                                     className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded"
                                                     sx={{ whiteSpace: 'nowrap' }}
-                                                >
-                                                    Delete
-                                                </Button>
+                                                >Trash</Button>
                                             ) : null}
                                         </TableCell>
                                         {/* : null} */}

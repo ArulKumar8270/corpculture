@@ -1,51 +1,79 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, TextInput, ActivityIndicator } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { clearAuth } from '../../store/slices/authSlice';
 import { cleanupPushNotificationsOnLogout } from '../../services/pushNotifications';
 import { clearPermissions } from '../../store/slices/permissionsSlice';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Toast from 'react-native-toast-message';
+import { userService } from '../../services/api';
+import { RootState } from '../../store';
 
 const DeactivateScreen = () => {
   const navigation = useNavigation();
   const dispatch = useDispatch();
+  const { user } = useSelector((state: RootState) => state.auth);
+  const [email, setEmail] = useState(user?.email || '');
+  const [phone, setPhone] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleDeactivate = () => {
+  const handleTrashAccount = () => {
+    if (!email.trim() || !phone.trim()) {
+      Toast.show({
+        type: 'error',
+        text1: 'Missing details',
+        text2: 'Please confirm your email and mobile number',
+      });
+      return;
+    }
+
     Alert.alert(
-      'Deactivate Account',
-      'Are you sure you want to deactivate your account? This action cannot be undone.',
+      'Move Account to Trash',
+      'Are you sure you want to move your account to trash? You will be logged out and can be restored by an administrator.',
       [
+        { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Deactivate',
+          text: 'Move to Trash',
           style: 'destructive',
           onPress: async () => {
+            setLoading(true);
             try {
-              // TODO: Call API to deactivate account
-              await cleanupPushNotificationsOnLogout();
-              await AsyncStorage.removeItem('authToken');
-              await AsyncStorage.removeItem('auth');
-              dispatch(clearAuth());
-              dispatch(clearPermissions());
-              Toast.show({
-                type: 'success',
-                text1: 'Account Deactivated',
-                text2: 'Your account has been deactivated successfully',
-              });
-              // @ts-ignore
-              navigation.navigate('Login');
-            } catch (error) {
-              console.error('Deactivation error:', error);
+              const response = await userService.deactivateUser({ email: email.trim(), phone: phone.trim() });
+
+              if (response.data?.success) {
+                await cleanupPushNotificationsOnLogout();
+                await AsyncStorage.removeItem('authToken');
+                await AsyncStorage.removeItem('auth');
+                dispatch(clearAuth());
+                dispatch(clearPermissions());
+                Toast.show({
+                  type: 'success',
+                  text1: 'Account moved to trash',
+                  text2: response.data?.message || 'Your account has been moved to trash successfully',
+                });
+                // @ts-ignore
+                navigation.navigate('Login');
+              } else {
+                Toast.show({
+                  type: 'error',
+                  text1: 'Error',
+                  text2: response.data?.message || 'Failed to move account to trash',
+                });
+              }
+            } catch (error: any) {
+              console.error('Trash account error:', error);
+              const errorType = error.response?.data?.errorType;
               Toast.show({
                 type: 'error',
                 text1: 'Error',
-                text2: 'Failed to deactivate account. Please try again.',
+                text2:
+                  errorType === 'phoneMismatch'
+                    ? error.response?.data?.message || 'Mobile number does not match'
+                    : error.response?.data?.message || 'Failed to move account to trash. Please try again.',
               });
+            } finally {
+              setLoading(false);
             }
           },
         },
@@ -55,13 +83,39 @@ const DeactivateScreen = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Deactivate Account</Text>
+      <Text style={styles.title}>Move Account to Trash</Text>
       <Text style={styles.description}>
-        If you deactivate your account, you will lose access to all your data and services.
-        This action cannot be undone.
+        If you move your account to trash, you will lose access to all your data and services until an administrator restores it.
       </Text>
-      <TouchableOpacity style={styles.button} onPress={handleDeactivate}>
-        <Text style={styles.buttonText}>Deactivate Account</Text>
+
+      <TextInput
+        style={styles.input}
+        placeholder="Confirm your email address"
+        value={email}
+        onChangeText={setEmail}
+        keyboardType="email-address"
+        autoCapitalize="none"
+        autoCorrect={false}
+      />
+      <TextInput
+        style={styles.input}
+        placeholder="Confirm your mobile number"
+        value={phone}
+        onChangeText={setPhone}
+        keyboardType="phone-pad"
+        maxLength={10}
+      />
+
+      <TouchableOpacity
+        style={[styles.button, loading && styles.buttonDisabled]}
+        onPress={handleTrashAccount}
+        disabled={loading}
+      >
+        {loading ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text style={styles.buttonText}>Move to Trash</Text>
+        )}
       </TouchableOpacity>
     </View>
   );
@@ -84,15 +138,28 @@ const styles = StyleSheet.create({
   description: {
     fontSize: 16,
     color: '#666',
-    marginBottom: 30,
+    marginBottom: 24,
     textAlign: 'center',
     lineHeight: 24,
+  },
+  input: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+    fontSize: 16,
   },
   button: {
     backgroundColor: '#dc3545',
     padding: 15,
     borderRadius: 8,
     alignItems: 'center',
+    marginTop: 8,
+  },
+  buttonDisabled: {
+    opacity: 0.7,
   },
   buttonText: {
     color: '#fff',

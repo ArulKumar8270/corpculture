@@ -143,8 +143,8 @@ const AllCategories = () => {
     }, [auth?.token, categoryLoading]);
 
     // Function to handle category deletion
-    const handleDeleteCategory = async (categoryId) => { // {{ edit_2 }}
-        if (window.confirm("Are you sure you want to delete this category?")) { // {{ edit_2 }}
+    const handleTrashCategory = async (categoryId) => { // {{ edit_2 }}
+        if (window.confirm("Are you sure you want to move this category to trash?")) { // {{ edit_2 }}
             try { // {{ edit_2 }}
                 const res = await axios.delete( // {{ edit_2 }}
                     `${import.meta.env.VITE_SERVER_URL}/api/v1/category/delete/${categoryId}`, // Assuming this is your delete endpoint // {{ edit_2 }}
@@ -156,15 +156,15 @@ const AllCategories = () => {
                 ); // {{ edit_2 }}
 
                 if (res.status === 200) { // {{ edit_2 }}
-                    toast.success("Category deleted successfully!"); // {{ edit_2 }}
+                    toast.success("Category moved to trash successfully!"); // {{ edit_2 }}
                     // Update the categories state to remove the deleted category // {{ edit_2 }}
                     setCategories(categories.filter(cat => cat._id !== categoryId)); // {{ edit_2 }}
                 } // {{ edit_2 }}
             } catch (error) { // {{ edit_2 }}
-                console.error("Error deleting category:", error); // {{ edit_2 }}
+                console.error("Error moving to trash category:", error); // {{ edit_2 }}
                 toast.error( // {{ edit_2 }}
                     error.response?.data?.message || // {{ edit_2 }}
-                    "Error deleting category. Please try again." // {{ edit_2 }}
+                    "Error moving to trash category. Please try again." // {{ edit_2 }}
                 ); // {{ edit_2 }}
             } // {{ edit_2 }}
         } // {{ edit_2 }}
@@ -219,9 +219,9 @@ const AllCategories = () => {
                             <EditIcon />
                         </IconButton>
                         <IconButton
-                            onClick={() => handleDeleteCategory(params.row.id)}
+                            onClick={() => handleTrashCategory(params.row.id)}
                             color="error"
-                            aria-label="delete category"
+                            aria-label="trash category"
                             size="small"
                         >
                             <DeleteIcon />

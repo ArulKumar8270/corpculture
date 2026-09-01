@@ -1,5 +1,6 @@
 import EmployeeLeave from "../../models/employeeLeaveModel.js";
 import Employee from "../../models/employeeModel.js";
+import { softDeleteById, TRASH_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
 
 // Create leave application (Employee)
 export const createLeaveController = async (req, res) => {
@@ -301,11 +302,11 @@ export const deleteLeaveController = async (req, res) => {
             });
         }
 
-        await EmployeeLeave.findByIdAndDelete(id);
+        await softDeleteById(EmployeeLeave, id, req.user?._id);
 
         res.status(200).send({
             success: true,
-            message: "Leave application deleted successfully",
+            message: TRASH_SUCCESS_MESSAGE,
         });
     } catch (error) {
         console.error("Error deleting leave:", error);

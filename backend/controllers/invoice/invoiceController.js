@@ -1,4 +1,5 @@
 import Invoice from "../../models/invoiceModel.js";
+import { softDeleteById, TRASH_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
 
 // Create new invoice
 export const createInvoice = async (req, res) => {
@@ -105,7 +106,7 @@ export const updateInvoice = async (req, res) => {
 // Delete invoice
 export const deleteInvoice = async (req, res) => {
     try {
-        const invoice = await Invoice.findByIdAndDelete(req.params.id);
+        const invoice = await softDeleteById(Invoice, req.params.id, req.user?._id);
 
         if (!invoice) {
             return res.status(404).send({
@@ -116,7 +117,7 @@ export const deleteInvoice = async (req, res) => {
 
         res.status(200).send({
             success: true,
-            message: "Invoice deleted successfully"
+            message: TRASH_SUCCESS_MESSAGE
         });
     } catch (error) {
         console.error("Error in deleting invoice:", error);

@@ -86,17 +86,17 @@ const GST = () => {
     };
 
     const handleDelete = async (id) => {
-        if (window.confirm('Are you sure you want to delete this GST entry?')) {
+        if (window.confirm('Are you sure you want to move this GST entry to trash?')) {
             try {
                 const { data } = await axios.delete(`${import.meta.env.VITE_SERVER_URL}/api/v1/gst/${id}`);
                 if (data?.success) {
                     toast.success(data.message);
                     fetchGstList(); // Refresh the list
                 } else {
-                    toast.error(data?.message || 'Failed to delete GST.');
+                    toast.error(data?.message || 'Failed to move to trash GST.');
                 }
             } catch (error) {
-                console.error('Error deleting GST:', error);
+                console.error('Error moving to trash GST:', error);
                 toast.error('Something went wrong while deleting GST.');
             }
         }
@@ -209,9 +209,7 @@ const GST = () => {
                                                 startIcon={<DeleteIcon />}
                                                 onClick={() => handleDelete(gst._id)}
                                                 className="bg-red-500 hover:bg-red-600"
-                                            >
-                                                Delete
-                                            </Button>
+                                            >Trash</Button>
                                         </TableCell> : null}
                                     </TableRow>
                                 ))

@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { softDeletePlugin } from "../plugins/softDeletePlugin.js";
 
 const serviceQuotationSchema = new mongoose.Schema({
     quotationNumber: {
@@ -119,4 +120,6 @@ const serviceQuotationSchema = new mongoose.Schema({
     },
 }, { timestamps: true });
 
+
+serviceQuotationSchema.plugin(softDeletePlugin);
 export default mongoose.model('ServiceQuotation', serviceQuotationSchema);

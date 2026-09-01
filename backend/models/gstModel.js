@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { softDeletePlugin } from "../plugins/softDeletePlugin.js";
 
 const gstSchema = new mongoose.Schema({
     gstType: {
@@ -15,6 +16,8 @@ const gstSchema = new mongoose.Schema({
 
 // Create non-unique index on gstType (allows duplicates)
 gstSchema.index({ gstType: 1 }, { unique: false });
+gstSchema.plugin(softDeletePlugin);
+
 
 const GST = mongoose.models.GST || mongoose.model('GST', gstSchema);
 

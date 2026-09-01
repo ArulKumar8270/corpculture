@@ -1,4 +1,5 @@
 import Material from '../../models/materialModel.js';
+import { softDeleteById, TRASH_SUCCESS_MESSAGE } from '../../utils/softDelete.js';
 
 // Create a new material
 export const createMaterial = async (req, res) => {
@@ -40,7 +41,7 @@ export const createMaterial = async (req, res) => {
 // Get all materials
 export const getAllMaterials = async (req, res) => {
     try {
-        const materials = await Material.find({ isActive: true })
+        const materials = await Material.find({})
             .sort({ createdAt: -1 });
 
         res.status(200).json({
@@ -142,10 +143,10 @@ export const updateMaterial = async (req, res) => {
     }
 };
 
-// Delete material (soft delete by setting isActive to false)
+// Trash material (soft delete)
 export const deleteMaterial = async (req, res) => {
     try {
-        const material = await Material.findById(req.params.id);
+        const material = await softDeleteById(Material, req.params.id, req.user?._id);
 
         if (!material) {
             return res.status(404).json({
@@ -154,22 +155,21 @@ export const deleteMaterial = async (req, res) => {
             });
         }
 
-        // Soft delete by setting isActive to false
         await Material.findByIdAndUpdate(
             req.params.id,
             { isActive: false, updatedBy: req.user._id },
-            { new: true }
+            { new: true, includeDeleted: true }
         );
 
         res.status(200).json({
             success: true,
-            message: 'Material deleted successfully'
+            message: TRASH_SUCCESS_MESSAGE
         });
     } catch (error) {
-        console.error('Error deleting material:', error);
+        console.error('Error moving material to trash:', error);
         res.status(500).json({
             success: false,
-            message: 'Error deleting material',
+            message: 'Error moving material to trash',
             error: error.message
         });
     }

@@ -211,7 +211,7 @@ const ServiceReportsandGatpass = (props) => {
     };
 
     const handleDelete = async (reportId) => {
-        if (window.confirm('Are you sure you want to delete this report?')) {
+        if (window.confirm('Are you sure you want to move this report to trash?')) {
             try {
                 const response = await axios.delete(`${import.meta.env.VITE_SERVER_URL}/api/v1/report/${reportId}`, {
                     headers: { Authorization: auth?.token }
@@ -228,10 +228,10 @@ const ServiceReportsandGatpass = (props) => {
                         rowsPerPage
                     );
                 } else {
-                    toast.error(response.data.message || 'Failed to delete report.');
+                    toast.error(response.data.message || 'Failed to move to trash report.');
                 }
             } catch (err) {
-                console.error('Error deleting report:', err);
+                console.error('Error moving to trash report:', err);
                 toast.error(err.response?.data?.message || 'Something went wrong while deleting report.');
             }
         }
@@ -686,7 +686,7 @@ const ServiceReportsandGatpass = (props) => {
                                                         <EditIcon />
                                                     </IconButton>
                                                 </Tooltip>
-                                                <Tooltip title="Delete Report">
+                                                <Tooltip title="Trash Report">
                                                     <IconButton onClick={() => handleDelete(report._id)} color="error">
                                                         <DeleteIcon />
                                                     </IconButton>

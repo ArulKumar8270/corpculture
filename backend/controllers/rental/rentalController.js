@@ -1,6 +1,7 @@
 import RentalModel from "../../models/rentalModel.js";
 import { resolveNotificationUserId } from "../../utils/resolveNotificationUserId.js";
 import { notifyAssignment } from "../../utils/expoPushNotification.js";
+import { softDeleteById, TRASH_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
 import { resolveEnquiryPincode, attachEnquiryPincodes } from "../../utils/resolveEnquiryPincode.js";
 import { tryAutoAssignNewRentalEnquiry } from "../../utils/tryAutoAssignNewEnquiry.js";
 
@@ -228,11 +229,11 @@ export const deleteRental = async (req, res) => {
             });
         }
 
-        await RentalModel.findByIdAndDelete(rentalId);
+        await softDeleteById(RentalModel, rentalId, req.user?._id);
 
         res.status(200).send({
             success: true,
-            message: "Rental deleted successfully"
+            message: TRASH_SUCCESS_MESSAGE
         });
     } catch (error) {
         console.error("Error in deleting rental:", error);

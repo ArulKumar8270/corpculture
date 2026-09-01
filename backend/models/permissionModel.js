@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { softDeletePlugin } from "../plugins/softDeletePlugin.js";
 
 const permissionSchema = new mongoose.Schema(
   {
@@ -38,4 +39,6 @@ const permissionSchema = new mongoose.Schema(
 // ✅ Compound unique index on userId + key
 permissionSchema.index({ userId: 1, key: 1 }, { unique: true });
 
+
+permissionSchema.plugin(softDeletePlugin);
 export default mongoose.model("Permission", permissionSchema);

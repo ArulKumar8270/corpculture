@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { softDeletePlugin } from "../plugins/softDeletePlugin.js";
 
 const contactPersonSchema = new mongoose.Schema({
     name: { type: String, required: true },
@@ -67,4 +68,6 @@ const companySchema = new mongoose.Schema({
     }
 });
 
+
+companySchema.plugin(softDeletePlugin);
 export default mongoose.model("Company", companySchema);

@@ -1,6 +1,7 @@
 import Credit from "../../models/creditModel.js";
 import Company from "../../models/companyModel.js";
 import mongoose from "mongoose";
+import { softDeleteById, TRASH_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
 import {
     computeCompanyCreditSummary,
     userCanAccessCompany,
@@ -294,7 +295,7 @@ export const updateCredit = async (req, res) => {
 // Delete Credit
 export const deleteCredit = async (req, res) => {
     try {
-        const credit = await Credit.findByIdAndDelete(req.params.id);
+        const credit = await softDeleteById(Credit, req.params.id, req.user?._id);
 
         if (!credit) {
             return res.status(404).send({
@@ -305,7 +306,7 @@ export const deleteCredit = async (req, res) => {
 
         res.status(200).send({
             success: true,
-            message: "Credit deleted successfully"
+            message: TRASH_SUCCESS_MESSAGE
         });
     } catch (error) {
         console.error("Error in deleting credit:", error);

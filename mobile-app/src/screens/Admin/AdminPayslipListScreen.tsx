@@ -83,10 +83,10 @@ const AdminPayslipListScreen = () => {
   const deletePayslip = (id: string, label: string) => {
     const auth = cleanAuthHeader(token);
     if (!auth) return;
-    Alert.alert('Delete payslip', `Remove payslip for ${label}?`, [
+    Alert.alert('Move to trash', `Move payslip for ${label} to trash?`, [
       { text: 'Cancel', style: 'cancel' },
       {
-        text: 'Delete',
+        text: 'Trash',
         style: 'destructive',
         onPress: async () => {
           const base = String(getApiBaseUrl() || '').replace(/\/$/, '');
@@ -95,15 +95,15 @@ const AdminPayslipListScreen = () => {
               headers: { Authorization: auth },
             });
             if (data?.success) {
-              Toast.show({ type: 'success', text1: 'Payslip deleted' });
+              Toast.show({ type: 'success', text1: 'Payslip moved to trash' });
               load();
             } else {
-              Toast.show({ type: 'error', text1: data?.message || 'Delete failed' });
+              Toast.show({ type: 'error', text1: data?.message || 'Failed to move to trash' });
             }
           } catch (e: any) {
             Toast.show({
               type: 'error',
-              text1: e?.response?.data?.message || 'Delete failed',
+              text1: e?.response?.data?.message || 'Failed to move to trash',
             });
           }
         },

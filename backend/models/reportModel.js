@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { softDeletePlugin } from "../plugins/softDeletePlugin.js";
 import { normalizeSendDetailsTo } from "../utils/normalizeSendDetailsTo.js";
 
 // Schema for individual material items within a report
@@ -176,4 +177,6 @@ reportSchema.post("findOne", function (doc) {
     coerceSendDetailsToOnDoc(doc);
 });
 
+
+reportSchema.plugin(softDeletePlugin);
 export default mongoose.model('Report', reportSchema);

@@ -1,4 +1,5 @@
 import GST from "../../models/gstModel.js";
+import { softDeleteById, TRASH_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
 
 // Create GST Type
 export const createGst = async (req, res) => {
@@ -87,12 +88,12 @@ export const updateGst = async (req, res) => {
 export const deleteGst = async (req, res) => {
     try {
         const gstId = req.params.id;
-        const deletedGst = await GST.findByIdAndDelete(gstId);
+        const deletedGst = await softDeleteById(GST, gstId, req.user?._id);
 
         if (!deletedGst) {
             return res.status(404).send({ success: false, message: 'GST Type not found' });
         }
-        res.status(200).send({ success: true, message: 'GST Type deleted successfully' });
+        res.status(200).send({ success: true, message: TRASH_SUCCESS_MESSAGE });
     } catch (error) {
         console.error("Error in deleteGst:", error);
         res.status(500).send({ success: false, message: 'Error in deleting GST Type', error });

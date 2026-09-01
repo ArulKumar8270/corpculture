@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { softDeletePlugin } from "../plugins/softDeletePlugin.js";
 
 const serviceInvoiceSchema = new mongoose.Schema({
     invoiceType: {
@@ -178,4 +179,6 @@ const serviceInvoiceSchema = new mongoose.Schema({
     },
 }, { timestamps: true });
 
+
+serviceInvoiceSchema.plugin(softDeletePlugin);
 export default mongoose.model('ServiceInvoice', serviceInvoiceSchema);

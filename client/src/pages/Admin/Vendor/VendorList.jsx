@@ -47,20 +47,20 @@ const VendorList = () => {
     };
 
     const handleDelete = async (vendorId) => {
-        if (window.confirm('Are you sure you want to delete this vendor?')) {
+        if (window.confirm('Are you sure you want to move this vendor to trash?')) {
             try {
                 const { data } = await axios.delete(`${import.meta.env.VITE_SERVER_URL}/api/v1/vendors/${vendorId}`);
                 if (data?.success) {
-                    toast.success(data.message || 'Vendor deleted successfully!');
+                    toast.success(data.message || 'Vendor moved to trash successfully!');
                     fetchVendors(); // Refresh the list
                 } else {
-                    toast.error(data?.message || 'Failed to delete vendor.');
+                    toast.error(data?.message || 'Failed to move to trash vendor.');
                 }
                 // The line below is redundant if fetchVendors() is called, as it will refresh the state from the server.
-                // toast.success(`Vendor with ID: ${vendorId} deleted successfully (simulated)!`);
+                // toast.success(`Vendor with ID: ${vendorId} moved to trash successfully (simulated)!`);
                 // setVendors(vendors.filter(vendor => vendor._id !== vendorId));
             } catch (error) {
-                console.error('Error deleting vendor:', error);
+                console.error('Error moving to trash vendor:', error);
                 toast.error('Something went wrong while deleting the vendor.');
             }
         }
@@ -151,9 +151,7 @@ const VendorList = () => {
                                                 startIcon={<DeleteIcon />}
                                                 onClick={() => handleDelete(vendor._id)}
                                                 className="bg-red-500 hover:bg-red-600"
-                                            >
-                                                Delete
-                                            </Button>
+                                            >Trash</Button>
                                         </TableCell> : null}
                                     </TableRow>
                                 ))

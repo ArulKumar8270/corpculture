@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { softDeletePlugin } from "../plugins/softDeletePlugin.js";
 
 const payslipSchema = new mongoose.Schema(
     {
@@ -60,4 +61,6 @@ payslipSchema.virtual("netPay").get(function () {
 payslipSchema.set("toJSON", { virtuals: true });
 payslipSchema.set("toObject", { virtuals: true });
 
+
+payslipSchema.plugin(softDeletePlugin);
 export default mongoose.model("Payslip", payslipSchema);

@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { softDeletePlugin } from "../plugins/softDeletePlugin.js";
 
 const deliveryAddressSchema = new mongoose.Schema({
     address: { type: String, required: true },
@@ -31,5 +32,7 @@ const userSchema = new mongoose.Schema({
     commissionCategorys: [{ type: String }], // Added commissionCategorys field
     expoPushTokens: [{ type: String }],
 }, { timestamps: true });
+
+userSchema.plugin(softDeletePlugin);
 
 export default mongoose.model('User', userSchema);

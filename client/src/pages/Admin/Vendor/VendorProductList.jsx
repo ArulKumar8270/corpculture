@@ -45,20 +45,20 @@ const VendorProductList = () => {
     };
 
     const handleDelete = async (productId) => {
-        if (window.confirm('Are you sure you want to delete this vendor product?')) {
+        if (window.confirm('Are you sure you want to move this vendor product to trash?')) {
             try {
                 const { data } = await axios.delete(`${import.meta.env.VITE_SERVER_URL}/api/v1/vendor-products/${productId}`);
                 if (data?.success) {
-                    toast.success(data.message || 'Vendor product deleted successfully!');
+                    toast.success(data.message || 'Vendor product moved to trash successfully!');
                     fetchVendorProducts(); // Refresh the list
                 } else {
-                    toast.error(data?.message || 'Failed to delete vendor product.');
+                    toast.error(data?.message || 'Failed to move to trash vendor product.');
                 }
                 // The line below is redundant if fetchVendorProducts() is called, as it will refresh the state from the server.
-                // toast.success(`Vendor product with ID: ${productId} deleted successfully (simulated)!`);
+                // toast.success(`Vendor product with ID: ${productId} moved to trash successfully (simulated)!`);
                 // setVendorProducts(vendorProducts.filter(product => product._id !== productId)); // Remove from local state
             } catch (error) {
-                console.error('Error deleting vendor product:', error);
+                console.error('Error moving to trash vendor product:', error);
                 toast.error('Something went wrong while deleting the vendor product (simulated).');
             }
         }
@@ -151,9 +151,7 @@ const VendorProductList = () => {
                                                 startIcon={<DeleteIcon />}
                                                 onClick={() => handleDelete(product._id)}
                                                 className="bg-red-500 hover:bg-red-600"
-                                            >
-                                                Delete
-                                            </Button>
+                                            >Trash</Button>
                                         </TableCell> : null}
                                     </TableRow>
                                 ))

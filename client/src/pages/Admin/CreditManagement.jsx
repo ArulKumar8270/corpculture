@@ -243,7 +243,7 @@ const CreditManagement = () => {
     };
 
     const handleDelete = async (creditId) => {
-        if (!window.confirm('Are you sure you want to delete this credit entry?')) {
+        if (!window.confirm('Are you sure you want to move this credit entry to trash?')) {
             return;
         }
 
@@ -252,7 +252,7 @@ const CreditManagement = () => {
                 `${import.meta.env.VITE_SERVER_URL}/api/v1/credit/delete/${creditId}`,
                 { headers: { Authorization: auth.token } }
             );
-            toast.success('Credit deleted successfully!');
+            toast.success('Credit moved to trash successfully!');
             // Refresh credits list
             const queryParams = new URLSearchParams({
                 page: page + 1,
@@ -270,8 +270,8 @@ const CreditManagement = () => {
                 setTotalCount(data.totalCount || 0);
             }
         } catch (err) {
-            console.error('Error deleting credit:', err);
-            toast.error(err.response?.data?.message || 'Failed to delete credit');
+            console.error('Error moving to trash credit:', err);
+            toast.error(err.response?.data?.message || 'Failed to move to trash credit');
         }
     };
 
@@ -470,9 +470,7 @@ const CreditManagement = () => {
                                                         startIcon={<DeleteIcon />}
                                                         onClick={() => handleDelete(credit._id)}
                                                         color="error"
-                                                    >
-                                                        Delete
-                                                    </Button>
+                                                    >Trash</Button>
                                                 </div>
                                             </TableCell>
                                         </TableRow>

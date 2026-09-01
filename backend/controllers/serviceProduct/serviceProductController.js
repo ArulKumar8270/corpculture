@@ -1,4 +1,5 @@
 import ServiceProduct from "../../models/serviceProductModel.js";
+import { softDeleteById, TRASH_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
 import Company from "../../models/companyModel.js"; // Assuming this path is correct
 import GST from "../../models/gstModel.js"; // Assuming this path is correct
 import Material from "../../models/materialModel.js"; // Import Material model
@@ -203,12 +204,12 @@ export const updateServiceProduct = async (req, res) => {
 export const deleteServiceProduct = async (req, res) => {
     try {
         const { id } = req.params;
-        const deletedServiceProduct = await ServiceProduct.findByIdAndDelete(id);
+        const deletedServiceProduct = await softDeleteById(ServiceProduct, id, req.user?._id);
 
         if (!deletedServiceProduct) {
             return res.status(404).send({ success: false, message: 'Service Product not found for deletion.' });
         }
-        res.status(200).send({ success: true, message: 'Service Product deleted successfully' });
+        res.status(200).send({ success: true, message: TRASH_SUCCESS_MESSAGE });
     } catch (error) {
         console.error("Error in deleteServiceProduct:", error);
         res.status(500).send({ success: false, message: 'Error in deleting service product', error });

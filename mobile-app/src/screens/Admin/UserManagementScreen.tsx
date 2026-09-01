@@ -234,14 +234,14 @@ const UserManagementScreen = () => {
     }
   };
 
-  const handleDeactivate = async (userId: string) => {
+  const handleTrashUser = async (userId: string) => {
     Alert.alert(
-      'Deactivate User',
-      'Are you sure you want to deactivate this user?',
+      'Move User to Trash',
+      'Are you sure you want to move this user account to trash?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Deactivate',
+          text: 'Move to Trash',
           style: 'destructive',
           onPress: async () => {
             try {
@@ -257,14 +257,14 @@ const UserManagementScreen = () => {
               Toast.show({
                 type: 'success',
                 text1: 'Success',
-                text2: 'User deactivated successfully',
+                text2: 'User moved to trash successfully',
               });
               loadUsers();
             } catch (error: any) {
               Toast.show({
                 type: 'error',
                 text1: 'Error',
-                text2: error.response?.data?.message || 'Failed to deactivate user',
+                text2: error.response?.data?.message || 'Failed to move user to trash',
               });
             }
           },
@@ -377,10 +377,10 @@ const UserManagementScreen = () => {
         )}
         <TouchableOpacity
           style={styles.deactivateButton}
-          onPress={() => handleDeactivate(user._id)}
+          onPress={() => handleTrashUser(user._id)}
         >
           <Icon name="block" size={20} color="#FF3B30" />
-          <Text style={styles.deactivateText}>Deactivate</Text>
+          <Text style={styles.deactivateText}>Trash</Text>
         </TouchableOpacity>
       </View>
     </View>

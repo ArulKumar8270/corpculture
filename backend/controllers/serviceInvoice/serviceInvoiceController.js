@@ -1,6 +1,7 @@
 import ServiceInvoice from "../../models/serviceInvoiceModel.js";
 import Company from "../../models/companyModel.js"; // Assuming Company model path
 import ServiceProduct from "../../models/serviceProductModel.js"; // Assuming ServiceProduct model path
+import { softDeleteById, TRASH_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
 import Material from "../../models/materialModel.js"; // Import Material model for reducing units
 import cloudinary from "cloudinary";
 import CommonDetails from "../../models/commonDetailsModel.js";
@@ -834,11 +835,11 @@ export const updateServiceInvoice = async (req, res) => {
 export const deleteServiceInvoice = async (req, res) => {
     try {
         const { id } = req.params;
-        const serviceInvoice = await ServiceInvoice.findByIdAndDelete(id);
+        const serviceInvoice = await softDeleteById(ServiceInvoice, id, req.user?._id);
         if (!serviceInvoice) {
             return res.status(404).send({ success: false, message: 'Service Invoice not found.' });
         }
-        res.status(200).send({ success: true, message: 'Service Invoice deleted successfully' });
+        res.status(200).send({ success: true, message: TRASH_SUCCESS_MESSAGE });
     } catch (error) {
         console.error("Error in deleteServiceInvoice:", error);
         res.status(500).send({ success: false, message: 'Error in deleting service invoice', error });

@@ -333,7 +333,7 @@ const ProfileStack = () => (
     <Stack.Screen name="ProfileMain" component={ProfileScreen} options={{ headerShown: false }} />
     <Stack.Screen name="Address" component={AddressScreen} options={{ title: 'Address' }} />
     <Stack.Screen name="PanCard" component={PanCardScreen} options={{ title: 'PAN Card' }} />
-    <Stack.Screen name="Deactivate" component={DeactivateScreen} options={{ title: 'Deactivate Account' }} />
+    <Stack.Screen name="Deactivate" component={DeactivateScreen} options={{ title: 'Move Account to Trash' }} />
     <Stack.Screen name="Payslips" component={PayslipListScreen} options={{ title: 'My Payslips' }} />
     <Stack.Screen name="PayslipView" component={PayslipViewScreen} options={{ title: 'Payslip' }} />
     <Stack.Screen name="ActivityLogList" component={EmployeeActivityLogListScreen} options={{ title: 'My Petrol Forms' }} />

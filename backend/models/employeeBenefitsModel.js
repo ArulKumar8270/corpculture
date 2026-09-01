@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { softDeletePlugin } from "../plugins/softDeletePlugin.js";
 
 const employeeBenefitsSchema = new mongoose.Schema({
     employeeId: {
@@ -31,4 +32,6 @@ const employeeBenefitsSchema = new mongoose.Schema({
     },
 }, { timestamps: true });
 
+
+employeeBenefitsSchema.plugin(softDeletePlugin);
 export default mongoose.model("EmployeeBenefits", employeeBenefitsSchema);

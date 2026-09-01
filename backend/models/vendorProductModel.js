@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { softDeletePlugin } from "../plugins/softDeletePlugin.js";
 
 const vendorProductSchema = new mongoose.Schema({
     vendorCompanyName: {
@@ -35,4 +36,6 @@ const vendorProductSchema = new mongoose.Schema({
 // Optional: If a product name should be unique per vendor, add a compound index
 // vendorProductSchema.index({ vendorCompanyName: 1, productName: 1 }, { unique: true });
 
+
+vendorProductSchema.plugin(softDeletePlugin);
 export default mongoose.model('VendorProduct', vendorProductSchema);

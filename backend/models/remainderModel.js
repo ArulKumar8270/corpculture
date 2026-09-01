@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { softDeletePlugin } from "../plugins/softDeletePlugin.js";
 
 const remainderSchema = new mongoose.Schema({
     companyId: {
@@ -36,4 +37,6 @@ const remainderSchema = new mongoose.Schema({
     ],
 }, { timestamps: true });
 
+
+remainderSchema.plugin(softDeletePlugin);
 export default mongoose.model('Remainder', remainderSchema);

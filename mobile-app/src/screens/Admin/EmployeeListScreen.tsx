@@ -147,14 +147,14 @@ const EmployeeListScreen = () => {
     (navigation as any).navigate('AddEmployee', { employeeId });
   };
 
-  const handleDeleteEmployee = (employeeId: string) => {
+  const handleTrashEmployee = (employeeId: string) => {
     Alert.alert(
-      'Delete Employee',
-      'Are you sure you want to delete this employee? This action cannot be undone.',
+      'Trash Employee',
+      'Are you sure you want to move this employee to trash? You can restore it from trash later.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Delete',
+          text: 'Trash',
           style: 'destructive',
           onPress: async () => {
             try {
@@ -166,14 +166,14 @@ const EmployeeListScreen = () => {
               Toast.show({
                 type: 'success',
                 text1: 'Success',
-                text2: 'Employee deleted successfully',
+                text2: 'Employee moved to trash successfully',
               });
               fetchEmployees();
             } catch (error: any) {
               Toast.show({
                 type: 'error',
                 text1: 'Error',
-                text2: error.response?.data?.message || 'Failed to delete employee',
+                text2: error.response?.data?.message || 'Failed to move to trash employee',
               });
             } finally {
               setLoading(false);
@@ -306,7 +306,7 @@ const EmployeeListScreen = () => {
             {(isAdmin || hasPermission('reportsEmployeeList', 'delete')) && (
               <TouchableOpacity
                 style={styles.actionButton}
-                onPress={() => handleDeleteEmployee(item._id)}
+                onPress={() => handleTrashEmployee(item._id)}
               >
                 <Icon name="delete" size={20} color="#dc3545" />
               </TouchableOpacity>

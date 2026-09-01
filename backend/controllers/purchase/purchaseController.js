@@ -1,4 +1,5 @@
 import Purchase from "../../models/purchaseModel.js";
+import { softDeleteById, TRASH_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
 import Vendor from "../../models/vendorModel.js"; // Assuming this path is correct
 import GST from "../../models/gstModel.js"; // Assuming this path is correct
 
@@ -595,12 +596,12 @@ export const updatePurchase = async (req, res) => {
 export const deletePurchase = async (req, res) => {
     try {
         const { id } = req.params;
-        const deletedPurchase = await Purchase.findByIdAndDelete(id);
+        const deletedPurchase = await softDeleteById(Purchase, id, req.user?._id);
 
         if (!deletedPurchase) {
             return res.status(404).send({ success: false, message: 'Purchase not found for deletion.' });
         }
-        res.status(200).send({ success: true, message: 'Purchase deleted successfully' });
+        res.status(200).send({ success: true, message: TRASH_SUCCESS_MESSAGE });
     } catch (error) {
         console.error("Error in deletePurchase:", error);
         res.status(500).send({ success: false, message: 'Error in deleting purchase', error });

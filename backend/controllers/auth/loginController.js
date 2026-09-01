@@ -17,9 +17,17 @@ export const loginController = async (req, res) => {
         }
 
         //FINDING THE USER
-        const user = await userModel.findOne({ email });
+        let user = await userModel.findOne({ email });
 
         if (!user) {
+            const trashedUser = await userModel.findOne({ email }, null, { includeDeleted: true });
+            if (trashedUser?.isDeleted) {
+                return res.status(401).send({
+                    success: false,
+                    message: "This account has been moved to trash and cannot be used to log in.",
+                    errorType: "accountTrashed",
+                });
+            }
             return res.status(401).send({
                 success: false,
                 message: "User Not Registered!",

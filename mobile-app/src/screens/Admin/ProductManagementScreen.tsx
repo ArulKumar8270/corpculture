@@ -100,12 +100,12 @@ const ProductManagementScreen = () => {
 
   const handleDelete = async (id: string) => {
     Alert.alert(
-      'Delete Product',
-      'Are you sure you want to delete this product?',
+      'Trash Product',
+      'Are you sure you want to move this product to trash?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Delete',
+          text: 'Trash',
           style: 'destructive',
           onPress: async () => {
             try {
@@ -124,7 +124,7 @@ const ProductManagementScreen = () => {
                 Toast.show({
                   type: 'success',
                   text1: 'Success',
-                  text2: 'Product deleted successfully',
+                  text2: 'Product moved to trash successfully',
                 });
                 updateDeletedProduct(id);
               }
@@ -132,7 +132,7 @@ const ProductManagementScreen = () => {
               Toast.show({
                 type: 'error',
                 text1: 'Error',
-                text2: error.response?.data?.message || 'Failed to delete product',
+                text2: error.response?.data?.message || 'Failed to move to trash product',
               });
             }
           },

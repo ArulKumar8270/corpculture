@@ -1,4 +1,5 @@
 import RentalProduct from "../../models/rentalProductModel.js";
+import { softDeleteById, TRASH_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
 import Company from "../../models/companyModel.js"; // Assuming this path is correct
 import GST from "../../models/gstModel.js"; // Assuming this path is correct
 
@@ -305,12 +306,12 @@ export const updateRentalProduct = async (req, res) => {
 export const deleteRentalProduct = async (req, res) => {
     try {
         const { id } = req.params;
-        const deletedRentalProduct = await RentalProduct.findByIdAndDelete(id);
+        const deletedRentalProduct = await softDeleteById(RentalProduct, id, req.user?._id);
 
         if (!deletedRentalProduct) {
             return res.status(404).send({ success: false, message: 'Rental Product not found for deletion.' });
         }
-        res.status(200).send({ success: true, message: 'Rental Product deleted successfully' });
+        res.status(200).send({ success: true, message: TRASH_SUCCESS_MESSAGE });
     } catch (error) {
         console.error("Error in deleteRentalProduct:", error);
         res.status(500).send({ success: false, message: 'Error in deleting rental product', error });

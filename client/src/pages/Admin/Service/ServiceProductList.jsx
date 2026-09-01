@@ -68,20 +68,20 @@ const ServiceProductList = () => {
     };
 
     const handleDelete = async (productId) => {
-        if (window.confirm('Are you sure you want to delete this product?')) {
+        if (window.confirm('Are you sure you want to move this product to trash?')) {
             try {
                 const { data } = await axios.delete(
                     `${import.meta.env.VITE_SERVER_URL}/api/v1/service-products/${productId}`,
                     { headers: { Authorization: auth?.token } }
                 );
                 if (data?.success) {
-                    toast.success(data.message || 'Product deleted successfully!');
+                    toast.success(data.message || 'Product moved to trash successfully!');
                     fetchServiceProducts(); // Refresh the list
                 } else {
-                    toast.error(data?.message || 'Failed to delete product.');
+                    toast.error(data?.message || 'Failed to move to trash product.');
                 }
             } catch (error) {
-                console.error('Error deleting product:', error);
+                console.error('Error moving to trash product:', error);
                 toast.error('Something went wrong while deleting the product.');
             }
         }
@@ -244,9 +244,7 @@ const ServiceProductList = () => {
                                                         startIcon={<DeleteIcon />}
                                                         onClick={() => handleDelete(product._id)}
                                                         className="bg-red-500 hover:bg-red-600"
-                                                    >
-                                                        Delete
-                                                    </Button>
+                                                    >Trash</Button>
                                                 ) : null}
                                             </TableCell>
                                         ) : null}

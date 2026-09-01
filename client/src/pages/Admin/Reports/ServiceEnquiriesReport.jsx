@@ -119,7 +119,7 @@ const ServiceEnquiriesReport = (props) => {
     };
 
     const handleDelete = async (enquiryId) => {
-        if (window.confirm('Are you sure you want to delete this enquiry?')) {
+        if (window.confirm('Are you sure you want to move this enquiry to trash?')) {
             try {
                 const response = await axios.delete(`${import.meta.env.VITE_SERVER_URL}/api/v1/service/${enquiryId}`, {
                     headers: { Authorization: auth?.token }
@@ -136,10 +136,10 @@ const ServiceEnquiriesReport = (props) => {
                         rowsPerPage
                     );
                 } else {
-                    toast.error(response.data.message || 'Failed to delete enquiry.');
+                    toast.error(response.data.message || 'Failed to move to trash enquiry.');
                 }
             } catch (err) {
-                console.error('Error deleting enquiry:', err);
+                console.error('Error moving to trash enquiry:', err);
                 toast.error(err.response?.data?.message || 'Something went wrong while deleting enquiry.');
             }
         }

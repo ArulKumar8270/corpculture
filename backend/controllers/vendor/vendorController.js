@@ -1,4 +1,5 @@
 import Vendor from "../../models/vendorModel.js";
+import { softDeleteById, TRASH_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
 
 // Create Vendor
 export const createVendor = async (req, res) => {
@@ -180,12 +181,12 @@ export const updateVendor = async (req, res) => {
 export const deleteVendor = async (req, res) => {
     try {
         const { id } = req.params;
-        const deletedVendor = await Vendor.findByIdAndDelete(id);
+        const deletedVendor = await softDeleteById(Vendor, id, req.user?._id);
 
         if (!deletedVendor) {
             return res.status(404).send({ success: false, message: 'Vendor not found for deletion.' });
         }
-        res.status(200).send({ success: true, message: 'Vendor deleted successfully' });
+        res.status(200).send({ success: true, message: TRASH_SUCCESS_MESSAGE });
     } catch (error) {
         console.error("Error in deleteVendor:", error);
         res.status(500).send({ success: false, message: 'Error in deleting vendor', error });

@@ -154,12 +154,12 @@ const CategoryManagementScreen = () => {
 
   const handleDelete = async (id: string) => {
     Alert.alert(
-      'Delete Category',
-      'Are you sure you want to delete this category?',
+      'Trash Category',
+      'Are you sure you want to move this category to trash?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Delete',
+          text: 'Trash',
           style: 'destructive',
           onPress: async () => {
             try {
@@ -167,14 +167,14 @@ const CategoryManagementScreen = () => {
               Toast.show({
                 type: 'success',
                 text1: 'Success',
-                text2: 'Category deleted successfully',
+                text2: 'Category moved to trash successfully',
               });
               loadCategories();
             } catch (error: any) {
               Toast.show({
                 type: 'error',
                 text1: 'Error',
-                text2: error.response?.data?.message || 'Failed to delete category',
+                text2: error.response?.data?.message || 'Failed to move to trash category',
               });
             }
           },

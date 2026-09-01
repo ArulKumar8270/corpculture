@@ -1,4 +1,5 @@
 import commissionModel from "../../models/commissionModel.js";
+import { softDeleteById, TRASH_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
 
 const buildCommissionSummary = (commissions = []) => {
     const totalEarned = commissions.reduce(
@@ -198,11 +199,11 @@ export const deleteCommission = async (req, res) => {
             });
         }
 
-        await commissionModel.findByIdAndDelete(commissionId);
+        await softDeleteById(commissionModel, commissionId, req.user?._id);
 
         res.status(200).send({
             success: true,
-            message: "Commission deleted successfully"
+            message: TRASH_SUCCESS_MESSAGE
         });
     } catch (error) {
         console.error("Error in deleting commission:", error);

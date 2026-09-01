@@ -1,4 +1,5 @@
 import Category from "../../models/categoryModel.js";
+import { softDeleteById, TRASH_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
 // Create Category
 export const createCategory = async (req, res) => {
     try {
@@ -62,16 +63,16 @@ export const updateCategory = async (req, res) => {
     }
 };
 
-// Delete Category
+// Trash Category (soft delete)
 export const deleteCategory = async (req, res) => {
     try {
-        const category = await Category.findByIdAndDelete(req.params.id);
+        const category = await softDeleteById(Category, req.params.id, req.user?._id);
         if (!category) {
             return res.status(404).send({ success: false, message: 'Category not found' });
         }
-        res.status(200).send({ success: true, message: 'Category deleted successfully' });
+        res.status(200).send({ success: true, message: TRASH_SUCCESS_MESSAGE });
     } catch (error) {
         console.error(error);
-        res.status(500).send({ success: false, message: 'Error in deleting category', error });
+        res.status(500).send({ success: false, message: 'Error in moving category to trash', error });
     }
 };

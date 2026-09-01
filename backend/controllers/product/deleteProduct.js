@@ -1,13 +1,12 @@
 import productModel from "../../models/productModel.js";
 import userModel from "../../models/userModel.js";
-import orderModel from "../../models/orderModel.js"; // Assuming you have an order model
+import { softDeleteById, TRASH_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
 
 const deleteProduct = async (req, res) => {
     try {
         const { productId } = req.body;
 
-        // Step 1: Delete the product from the product model
-        const response = await productModel.findByIdAndDelete(productId);
+        const response = await softDeleteById(productModel, productId, req.user?._id);
 
         if (!response) {
             return res.status(401).send({
@@ -17,29 +16,21 @@ const deleteProduct = async (req, res) => {
             });
         }
 
-        // Step 2: Remove the product from all users' wishlists
+        // Remove the product from all users' wishlists (no longer available)
         await userModel.updateMany(
-            { wishlist: productId }, // Find users with this product in their wishlist
-            { $pull: { wishlist: productId } } // Pull the product out of the wishlist array
+            { wishlist: productId },
+            { $pull: { wishlist: productId } }
         );
 
-        // Step 3: Remove the product from order history (if applicable)
-        await orderModel.updateMany(
-            { "products.productId": productId }, // Find orders containing this product
-            { $pull: { products: { productId } } } // Pull the product from the products array
-        );
-
-        // Step 4: Send success response
         res.status(201).send({
             success: true,
-            message:
-                "Product Deleted Successfully and removed from wishlists and order history",
+            message: TRASH_SUCCESS_MESSAGE,
         });
     } catch (error) {
         console.log("New Product Error: " + error);
         res.status(500).send({
             success: false,
-            message: "Error in Deleting Product",
+            message: "Error in moving product to trash",
             error,
         });
     }

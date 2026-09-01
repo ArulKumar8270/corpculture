@@ -293,19 +293,19 @@ const EmployeeLeaveForm = () => {
         }
     };
 
-    const handleDelete = async (id) => {
-        if (!window.confirm("Delete this leave application?")) return;
+    const handleTrash = async (id) => {
+        if (!window.confirm("Move this leave application to trash?")) return;
         try {
             const { data } = await axios.delete(
                 `${import.meta.env.VITE_SERVER_URL}/api/v1/employee-leave/delete/${id}`,
                 { headers: { Authorization: auth?.token } }
             );
             if (data?.success) {
-                toast.success("Leave application deleted.");
+                toast.success("Leave application moved to trash.");
                 fetchMyLeaves();
-            } else toast.error(data?.message || "Delete failed.");
+            } else toast.error(data?.message || "Failed to move to trash.");
         } catch (err) {
-            toast.error(err.response?.data?.message || "Delete failed.");
+            toast.error(err.response?.data?.message || "Failed to move to trash.");
         }
     };
 
@@ -606,7 +606,7 @@ const EmployeeLeaveForm = () => {
                                                     <IconButton size="small" onClick={() => handleEditClick(row)}>
                                                         <EditIcon fontSize="small" />
                                                     </IconButton>
-                                                    <IconButton size="small" onClick={() => handleDelete(row._id)}>
+                                                    <IconButton size="small" onClick={() => handleTrash(row._id)} aria-label="trash leave">
                                                         <DeleteIcon fontSize="small" />
                                                     </IconButton>
                                                 </>

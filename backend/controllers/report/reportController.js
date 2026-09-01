@@ -1,6 +1,7 @@
 import Report from "../../models/reportModel.js";
 import Company from "../../models/companyModel.js"; // Assuming Company model path
 import Employee from "../../models/employeeModel.js";
+import { softDeleteById, TRASH_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
 import Counter from "../../models/counterModel.js";
 import mongoose from "mongoose";
 import { normalizeSendDetailsTo } from "../../utils/normalizeSendDetailsTo.js";
@@ -608,12 +609,12 @@ export const updateReport = async (req, res) => {
 export const deleteReport = async (req, res) => {
     try {
         const { id } = req.params;
-        const deletedReport = await Report.findByIdAndDelete(id);
+        const deletedReport = await softDeleteById(Report, id, req.user?._id);
 
         if (!deletedReport) {
             return res.status(404).send({ success: false, message: 'Report not found.' });
         }
-        res.status(200).send({ success: true, message: 'Report deleted successfully' });
+        res.status(200).send({ success: true, message: TRASH_SUCCESS_MESSAGE });
     } catch (error) {
         console.error("Error in deleteReport:", error);
         res.status(500).send({ success: false, message: 'Error in deleting report', error });

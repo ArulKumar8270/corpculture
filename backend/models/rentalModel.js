@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { softDeletePlugin } from "../plugins/softDeletePlugin.js";
 
 const rentalSchema = new mongoose.Schema({
     customerType: {
@@ -79,4 +80,6 @@ const rentalSchema = new mongoose.Schema({
     }
 });
 
+
+rentalSchema.plugin(softDeletePlugin);
 export default mongoose.model("Rental", rentalSchema);

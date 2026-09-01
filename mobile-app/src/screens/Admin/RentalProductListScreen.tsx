@@ -110,12 +110,12 @@ const RentalProductListScreen = () => {
 
   const handleDelete = async (productId: string) => {
     Alert.alert(
-      'Delete Rental Product',
-      'Are you sure you want to delete this rental product?',
+      'Trash Rental Product',
+      'Are you sure you want to move this rental product to trash?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Delete',
+          text: 'Trash',
           style: 'destructive',
           onPress: async () => {
             try {
@@ -131,21 +131,21 @@ const RentalProductListScreen = () => {
                 Toast.show({
                   type: 'success',
                   text1: 'Success',
-                  text2: data.message || 'Rental product deleted successfully!',
+                  text2: data.message || 'Rental product moved to trash successfully!',
                 });
                 fetchRentalProducts();
               } else {
                 Toast.show({
                   type: 'error',
                   text1: 'Error',
-                  text2: data?.message || 'Failed to delete rental product',
+                  text2: data?.message || 'Failed to move to trash rental product',
                 });
               }
             } catch (error: any) {
               Toast.show({
                 type: 'error',
                 text1: 'Error',
-                text2: error.response?.data?.message || 'Failed to delete rental product',
+                text2: error.response?.data?.message || 'Failed to move to trash rental product',
               });
             }
           },

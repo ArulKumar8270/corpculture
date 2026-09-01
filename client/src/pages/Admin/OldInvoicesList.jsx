@@ -275,8 +275,8 @@ function OldInvoicesList() {
         }
     };
 
-    const handleDeleteInvoice = async (invoiceId) => {
-        if (!window.confirm('Are you sure you want to delete this invoice?')) {
+    const handleTrashInvoice = async (invoiceId) => {
+        if (!window.confirm('Are you sure you want to move this invoice to trash?')) {
             return;
         }
 
@@ -291,14 +291,14 @@ function OldInvoicesList() {
             );
 
             if (response.data?.success) {
-                toast.success('Invoice deleted successfully');
+                toast.success('Invoice moved to trash successfully');
                 fetchOldInvoices();
             } else {
-                toast.error(response.data?.message || 'Failed to delete invoice');
+                toast.error(response.data?.message || 'Failed to move to trash invoice');
             }
         } catch (error) {
-            console.error("Error deleting invoice:", error);
-            toast.error('Error deleting invoice');
+            console.error("Error moving to trash invoice:", error);
+            toast.error('Error moving to trash invoice');
         }
     };
 
@@ -512,9 +512,9 @@ function OldInvoicesList() {
                                             </IconButton>
                                             <IconButton
                                                 size="small"
-                                                onClick={() => handleDeleteInvoice(invoice._id)}
+                                                onClick={() => handleTrashInvoice(invoice._id)}
                                                 color="error"
-                                                title="Delete"
+                                                title="Trash"
                                             >
                                                 <DeleteIcon />
                                             </IconButton>

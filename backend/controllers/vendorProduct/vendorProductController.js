@@ -1,4 +1,5 @@
 import VendorProduct from "../../models/vendorProductModel.js";
+import { softDeleteById, TRASH_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
 import Vendor from "../../models/vendorModel.js"; // Assuming this path is correct
 import GST from "../../models/gstModel.js"; // Assuming this path is correct
 
@@ -142,12 +143,12 @@ export const updateVendorProduct = async (req, res) => {
 export const deleteVendorProduct = async (req, res) => {
     try {
         const { id } = req.params;
-        const deletedVendorProduct = await VendorProduct.findByIdAndDelete(id);
+        const deletedVendorProduct = await softDeleteById(VendorProduct, id, req.user?._id);
 
         if (!deletedVendorProduct) {
             return res.status(404).send({ success: false, message: 'Vendor Product not found for deletion.' });
         }
-        res.status(200).send({ success: true, message: 'Vendor Product deleted successfully' });
+        res.status(200).send({ success: true, message: TRASH_SUCCESS_MESSAGE });
     } catch (error) {
         console.error("Error in deleteVendorProduct:", error);
         res.status(500).send({ success: false, message: 'Error in deleting vendor product', error });

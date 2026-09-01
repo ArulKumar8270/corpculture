@@ -1,4 +1,5 @@
 import Permission from "../../models/permissionModel.js";
+import { softDeleteOne, TRASH_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
 
 // Create a new Permission entry
 export const createPermission = async (req, res) => {
@@ -90,12 +91,12 @@ export const updatePermission = async (req, res) => {
 export const deletePermission = async (req, res) => {
   try {
     const { key } = req.params;
-    const deletedPermission = await Permission.findOneAndDelete({ key });
+    const deletedPermission = await softDeleteOne(Permission, { key }, req.user?._id);
 
     if (!deletedPermission) {
       return res.status(404).send({ success: false, message: 'Permission entry not found for deletion.' });
     }
-    res.status(200).send({ success: true, message: 'Permission entry deleted successfully.' });
+    res.status(200).send({ success: true, message: TRASH_SUCCESS_MESSAGE });
   } catch (error) {
     console.error("Error in deletePermission:", error);
     res.status(500).send({ success: false, message: 'Error deleting permission entry.', error });

@@ -73,8 +73,8 @@ const AdminEmployees = () => {
     navigate(`../addEmployee/${employeeId}`);
   };
 
-  const handleDeleteEmployee = async (employeeId) => {
-    if (window.confirm("Are you sure you want to delete this employee? This action cannot be undone.")) {
+  const handleTrashEmployee = async (employeeId) => {
+    if (window.confirm("Are you sure you want to move this employee to trash? You can restore it from trash later.")) {
       try {
         setLoading(true);
         const response = await axios.delete(
@@ -86,12 +86,12 @@ const AdminEmployees = () => {
           }
         );
         if (response.status === 200) {
-          toast.success("Employee deleted successfully!");
+          toast.success("Employee moved to trash successfully!");
           fetchEmployees();
         }
       } catch (error) {
-        console.error("Error deleting employee:", error);
-        toast.error(error.response?.data?.message || "Failed to delete employee. Please try again.");
+        console.error("Error moving to trash employee:", error);
+        toast.error(error.response?.data?.message || "Failed to move to trash employee. Please try again.");
       } finally {
         setLoading(false);
       }
@@ -271,9 +271,9 @@ const AdminEmployees = () => {
                       )}
                       {hasPermission("reportsEmployeeList", "delete") && (
                         <IconButton
-                          onClick={() => handleDeleteEmployee(employee._id)}
+                          onClick={() => handleTrashEmployee(employee._id)}
                           color="error"
-                          aria-label="delete employee"
+                          aria-label="trash employee"
                         >
                           <DeleteIcon />
                         </IconButton>

@@ -517,7 +517,7 @@ const ServiceInvoicesReport = (props) => {
     };
 
     const handleDelete = async (invoiceId) => {
-        if (window.confirm('Are you sure you want to delete this invoice?')) {
+        if (window.confirm('Are you sure you want to move this invoice to trash?')) {
             try {
                 const response = await axios.delete(`${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/${invoiceId}`, {
                     headers: { Authorization: auth?.token }
@@ -527,10 +527,10 @@ const ServiceInvoicesReport = (props) => {
                     // Refresh with current filters and pagination
                     fetchServiceInvoices(fromDate, toDate, companyNameFilter, invoiceNumberFilter, paymentStatusFilter, page, rowsPerPage);
                 } else {
-                    toast.error(response.data.message || 'Failed to delete invoice.');
+                    toast.error(response.data.message || 'Failed to move to trash invoice.');
                 }
             } catch (err) {
-                console.error('Error deleting invoice:', err);
+                console.error('Error moving to trash invoice:', err);
                 toast.error(err.response?.data?.message || 'Something went wrong while deleting invoice.');
             }
         }

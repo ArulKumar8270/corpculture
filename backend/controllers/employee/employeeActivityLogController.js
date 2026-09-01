@@ -2,6 +2,7 @@ import EmployeeActivityLog from "../../models/employeeActivityLogModel.js";
 import Company from "../../models/companyModel.js";
 import Employee from "../../models/employeeModel.js";
 import CommonDetails from "../../models/commonDetailsModel.js";
+import { softDeleteOne, TRASH_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
 
 async function computePetrolAmount(km) {
     const n = Number(km);
@@ -401,21 +402,21 @@ export const deleteActivityLogController = async (req, res) => {
             });
         }
 
-        const activityLog = await EmployeeActivityLog.findOneAndDelete({
+        const activityLog = await softDeleteOne(EmployeeActivityLog, {
             _id: id,
             employeeId: employee._id,
-        });
+        }, req.user?._id);
 
         if (!activityLog) {
             return res.status(404).send({
                 success: false,
-                message: "Activity log not found or you don't have permission to delete it",
+                message: "Activity log not found or you don't have permission to trash it",
             });
         }
 
         res.status(200).send({
             success: true,
-            message: "Activity log deleted successfully",
+            message: TRASH_SUCCESS_MESSAGE,
         });
     } catch (error) {
         console.error("Error deleting activity log:", error);

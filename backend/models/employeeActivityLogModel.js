@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { softDeletePlugin } from "../plugins/softDeletePlugin.js";
 
 const employeeActivityLogSchema = new mongoose.Schema(
     {
@@ -97,5 +98,7 @@ const employeeActivityLogSchema = new mongoose.Schema(
     { timestamps: true }
 );
 
+
+employeeActivityLogSchema.plugin(softDeletePlugin);
 export default mongoose.model("EmployeeActivityLog", employeeActivityLogSchema);
 

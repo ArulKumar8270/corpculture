@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { softDeletePlugin } from "../plugins/softDeletePlugin.js";
 
 const commissionSchema = new mongoose.Schema({
     commissionFrom: {
@@ -56,4 +57,6 @@ const commissionSchema = new mongoose.Schema({
     }
 });
 
+
+commissionSchema.plugin(softDeletePlugin);
 export default mongoose.model("Commission", commissionSchema);

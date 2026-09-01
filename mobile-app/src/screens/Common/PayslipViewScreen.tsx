@@ -92,10 +92,10 @@ const PayslipViewScreen = () => {
     const auth = cleanAuthHeader(token);
     if (!auth) return;
     const label = (payslip.employeeName || payslip.employeeId?.name || 'this payslip').toString();
-    Alert.alert('Delete payslip', `Remove payslip for ${label}?`, [
+    Alert.alert('Move to trash', `Move payslip for ${label} to trash?`, [
       { text: 'Cancel', style: 'cancel' },
       {
-        text: 'Delete',
+        text: 'Trash',
         style: 'destructive',
         onPress: async () => {
           const base = String(getApiBaseUrl() || '').replace(/\/$/, '');
@@ -104,15 +104,15 @@ const PayslipViewScreen = () => {
               headers: { Authorization: auth },
             });
             if (data?.success) {
-              Toast.show({ type: 'success', text1: 'Payslip deleted' });
+              Toast.show({ type: 'success', text1: 'Payslip moved to trash' });
               navigation.goBack();
             } else {
-              Toast.show({ type: 'error', text1: data?.message || 'Delete failed' });
+              Toast.show({ type: 'error', text1: data?.message || 'Failed to move to trash' });
             }
           } catch (e: any) {
             Toast.show({
               type: 'error',
-              text1: e?.response?.data?.message || 'Delete failed',
+              text1: e?.response?.data?.message || 'Failed to move to trash',
             });
           }
         },
@@ -203,7 +203,7 @@ const PayslipViewScreen = () => {
           </TouchableOpacity>
           <TouchableOpacity style={styles.deleteBtn} onPress={confirmDelete} activeOpacity={0.85}>
             <Icon name="delete-outline" size={20} color="#fff" />
-            <Text style={styles.deleteBtnText}>Delete</Text>
+            <Text style={styles.deleteBtnText}>Trash</Text>
           </TouchableOpacity>
         </View>
       ) : null}

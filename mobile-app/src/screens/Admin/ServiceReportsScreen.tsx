@@ -162,12 +162,12 @@ const ServiceReportsScreen = () => {
 
   const handleDelete = async (reportId: string) => {
     Alert.alert(
-      'Confirm Delete',
-      'Are you sure you want to delete this report?',
+      'Confirm Trash',
+      'Are you sure you want to move this report to trash?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Delete',
+          text: 'Trash',
           style: 'destructive',
           onPress: async () => {
             try {
@@ -184,21 +184,21 @@ const ServiceReportsScreen = () => {
                 Toast.show({
                   type: 'success',
                   text1: 'Success',
-                  text2: response.data.message || 'Report deleted successfully!',
+                  text2: response.data.message || 'Report moved to trash successfully!',
                 });
                 fetchReports();
               } else {
                 Toast.show({
                   type: 'error',
                   text1: 'Error',
-                  text2: response.data?.message || 'Failed to delete report',
+                  text2: response.data?.message || 'Failed to move to trash report',
                 });
               }
             } catch (error: any) {
               Toast.show({
                 type: 'error',
                 text1: 'Error',
-                text2: error.response?.data?.message || 'Failed to delete report',
+                text2: error.response?.data?.message || 'Failed to move to trash report',
               });
             }
           },
@@ -463,7 +463,7 @@ const ServiceReportsScreen = () => {
                 onPress={() => handleDelete(item._id)}
               >
                 <Icon name="delete" size={18} color="#FF3B30" />
-                <Text style={[styles.actionButtonText, styles.deleteButtonText]}>Delete</Text>
+                <Text style={[styles.actionButtonText, styles.deleteButtonText]}>Trash</Text>
               </TouchableOpacity>
             </>
           )}

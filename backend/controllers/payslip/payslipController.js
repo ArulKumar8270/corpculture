@@ -1,5 +1,6 @@
 import Payslip from "../../models/payslipModel.js";
 import Employee from "../../models/employeeModel.js";
+import { softDeleteById, TRASH_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
 
 function buildPayslipFieldsFromBody(body, employee) {
     const earnings = body.earnings && typeof body.earnings === "object" ? body.earnings : {};
@@ -116,8 +117,8 @@ export const deletePayslipController = async (req, res) => {
         if (!may) {
             return res.status(403).send({ success: false, message: "Not allowed to delete this payslip" });
         }
-        await Payslip.deleteOne({ _id: payslip._id });
-        res.status(200).send({ success: true, message: "Payslip deleted" });
+        await softDeleteById(Payslip, payslip._id, req.user?._id);
+        res.status(200).send({ success: true, message: TRASH_SUCCESS_MESSAGE });
     } catch (error) {
         console.error("Delete payslip error:", error);
         res.status(500).send({ success: false, message: "Error deleting payslip", error });

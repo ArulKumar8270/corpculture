@@ -4,6 +4,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 import OldInvoice from "../../models/oldInvoiceModel.js";
+import { softDeleteById, TRASH_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -854,7 +855,7 @@ export const updateOldInvoice = async (req, res) => {
  */
 export const deleteOldInvoice = async (req, res) => {
     try {
-        const invoice = await OldInvoice.findByIdAndDelete(req.params.id);
+        const invoice = await softDeleteById(OldInvoice, req.params.id, req.user?._id);
 
         if (!invoice) {
             return res.status(404).send({
@@ -865,7 +866,7 @@ export const deleteOldInvoice = async (req, res) => {
 
         res.status(200).send({
             success: true,
-            message: "Old invoice deleted successfully"
+            message: TRASH_SUCCESS_MESSAGE
         });
 
     } catch (error) {
@@ -883,12 +884,15 @@ export const deleteOldInvoice = async (req, res) => {
  */
 export const deleteAllOldInvoices = async (req, res) => {
     try {
-        const result = await OldInvoice.deleteMany({});
+        const result = await OldInvoice.updateMany(
+            { isDeleted: { $ne: true } },
+            { isDeleted: true, deletedAt: new Date(), deletedBy: req.user?._id }
+        );
 
         res.status(200).send({
             success: true,
-            message: `Deleted ${result.deletedCount} old invoices`,
-            deletedCount: result.deletedCount
+            message: `Moved ${result.modifiedCount} old invoices to trash`,
+            deletedCount: result.modifiedCount
         });
 
     } catch (error) {

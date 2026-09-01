@@ -1,6 +1,7 @@
 import ServiceModel from "../../models/serviceModel.js";
 import { resolveNotificationUserId } from "../../utils/resolveNotificationUserId.js";
 import { notifyAssignment } from "../../utils/expoPushNotification.js";
+import { softDeleteById, TRASH_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
 import { resolveEnquiryPincode, attachEnquiryPincodes } from "../../utils/resolveEnquiryPincode.js";
 import { tryAutoAssignNewServiceEnquiry } from "../../utils/tryAutoAssignNewEnquiry.js";
 
@@ -201,11 +202,11 @@ export const deleteService = async (req, res) => {
             });
         }
 
-        await ServiceModel.findByIdAndDelete(serviceId);
+        await softDeleteById(ServiceModel, serviceId, req.user?._id);
 
         res.status(200).send({
             success: true,
-            message: "Service deleted successfully"
+            message: TRASH_SUCCESS_MESSAGE
         });
     } catch (error) {
         console.error("Error in deleting service:", error);

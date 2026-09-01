@@ -1,6 +1,7 @@
 import ServiceQuotation from "../../models/serviceQuotationModel.js";
 import Company from "../../models/companyModel.js"; // Assuming Company model path
 import ServiceProduct from "../../models/serviceProductModel.js";
+import { softDeleteById, TRASH_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
 
 // Helper function to calculate totals
 const calculateQuotationTotals = (products) => {
@@ -324,13 +325,13 @@ export const updateServiceQuotation = async (req, res) => {
 export const deleteServiceQuotation = async (req, res) => {
     try {
         const { id } = req.params;
-        const serviceQuotation = await ServiceQuotation.findByIdAndDelete(id);
+        const serviceQuotation = await softDeleteById(ServiceQuotation, id, req.user?._id);
 
         if (!serviceQuotation) {
             return res.status(404).send({ success: false, message: 'Service Quotation not found.' });
         }
 
-        res.status(200).send({ success: true, message: 'Service Quotation deleted successfully' });
+        res.status(200).send({ success: true, message: TRASH_SUCCESS_MESSAGE });
     } catch (error) {
         console.error("Error in deleteServiceQuotation:", error);
         res.status(500).send({ success: false, message: 'Error in deleting service Quotation', error });

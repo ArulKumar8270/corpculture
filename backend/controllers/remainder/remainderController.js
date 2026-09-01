@@ -1,6 +1,7 @@
 import Remainder from "../../models/remainderModel.js";
 import Company from "../../models/companyModel.js"; // Assuming you have a Company model
 import ServiceInvoice from "../../models/serviceInvoiceModel.js"; // Import ServiceInvoice model
+import { softDeleteById, TRASH_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
 import RentalPaymentEntry from "../../models/rentalPaymentEntryModel.js"; // Import RentalPaymentEntry model
 
 const IST = "Asia/Kolkata";
@@ -228,13 +229,13 @@ export const updateRemainder = async (req, res) => {
 export const deleteRemainder = async (req, res) => {
     try {
         const { id } = req.params;
-        const remainder = await Remainder.findByIdAndDelete(id);
+        const remainder = await softDeleteById(Remainder, id, req.user?._id);
 
         if (!remainder) {
             return res.status(404).send({ success: false, message: 'Remainder not found.' });
         }
 
-        res.status(200).send({ success: true, message: 'Remainder deleted successfully' });
+        res.status(200).send({ success: true, message: TRASH_SUCCESS_MESSAGE });
 
     } catch (error) {
         console.error("Error in deleteRemainder:", error);

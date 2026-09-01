@@ -37,7 +37,7 @@ const Actions = ({ id, name, updateDeletedProduct }) => {
                 }
             );
             if (res.status === 201) {
-                toast.success("Product Deleted Successfully!");
+                toast.success("Product moved to trash successfully!");
                 // After a successful deletion, update the products state
                 updateDeletedProduct(id);
             }
@@ -75,15 +75,15 @@ const Actions = ({ id, name, updateDeletedProduct }) => {
                 aria-labelledby="alert-dialog-title"
             >
                 <DialogTitle id="alert-dialog-title">
-                    {"Are you sure?"}
+                    {"Move to trash?"}
                 </DialogTitle>
                 <DialogContent>
                     <p className="text-gray-500">
-                        Do you really want to delete
+                        Do you really want to move
                         {name && (
                             <span className="font-medium">&nbsp;{name}</span>
                         )}
-                        ?
+                        &nbsp;to trash?
                     </p>
                 </DialogContent>
                 <DialogActions>
@@ -96,9 +96,7 @@ const Actions = ({ id, name, updateDeletedProduct }) => {
                     <button
                         onClick={() => deleteHandler(id)}
                         className="py-2 px-6 ml-4 rounded bg-red-600 hover:bg-red-700 text-white shadow"
-                    >
-                        Delete
-                    </button>
+                    >Trash</button>
                 </DialogActions>
             </Dialog>
         </>

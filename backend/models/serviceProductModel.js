@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { softDeletePlugin } from "../plugins/softDeletePlugin.js";
 
 const serviceProductSchema = new mongoose.Schema({
     company: {
@@ -53,5 +54,7 @@ const serviceProductSchema = new mongoose.Schema({
         min: 0,
     },
 }, { timestamps: true });
+
+serviceProductSchema.plugin(softDeletePlugin);
 
 export default mongoose.model('ServiceProduct', serviceProductSchema);

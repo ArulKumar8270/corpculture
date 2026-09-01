@@ -76,17 +76,17 @@ const PurchaseList = () => {
     };
 
     const handleDelete = async (id) => {
-        if (window.confirm('Are you sure you want to delete this purchase record?')) {
+        if (window.confirm('Are you sure you want to move this purchase record to trash?')) {
             try {
                 const { data } = await axios.delete(`${import.meta.env.VITE_SERVER_URL}/api/v1/purchases/${id}`);
                 if (data?.success) {
-                    toast.success(data?.message || 'Purchase deleted successfully.');
+                    toast.success(data?.message || 'Purchase moved to trash successfully.');
                     fetchPurchases(); // Refresh the list
                 } else {
-                    toast.error(data?.message || 'Failed to delete purchase.');
+                    toast.error(data?.message || 'Failed to move to trash purchase.');
                 }
             } catch (error) {
-                console.error('Error deleting purchase:', error);
+                console.error('Error moving to trash purchase:', error);
                 toast.error('Something went wrong while deleting purchase.');
             }
         }

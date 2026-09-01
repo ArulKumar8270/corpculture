@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { softDeletePlugin } from "../plugins/softDeletePlugin.js";
 
 const employeeSchema = new mongoose.Schema(
     {
@@ -99,4 +100,6 @@ const employeeSchema = new mongoose.Schema(
     { timestamps: true } // Adds createdAt and updatedAt timestamps
 );
 
+
+employeeSchema.plugin(softDeletePlugin);
 export default mongoose.model("Employee", employeeSchema);

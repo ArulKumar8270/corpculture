@@ -1,5 +1,6 @@
 import Employee from "../../models/employeeModel.js";
 import bcrypt from "bcryptjs"; // Assuming you use bcrypt for password hashing
+import { softDeleteById, TRASH_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
 
 // Create a new employee
 export const createEmployeeController = async (req, res) => {
@@ -221,7 +222,7 @@ export const deleteEmployeeController = async (req, res) => {
     try {
         const employeeId = req.params.id;
 
-        const employee = await Employee.findByIdAndDelete(employeeId);
+        const employee = await softDeleteById(Employee, employeeId, req.user?._id);
 
         if (!employee) {
             return res.status(404).send({
@@ -232,7 +233,7 @@ export const deleteEmployeeController = async (req, res) => {
 
         res.status(200).send({
             success: true,
-            message: "Employee deleted successfully",
+            message: TRASH_SUCCESS_MESSAGE,
         });
 
     } catch (error) {

@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { softDeletePlugin } from "../plugins/softDeletePlugin.js";
 
 const serviceSchema = new mongoose.Schema({
     customerType: {
@@ -78,4 +79,6 @@ const serviceSchema = new mongoose.Schema({
     }
 });
 
+
+serviceSchema.plugin(softDeletePlugin);
 export default mongoose.model("Service", serviceSchema);

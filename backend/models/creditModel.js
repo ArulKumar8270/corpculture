@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { softDeletePlugin } from "../plugins/softDeletePlugin.js";
 
 const creditSchema = new mongoose.Schema({
     companyId: {
@@ -35,4 +36,6 @@ const creditSchema = new mongoose.Schema({
 creditSchema.index({ companyId: 1 });
 creditSchema.index({ createdAt: -1 });
 
+
+creditSchema.plugin(softDeletePlugin);
 export default mongoose.model("Credit", creditSchema);

@@ -78,11 +78,11 @@ const VendorProductListScreen = () => {
   const handleDelete = async (productId: string) => {
     Alert.alert(
       'Delete Vendor Product',
-      'Are you sure you want to delete this vendor product?',
+      'Are you sure you want to move this vendor product to trash?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Delete',
+          text: 'Trash',
           style: 'destructive',
           onPress: async () => {
             try {
@@ -96,18 +96,18 @@ const VendorProductListScreen = () => {
                 Toast.show({
                   type: 'success',
                   text1: 'Success',
-                  text2: response.data.message || 'Vendor product deleted successfully!',
+                  text2: response.data.message || 'Vendor product moved to trash successfully!',
                 });
                 fetchVendorProducts();
               } else {
                 Toast.show({
                   type: 'error',
                   text1: 'Error',
-                  text2: response.data?.message || 'Failed to delete vendor product.',
+                  text2: response.data?.message || 'Failed to move to trash vendor product.',
                 });
               }
             } catch (error: any) {
-              console.error('Error deleting vendor product:', error);
+              console.error('Error moving to trash vendor product:', error);
               Toast.show({
                 type: 'error',
                 text1: 'Error',
@@ -180,7 +180,7 @@ const VendorProductListScreen = () => {
               onPress={() => handleDelete(item._id)}
             >
               <Icon name="delete" size={18} color="#fff" />
-              <Text style={styles.actionButtonText}>Delete</Text>
+              <Text style={styles.actionButtonText}>Trash</Text>
             </TouchableOpacity>
           </View>
         )}

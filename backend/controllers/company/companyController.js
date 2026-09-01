@@ -2,6 +2,7 @@ import companyModel from "../../models/companyModel.js";
 import ServiceInvoice from "../../models/serviceInvoiceModel.js"; // Import ServiceInvoice model
 import Report from "../../models/reportModel.js"; // Import Report model
 import RentalPaymentEntry from "../../models/rentalPaymentEntryModel.js"; // Import RentalPaymentEntry model
+import { softDeleteById, TRASH_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
 
 const sanitizeCompanyPayload = (body = {}) => {
     const payload = { ...body };
@@ -239,11 +240,11 @@ export const deleteCompany = async (req, res) => {
             });
         }
 
-        await companyModel.findByIdAndDelete(companyId);
+        await softDeleteById(companyModel, companyId, req.user?._id);
 
         res.status(200).send({
             success: true,
-            message: "company deleted successfully"
+            message: TRASH_SUCCESS_MESSAGE
         });
     } catch (error) {
         console.error("Error in deleting company:", error);

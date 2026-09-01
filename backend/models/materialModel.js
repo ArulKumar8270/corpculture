@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { softDeletePlugin } from '../plugins/softDeletePlugin.js';
 
 const materialSchema = new mongoose.Schema({
     name: {
@@ -29,4 +30,6 @@ const materialSchema = new mongoose.Schema({
     }
 }, { timestamps: true });
 
+
+materialSchema.plugin(softDeletePlugin);
 export default mongoose.model('Material', materialSchema);

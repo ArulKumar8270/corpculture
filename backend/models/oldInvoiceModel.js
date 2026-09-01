@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { softDeletePlugin } from "../plugins/softDeletePlugin.js";
 
 const oldInvoiceSchema = new mongoose.Schema({
     invoiceNumber: {
@@ -110,5 +111,7 @@ oldInvoiceSchema.index({ customerName: 1 });
 oldInvoiceSchema.index({ paymentStatus: 1 });
 oldInvoiceSchema.index({ remainderDate: 1 });
 
+
+oldInvoiceSchema.plugin(softDeletePlugin);
 export default mongoose.model("OldInvoice", oldInvoiceSchema);
 

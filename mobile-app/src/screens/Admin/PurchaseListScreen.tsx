@@ -110,11 +110,11 @@ const PurchaseListScreen = () => {
   const handleDelete = async (id: string) => {
     Alert.alert(
       'Delete Purchase',
-      'Are you sure you want to delete this purchase record?',
+      'Are you sure you want to move this purchase record to trash?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Delete',
+          text: 'Trash',
           style: 'destructive',
           onPress: async () => {
             try {
@@ -128,18 +128,18 @@ const PurchaseListScreen = () => {
                 Toast.show({
                   type: 'success',
                   text1: 'Success',
-                  text2: response.data?.message || 'Purchase deleted successfully.',
+                  text2: response.data?.message || 'Purchase moved to trash successfully.',
                 });
                 fetchPurchases();
               } else {
                 Toast.show({
                   type: 'error',
                   text1: 'Error',
-                  text2: response.data?.message || 'Failed to delete purchase.',
+                  text2: response.data?.message || 'Failed to move to trash purchase.',
                 });
               }
             } catch (error: any) {
-              console.error('Error deleting purchase:', error);
+              console.error('Error moving to trash purchase:', error);
               Toast.show({
                 type: 'error',
                 text1: 'Error',
@@ -276,7 +276,7 @@ const PurchaseListScreen = () => {
               onPress={() => handleDelete(item._id)}
             >
               <Icon name="delete" size={18} color="#fff" />
-              <Text style={styles.actionButtonText}>Delete</Text>
+              <Text style={styles.actionButtonText}>Trash</Text>
             </TouchableOpacity>
           </View>
         )}

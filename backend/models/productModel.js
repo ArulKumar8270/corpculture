@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { softDeletePlugin } from "../plugins/softDeletePlugin.js";
 
 const productSchema = new mongoose.Schema({
     name: {
@@ -183,5 +184,7 @@ const productSchema = new mongoose.Schema({
         default: Date.now,
     },
 });
+
+productSchema.plugin(softDeletePlugin);
 
 export default mongoose.model("Product", productSchema);

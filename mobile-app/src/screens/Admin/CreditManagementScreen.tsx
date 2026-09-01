@@ -272,11 +272,11 @@ const CreditManagementScreen = () => {
   const handleDelete = (creditId: string) => {
     Alert.alert(
       'Delete Credit',
-      'Are you sure you want to delete this credit entry?',
+      'Are you sure you want to move this credit entry to trash?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Delete',
+          text: 'Trash',
           style: 'destructive',
           onPress: async () => {
             try {
@@ -286,14 +286,14 @@ const CreditManagementScreen = () => {
               Toast.show({
                 type: 'success',
                 text1: 'Success',
-                text2: 'Credit deleted successfully',
+                text2: 'Credit moved to trash successfully',
               });
               fetchCredits();
             } catch (err: any) {
               Toast.show({
                 type: 'error',
                 text1: 'Error',
-                text2: err.response?.data?.message || 'Failed to delete credit',
+                text2: err.response?.data?.message || 'Failed to move to trash credit',
               });
             }
           },
@@ -354,7 +354,7 @@ const CreditManagementScreen = () => {
           onPress={() => handleDelete(item._id)}
         >
           <Icon name="delete" size={18} color="#dc3545" />
-          <Text style={[styles.actionButtonText, { color: '#dc3545' }]}>Delete</Text>
+          <Text style={[styles.actionButtonText, { color: '#dc3545' }]}>Trash</Text>
         </TouchableOpacity>
       </View>
     </View>

@@ -165,11 +165,11 @@ const GSTManagementScreen = () => {
   const handleDelete = async (id: string) => {
     Alert.alert(
       'Delete GST',
-      'Are you sure you want to delete this GST entry?',
+      'Are you sure you want to move this GST entry to trash?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Delete',
+          text: 'Trash',
           style: 'destructive',
           onPress: async () => {
             try {
@@ -183,18 +183,18 @@ const GSTManagementScreen = () => {
                 Toast.show({
                   type: 'success',
                   text1: 'Success',
-                  text2: response.data.message || 'GST deleted successfully',
+                  text2: response.data.message || 'GST moved to trash successfully',
                 });
                 fetchGstList();
               } else {
                 Toast.show({
                   type: 'error',
                   text1: 'Error',
-                  text2: response.data?.message || 'Failed to delete GST.',
+                  text2: response.data?.message || 'Failed to move to trash GST.',
                 });
               }
             } catch (error: any) {
-              console.error('Error deleting GST:', error);
+              console.error('Error moving to trash GST:', error);
               Toast.show({
                 type: 'error',
                 text1: 'Error',
@@ -237,7 +237,7 @@ const GSTManagementScreen = () => {
               onPress={() => handleDelete(item._id)}
             >
               <Icon name="delete" size={18} color="#fff" />
-              <Text style={styles.actionButtonText}>Delete</Text>
+              <Text style={styles.actionButtonText}>Trash</Text>
             </TouchableOpacity>
           </View>
         )}

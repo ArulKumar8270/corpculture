@@ -93,7 +93,7 @@ const RentalProductList = () => {
     };
 
     const handleDelete = async (productId) => {
-        if (window.confirm('Are you sure you want to delete this rental product?')) {
+        if (window.confirm('Are you sure you want to move this rental product to trash?')) {
             try {
                 const { data } = await axios.delete(
                     `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-products/${productId}`,
@@ -104,13 +104,13 @@ const RentalProductList = () => {
                     }
                 );
                 if (data?.success) {
-                    toast.success(data.message || 'Rental product deleted successfully!');
+                    toast.success(data.message || 'Rental product moved to trash successfully!');
                     fetchRentalProducts(); // Refresh the list
                 } else {
-                    toast.error(data?.message || 'Failed to delete rental product.');
+                    toast.error(data?.message || 'Failed to move to trash rental product.');
                 }
             } catch (error) {
-                console.error('Error deleting rental product:', error);
+                console.error('Error moving to trash rental product:', error);
                 toast.error('Something went wrong while deleting the rental product.');
             }
         }
@@ -387,9 +387,7 @@ const RentalProductList = () => {
                                                         startIcon={<DeleteIcon />}
                                                         onClick={() => handleDelete(product._id)}
                                                         className="bg-red-500 hover:bg-red-600"
-                                                    >
-                                                        Delete
-                                                    </Button>
+                                                    >Trash</Button>
                                                 ) : null}
                                             </TableCell>
                                         ) : null}

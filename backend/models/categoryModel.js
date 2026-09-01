@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { softDeletePlugin } from "../plugins/softDeletePlugin.js";
 
 const categorySchema = new mongoose.Schema({
     name: {
@@ -13,5 +14,7 @@ const categorySchema = new mongoose.Schema({
         default: 0,
     },
 }, { timestamps: true });
+
+categorySchema.plugin(softDeletePlugin);
 
 export default mongoose.model('Category', categorySchema);

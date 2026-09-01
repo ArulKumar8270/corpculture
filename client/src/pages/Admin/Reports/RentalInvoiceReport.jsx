@@ -495,7 +495,7 @@ const RentalInvoiceReport = (props) => {
     };
 
     const handleDelete = async (invoiceId) => {
-        if (window.confirm('Are you sure you want to delete this rental invoice?')) {
+        if (window.confirm('Are you sure you want to move this rental invoice to trash?')) {
             try {
                 // Assuming a delete endpoint for rental payment entries
                 const response = await axios.delete(`${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/${invoiceId}`, {
@@ -505,10 +505,10 @@ const RentalInvoiceReport = (props) => {
                     toast.success(response.data.message);
                     fetchRentalInvoices(fromDate, toDate, companyNameFilter, invoiceNumberFilter, paymentStatusFilter, page, rowsPerPage);
                 } else {
-                    toast.error(response.data.message || 'Failed to delete rental invoice.');
+                    toast.error(response.data.message || 'Failed to move to trash rental invoice.');
                 }
             } catch (err) {
-                console.error('Error deleting rental invoice:', err);
+                console.error('Error moving to trash rental invoice:', err);
                 toast.error(err.response?.data?.message || 'Something went wrong while deleting rental invoice.');
             }
         }

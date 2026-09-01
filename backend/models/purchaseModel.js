@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { softDeletePlugin } from "../plugins/softDeletePlugin.js";
 
 const purchaseSchema = new mongoose.Schema({
     vendorCompanyName: {
@@ -61,4 +62,6 @@ const purchaseSchema = new mongoose.Schema({
     },
 }, { timestamps: true });
 
+
+purchaseSchema.plugin(softDeletePlugin);
 export default mongoose.model('Purchase', purchaseSchema);

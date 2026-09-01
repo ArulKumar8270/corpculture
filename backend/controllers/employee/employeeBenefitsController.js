@@ -1,5 +1,6 @@
 import EmployeeBenefits from "../../models/employeeBenefitsModel.js";
 import Employee from "../../models/employeeModel.js";
+import { softDeleteById, TRASH_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
 
 const benefitPopulate = [
     { path: "employeeId", select: "name email employeeId userId" },
@@ -229,11 +230,11 @@ export const updateEmployeeBenefit = async (req, res) => {
 export const deleteEmployeeBenefit = async (req, res) => {
     try {
         const { id } = req.params;
-        const deleted = await EmployeeBenefits.findByIdAndDelete(id);
+        const deleted = await softDeleteById(EmployeeBenefits, id, req.user?._id);
         if (!deleted) {
             return res.status(404).send({ success: false, message: "Employee benefit not found" });
         }
-        res.status(200).send({ success: true, message: "Employee benefit deleted" });
+        res.status(200).send({ success: true, message: TRASH_SUCCESS_MESSAGE });
     } catch (error) {
         res.status(500).send({ success: false, message: "Error deleting employee benefit", error });
     }

@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { softDeletePlugin } from "../plugins/softDeletePlugin.js";
 
 // Sub-schema for A3/A4/A5 configuration
 const configSchema = new mongoose.Schema({
@@ -101,5 +102,7 @@ const rentalProductSchema = new mongoose.Schema({
         default: () => ({}),
     },
 }, { timestamps: true });
+
+rentalProductSchema.plugin(softDeletePlugin);
 
 export default mongoose.model('RentalProduct', rentalProductSchema);

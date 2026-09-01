@@ -4,7 +4,7 @@ import { loginController } from "../controllers/auth/loginController.js";
 import { userCheckController } from "../controllers/auth/userExist.js";
 import { forgotPasswordController } from "../controllers/auth/forgotPassword.js";
 import { updateDetailsController } from "../controllers/auth/updateDetails.js";
-import { deactivateController } from "../controllers/auth/deactivateAccount.js";
+import { deactivateController, deactivateUserByAdminController } from "../controllers/auth/deactivateAccount.js";
 import { isAdmin, requireSignIn } from "../middleware/authMiddleware.js";
 import { deleteFileController, uploadFileController } from "../controllers/auth/uploadController.js";
 //router object
@@ -51,8 +51,11 @@ router.get("/admin-auth", requireSignIn, (req, res) => {
 // update details POST route\
 router.post("/update-details", updateDetailsController);
 
-// deactivate account
+// deactivate account (move to trash)
 router.post("/deactivate", deactivateController);
+
+// admin trash user account
+router.post("/deactivate-user", isAdmin, deactivateUserByAdminController);
 
 // Get all users route (example: protected for admin)
 router.get('/all-users', isAdmin, getAllUsersController); // Add appropriate middleware
