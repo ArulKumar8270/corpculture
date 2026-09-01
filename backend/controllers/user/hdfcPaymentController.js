@@ -4,9 +4,9 @@ import orderModel from "../../models/orderModel.js";
 import productModel from "../../models/productModel.js";
 import { tryAutoAssignNewOrder } from "../../utils/tryAutoAssignNewOrder.js";
 import {
-    computeOrderAmountFromItems,
-    getCartItemBaseUnit,
-} from "../../utils/orderAmountUtil.js";
+    mapValidatedOrderItems,
+    validateAndPriceOrderItems,
+} from "../../utils/validateOrderItems.js";
 import {
     createHdfcSession,
     getHdfcConfig,
@@ -64,21 +64,7 @@ const validateCheckoutPayload = (body) => {
     return null;
 };
 
-const mapOrderItems = (orderItems) =>
-    orderItems.map((product) => ({
-        name: product.name,
-        image: product.image,
-        sendInvoice: product.sendInvoice,
-        isInstalation: product.isInstalation,
-        brandName: product.brandName,
-        price: getCartItemBaseUnit(product),
-        discountPrice: product.discountPrice,
-        deliveryCharge: product.deliveryCharge,
-        installationCost: product.installationCost,
-        quantity: product.quantity,
-        productId: product.productId,
-        seller: product.seller ? new mongoose.Types.ObjectId(product.seller) : undefined,
-    }));
+const mapOrderItems = (orderItems) => mapValidatedOrderItems(orderItems);
 
 const reduceStock = async (orderItems) => {
     for (const item of orderItems) {
@@ -106,10 +92,11 @@ export const initiateHdfcPayment = async (req, res) => {
         }
 
         const { orderItems, shippingInfo, orderReferenceNo, companyId, frontendURL } = req.body;
-        const amount = computeOrderAmountFromItems(orderItems);
-        if (!(amount > 0)) {
-            return res.status(400).send({ success: false, message: "Order amount must be greater than 0" });
+        const priced = await validateAndPriceOrderItems(orderItems);
+        if (priced.error) {
+            return res.status(400).send({ success: false, message: priced.error });
         }
+        const { items: validatedItems, amount } = priced;
 
         const hdfcOrderId = makeHdfcOrderId();
         const hdfcCustomerId = makeHdfcCustomerId(req.user._id);
@@ -156,7 +143,7 @@ export const initiateHdfcPayment = async (req, res) => {
             hdfcOrderId,
             buyer: req.user._id,
             hdfcCustomerId,
-            orderItems,
+            orderItems: validatedItems,
             shippingInfo,
             orderReferenceNo: String(orderReferenceNo).trim(),
             companyId:

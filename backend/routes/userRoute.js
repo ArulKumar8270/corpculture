@@ -1,5 +1,9 @@
 import express from "express";
 import { requireSignIn, isAdmin } from "../middleware/authMiddleware.js";
+import {
+    paymentRateLimiter,
+    orderCreateRateLimiter,
+} from "../middleware/rateLimitMiddleware.js";
 import getWishlistItems from "../controllers/user/getWishlistItems.js";
 import updateWishlist from "../controllers/user/updateWishlist.js";
 import getWishlistProducts from "../controllers/user/getWishlistProducts.js";
@@ -36,13 +40,13 @@ router.post("/update-wishlist", requireSignIn, updateWishlist);
 router.get("/wishlist-products", requireSignIn, getWishlistProducts);
 
 // checkout session - stripe payment
-router.post("/create-checkout-session", requireSignIn, createSession);
-router.post("/payment-success", requireSignIn, handleSuccess);
-router.post("/create-order", requireSignIn, createOrderWithoutPayment);
+router.post("/create-checkout-session", requireSignIn, paymentRateLimiter, createSession);
+router.post("/payment-success", requireSignIn, paymentRateLimiter, handleSuccess);
+router.post("/create-order", requireSignIn, orderCreateRateLimiter, createOrderWithoutPayment);
 router.get("/hdfc/return", hdfcPaymentReturn);
-router.post("/hdfc/session", requireSignIn, initiateHdfcPayment);
-router.post("/hdfc/verify", requireSignIn, verifyHdfcPayment);
-router.get("/hdfc/verify/:orderId", requireSignIn, verifyHdfcPayment);
+router.post("/hdfc/session", requireSignIn, paymentRateLimiter, initiateHdfcPayment);
+router.post("/hdfc/verify", requireSignIn, paymentRateLimiter, verifyHdfcPayment);
+router.get("/hdfc/verify/:orderId", requireSignIn, paymentRateLimiter, verifyHdfcPayment);
 router.post("/hdfc/refund", requireSignIn, isAdmin, refundHdfcPayment);
 router.get("/byComapny/:id", getUsersByCompany);
 

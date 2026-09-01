@@ -3,27 +3,28 @@ import dotenv from "dotenv";
 dotenv.config();
 const stripeInstance = stripe(process.env.STRIPE_SECRET_KEY);
 import orderModel from "../../models/orderModel.js";
-import mongoose from "mongoose";
 import productModel from "../../models/productModel.js";
 import { tryAutoAssignNewOrder } from "../../utils/tryAutoAssignNewOrder.js";
 import {
-    computeOrderAmountFromItems,
-    getCartItemBaseUnit,
-} from "../../utils/orderAmountUtil.js";
+    mapValidatedOrderItems,
+    validateAndPriceOrderItems,
+} from "../../utils/validateOrderItems.js";
 
 const handleSuccess = async (req, res) => {
     try {
-        // Retrieve the session ID from the request body
         const { sessionId, orderItems, shippingInfo, orderReferenceNo } = req.body;
 
-        // Validate order items and session ID
-        if (!orderItems.length) {
-            return res.status(503).send("No OrderItems received from client!");
+        if (!Array.isArray(orderItems) || !orderItems.length) {
+            return res.status(400).send({
+                success: false,
+                message: "No order items received",
+            });
         }
         if (!sessionId) {
-            return res
-                .status(503)
-                .send("No sessionId for payment received from client!");
+            return res.status(400).send({
+                success: false,
+                message: "Payment session ID is required",
+            });
         }
 
         const ref = String(orderReferenceNo || "").trim();
@@ -34,95 +35,100 @@ const handleSuccess = async (req, res) => {
             });
         }
 
-        // Fetch the payment intent associated with the session
-        // const session = await stripeInstance.checkout.sessions.retrieve(
-        //     sessionId
-        // );
-        let session = {
-            payment_intent: "pi_3N7qf3Lw5q2q7Xw5720Y3720",
-            // Calculate total amount from order items
-            amount_total: computeOrderAmountFromItems(orderItems),
-            customer_details: {
-                address: {
-                    line1: "123 Main Street",
-                    city: "Anytown",
-                    state: "CA",
-                    country: "USA",
-                    postal_code: "12345",
-                },
-                phone: "1234567890",
-                name: "John Doe",
-                email: "arulkumar8270@gmail.com"
-            },
+        if (!process.env.STRIPE_SECRET_KEY) {
+            return res.status(503).send({
+                success: false,
+                message: "Stripe payment is not configured",
+            });
         }
 
-        // Extract the payment intent ID from the retrieved session
-        const paymentIntentId = session?.payment_intent;
-        // Ensure amount is a number (remove commas if present and convert to number)
-        const amount = typeof session.amount_total === 'string' 
-            ? parseFloat(session.amount_total.replace(/,/g, '')) 
-            : Number(session.amount_total);
+        const priced = await validateAndPriceOrderItems(orderItems);
+        if (priced.error) {
+            return res.status(400).send({ success: false, message: priced.error });
+        }
 
-        // Map order items to the required format
-        const orderObject = orderItems?.map((product) => ({
-            name: product.name,
-            image: product.image,
-            sendInvoice: product.sendInvoice,
-            isInstalation: product.isInstalation,
-            brandName: product.brandName,
-            price: getCartItemBaseUnit(product),
-            discountPrice: product.discountPrice,
-            deliveryCharge: product.deliveryCharge,
-            installationCost: product.installationCost,
-            quantity: product.quantity,
-            productId: new mongoose.Types.ObjectId(product.productId),
-            seller: new mongoose.Types.ObjectId(product.seller),
-        }));
+        const session = await stripeInstance.checkout.sessions.retrieve(sessionId);
 
-        // Construct shipping information (prefer client-provided shippingInfo from Shipping page)
-        const shippingObject = shippingInfo && typeof shippingInfo === "object"
-            ? shippingInfo
-            : {
-                address: session?.customer_details?.address?.line1,
-                city: session?.customer_details?.address?.city,
-                state: session?.customer_details?.address?.state,
-                country: session?.customer_details?.address?.country,
-                pincode: session?.customer_details?.address?.postal_code,
-                phoneNo: session?.customer_details?.phone || "Not Provided",
-                landmark:
-                    session?.customer_details?.address?.line2 || "No Landmark",
-            };
+        if (session.payment_status !== "paid") {
+            return res.status(400).send({
+                success: false,
+                message: "Payment has not been completed",
+            });
+        }
 
-        // Create and save the order in the database
+        const paidAmount = Number(session.amount_total) / 100;
+        if (paidAmount + 0.01 < priced.amount) {
+            return res.status(400).send({
+                success: false,
+                message: "Paid amount does not match the order total",
+            });
+        }
+
+        const paymentIntentId =
+            typeof session.payment_intent === "string"
+                ? session.payment_intent
+                : session.payment_intent?.id;
+
+        if (!paymentIntentId) {
+            return res.status(400).send({
+                success: false,
+                message: "Invalid payment session",
+            });
+        }
+
+        const existingOrder = await orderModel.findOne({ paymentId: paymentIntentId });
+        if (existingOrder) {
+            return res.status(200).send({ success: true, order: existingOrder });
+        }
+
+        const orderObject = mapValidatedOrderItems(priced.items);
+
+        const shippingObject =
+            shippingInfo && typeof shippingInfo === "object"
+                ? shippingInfo
+                : {
+                      address: session?.customer_details?.address?.line1,
+                      city: session?.customer_details?.address?.city,
+                      state: session?.customer_details?.address?.state,
+                      country: session?.customer_details?.address?.country,
+                      pincode: session?.customer_details?.address?.postal_code,
+                      phoneNo: session?.customer_details?.phone || "Not Provided",
+                      landmark:
+                          session?.customer_details?.address?.line2 || "No Landmark",
+                  };
+
         const combinedOrder = {
             paymentId: paymentIntentId,
             products: orderObject,
             buyer: req.user._id,
             orderReferenceNo: ref,
             shippingInfo: shippingObject,
-            amount: amount,
+            amount: priced.amount,
+            paymentMethod: "online",
+            paymentStatus: "Paid",
         };
         const order = new orderModel(combinedOrder);
         await order.save();
 
         await tryAutoAssignNewOrder(order);
 
-        // Reduce stock for each product
-        for (const item of orderItems) {
-            const product = await productModel.findById(item?.productId);
+        for (const item of priced.items) {
+            const product = await productModel.findById(item.productId);
             if (product) {
-                product.stock -= item?.quantity;
+                product.stock -= item.quantity;
                 await product.save();
             } else {
                 throw new Error(`Product with ID ${item.productId} not found`);
             }
         }
-        // Send success response
-        return res.status(200).send({ success: true, order: order });
+
+        return res.status(200).send({ success: true, order });
     } catch (error) {
         console.error("Error in handling payment success:", error);
-        // Ensure you only send one response
-        return res.status(500).send("Error in handling payment success");
+        return res.status(500).send({
+            success: false,
+            message: "Error in handling payment success",
+        });
     }
 };
 

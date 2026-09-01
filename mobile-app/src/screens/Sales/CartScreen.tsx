@@ -286,9 +286,6 @@ const CartScreen = () => {
       }
     }
 
-    await AsyncStorage.setItem('sessionId', 'sdfas09df8as7');
-    
-    // Navigate to shipping screen (equivalent to /shipping/confirm)
     navigation.navigate('Shipping' as never);
   };
 

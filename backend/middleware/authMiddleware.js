@@ -5,7 +5,6 @@ import UserModel from "../models/userModel.js";
 const requireSignIn = asyncHandler(async (req, res, next) => {
     try {
         const token = req.headers.authorization;
-       console.log(token, "token23");
         if (!token) {
             return res.status(401).json({ message: "JWT must be provided" });
         }

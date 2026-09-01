@@ -7,8 +7,8 @@ import {
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
   Linking,
+  AppState,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
@@ -84,7 +84,11 @@ const ShippingScreen = () => {
   const [statePickerVisible, setStatePickerVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [paying, setPaying] = useState(false);
+  const [pendingHdfcOrderId, setPendingHdfcOrderId] = useState<string | null>(null);
+  const [hdfcPaymentUrl, setHdfcPaymentUrl] = useState<string | null>(null);
+  const [paymentStatusMessage, setPaymentStatusMessage] = useState('');
   const lastAppliedCompanyRef = useRef<string | null>(null);
+  const pollCancelledRef = useRef(false);
 
   const applyCompanyToShipping = async (company: any) => {
     const defaults = getCompanyShippingDefaults(company, user?.phone);
@@ -101,7 +105,31 @@ const ShippingScreen = () => {
 
   useEffect(() => {
     loadShippingInfo();
+    loadPendingPayment();
   }, []);
+
+  const loadPendingPayment = async () => {
+    try {
+      const storedOrderId = (await AsyncStorage.getItem('hdfcOrderId'))?.trim();
+      const storedPayUrl = (await AsyncStorage.getItem('hdfcPaymentUrl'))?.trim();
+      if (storedOrderId) {
+        setPendingHdfcOrderId(storedOrderId);
+        setHdfcPaymentUrl(storedPayUrl || null);
+        setPaymentStatusMessage('You have a payment in progress. Approve UPI in PhonePe/GPay, then tap Check Payment Status.');
+      }
+    } catch (error) {
+      console.error('Error loading pending payment:', error);
+    }
+  };
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active' && pendingHdfcOrderId && !paying) {
+        verifyPendingPayment(pendingHdfcOrderId, { silent: true });
+      }
+    });
+    return () => subscription.remove();
+  }, [pendingHdfcOrderId, paying, token]);
 
   useEffect(() => {
     if (!Array.isArray(companyDetails) || companyDetails.length === 0) return;
@@ -285,7 +313,9 @@ const ShippingScreen = () => {
   };
 
   const pollHdfcPayment = async (hdfcOrderId: string) => {
+    pollCancelledRef.current = false;
     for (let attempt = 0; attempt < 30; attempt += 1) {
+      if (pollCancelledRef.current) return { cancelled: true };
       const { data } = await axios.post(
         `${getApiBaseUrl()}/user/hdfc/verify`,
         { hdfcOrderId },
@@ -293,9 +323,73 @@ const ShippingScreen = () => {
       );
       if (data?.paid && data?.order?._id) return data;
       if (!data?.pending) return data;
+      if (data?.awaitingUpi) {
+        setPaymentStatusMessage(
+          'Waiting for UPI approval. Open PhonePe/GPay and approve the request.'
+        );
+      }
       await new Promise((resolve) => setTimeout(resolve, 3000));
     }
     return { pending: true };
+  };
+
+  const clearPendingPayment = async () => {
+    setPendingHdfcOrderId(null);
+    setHdfcPaymentUrl(null);
+    setPaymentStatusMessage('');
+    await AsyncStorage.removeItem('hdfcOrderId');
+    await AsyncStorage.removeItem('hdfcPaymentUrl');
+  };
+
+  const handlePaymentSuccess = async (orderId: string) => {
+    await AsyncStorage.setItem('skipOrderId', String(orderId));
+    await clearPendingPayment();
+    navigation.navigate('OrderSuccess' as never);
+  };
+
+  const verifyPendingPayment = async (
+    hdfcOrderId: string,
+    options: { silent?: boolean } = {}
+  ) => {
+    if (!token) return;
+    if (!options.silent) setPaying(true);
+    try {
+      const result = await pollHdfcPayment(hdfcOrderId);
+      if (result?.cancelled) return;
+      if (result?.paid && result?.order?._id) {
+        await handlePaymentSuccess(String(result.order._id));
+        return;
+      }
+      if (result?.pending || result?.resumePayment || result?.awaitingUpi) {
+        setPendingHdfcOrderId(hdfcOrderId);
+        setPaymentStatusMessage(
+          result?.awaitingUpi
+            ? 'Waiting for UPI approval. Approve in PhonePe/GPay, then tap Check Payment Status.'
+            : 'Payment is still processing. Tap Check Payment Status to try again.'
+        );
+        if (!options.silent) {
+          Toast.show({
+            type: 'info',
+            text1: 'Payment not completed',
+            text2: 'Approve UPI in your payment app, or reopen the payment page.',
+          });
+        }
+        return;
+      }
+      await clearPendingPayment();
+      navigation.navigate('OrderFailed' as never);
+    } catch (error: any) {
+      console.error('HDFC verify error:', error);
+      if (!options.silent) {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: error.response?.data?.message || 'Could not verify payment',
+        });
+      }
+    } finally {
+      if (!options.silent) setPaying(false);
+    }
   };
 
   const openHdfcPaymentPage = async (payUrl: string) => {
@@ -317,6 +411,7 @@ const ShippingScreen = () => {
     if (!checkout) return;
 
     setPaying(true);
+    pollCancelledRef.current = false;
     try {
       await AsyncStorage.setItem('shippingInfo', JSON.stringify(checkout.shippingInfo));
       await AsyncStorage.setItem('orderReferenceNo', checkout.orderReferenceNo);
@@ -334,8 +429,8 @@ const ShippingScreen = () => {
       );
 
       const payUrl =
-        data?.paymentUrl ||
         data?.paymentLinks?.mobile ||
+        data?.paymentUrl ||
         data?.paymentLinks?.web;
       if (!data?.success || !payUrl || !data?.hdfcOrderId) {
         Toast.show({
@@ -348,30 +443,17 @@ const ShippingScreen = () => {
 
       await AsyncStorage.setItem('hdfcOrderId', data.hdfcOrderId);
       await AsyncStorage.setItem('hdfcPaymentUrl', payUrl);
+      setPendingHdfcOrderId(data.hdfcOrderId);
+      setHdfcPaymentUrl(payUrl);
+      setPaymentStatusMessage('Complete payment in your browser or UPI app.');
       Toast.show({
         type: 'info',
         text1: 'Complete UPI in your app',
-        text2: 'Keep this screen open and approve the UPI request. Do not close the payment page until you pay.',
+        text2: 'Approve the UPI request in PhonePe/GPay. Return here to confirm payment.',
       });
       await openHdfcPaymentPage(payUrl);
 
-      const result = await pollHdfcPayment(data.hdfcOrderId);
-      if (result?.paid && result?.order?._id) {
-        await AsyncStorage.setItem('skipOrderId', String(result.order._id));
-        await AsyncStorage.removeItem('hdfcOrderId');
-        await AsyncStorage.removeItem('hdfcPaymentUrl');
-        navigation.navigate('OrderSuccess' as never);
-        return;
-      }
-      if (result?.pending || result?.resumePayment || result?.awaitingUpi) {
-        Toast.show({
-          type: 'info',
-          text1: 'Payment not completed',
-          text2: 'Approve UPI in PhonePe/GPay, or tap Make Payment again to reopen the page.',
-        });
-        return;
-      }
-      navigation.navigate('OrderFailed' as never);
+      await verifyPendingPayment(data.hdfcOrderId, { silent: true });
     } catch (error: any) {
       console.error('HDFC payment error:', error);
       Toast.show({
@@ -382,6 +464,33 @@ const ShippingScreen = () => {
     } finally {
       setPaying(false);
     }
+  };
+
+  const handleResumePaymentPage = async () => {
+    const payUrl = hdfcPaymentUrl || (await AsyncStorage.getItem('hdfcPaymentUrl'))?.trim();
+    if (!payUrl) {
+      Toast.show({
+        type: 'error',
+        text1: 'Payment link missing',
+        text2: 'Tap Make Payment to start again.',
+      });
+      return;
+    }
+    await openHdfcPaymentPage(payUrl);
+  };
+
+  const handleCheckPaymentStatus = async () => {
+    const hdfcOrderId =
+      pendingHdfcOrderId || (await AsyncStorage.getItem('hdfcOrderId'))?.trim();
+    if (!hdfcOrderId) {
+      Toast.show({
+        type: 'error',
+        text1: 'No pending payment',
+        text2: 'Tap Make Payment to start checkout.',
+      });
+      return;
+    }
+    await verifyPendingPayment(hdfcOrderId);
   };
 
   const handleSkipPayment = async () => {
@@ -616,6 +725,35 @@ const ShippingScreen = () => {
           </View>
         )}
 
+        {pendingHdfcOrderId && (
+          <View style={styles.pendingPaymentCard}>
+            <Text style={styles.pendingPaymentTitle}>Payment in progress</Text>
+            {!!paymentStatusMessage && (
+              <Text style={styles.pendingPaymentMessage}>{paymentStatusMessage}</Text>
+            )}
+            <TouchableOpacity
+              style={[styles.resumePaymentButton, paying && styles.paymentButtonDisabled]}
+              onPress={handleCheckPaymentStatus}
+              disabled={paying}
+            >
+              {paying ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.resumePaymentButtonText}>Check Payment Status</Text>
+              )}
+            </TouchableOpacity>
+            {!!hdfcPaymentUrl && (
+              <TouchableOpacity
+                style={styles.reopenPaymentButton}
+                onPress={handleResumePaymentPage}
+                disabled={paying}
+              >
+                <Text style={styles.reopenPaymentButtonText}>Return to payment page</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
         <TouchableOpacity
           style={[styles.onlinePaymentButton, (loading || paying) && styles.paymentButtonDisabled]}
           onPress={handleOnlinePayment}
@@ -838,6 +976,50 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#019ee3',
     flex: 1,
+  },
+  pendingPaymentCard: {
+    backgroundColor: '#fff8e6',
+    borderRadius: 8,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#ffd666',
+  },
+  pendingPaymentTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#8a5b00',
+    marginBottom: 6,
+  },
+  pendingPaymentMessage: {
+    fontSize: 13,
+    color: '#6b4c00',
+    marginBottom: 12,
+    lineHeight: 18,
+  },
+  resumePaymentButton: {
+    backgroundColor: '#019ee3',
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  resumePaymentButtonText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  reopenPaymentButton: {
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#019ee3',
+  },
+  reopenPaymentButtonText: {
+    color: '#019ee3',
+    fontSize: 14,
+    fontWeight: '600',
   },
   onlinePaymentButton: {
     backgroundColor: '#fb641b',

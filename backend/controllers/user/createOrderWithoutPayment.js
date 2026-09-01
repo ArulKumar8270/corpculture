@@ -3,9 +3,9 @@ import orderModel from "../../models/orderModel.js";
 import productModel from "../../models/productModel.js";
 import { tryAutoAssignNewOrder } from "../../utils/tryAutoAssignNewOrder.js";
 import {
-  computeOrderAmountFromItems,
-  getCartItemBaseUnit,
-} from "../../utils/orderAmountUtil.js";
+  mapValidatedOrderItems,
+  validateAndPriceOrderItems,
+} from "../../utils/validateOrderItems.js";
 import {
   computeCompanyCreditSummary,
   userCanAccessCompany,
@@ -56,23 +56,16 @@ const createOrderWithoutPayment = async (req, res) => {
       }
     }
 
-    // Map order items to schema format (same structure used in payment-success)
-    const orderObject = orderItems.map((product) => ({
-      name: product.name,
-      image: product.image,
-      sendInvoice: product.sendInvoice,
-      isInstalation: product.isInstalation,
-      brandName: product.brandName,
-      price: getCartItemBaseUnit(product),
-      discountPrice: product.discountPrice,
-      deliveryCharge: product.deliveryCharge,
-      installationCost: product.installationCost,
-      quantity: product.quantity,
-      productId: product.productId,
-      seller: product.seller ? new mongoose.Types.ObjectId(product.seller) : undefined,
-    }));
+    const priced = await validateAndPriceOrderItems(orderItems);
+    if (priced.error) {
+      return res.status(400).send({
+        success: false,
+        message: priced.error,
+      });
+    }
 
-    const amount = computeOrderAmountFromItems(orderItems);
+    const { items: validatedItems, amount } = priced;
+    const orderObject = mapValidatedOrderItems(validatedItems);
     const isCreditPayment = paymentMethod === "credit";
     const resolvedCompanyId =
       companyId && mongoose.Types.ObjectId.isValid(companyId)
@@ -133,7 +126,7 @@ const createOrderWithoutPayment = async (req, res) => {
     await tryAutoAssignNewOrder(order);
 
     // Reduce stock
-    for (const item of orderItems) {
+    for (const item of validatedItems) {
       const product = await productModel.findById(item?.productId);
       if (product) {
         product.stock -= item?.quantity;

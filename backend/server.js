@@ -47,6 +47,7 @@ import authRoute from "./routes/authRoute.js";
 import productRoute from "./routes/productRoute.js";
 import userRoute from "./routes/userRoute.js";
 import { dropGstTypeUniqueIndex } from "./models/gstModel.js";
+import { getAllowedOrigins } from "./utils/allowedOrigins.js";
 
 //rest object
 const app = express();
@@ -62,7 +63,19 @@ cloudinary.config({
 });
 
 //middleware
-app.use(cors());
+const allowedOrigins = getAllowedOrigins();
+app.use(
+    cors({
+        origin(origin, callback) {
+            if (!origin || allowedOrigins.includes(origin)) {
+                callback(null, true);
+            } else {
+                callback(new Error("Not allowed by CORS"));
+            }
+        },
+        credentials: true,
+    })
+);
 app.use(morgan("dev"));
 // to send large files
 app.use(

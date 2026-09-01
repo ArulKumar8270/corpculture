@@ -1,39 +1,54 @@
 import stripe from "stripe";
-// to resolve stripe secret key error again use dotenv here
 import dotenv from "dotenv";
 dotenv.config();
 const stripeInstance = stripe(process.env.STRIPE_SECRET_KEY);
 import { getCartItemLineTotal } from "../../utils/orderAmountUtil.js";
+import { validateAndPriceOrderItems } from "../../utils/validateOrderItems.js";
+import { isAllowedFrontendOrigin } from "../../utils/allowedOrigins.js";
 
 const createSession = async (req, res) => {
     try {
-        const {
-            products,
-            frontendURL,
-            customerEmail,
-            customerPhone,
-            customerName,
-        } = req.body;
-        // console.log(frontendURL);
+        const { products, frontendURL } = req.body;
+
+        if (!process.env.STRIPE_SECRET_KEY) {
+            return res.status(503).send({
+                success: false,
+                message: "Stripe payment is not configured",
+            });
+        }
+
+        if (!frontendURL || !isAllowedFrontendOrigin(frontendURL)) {
+            return res.status(400).send({
+                success: false,
+                message: "Invalid frontend URL",
+            });
+        }
+
+        const priced = await validateAndPriceOrderItems(products);
+        if (priced.error) {
+            return res.status(400).send({ success: false, message: priced.error });
+        }
+
         const successPath = "/shipping/confirm";
         const cancelPath = "/shipping/failed";
+        const baseUrl = String(frontendURL).replace(/\/$/, "");
+        const successURL = `${baseUrl}${successPath}`;
+        const cancelURL = `${baseUrl}${cancelPath}`;
 
-        const successURL = frontendURL + successPath;
-        const cancelURL = frontendURL + cancelPath;
-        // console.log(successURL, cancelURL);
-        const lineItems = products?.map((item) => {
+        const lineItems = priced.items.map((item) => {
             const lineTotal = getCartItemLineTotal(item);
             return {
                 price_data: {
                     currency: "inr",
                     unit_amount: Math.round(lineTotal * 100),
                     product_data: {
-                        name: item?.name,
+                        name: item.name,
                     },
                 },
                 quantity: 1,
             };
         });
+
         const session = await stripeInstance.checkout.sessions.create({
             payment_method_types: ["card"],
             currency: "inr",
@@ -41,23 +56,25 @@ const createSession = async (req, res) => {
             mode: "payment",
             success_url: successURL,
             cancel_url: cancelURL,
-            customer_email: customerEmail,
+            customer_email: req.user?.email,
             shipping_address_collection: {
-                allowed_countries: ["IN"], // Limit address collection to specific countries if needed
+                allowed_countries: ["IN"],
             },
             phone_number_collection: {
                 enabled: true,
             },
+            metadata: {
+                buyerId: String(req.user._id),
+                orderAmount: String(priced.amount),
+            },
         });
 
-        console.log('session: ', session);
-        res.send({ session: session });
+        res.send({ session });
     } catch (error) {
-        console.log("Error in creating stripe session id: " + error);
+        console.error("Error in creating stripe session:", error.message);
         res.status(500).send({
             success: false,
             message: "Error in Payment Gateway",
-            error,
         });
     }
 };
