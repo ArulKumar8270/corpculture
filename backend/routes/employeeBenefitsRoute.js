@@ -1,21 +1,11 @@
 import express from "express";
-import {
-    createEmployeeBenefit,
-    getAllEmployeeBenefits,
-    getEmployeeBenefitById,
-    updateEmployeeBenefit,
-    deleteEmployeeBenefit,
-    getMyEmployeeBenefits,
-} from "../controllers/employee/employeeBenefitsController.js";
-import { requireSignIn, isAdminOrEmployee } from "../middleware/authMiddleware.js";
+import { requireSignIn } from "../middleware/authMiddleware.js";
+import employeeBenefitsPublicRoutes from "./public/employeeBenefitsPublicRoutes.js";
+import { getMyEmployeeBenefits } from "../controllers/employee/employeeBenefitsController.js";
 
 const router = express.Router();
 
-router.post("/", isAdminOrEmployee, createEmployeeBenefit);
-router.get("/", isAdminOrEmployee, getAllEmployeeBenefits);
 router.get("/my", requireSignIn, getMyEmployeeBenefits);
-router.get("/:id", isAdminOrEmployee, getEmployeeBenefitById);
-router.put("/:id", isAdminOrEmployee, updateEmployeeBenefit);
-router.delete("/:id", isAdminOrEmployee, deleteEmployeeBenefit);
+router.use(employeeBenefitsPublicRoutes);
 
 export default router;

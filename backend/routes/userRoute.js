@@ -4,6 +4,7 @@ import {
     paymentRateLimiter,
     orderCreateRateLimiter,
 } from "../middleware/rateLimitMiddleware.js";
+import userPublicRoutes from "./public/userPublicRoutes.js";
 import getWishlistItems from "../controllers/user/getWishlistItems.js";
 import updateWishlist from "../controllers/user/updateWishlist.js";
 import getWishlistProducts from "../controllers/user/getWishlistProducts.js";
@@ -14,60 +15,38 @@ import {
     initiateHdfcPayment,
     verifyHdfcPayment,
     refundHdfcPayment,
-    hdfcPaymentReturn,
 } from "../controllers/user/hdfcPaymentController.js";
 import getOrders from "../controllers/user/getOrders.js";
 import getOrderDetail from "../controllers/user/getOrderDetail.js";
-import getOrdersByEmployeeId from "../controllers/user/getOrdersByEmpId.js";
 import getAdminOrders from "../controllers/user/getAdminOrders.js";
 import updateOrder from "../controllers/user/updateOrder.js";
 import assignOrder from "../controllers/user/assignOrder.js";
 import autoAssignOrders, { suggestEmployeesForOrder } from "../controllers/user/autoAssignOrders.js";
 import getAllUserOrder from "../controllers/user/getAllUserOrder.js";
-import getUsersByCompany from "../controllers/user/getUsersByCompany.js";
 import { updateUserPermissions } from "../controllers/user/userController.js";
-//router object
+
 const router = express.Router();
 
-//routing
-//get Wishlist Items id
+router.use(userPublicRoutes);
+
 router.get("/wishlist", requireSignIn, getWishlistItems);
-
-//update wishlist Items
 router.post("/update-wishlist", requireSignIn, updateWishlist);
-
-// get wishlist products
 router.get("/wishlist-products", requireSignIn, getWishlistProducts);
-
-// checkout session - stripe payment
 router.post("/create-checkout-session", requireSignIn, paymentRateLimiter, createSession);
 router.post("/payment-success", requireSignIn, paymentRateLimiter, handleSuccess);
 router.post("/create-order", requireSignIn, orderCreateRateLimiter, createOrderWithoutPayment);
-router.get("/hdfc/return", hdfcPaymentReturn);
 router.post("/hdfc/session", requireSignIn, paymentRateLimiter, initiateHdfcPayment);
 router.post("/hdfc/verify", requireSignIn, paymentRateLimiter, verifyHdfcPayment);
 router.get("/hdfc/verify/:orderId", requireSignIn, paymentRateLimiter, verifyHdfcPayment);
 router.post("/hdfc/refund", requireSignIn, isAdmin, refundHdfcPayment);
-router.get("/byComapny/:id", getUsersByCompany);
-
-// get user orders
 router.get("/orders", requireSignIn, getOrders);
 router.get("/order-detail", requireSignIn, getOrderDetail);
-router.get("/ordersByEmpId/:id", getOrdersByEmployeeId);
-
-//get admin orders
 router.get("/admin-orders", requireSignIn, getAdminOrders);
-router.get("/admin-order-detail", getOrderDetail);
-
-//update order status
 router.patch("/update/order-status", requireSignIn, updateOrder);
 router.patch("/update/aassign-orders", requireSignIn, assignOrder);
 router.patch("/auto-assign-orders", requireSignIn, autoAssignOrders);
 router.get("/order/:id/suggest-employee", requireSignIn, suggestEmployeesForOrder);
-
-//get all order and delete if possible
 router.get("/get-all-order", requireSignIn, getAllUserOrder);
-
-// update user permissions
 router.patch("/:userId/permissions", requireSignIn, updateUserPermissions);
+
 export default router;

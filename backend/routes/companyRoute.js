@@ -1,46 +1,23 @@
 import express from "express";
-import { isAdmin, isAdminOrEmployee, requireSignIn } from "../middleware/authMiddleware.js";
+import { isAdminOrEmployee, requireSignIn } from "../middleware/authMiddleware.js";
 import { requirePermission } from "../middleware/permissionMiddleware.js";
-import {
-    createCompany,
-    updateCompany,
-    getCompanyById,
-    deleteCompany,
-    getAllCompanies,
-    getCompanyByUser,
-    getCompanyByPhone
-} from "../controllers/company/companyController.js";
+import companyPublicRoutes from "./public/companyPublicRoutes.js";
+import { deleteCompany, getAllCompanies } from "../controllers/company/companyController.js";
 
 const router = express.Router();
 
-// Create company request
-router.post("/create", createCompany);
+router.use(companyPublicRoutes);
 
-// Get all companys
 router.get(
     "/all",
     requireSignIn,
     (req, res, next) => {
-        // Employees (role 3) need company list for workflows (reports/invoices/profile).
-        // Admins are handled by requirePermission (admin bypass) below.
         if (Number(req.user?.role) === 3) return next();
         return requirePermission("otherSettingsAllCompany", "view")(req, res, next);
     },
     getAllCompanies
 );
 
-// Get single company
-router.get("/get/:id", getCompanyById);
-
-router.get("/getByPhone/:phone", getCompanyByPhone);
-
-// GET user's company details (Protected route)
-router.get('/user-company/:id', getCompanyByUser); 
-
-// Update company
-router.put("/update/:id", updateCompany);
-
-// Delete company
 router.delete("/delete/:id", isAdminOrEmployee, deleteCompany);
 
 export default router;

@@ -37,6 +37,7 @@ import oldInvoiceRoutes from "./routes/oldInvoiceRoute.js"; // Import old invoic
 import creditRoutes from "./routes/creditRoutes.js"; // Import credit routes
 import payslipRoutes from "./routes/payslipRoute.js";
 import notificationRoutes from "./routes/notificationRoute.js";
+import publicRoutes from "./routes/public/index.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
@@ -102,6 +103,9 @@ const PORT = process.env.PORT || 8080;
 app.get("/", (req, res) => {
     res.send("Hello there!");
 });
+
+// Public API namespace (no JWT) — legacy /api/v1/* URLs still work unchanged
+app.use("/api/v1/public", publicRoutes);
 
 //routes
 app.use("/api/v1/auth", authRoute);

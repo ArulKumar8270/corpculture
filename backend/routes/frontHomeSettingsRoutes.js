@@ -1,15 +1,15 @@
 import express from "express";
 import { requireSignIn } from "../middleware/authMiddleware.js";
 import { requirePermission } from "../middleware/permissionMiddleware.js";
+import frontHomeSettingsPublicRoutes from "./public/frontHomeSettingsPublicRoutes.js";
 import {
-    getFrontHomeSettings,
     updateFrontHomeSettings,
     resetFrontHomeSettings,
 } from "../controllers/frontHome/frontHomeSettingsController.js";
 
 const router = express.Router();
 
-router.get("/", getFrontHomeSettings);
+router.use(frontHomeSettingsPublicRoutes);
 
 router.put(
     "/",

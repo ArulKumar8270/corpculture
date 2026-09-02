@@ -1,38 +1,22 @@
 import express from "express";
-import { isAdmin, isAdminOrEmployee, requireSignIn } from "../middleware/authMiddleware.js"; // Assuming middleware path
+import { isAdminOrEmployee, requireSignIn } from "../middleware/authMiddleware.js";
+import employeePublicRoutes from "./public/employeePublicRoutes.js";
 import {
     createEmployeeController,
     getAllEmployeesController,
-    getSingleEmployeeController,
     getEmployeeByUserIdController,
     updateEmployeeController,
-    deleteEmployeeController
-} from '../controllers/employee/employeeController.js';
+    deleteEmployeeController,
+} from "../controllers/employee/employeeController.js";
 
 const router = express.Router();
 
-// Create Employee || POST
-// Assuming only admin can create employees
+router.use(employeePublicRoutes);
+
 router.post("/create", isAdminOrEmployee, createEmployeeController);
-
-// Get All Employees || GET
-// Assuming only admin can view all employees
 router.get("/all", isAdminOrEmployee, getAllEmployeesController);
-
-// Get Single Employee || GET
-// Assuming only signed-in users (or admin) can view a single employee
-router.get("/get/:id", getSingleEmployeeController);
-
-// Get Employee by User ID || GET
-// For users to get their own employee data
 router.get("/user/:userId", requireSignIn, getEmployeeByUserIdController);
-
-// Update Employee || PUT
-// Assuming only admin can update employees
 router.put("/update/:id", isAdminOrEmployee, updateEmployeeController);
-
-// Delete Employee || DELETE
-// Assuming only admin can delete employees
 router.delete("/delete/:id", isAdminOrEmployee, deleteEmployeeController);
 
 export default router;
