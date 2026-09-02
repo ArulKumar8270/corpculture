@@ -15,6 +15,13 @@ import { RootState } from '../../store';
 import axios from 'axios';
 import { getApiBaseUrl } from '../../services/api';
 import Toast from 'react-native-toast-message';
+import TrashStatusToggle from '../../components/TrashStatusToggle';
+import {
+  buildTrashListUrl,
+  restoreFromTrash,
+  isTrashView,
+  type TrashViewMode,
+} from '../../utils/trashApi';
 // @ts-ignore
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 
@@ -23,6 +30,7 @@ const AdminPayslipListScreen = () => {
   const { token, user } = useSelector((s: RootState) => s.auth);
   const [payslips, setPayslips] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<TrashViewMode>('active');
   const isAdmin = user?.role === 1 || Number(user?.role) === 1;
 
   const cleanAuthHeader = (raw: string | null | undefined) => {
@@ -44,7 +52,7 @@ const AdminPayslipListScreen = () => {
     const base = String(getApiBaseUrl() || '').replace(/\/$/, '');
     try {
       setLoading(true);
-      const { data } = await axios.get(`${base}/payslip/all`, {
+      const { data } = await axios.get(buildTrashListUrl('/payslip/all', viewMode), {
         headers: { Authorization: auth },
       });
       if (data?.success) {
@@ -68,7 +76,7 @@ const AdminPayslipListScreen = () => {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [token, viewMode]);
 
   useFocusEffect(
     useCallback(() => {
@@ -111,11 +119,38 @@ const AdminPayslipListScreen = () => {
     ]);
   };
 
+  const restorePayslip = (id: string, label: string) => {
+    const auth = cleanAuthHeader(token);
+    if (!auth) return;
+    Alert.alert('Restore Payslip', `Restore payslip for ${label} from trash?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Restore',
+        onPress: async () => {
+          try {
+            const { data } = await restoreFromTrash('/payslip', id, auth);
+            if (data?.success) {
+              Toast.show({ type: 'success', text1: data.message || 'Payslip restored' });
+              load();
+            } else {
+              Toast.show({ type: 'error', text1: data?.message || 'Failed to restore' });
+            }
+          } catch (e: any) {
+            Toast.show({
+              type: 'error',
+              text1: e?.response?.data?.message || 'Failed to restore',
+            });
+          }
+        },
+      },
+    ]);
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Payslips</Text>
-        {isAdmin ? (
+        {isAdmin && !isTrashView(viewMode) ? (
           <TouchableOpacity
             style={styles.addBtn}
             onPress={() => navigation.navigate('AddPayslip')}
@@ -124,6 +159,10 @@ const AdminPayslipListScreen = () => {
             <Text style={styles.addBtnText}>Add</Text>
           </TouchableOpacity>
         ) : null}
+      </View>
+
+      <View style={styles.toggleContainer}>
+        <TrashStatusToggle viewMode={viewMode} onChange={setViewMode} />
       </View>
 
       {loading ? (
@@ -148,7 +187,14 @@ const AdminPayslipListScreen = () => {
                     }
                     activeOpacity={0.75}
                   >
-                    <Text style={styles.empName}>{name}</Text>
+                    <View style={styles.cardTitleRow}>
+                      <Text style={styles.empName}>{name}</Text>
+                      {isTrashView(viewMode) && (
+                        <View style={styles.trashBadge}>
+                          <Text style={styles.trashBadgeText}>Trash</Text>
+                        </View>
+                      )}
+                    </View>
                     <Text style={styles.row}>Period: {item.payPeriod}</Text>
                     <Text style={styles.row}>Pay date: {formatDate(item.payDate)}</Text>
                     <Text style={styles.net}>Net: {formatMoney(item.netPay)}</Text>
@@ -156,20 +202,32 @@ const AdminPayslipListScreen = () => {
                   </TouchableOpacity>
                   {isAdmin ? (
                     <View style={styles.cardActions}>
-                      <TouchableOpacity
-                        style={styles.iconBtn}
-                        onPress={() => navigation.navigate('AddPayslip', { payslipId: item._id })}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      >
-                        <Icon name="edit" size={22} color="#019ee3" />
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.iconBtn}
-                        onPress={() => deletePayslip(item._id, name)}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      >
-                        <Icon name="delete-outline" size={22} color="#c62828" />
-                      </TouchableOpacity>
+                      {isTrashView(viewMode) ? (
+                        <TouchableOpacity
+                          style={styles.iconBtn}
+                          onPress={() => restorePayslip(item._id, name)}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
+                          <Icon name="restore" size={22} color="#28a745" />
+                        </TouchableOpacity>
+                      ) : (
+                        <>
+                          <TouchableOpacity
+                            style={styles.iconBtn}
+                            onPress={() => navigation.navigate('AddPayslip', { payslipId: item._id })}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          >
+                            <Icon name="edit" size={22} color="#019ee3" />
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.iconBtn}
+                            onPress={() => deletePayslip(item._id, name)}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          >
+                            <Icon name="delete-outline" size={22} color="#c62828" />
+                          </TouchableOpacity>
+                        </>
+                      )}
                     </View>
                   ) : null}
                 </View>
@@ -204,6 +262,29 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   addBtnText: { color: '#fff', fontWeight: '600' },
+  toggleContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    backgroundColor: '#fff',
+  },
+  trashBadge: {
+    backgroundColor: '#ff9800',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  trashBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  cardTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+    marginBottom: 6,
+  },
   card: {
     backgroundColor: '#fff',
     marginHorizontal: 16,

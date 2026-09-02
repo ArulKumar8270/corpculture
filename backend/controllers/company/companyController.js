@@ -2,7 +2,7 @@ import companyModel from "../../models/companyModel.js";
 import ServiceInvoice from "../../models/serviceInvoiceModel.js"; // Import ServiceInvoice model
 import Report from "../../models/reportModel.js"; // Import Report model
 import RentalPaymentEntry from "../../models/rentalPaymentEntryModel.js"; // Import RentalPaymentEntry model
-import { softDeleteById, TRASH_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
+import { softDeleteById, restoreById, getTrashListQuery, withRecordStatus, TRASH_SUCCESS_MESSAGE, RESTORE_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
 
 const sanitizeCompanyPayload = (body = {}) => {
     const payload = { ...body };
@@ -88,11 +88,14 @@ export const getAllCompanies = async (req, res) => {
         // Calculate skip for pagination
         const skip = (parseInt(page) - 1) * parseInt(limit);
 
+        const { filter, options } = getTrashListQuery(req, findQuery);
+
         // Get total count of documents matching the filters (before pagination)
-        const totalCount = await companyModel.countDocuments(findQuery);
+        const totalCount = await companyModel.countDocuments(filter).setOptions(options);
 
         // Fetch companies with pagination
-        const companies = await companyModel.find(findQuery)
+        const companies = await companyModel.find(filter)
+            .setOptions(options)
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(parseInt(limit))
@@ -101,7 +104,7 @@ export const getAllCompanies = async (req, res) => {
         if (skipCountQueries) {
             return res.status(200).send({
                 success: true,
-                companies,
+                companies: companies.map((c) => withRecordStatus(c)),
                 totalCount,
                 page: parseInt(page),
                 limit: parseInt(limit),
@@ -134,7 +137,7 @@ export const getAllCompanies = async (req, res) => {
                 Report.countDocuments({ company: company._id, reportType: "rental" })
             ]);
 
-            return {
+            return withRecordStatus({
                 ...company,
                 serviceInvoiceCount,
                 serviceQuotationCount,
@@ -142,7 +145,7 @@ export const getAllCompanies = async (req, res) => {
                 rentalInvoiceCount,
                 rentalQuotationCount,
                 rentalReportCount
-            };
+            });
         }));
 
         res.status(200).send({
@@ -251,6 +254,34 @@ export const deleteCompany = async (req, res) => {
         res.status(500).send({
             success: false,
             message: "Error in deleting company",
+            error
+        });
+    }
+};
+
+// Restore company from trash
+export const restoreCompany = async (req, res) => {
+    try {
+        const companyId = req.params.id;
+        const restoredCompany = await restoreById(companyModel, companyId);
+
+        if (!restoredCompany) {
+            return res.status(404).send({
+                success: false,
+                message: "Company not found in trash.",
+            });
+        }
+
+        res.status(200).send({
+            success: true,
+            message: RESTORE_SUCCESS_MESSAGE,
+            company: withRecordStatus(restoredCompany),
+        });
+    } catch (error) {
+        console.error("Error in restoring company:", error);
+        res.status(500).send({
+            success: false,
+            message: "Error in restoring company",
             error
         });
     }

@@ -1,6 +1,6 @@
 import Employee from "../../models/employeeModel.js";
 import bcrypt from "bcryptjs"; // Assuming you use bcrypt for password hashing
-import { softDeleteById, TRASH_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
+import { softDeleteById, restoreById, getTrashListQuery, mapWithRecordStatus, TRASH_SUCCESS_MESSAGE, RESTORE_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
 
 // Create a new employee
 export const createEmployeeController = async (req, res) => {
@@ -89,8 +89,9 @@ const normalizeEmployeeMoneyFields = (doc) => {
 // Get all employees
 export const getAllEmployeesController = async (req, res) => {
     try {
-        const employees = await Employee.find({}).populate('department').select("-password").lean();
-        const normalized = employees.map((e) => normalizeEmployeeMoneyFields(e));
+        const { filter, options } = getTrashListQuery(req);
+        const employees = await Employee.find(filter).setOptions(options).populate('department').select("-password").lean();
+        const normalized = mapWithRecordStatus(employees.map((e) => normalizeEmployeeMoneyFields(e)));
         res.status(200).send({
             success: true,
             message: "All employees fetched successfully",
@@ -241,6 +242,35 @@ export const deleteEmployeeController = async (req, res) => {
         res.status(500).send({
             success: false,
             message: "Error deleting employee",
+            error,
+        });
+    }
+};
+
+// Restore employee from trash
+export const restoreEmployeeController = async (req, res) => {
+    try {
+        const employeeId = req.params.id;
+        const restoredEmployee = await restoreById(Employee, employeeId);
+
+        if (!restoredEmployee) {
+            return res.status(404).send({
+                success: false,
+                message: "Employee not found in trash.",
+            });
+        }
+
+        const employeeObj = restoredEmployee.toObject ? restoredEmployee.toObject() : restoredEmployee;
+        res.status(200).send({
+            success: true,
+            message: RESTORE_SUCCESS_MESSAGE,
+            employee: mapWithRecordStatus([normalizeEmployeeMoneyFields(employeeObj)])[0],
+        });
+    } catch (error) {
+        console.error("Error in restoreEmployeeController:", error);
+        res.status(500).send({
+            success: false,
+            message: "Error restoring employee",
             error,
         });
     }

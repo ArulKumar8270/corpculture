@@ -21,6 +21,13 @@ import axios from 'axios';
 import Toast from 'react-native-toast-message';
 import { usePermissions } from '../../hooks/usePermissions';
 import { getApiBaseUrl } from '../../services/api';
+import TrashStatusToggle from '../../components/TrashStatusToggle';
+import {
+  buildTrashListUrl,
+  restoreUserFromTrash,
+  isTrashView,
+  type TrashViewMode,
+} from '../../utils/trashApi';
 
 const UserManagementScreen = () => {
   const navigation = useNavigation();
@@ -41,19 +48,20 @@ const UserManagementScreen = () => {
   const [isUpdating, setIsUpdating] = useState(false);
   const [categories, setCategories] = useState<any[]>([]);
   const [categoryPickerVisible, setCategoryPickerVisible] = useState(false);
+  const [viewMode, setViewMode] = useState<TrashViewMode>('active');
 
   useEffect(() => {
     if (token) {
       loadUsers();
       fetchCategories();
     }
-  }, [token]);
+  }, [token, viewMode]);
 
   const loadUsers = async () => {
     setLoading(true);
     try {
       const response = await axios.get(
-        `${getApiBaseUrl()}/auth/all-users`,
+        buildTrashListUrl('/auth/all-users', viewMode),
         {
           headers: {
             Authorization: token,
@@ -273,6 +281,40 @@ const UserManagementScreen = () => {
     );
   };
 
+  const handleRestoreUser = (userId: string) => {
+    Alert.alert('Restore User', 'Restore this user account from trash?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Restore',
+        onPress: async () => {
+          try {
+            const response = await restoreUserFromTrash(userId, token || '');
+            if (response.data?.success) {
+              Toast.show({
+                type: 'success',
+                text1: 'Success',
+                text2: response.data.message || 'User restored successfully',
+              });
+              loadUsers();
+            } else {
+              Toast.show({
+                type: 'error',
+                text1: 'Error',
+                text2: response.data?.message || 'Failed to restore user',
+              });
+            }
+          } catch (error: any) {
+            Toast.show({
+              type: 'error',
+              text1: 'Error',
+              text2: error.response?.data?.message || 'Failed to restore user',
+            });
+          }
+        },
+      },
+    ]);
+  };
+
   const getRoleName = (role: number) => {
     switch (role) {
       case 0:
@@ -322,6 +364,11 @@ const UserManagementScreen = () => {
         {isChild && <View style={styles.childIndicator} />}
         <View style={styles.userHeaderRow}>
           <Text style={styles.userName}>{user.name || 'N/A'}</Text>
+          {isTrashView(viewMode) && (
+            <View style={styles.trashBadge}>
+              <Text style={styles.trashBadgeText}>Trash</Text>
+            </View>
+          )}
           {!isChild && filteredUsers.some((child) => String(child.parentId) === String(user._id)) && (
             <TouchableOpacity
               onPress={() => toggleExpand(user._id)}
@@ -356,7 +403,7 @@ const UserManagementScreen = () => {
         )}
       </View>
       <View style={styles.actionButtons}>
-        {!user.parentId && hasPermission('reportsUserList') && (
+        {!isTrashView(viewMode) && !user.parentId && hasPermission('reportsUserList') && (
           <View style={styles.commissionToggleContainer}>
             <Text style={styles.commissionToggleLabel}>Commission</Text>
             <Switch
@@ -366,7 +413,7 @@ const UserManagementScreen = () => {
             />
           </View>
         )}
-        {hasPermission('reportsUserList') && (
+        {!isTrashView(viewMode) && hasPermission('reportsUserList') && (
           <TouchableOpacity
             style={styles.editButton}
             onPress={() => handleOpenModal(user)}
@@ -375,13 +422,23 @@ const UserManagementScreen = () => {
             <Text style={styles.editText}>Edit</Text>
           </TouchableOpacity>
         )}
-        <TouchableOpacity
-          style={styles.deactivateButton}
-          onPress={() => handleTrashUser(user._id)}
-        >
-          <Icon name="block" size={20} color="#FF3B30" />
-          <Text style={styles.deactivateText}>Trash</Text>
-        </TouchableOpacity>
+        {isTrashView(viewMode) ? (
+          <TouchableOpacity
+            style={styles.restoreButton}
+            onPress={() => handleRestoreUser(user._id)}
+          >
+            <Icon name="restore" size={20} color="#28a745" />
+            <Text style={styles.restoreText}>Restore</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={styles.deactivateButton}
+            onPress={() => handleTrashUser(user._id)}
+          >
+            <Icon name="block" size={20} color="#FF3B30" />
+            <Text style={styles.deactivateText}>Trash</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -404,6 +461,10 @@ const UserManagementScreen = () => {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Users</Text>
+      </View>
+
+      <View style={styles.toggleContainer}>
+        <TrashStatusToggle viewMode={viewMode} onChange={setViewMode} />
       </View>
 
       <View style={styles.searchContainer}>
@@ -888,6 +949,36 @@ const styles = StyleSheet.create({
     color: '#FF3B30',
     fontSize: 14,
     fontWeight: '500',
+  },
+  restoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+    borderWidth: 1,
+    borderColor: '#28a745',
+    borderRadius: 6,
+    gap: 5,
+  },
+  restoreText: {
+    color: '#28a745',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  toggleContainer: {
+    paddingHorizontal: 15,
+    paddingTop: 10,
+    backgroundColor: '#fff',
+  },
+  trashBadge: {
+    backgroundColor: '#ff9800',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  trashBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
   },
   emptyContainer: {
     padding: 50,

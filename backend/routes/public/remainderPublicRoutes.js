@@ -6,6 +6,7 @@ import {
     getRemaindersByCompany,
     updateRemainder,
     deleteRemainder,
+    restoreRemainder,
     getRemaindersByTodayDate,
 } from "../../controllers/remainder/remainderController.js";
 
@@ -16,6 +17,7 @@ router.get("/", getAllRemainders);
 router.get("/getByToday/remainder", getRemaindersByTodayDate);
 router.post("/getByToday/remainder", getRemaindersByTodayDate);
 router.get("/company/:companyId/:type", getRemaindersByCompany);
+router.post("/restore/:id", restoreRemainder);
 router.get("/:id", getRemainderById);
 router.put("/:id", updateRemainder);
 router.delete("/:id", deleteRemainder);

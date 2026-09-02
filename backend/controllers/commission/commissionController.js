@@ -1,5 +1,5 @@
 import commissionModel from "../../models/commissionModel.js";
-import { softDeleteById, TRASH_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
+import { softDeleteById, restoreById, getTrashListQuery, mapWithRecordStatus, TRASH_SUCCESS_MESSAGE, RESTORE_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
 
 const buildCommissionSummary = (commissions = []) => {
     const totalEarned = commissions.reduce(
@@ -95,7 +95,9 @@ export const createCommission = async (req, res) => {
 export const getAllCommissions = async (req, res) => {
     try {
         const commissionFrom = req.query.commissionFrom || "Sales";
-        const commissions = await commissionModel.find({commissionFrom})
+        const { filter, options } = getTrashListQuery(req, { commissionFrom });
+        const commissions = await commissionModel.find(filter)
+            .setOptions(options)
             .populate("userId")
             .populate("companyId")
             .populate({
@@ -111,7 +113,7 @@ export const getAllCommissions = async (req, res) => {
 
         res.status(200).send({
             success: true,
-            commissions
+            commissions: mapWithRecordStatus(commissions)
         });
     } catch (error) {
         console.error("Error in getting commissions:", error);
@@ -210,6 +212,35 @@ export const deleteCommission = async (req, res) => {
         res.status(500).send({
             success: false,
             message: "Error in deleting commission",
+            error
+        });
+    }
+};
+
+// Restore Commission from trash
+export const restoreCommission = async (req, res) => {
+    try {
+        const commissionId = req.params.id;
+        const restoredCommission = await restoreById(commissionModel, commissionId);
+
+        if (!restoredCommission) {
+            return res.status(404).send({
+                success: false,
+                message: "Commission not found in trash.",
+                errorType: "commissionNotFound"
+            });
+        }
+
+        res.status(200).send({
+            success: true,
+            message: RESTORE_SUCCESS_MESSAGE,
+            commission: mapWithRecordStatus([restoredCommission])[0],
+        });
+    } catch (error) {
+        console.error("Error in restoring commission:", error);
+        res.status(500).send({
+            success: false,
+            message: "Error in restoring commission",
             error
         });
     }

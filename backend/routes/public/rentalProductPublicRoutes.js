@@ -5,6 +5,7 @@ import {
     getRentalProductById,
     updateRentalProduct,
     deleteRentalProduct,
+    restoreRentalProduct,
     getRentalProductsByCompany,
     getTodaysRentalProducts,
     normalizeExistingRentalPaymentDates,
@@ -14,6 +15,7 @@ const router = express.Router();
 
 router.post("/", createRentalProduct);
 router.get("/", getAllRentalProducts);
+router.post("/restore/:id", restoreRentalProduct);
 router.get("/getServiceProductsByCompany/:companyId", getRentalProductsByCompany);
 router.get("/payment/today", getTodaysRentalProducts);
 router.get("/:id", getRentalProductById);

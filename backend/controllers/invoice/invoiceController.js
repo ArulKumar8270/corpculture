@@ -1,5 +1,5 @@
 import Invoice from "../../models/invoiceModel.js";
-import { softDeleteById, TRASH_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
+import { softDeleteById, restoreById, getTrashListQuery, mapWithRecordStatus, TRASH_SUCCESS_MESSAGE, RESTORE_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
 
 // Create new invoice
 export const createInvoice = async (req, res) => {
@@ -25,14 +25,16 @@ export const createInvoice = async (req, res) => {
 // Get all invoices
 export const getAllInvoices = async (req, res) => {
     try {
-        const invoices = await Invoice.find({})
+        const { filter, options } = getTrashListQuery(req);
+        const invoices = await Invoice.find(filter)
+            .setOptions(options)
             .populate('customer')
             .populate('order')
             .sort({ createdAt: -1 });
 
         res.status(200).send({
             success: true,
-            invoices
+            invoices: mapWithRecordStatus(invoices)
         });
     } catch (error) {
         console.error("Error in fetching invoices:", error);
@@ -124,6 +126,33 @@ export const deleteInvoice = async (req, res) => {
         res.status(500).send({
             success: false,
             message: "Error in deleting invoice",
+            error
+        });
+    }
+};
+
+// Restore invoice from trash
+export const restoreInvoice = async (req, res) => {
+    try {
+        const restoredInvoice = await restoreById(Invoice, req.params.id);
+
+        if (!restoredInvoice) {
+            return res.status(404).send({
+                success: false,
+                message: "Invoice not found in trash."
+            });
+        }
+
+        res.status(200).send({
+            success: true,
+            message: RESTORE_SUCCESS_MESSAGE,
+            invoice: mapWithRecordStatus([restoredInvoice])[0],
+        });
+    } catch (error) {
+        console.error("Error in restoring invoice:", error);
+        res.status(500).send({
+            success: false,
+            message: "Error in restoring invoice",
             error
         });
     }

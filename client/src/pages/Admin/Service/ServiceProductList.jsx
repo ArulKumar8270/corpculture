@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
-import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Button, Typography, TextField, Pagination, Box } from '@mui/material';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
+import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Button, Typography, TextField, Pagination, Box, Chip } from '@mui/material';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import { useAuth } from '../../../context/auth';
+import TrashStatusToggle from '../../../components/TrashStatusToggle';
+import TrashActions from '../../../components/TrashActions';
+import { buildTrashListUrl, restoreFromTrash, isTrashView } from '../../../utils/trashApi';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 
@@ -25,10 +26,11 @@ const ServiceProductList = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
     const [exportingExcel, setExportingExcel] = useState(false);
+    const [viewMode, setViewMode] = useState('active');
 
     useEffect(() => {
         fetchServiceProducts();
-    }, []);
+    }, [viewMode]);
 
     // Reset to page 1 when search term changes
     useEffect(() => {
@@ -47,9 +49,10 @@ const ServiceProductList = () => {
 
     const fetchServiceProducts = async () => {
         try {
-            const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/service-products`); // Assuming this is your API endpoint
-            if (data?.success && data.serviceProducts.length > 0) {
-                setServiceProducts(data.serviceProducts);
+            const url = buildTrashListUrl(`${import.meta.env.VITE_SERVER_URL}/api/v1/service-products`, viewMode);
+            const { data } = await axios.get(url);
+            if (data?.success) {
+                setServiceProducts(data.serviceProducts || []);
             } else {
                 toast.error(data?.message || 'Failed to fetch service products. Displaying sample data.');
                 // Sample data if API fails or returns empty
@@ -83,6 +86,23 @@ const ServiceProductList = () => {
             } catch (error) {
                 console.error('Error moving to trash product:', error);
                 toast.error('Something went wrong while deleting the product.');
+            }
+        }
+    };
+
+    const handleRestore = async (productId) => {
+        if (window.confirm('Restore this product from trash?')) {
+            try {
+                const { data } = await restoreFromTrash(`${import.meta.env.VITE_SERVER_URL}/api/v1/service-products`, productId);
+                if (data?.success) {
+                    toast.success(data.message || 'Product restored successfully!');
+                    fetchServiceProducts();
+                } else {
+                    toast.error(data?.message || 'Failed to restore product.');
+                }
+            } catch (error) {
+                console.error('Error restoring product:', error);
+                toast.error(error.response?.data?.message || 'Something went wrong while restoring the product.');
             }
         }
     };
@@ -155,7 +175,7 @@ const ServiceProductList = () => {
                     >
                         {exportingExcel ? 'Preparing Excel…' : 'Download Excel'}
                     </Button>
-                    {canEditServiceProducts ? <Button
+                    {canEditServiceProducts && !isTrashView(viewMode) ? <Button
                         variant="contained"
                         color="primary"
                         onClick={() => navigate('../addServiceProduct')}
@@ -165,6 +185,8 @@ const ServiceProductList = () => {
                     </Button> : null}
                 </div>
             </div>
+
+            <TrashStatusToggle viewMode={viewMode} onChange={setViewMode} />
 
             {/* Search Input */}
             <TextField
@@ -192,6 +214,7 @@ const ServiceProductList = () => {
                                 <TableCell className="font-semibold">Partner Profit</TableCell>
                                 <TableCell className="font-semibold">Employee Commission</TableCell>
                                 <TableCell className="font-semibold">Total Amount</TableCell>
+                                {isTrashView(viewMode) ? <TableCell className="font-semibold">Status</TableCell> : null}
                                 {showActions ? <TableCell className="font-semibold">Action</TableCell> : null}
                             </TableRow>
                         </TableHead>
@@ -222,37 +245,27 @@ const ServiceProductList = () => {
                                         <TableCell>{product.commission ?? 'N/A'}</TableCell>
                                         <TableCell>{product.employeeCommission ?? 'N/A'}</TableCell>
                                         <TableCell>{product.totalAmount}</TableCell>
+                                        {isTrashView(viewMode) ? (
+                                            <TableCell>
+                                                <Chip label="Trash" size="small" color="warning" />
+                                            </TableCell>
+                                        ) : null}
                                         {showActions ? (
                                             <TableCell>
-                                                {canEditServiceProducts ? (
-                                                    <Button
-                                                        variant="contained"
-                                                        color="primary"
-                                                        size="small"
-                                                        startIcon={<EditIcon />}
-                                                        onClick={() => handleEdit(product._id)}
-                                                        className="mr-2 bg-blue-500 hover:bg-blue-600"
-                                                    >
-                                                        Edit
-                                                    </Button>
-                                                ) : null}
-                                                {canDeleteServiceProducts ? (
-                                                    <Button
-                                                        variant="contained"
-                                                        color="error"
-                                                        size="small"
-                                                        startIcon={<DeleteIcon />}
-                                                        onClick={() => handleDelete(product._id)}
-                                                        className="bg-red-500 hover:bg-red-600"
-                                                    >Trash</Button>
-                                                ) : null}
+                                                <TrashActions
+                                                    viewMode={viewMode}
+                                                    onEdit={() => handleEdit(product._id)}
+                                                    onTrash={canDeleteServiceProducts ? () => handleDelete(product._id) : undefined}
+                                                    onRestore={() => handleRestore(product._id)}
+                                                    showEdit={canEditServiceProducts}
+                                                />
                                             </TableCell>
                                         ) : null}
                                     </TableRow>
                                 ))
                             ) : (
                                 <TableRow>
-                                    <TableCell colSpan={showActions ? 9 : 8} className="text-center text-gray-500 py-4">
+                                    <TableCell colSpan={showActions ? (isTrashView(viewMode) ? 10 : 9) : 8} className="text-center text-gray-500 py-4">
                                         No service products found.
                                     </TableCell>
                                 </TableRow>

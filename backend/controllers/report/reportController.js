@@ -1,7 +1,7 @@
 import Report from "../../models/reportModel.js";
 import Company from "../../models/companyModel.js"; // Assuming Company model path
 import Employee from "../../models/employeeModel.js";
-import { softDeleteById, TRASH_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
+import { softDeleteById, restoreById, getTrashListQuery, mapWithRecordStatus, findLinkedRefs, TRASH_SUCCESS_MESSAGE, RESTORE_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
 import Counter from "../../models/counterModel.js";
 import mongoose from "mongoose";
 import { normalizeSendDetailsTo } from "../../utils/normalizeSendDetailsTo.js";
@@ -122,7 +122,7 @@ const enrichReportsWithEmployeeDetails = async (reports) => {
 
     if (userIds.length === 0) return reports;
 
-    const employees = await Employee.find({ userId: { $in: userIds } })
+    const employees = await findLinkedRefs(Employee, { userId: { $in: userIds } })
         .select("-password")
         .populate("department", "name")
         .lean();
@@ -460,16 +460,19 @@ export const getAllReports = async (req, res) => {
             });
         }
 
-        const findQuery = andConditions.length > 0 ? { $and: andConditions } : {};
+        const baseFindQuery = andConditions.length > 0 ? { $and: andConditions } : {};
 
         // Calculate skip for pagination
         const skip = (parseInt(page) - 1) * parseInt(limit);
 
+        const { filter, options } = getTrashListQuery(req, baseFindQuery);
+
         // Get total count of documents matching the filters (before pagination)
-        const totalCount = await Report.countDocuments(findQuery);
+        const totalCount = await Report.countDocuments(filter).setOptions(options);
 
         // Fetch reports with pagination and populate necessary fields
-        const reports = await Report.find(findQuery)
+        const reports = await Report.find(filter)
+            .setOptions(options)
             .populate('company') // Populate company details
             .populate({ path: 'assignedTo', select: ASSIGNED_TO_USER_SELECT })
             .sort({ createdAt: -1 }) // Sort by creation date, newest first
@@ -478,7 +481,7 @@ export const getAllReports = async (req, res) => {
 
         const enrichedReports = await enrichReportsWithEmployeeDetails(reports);
 
-        res.status(200).send({ success: true, message: 'All Reports fetched', reports: enrichedReports, totalCount });
+        res.status(200).send({ success: true, message: 'All Reports fetched', reports: mapWithRecordStatus(enrichedReports), totalCount });
     } catch (error) {
         console.error("Error in getAllReports:", error);
         res.status(500).send({ success: false, message: 'Error in getting reports', error });
@@ -618,5 +621,26 @@ export const deleteReport = async (req, res) => {
     } catch (error) {
         console.error("Error in deleteReport:", error);
         res.status(500).send({ success: false, message: 'Error in deleting report', error });
+    }
+};
+
+// Restore Report from trash
+export const restoreReport = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const restoredReport = await restoreById(Report, id);
+
+        if (!restoredReport) {
+            return res.status(404).send({ success: false, message: 'Report not found in trash.' });
+        }
+        const enrichedReport = await enrichReportsWithEmployeeDetails(restoredReport);
+        res.status(200).send({
+            success: true,
+            message: RESTORE_SUCCESS_MESSAGE,
+            report: mapWithRecordStatus([enrichedReport])[0],
+        });
+    } catch (error) {
+        console.error("Error in restoreReport:", error);
+        res.status(500).send({ success: false, message: 'Error in restoring report', error });
     }
 };

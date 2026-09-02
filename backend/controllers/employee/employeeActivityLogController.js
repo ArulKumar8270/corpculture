@@ -2,7 +2,7 @@ import EmployeeActivityLog from "../../models/employeeActivityLogModel.js";
 import Company from "../../models/companyModel.js";
 import Employee from "../../models/employeeModel.js";
 import CommonDetails from "../../models/commonDetailsModel.js";
-import { softDeleteOne, TRASH_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
+import { softDeleteOne, restoreById, getTrashListQuery, mapWithRecordStatus, TRASH_SUCCESS_MESSAGE, RESTORE_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
 
 async function computePetrolAmount(km) {
     const n = Number(km);
@@ -605,7 +605,10 @@ export const getAllActivityLogsController = async (req, res) => {
 
         const skip = (parseInt(page) - 1) * parseInt(limit);
 
-        const activityLogs = await EmployeeActivityLog.find(query)
+        const { filter, options } = getTrashListQuery(req, query);
+
+        const activityLogs = await EmployeeActivityLog.find(filter)
+            .setOptions(options)
             .populate("employeeId", "name email")
             .populate("userId", "name email")
             .populate("fromCompany", "companyName")
@@ -635,12 +638,12 @@ export const getAllActivityLogsController = async (req, res) => {
             await EmployeeActivityLog.bulkWrite(ops, { ordered: false });
         }
 
-        const totalCount = await EmployeeActivityLog.countDocuments(query);
+        const totalCount = await EmployeeActivityLog.countDocuments(filter).setOptions(options);
 
         res.status(200).send({
             success: true,
             message: "Activity logs fetched successfully",
-            activityLogs,
+            activityLogs: mapWithRecordStatus(activityLogs),
             totalCount,
             currentPage: parseInt(page),
             totalPages: Math.ceil(totalCount / parseInt(limit)),
@@ -701,3 +704,30 @@ export const updateActivityLogStatusAdminController = async (req, res) => {
     }
 };
 
+// Restore activity log from trash
+export const restoreActivityLogController = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const restoredLog = await restoreById(EmployeeActivityLog, id);
+
+        if (!restoredLog) {
+            return res.status(404).send({
+                success: false,
+                message: "Activity log not found in trash.",
+            });
+        }
+
+        res.status(200).send({
+            success: true,
+            message: RESTORE_SUCCESS_MESSAGE,
+            activityLog: mapWithRecordStatus([restoredLog])[0],
+        });
+    } catch (error) {
+        console.error("Error restoring activity log:", error);
+        res.status(500).send({
+            success: false,
+            message: "Error in restoring activity log",
+            error: error.message,
+        });
+    }
+};

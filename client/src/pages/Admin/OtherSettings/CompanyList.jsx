@@ -8,6 +8,10 @@ import {
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
+import TrashStatusToggle from '../../../components/TrashStatusToggle';
+import TrashActions from '../../../components/TrashActions';
+import { buildTrashListUrl, restoreFromTrash, isTrashView } from '../../../utils/trashApi';
+import { Chip } from '@mui/material';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 
@@ -23,15 +27,17 @@ const CompanyList = () => {
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [totalCount, setTotalCount] = useState(0);
     const [exportingExcel, setExportingExcel] = useState(false);
+    const [viewMode, setViewMode] = useState('active');
 
 
     const fetchCompanies = async () => {
         try {
             setLoading(true);
             const queryParams = new URLSearchParams({
-                page: page + 1, // Backend expects 1-indexed page
+                page: page + 1,
                 limit: rowsPerPage,
-                search: appliedSearch || ''
+                search: appliedSearch || '',
+                status: viewMode === 'trash' ? 'trash' : 'active',
             }).toString();
 
             const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/company/all?${queryParams}`, {
@@ -61,7 +67,7 @@ const CompanyList = () => {
             fetchCompanies();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [auth?.token, page, rowsPerPage, appliedSearch]);
+    }, [auth?.token, page, rowsPerPage, appliedSearch, viewMode]);
 
     useEffect(() => {
         setPage(0);
@@ -89,6 +95,25 @@ const CompanyList = () => {
         } catch (err) {
             console.error('Error moving to trash company:', err);
             toast.error(err.response?.data?.message || 'Something went wrong while deleting the company.');
+        }
+    };
+
+    const handleRestoreCompany = async (companyId) => {
+        if (!window.confirm('Restore this company from trash?')) return;
+        try {
+            const { data } = await restoreFromTrash(
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/company`,
+                companyId
+            );
+            if (data?.success) {
+                toast.success(data.message || 'Company restored successfully.');
+                await fetchCompanies();
+            } else {
+                toast.error(data?.message || 'Failed to restore company.');
+            }
+        } catch (err) {
+            console.error('Error restoring company:', err);
+            toast.error(err.response?.data?.message || 'Something went wrong while restoring the company.');
         }
     };
 
@@ -238,11 +263,13 @@ const CompanyList = () => {
                         color="primary"
                         onClick={() => navigate("../addCompany")}
                         className="bg-[#019ee3] hover:bg-[#017bb3] text-white px-4 py-2 rounded"
+                        sx={{ display: isTrashView(viewMode) ? 'none' : undefined }}
                     >
                         Add New Company
                     </Button>
                 </div>
             </div>
+            <TrashStatusToggle viewMode={viewMode} onChange={setViewMode} />
             {/* Filter Section */}
             <Paper className="p-4 mb-4 shadow-md rounded-xl bg-white">
                 <Typography variant="h6" className="mb-1 text-[#019ee3] font-semibold">
@@ -304,8 +331,7 @@ const CompanyList = () => {
                                         {/* <TableCell sx={{ color: 'white' }}>Invoice Type</TableCell> */}
                                         <TableCell sx={{ color: 'white' }}>Contact Person</TableCell>
                                         <TableCell sx={{ color: 'white' }}>Company Mobile</TableCell>
-                                        {/* <TableCell sx={{ color: 'white' }}>Customer Type</TableCell> */}
-                                        {/* <TableCell sx={{ color: 'white' }}>Created At</TableCell> */}
+                                        {isTrashView(viewMode) ? <TableCell sx={{ color: 'white' }}>Status</TableCell> : null}
                                         {hasPermission("reportsCompanyList") ? <TableCell sx={{ color: 'white', position: 'sticky', right: 0, bgcolor: '#019ee3', zIndex: 1 }}>Action</TableCell> : null}
                                     </TableRow>
                                 </TableHead>
@@ -320,32 +346,20 @@ const CompanyList = () => {
                                         <TableCell>{company.gstNo || 'N/A'}</TableCell>
                                         {/* <TableCell>{company.invoiceType}</TableCell> */}
                                         <TableCell>{company.contactPersons?.[0]?.name || company.contactPerson || 'N/A'}</TableCell>
-                                        <TableCell>{company.phone || company.contactPersons?.[0]?.mobile || 'N/A'}</TableCell> {/* Updated to prioritize company.phone */}
-                                        {/* <TableCell>{company.customerType || 'N/A'}</TableCell> */}
-                                        {/* <TableCell>{new Date(company.createdAt).toLocaleDateString()}</TableCell> */}
-                                        {/* {hasPermission("reportsCompanyList") ?  */}
+                                        <TableCell>{company.phone || company.contactPersons?.[0]?.mobile || 'N/A'}</TableCell>
+                                        {isTrashView(viewMode) ? (
+                                            <TableCell>
+                                                <Chip label="Trash" size="small" color="warning" />
+                                            </TableCell>
+                                        ) : null}
                                         <TableCell>
-                                            <Button
-                                                variant="contained"
-                                                size="small"
-                                                onClick={() => navigate(`../addCompany/${company._id}`)}
-                                                className="hover:bg-[#017bb3] text-black px-3 py-1 rounded mr-2"
-                                                sx={{ position: 'sticky', right: 0, bgcolor: 'black', zIndex: 1, whiteSpace: 'nowrap', marginBottom: '10px' }}
-                                            >
-                                                Edit
-                                            </Button>
-                                            {isAdmin ? (
-                                                <Button
-                                                    variant="contained"
-                                                    size="small"
-                                                    color="error"
-                                                    onClick={() => handleTrashCompany(company._id)}
-                                                    className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded"
-                                                    sx={{ whiteSpace: 'nowrap' }}
-                                                >Trash</Button>
-                                            ) : null}
+                                            <TrashActions
+                                                viewMode={viewMode}
+                                                onEdit={() => navigate(`../addCompany/${company._id}`)}
+                                                onTrash={isAdmin ? () => handleTrashCompany(company._id) : undefined}
+                                                onRestore={() => handleRestoreCompany(company._id)}
+                                            />
                                         </TableCell>
-                                        {/* : null} */}
                                     </TableRow>
                                     ))}
                                 </TableBody>

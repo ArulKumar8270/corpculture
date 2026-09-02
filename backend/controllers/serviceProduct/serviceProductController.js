@@ -1,5 +1,5 @@
 import ServiceProduct from "../../models/serviceProductModel.js";
-import { softDeleteById, TRASH_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
+import { softDeleteById, restoreById, getTrashListQuery, mapWithRecordStatus, TRASH_SUCCESS_MESSAGE, RESTORE_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
 import Company from "../../models/companyModel.js"; // Assuming this path is correct
 import GST from "../../models/gstModel.js"; // Assuming this path is correct
 import Material from "../../models/materialModel.js"; // Import Material model
@@ -71,13 +71,15 @@ export const createServiceProduct = async (req, res) => {
 // Get All Service Products
 export const getAllServiceProducts = async (req, res) => {
     try {
-        const serviceProducts = await ServiceProduct.find({})
+        const { filter, options } = getTrashListQuery(req);
+        const serviceProducts = await ServiceProduct.find(filter)
+            .setOptions(options)
             .populate('company') // Populate company name
             .populate('gstType', 'gstType gstPercentage') // Populate GST details
             .populate('productName', 'name unit description') // Populate Material details
             .sort({ createdAt: -1 });
 
-        res.status(200).send({ success: true, message: 'All Service Products fetched', serviceProducts });
+        res.status(200).send({ success: true, message: 'All Service Products fetched', serviceProducts: mapWithRecordStatus(serviceProducts) });
     } catch (error) {
         console.error("Error in getAllServiceProducts:", error);
         res.status(500).send({ success: false, message: 'Error in getting all service products', error });
@@ -213,5 +215,25 @@ export const deleteServiceProduct = async (req, res) => {
     } catch (error) {
         console.error("Error in deleteServiceProduct:", error);
         res.status(500).send({ success: false, message: 'Error in deleting service product', error });
+    }
+};
+
+// Restore Service Product from trash
+export const restoreServiceProduct = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const restoredServiceProduct = await restoreById(ServiceProduct, id);
+
+        if (!restoredServiceProduct) {
+            return res.status(404).send({ success: false, message: 'Service Product not found in trash.' });
+        }
+        res.status(200).send({
+            success: true,
+            message: RESTORE_SUCCESS_MESSAGE,
+            serviceProduct: mapWithRecordStatus([restoredServiceProduct])[0],
+        });
+    } catch (error) {
+        console.error("Error in restoreServiceProduct:", error);
+        res.status(500).send({ success: false, message: 'Error in restoring service product', error });
     }
 };

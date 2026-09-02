@@ -1,6 +1,6 @@
 import EmployeeBenefits from "../../models/employeeBenefitsModel.js";
 import Employee from "../../models/employeeModel.js";
-import { softDeleteById, TRASH_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
+import { softDeleteById, restoreById, getTrashListQuery, mapWithRecordStatus, findLinkedRefs, TRASH_SUCCESS_MESSAGE, RESTORE_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
 
 const benefitPopulate = [
     { path: "employeeId", select: "name email employeeId userId" },
@@ -12,7 +12,7 @@ const benefitPopulate = [
     },
 ];
 
-const fetchBenefitsWithPositiveAmount = async (query, skip, limit) => {
+const fetchBenefitsWithPositiveAmount = async (query, skip, limit, options = {}) => {
     const [aggResult] = await EmployeeBenefits.aggregate([
         { $match: query },
         {
@@ -58,6 +58,7 @@ const fetchBenefitsWithPositiveAmount = async (query, skip, limit) => {
     }
 
     const benefits = await EmployeeBenefits.find({ _id: { $in: ids } })
+        .setOptions(options)
         .populate(benefitPopulate)
         .lean();
 
@@ -102,14 +103,16 @@ export const createEmployeeBenefit = async (req, res) => {
 export const getAllEmployeeBenefits = async (req, res) => {
     try {
         const { employeeId, page = 1, limit = 20 } = req.query;
-        const query = {};
-        if (employeeId) query.employeeId = employeeId;
+        const baseQuery = {};
+        if (employeeId) baseQuery.employeeId = employeeId;
+        const { filter, options } = getTrashListQuery(req, baseQuery);
 
         const skip = (parseInt(page) - 1) * parseInt(limit);
 
         // Backfill (page-scope): older records may store employeeId as User._id.
         // Convert to Employee._id so populate works and employee name shows.
-        const rawPage = await EmployeeBenefits.find(query)
+        const rawPage = await EmployeeBenefits.find(filter)
+            .setOptions(options)
             .select("_id employeeId")
             .sort({ createdAt: -1 })
             .skip(skip)
@@ -121,14 +124,14 @@ export const getAllEmployeeBenefits = async (req, res) => {
             .filter(Boolean);
 
         if (ids.length > 0) {
-            const employeesById = await Employee.find({ _id: { $in: ids } })
+            const employeesById = await findLinkedRefs(Employee, { _id: { $in: ids } })
                 .select("_id")
                 .lean();
             const employeeIdSet = new Set(employeesById.map((e) => String(e._id)));
             const missing = ids.filter((id) => !employeeIdSet.has(String(id)));
 
             if (missing.length > 0) {
-                const employeesByUser = await Employee.find({ userId: { $in: missing } })
+                const employeesByUser = await findLinkedRefs(Employee, { userId: { $in: missing } })
                     .select("_id userId")
                     .lean();
                 const map = new Map(
@@ -154,12 +157,13 @@ export const getAllEmployeeBenefits = async (req, res) => {
         }
 
         const { benefits, totalCount } = await fetchBenefitsWithPositiveAmount(
-            query,
+            filter,
             skip,
-            parseInt(limit)
+            parseInt(limit),
+            options
         );
 
-        res.status(200).send({ success: true, benefits, totalCount });
+        res.status(200).send({ success: true, benefits: mapWithRecordStatus(benefits), totalCount });
     } catch (error) {
         res.status(500).send({ success: false, message: "Error fetching employee benefits", error });
     }
@@ -237,5 +241,23 @@ export const deleteEmployeeBenefit = async (req, res) => {
         res.status(200).send({ success: true, message: TRASH_SUCCESS_MESSAGE });
     } catch (error) {
         res.status(500).send({ success: false, message: "Error deleting employee benefit", error });
+    }
+};
+
+// Restore Employee Benefit from trash
+export const restoreEmployeeBenefit = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const restored = await restoreById(EmployeeBenefits, id);
+        if (!restored) {
+            return res.status(404).send({ success: false, message: "Employee benefit not found in trash." });
+        }
+        res.status(200).send({
+            success: true,
+            message: RESTORE_SUCCESS_MESSAGE,
+            benefit: mapWithRecordStatus([restored])[0],
+        });
+    } catch (error) {
+        res.status(500).send({ success: false, message: "Error restoring employee benefit", error });
     }
 };

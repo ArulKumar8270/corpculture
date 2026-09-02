@@ -7,11 +7,12 @@ import {
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import toast from 'react-hot-toast';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
 import SearchIcon from '@mui/icons-material/Search';
 import { useAuth } from '../../../context/auth';
-import dayjs from 'dayjs'; // Import dayjs
+import TrashStatusToggle from '../../../components/TrashStatusToggle';
+import TrashActions from '../../../components/TrashActions';
+import { buildTrashListUrl, restoreFromTrash, isTrashView, formatLinkedLabel } from '../../../utils/trashApi';
+import dayjs from 'dayjs';
 
 const PurchaseList = () => {
     const navigate = useNavigate();
@@ -23,7 +24,8 @@ const PurchaseList = () => {
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [searchTerm, setSearchTerm] = useState('');
     const [materials, setMaterials] = useState([]); // New state for materials
-    const [stockTab, setStockTab] = useState('inStock'); // inStock | lowStock | noStock
+    const [stockTab, setStockTab] = useState('inStock');
+    const [viewMode, setViewMode] = useState('active');
 
     const hasPermission = (key) => {
         return userPermissions.some(p => p.key === key && p.actions.includes('edit')) || auth?.user?.role === 1;
@@ -32,7 +34,8 @@ const PurchaseList = () => {
     const fetchPurchases = async () => {
         try {
             setLoading(true);
-            const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/purchases`);
+            const url = buildTrashListUrl(`${import.meta.env.VITE_SERVER_URL}/api/v1/purchases`, viewMode);
+            const { data } = await axios.get(url);
             if (data?.success) {
                 setPurchases(data.purchases);
             } else {
@@ -64,8 +67,8 @@ const PurchaseList = () => {
 
     useEffect(() => {
         fetchPurchases();
-        fetchMaterials(); // Call fetchMaterials on component mount
-    }, []);
+        fetchMaterials();
+    }, [viewMode]);
 
     const handleAddPurchase = () => {
         navigate('../purchaseRegister');
@@ -88,6 +91,23 @@ const PurchaseList = () => {
             } catch (error) {
                 console.error('Error moving to trash purchase:', error);
                 toast.error('Something went wrong while deleting purchase.');
+            }
+        }
+    };
+
+    const handleRestore = async (id) => {
+        if (window.confirm('Restore this purchase record from trash?')) {
+            try {
+                const { data } = await restoreFromTrash(`${import.meta.env.VITE_SERVER_URL}/api/v1/purchases`, id);
+                if (data?.success) {
+                    toast.success(data?.message || 'Purchase restored successfully.');
+                    fetchPurchases();
+                } else {
+                    toast.error(data?.message || 'Failed to restore purchase.');
+                }
+            } catch (error) {
+                console.error('Error restoring purchase:', error);
+                toast.error('Something went wrong while restoring purchase.');
             }
         }
     };
@@ -168,7 +188,7 @@ const PurchaseList = () => {
                 <Typography variant="h5" className="font-semibold text-blue-600">
                     Material List
                 </Typography>
-                {hasPermission("vendorPurchaseList") ? <Button
+                {hasPermission("vendorPurchaseList") && !isTrashView(viewMode) ? <Button
                     variant="contained"
                     className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md"
                     onClick={handleAddPurchase}
@@ -177,7 +197,10 @@ const PurchaseList = () => {
                 </Button> : null}
             </div>
 
+            <TrashStatusToggle viewMode={viewMode} onChange={setViewMode} />
+
             {/* Product Summary Section */}
+            {!isTrashView(viewMode) ? (
             <Paper className="p-4 mb-4 shadow-md w-[95%] max-h-[300px] overflow-y-auto" elevation={3}>
                 <Typography variant="h6" className="font-semibold mb-3">
                     Material Summary
@@ -258,8 +281,9 @@ const PurchaseList = () => {
                     </Table>
                 </TableContainer> */}
             </Paper>
+            ) : null}
 
-            <Paper className="p-6 shadow-md w-[95%]" elevation={3}> {/* Increased elevation for a modern look */}
+            <Paper className="p-6 shadow-md w-[95%]" elevation={3}>
                 <div className="mb-4">
                     <TextField
                         label="Search Purchases (Product, Invoice, Vendor, Date)" // Updated label
@@ -296,6 +320,7 @@ const PurchaseList = () => {
                                     <TableCell align="right" sx={{ fontWeight: 'bold', backgroundColor: '#f0f0f0' }}>Rate</TableCell>
                                     <TableCell align="right" sx={{ fontWeight: 'bold', backgroundColor: '#f0f0f0' }}>Price</TableCell>
                                     <TableCell align="right" sx={{ fontWeight: 'bold', backgroundColor: '#f0f0f0' }}>Gross Total</TableCell>
+                                    {isTrashView(viewMode) ? <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#f0f0f0' }}>Status</TableCell> : null}
                                     {hasPermission("vendorPurchaseList") ? <TableCell align="center" sx={{ fontWeight: 'bold', backgroundColor: '#f0f0f0' }}>Actions</TableCell> : null}
                                 </TableRow>
                             </TableHead>
@@ -306,32 +331,27 @@ const PurchaseList = () => {
                                         <TableRow key={purchase._id}>
                                             <TableCell>{page * rowsPerPage + index + 1}</TableCell>
                                             <TableCell>{purchase.purchaseInvoiceNumber}</TableCell>
-                                            <TableCell>{purchase.vendorCompanyName?.companyName}</TableCell>
-                                            <TableCell>{purchase.productName?.productName}</TableCell> {/* Updated this line */}
+                                            <TableCell>{formatLinkedLabel(purchase.vendorCompanyName)}</TableCell>
+                                            <TableCell>{formatLinkedLabel(purchase.productName, ['productName'])}</TableCell>
                                             <TableCell>{new Date(purchase.purchaseDate).toLocaleDateString()}</TableCell>
                                             <TableCell align="right" style={{ color: purchase.quantity < 0 ? 'red' : 'inherit' }}>{purchase.quantity}</TableCell>
                                             <TableCell align="right">{purchase.rate.toFixed(2)}</TableCell>
                                             <TableCell align="right">{purchase.price.toFixed(2)}</TableCell>
                                             <TableCell align="right">{purchase.grossTotal.toFixed(2)}</TableCell>
+                                            {isTrashView(viewMode) ? (
+                                                <TableCell>
+                                                    <Chip label="Trash" size="small" color="warning" />
+                                                </TableCell>
+                                            ) : null}
                                            {hasPermission("vendorPurchaseList") ? <TableCell align="center">
-                                                <div className="flex justify-center space-x-2">
-                                                    <Button
-                                                        variant="contained"
-                                                        startIcon={<EditIcon />}
-                                                        className="bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 text-xs"
-                                                        onClick={() => handleEdit(purchase._id)}
-                                                    >
-                                                        EDIT
-                                                    </Button>
-                                                    <Button
-                                                        variant="contained"
-                                                        startIcon={<DeleteIcon />}
-                                                        className="bg-red-600 hover:bg-red-700 text-white px-2 py-1 text-xs"
-                                                        onClick={() => handleDelete(purchase._id)}
-                                                    >
-                                                        DELETE
-                                                    </Button>
-                                                </div>
+                                                <TrashActions
+                                                    viewMode={viewMode}
+                                                    onEdit={() => handleEdit(purchase._id)}
+                                                    onTrash={() => handleDelete(purchase._id)}
+                                                    onRestore={() => handleRestore(purchase._id)}
+                                                    editLabel="EDIT"
+                                                    trashLabel="DELETE"
+                                                />
                                             </TableCell> : null}
                                         </TableRow>
                                     ))}

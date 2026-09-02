@@ -1,5 +1,5 @@
 import GST from "../../models/gstModel.js";
-import { softDeleteById, TRASH_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
+import { softDeleteById, restoreById, getTrashListQuery, mapWithRecordStatus, TRASH_SUCCESS_MESSAGE, RESTORE_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
 
 // Create GST Type
 export const createGst = async (req, res) => {
@@ -31,8 +31,9 @@ export const createGst = async (req, res) => {
 // Get All GST Types
 export const getAllGst = async (req, res) => {
     try {
-        const gstTypes = await GST.find({}).sort({ createdAt: -1 });
-        res.status(200).send({ success: true, message: 'All GST Types fetched', gst: gstTypes });
+        const { filter, options } = getTrashListQuery(req);
+        const gstTypes = await GST.find(filter).setOptions(options).sort({ createdAt: -1 });
+        res.status(200).send({ success: true, message: 'All GST Types fetched', gst: mapWithRecordStatus(gstTypes) });
     } catch (error) {
         console.error("Error in getAllGst:", error);
         res.status(500).send({ success: false, message: 'Error in getting all GST Types', error });
@@ -97,5 +98,23 @@ export const deleteGst = async (req, res) => {
     } catch (error) {
         console.error("Error in deleteGst:", error);
         res.status(500).send({ success: false, message: 'Error in deleting GST Type', error });
+    }
+};
+
+// Restore GST Type from trash
+export const restoreGst = async (req, res) => {
+    try {
+        const restoredGst = await restoreById(GST, req.params.id);
+        if (!restoredGst) {
+            return res.status(404).send({ success: false, message: 'GST Type not found in trash.' });
+        }
+        res.status(200).send({
+            success: true,
+            message: RESTORE_SUCCESS_MESSAGE,
+            gst: mapWithRecordStatus([restoredGst])[0],
+        });
+    } catch (error) {
+        console.error("Error in restoreGst:", error);
+        res.status(500).send({ success: false, message: 'Error in restoring GST Type', error });
     }
 };

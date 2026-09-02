@@ -20,6 +20,13 @@ import { usePermissions } from '../../hooks/usePermissions';
 import axios from 'axios';
 import { getApiBaseUrl } from '../../services/api';
 import Toast from 'react-native-toast-message';
+import TrashStatusToggle from '../../components/TrashStatusToggle';
+import {
+  buildTrashListUrl,
+  restoreFromTrash,
+  isTrashView,
+  type TrashViewMode,
+} from '../../utils/trashApi';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 
@@ -48,30 +55,31 @@ const RentalProductListScreen = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [exportingExcel, setExportingExcel] = useState(false);
+  const [viewMode, setViewMode] = useState<TrashViewMode>('active');
   const ROWS_PER_PAGE_OPTIONS = [5, 10, 25, 50, 100];
 
   useEffect(() => {
     fetchRentalProducts();
     fetchEmployees();
-  }, []);
+  }, [viewMode]);
 
   useFocusEffect(
     useCallback(() => {
       fetchRentalProducts();
       fetchEmployees();
-    }, [token])
+    }, [token, viewMode])
   );
 
   const fetchRentalProducts = async () => {
     try {
       setLoading(true);
-      const { data } = await axios.get(`${getApiBaseUrl()}/rental-products`, {
+      const { data } = await axios.get(buildTrashListUrl('/rental-products', viewMode), {
         headers: {
           Authorization: token || '',
         },
       });
-      if (data?.success && data.rentalProducts?.length > 0) {
-        setProducts(data.rentalProducts);
+      if (data?.success) {
+        setProducts(data.rentalProducts || []);
       } else {
         setProducts([]);
       }
@@ -152,6 +160,40 @@ const RentalProductListScreen = () => {
         },
       ]
     );
+  };
+
+  const handleRestore = (productId: string) => {
+    Alert.alert('Restore Rental Product', 'Restore this rental product from trash?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Restore',
+        onPress: async () => {
+          try {
+            const { data } = await restoreFromTrash('/rental-products', productId, token || '');
+            if (data?.success) {
+              Toast.show({
+                type: 'success',
+                text1: 'Success',
+                text2: data.message || 'Rental product restored successfully!',
+              });
+              fetchRentalProducts();
+            } else {
+              Toast.show({
+                type: 'error',
+                text1: 'Error',
+                text2: data?.message || 'Failed to restore rental product.',
+              });
+            }
+          } catch (error: any) {
+            Toast.show({
+              type: 'error',
+              text1: 'Error',
+              text2: error.response?.data?.message || 'Failed to restore rental product.',
+            });
+          }
+        },
+      },
+    ]);
   };
 
   const handleAssignEmployee = async (productId: string, employeeId: string, product: any) => {
@@ -307,7 +349,14 @@ const RentalProductListScreen = () => {
         <View style={styles.productHeader}>
           <Text style={styles.productSNo}>{page * rowsPerPage + index + 1}</Text>
           <View style={styles.productMainInfo}>
-            <Text style={styles.productCompany}>{item.company?.companyName || 'N/A'}</Text>
+            <View style={styles.productTitleRow}>
+              <Text style={styles.productCompany}>{item.company?.companyName || 'N/A'}</Text>
+              {isTrashView(viewMode) && (
+                <View style={styles.trashBadge}>
+                  <Text style={styles.trashBadgeText}>Trash</Text>
+                </View>
+              )}
+            </View>
             <Text style={styles.productModel}>{item.modelName || 'N/A'}</Text>
             <Text style={styles.productSerial}>Serial: {item.serialNo || 'N/A'}</Text>
           </View>
@@ -365,13 +414,32 @@ const RentalProductListScreen = () => {
 
         {hasPermission('rentalAllProducts') && (
           <View style={styles.productActions}>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.editButton]}
-              onPress={() => handleEdit(item)}
-            >
-              <Icon name="edit" size={18} color="#007AFF" />
-              <Text style={styles.actionButtonText}>Edit</Text>
-            </TouchableOpacity>
+            {isTrashView(viewMode) ? (
+              <TouchableOpacity
+                style={[styles.actionButton, styles.restoreButton]}
+                onPress={() => handleRestore(item._id)}
+              >
+                <Icon name="restore" size={18} color="#fff" />
+                <Text style={styles.actionButtonText}>Restore</Text>
+              </TouchableOpacity>
+            ) : (
+              <>
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.editButton]}
+                  onPress={() => handleEdit(item)}
+                >
+                  <Icon name="edit" size={18} color="#007AFF" />
+                  <Text style={styles.actionButtonText}>Edit</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.deleteButton]}
+                  onPress={() => handleDelete(item._id)}
+                >
+                  <Icon name="delete" size={18} color="#FF3B30" />
+                  <Text style={styles.actionButtonText}>Trash</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         )}
       </View>
@@ -400,7 +468,7 @@ const RentalProductListScreen = () => {
               </>
             )}
           </TouchableOpacity>
-          {hasPermission('rentalAllProducts') && (
+          {hasPermission('rentalAllProducts') && !isTrashView(viewMode) && (
             <TouchableOpacity
               style={styles.addButton}
               onPress={() => (navigation as any).navigate('AddRentalProduct')}
@@ -409,6 +477,10 @@ const RentalProductListScreen = () => {
             </TouchableOpacity>
           )}
         </View>
+      </View>
+
+      <View style={styles.toggleContainer}>
+        <TrashStatusToggle viewMode={viewMode} onChange={setViewMode} />
       </View>
 
       {/* Search Input */}
@@ -629,6 +701,27 @@ const styles = StyleSheet.create({
   productMainInfo: {
     flex: 1,
   },
+  productTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  toggleContainer: {
+    paddingHorizontal: 15,
+    paddingTop: 10,
+  },
+  trashBadge: {
+    backgroundColor: '#ff9800',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  trashBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
   productCompany: {
     fontSize: 16,
     fontWeight: '600',
@@ -697,6 +790,12 @@ const styles = StyleSheet.create({
   },
   editButton: {
     backgroundColor: '#e3f2fd',
+  },
+  deleteButton: {
+    backgroundColor: '#ffebee',
+  },
+  restoreButton: {
+    backgroundColor: '#28a745',
   },
   actionButtonText: {
     fontSize: 12,

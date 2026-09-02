@@ -19,6 +19,14 @@ import axios from 'axios';
 import { getApiBaseUrl } from '../../services/api';
 import Toast from 'react-native-toast-message';
 import { usePermissions } from '../../hooks/usePermissions';
+import TrashStatusToggle from '../../components/TrashStatusToggle';
+import {
+  buildTrashListUrl,
+  restoreFromTrash,
+  isTrashView,
+  formatLinkedLabel,
+  type TrashViewMode,
+} from '../../utils/trashApi';
 
 const PurchaseListScreen = () => {
   const navigation = useNavigation();
@@ -31,19 +39,20 @@ const PurchaseListScreen = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [searchTerm, setSearchTerm] = useState('');
+  const [viewMode, setViewMode] = useState<TrashViewMode>('active');
 
   useFocusEffect(
     useCallback(() => {
       fetchPurchases();
       fetchMaterials();
-    }, [token])
+    }, [token, viewMode])
   );
 
   const fetchPurchases = async () => {
     try {
       setLoading(true);
       const response = await axios.get(
-        `${getApiBaseUrl()}/purchases`,
+        buildTrashListUrl('/purchases', viewMode),
         {
           headers: { Authorization: token || '' },
         }
@@ -152,6 +161,40 @@ const PurchaseListScreen = () => {
     );
   };
 
+  const handleRestore = (id: string) => {
+    Alert.alert('Restore Purchase', 'Restore this purchase from trash?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Restore',
+        onPress: async () => {
+          try {
+            const response = await restoreFromTrash('/purchases', id, token || '');
+            if (response.data?.success) {
+              Toast.show({
+                type: 'success',
+                text1: 'Success',
+                text2: response.data.message || 'Purchase restored successfully.',
+              });
+              fetchPurchases();
+            } else {
+              Toast.show({
+                type: 'error',
+                text1: 'Error',
+                text2: response.data?.message || 'Failed to restore purchase.',
+              });
+            }
+          } catch (error: any) {
+            Toast.show({
+              type: 'error',
+              text1: 'Error',
+              text2: error.response?.data?.message || 'Something went wrong while restoring purchase.',
+            });
+          }
+        },
+      },
+    ]);
+  };
+
   const filteredPurchases = purchases.filter((purchase) => {
     const lowerCaseSearchTerm = searchTerm.toLowerCase();
     const productName = purchase?.productName?.productName?.toLowerCase() || '';
@@ -212,20 +255,27 @@ const PurchaseListScreen = () => {
       <View style={styles.purchaseCard}>
         <View style={styles.purchaseHeader}>
           <Text style={styles.serialNumber}>#{page * rowsPerPage + index + 1}</Text>
-          <Text style={styles.invoiceNumber}>{item.purchaseInvoiceNumber || 'N/A'}</Text>
+          <View style={styles.purchaseHeaderRight}>
+            {isTrashView(viewMode) && (
+              <View style={styles.trashBadge}>
+                <Text style={styles.trashBadgeText}>Trash</Text>
+              </View>
+            )}
+            <Text style={styles.invoiceNumber}>{item.purchaseInvoiceNumber || 'N/A'}</Text>
+          </View>
         </View>
 
         <View style={styles.purchaseDetails}>
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Vendor Company:</Text>
             <Text style={styles.detailValue}>
-              {item.vendorCompanyName?.companyName || 'N/A'}
+              {formatLinkedLabel(item.vendorCompanyName)}
             </Text>
           </View>
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Material Name:</Text>
             <Text style={styles.detailValue}>
-              {item.productName?.productName || 'N/A'}
+              {formatLinkedLabel(item.productName, ['productName'])}
             </Text>
           </View>
           <View style={styles.detailRow}>
@@ -264,20 +314,32 @@ const PurchaseListScreen = () => {
 
         {canEdit && (
           <View style={styles.actionButtons}>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.editButton]}
-              onPress={() => handleEdit(item._id)}
-            >
-              <Icon name="edit" size={18} color="#fff" />
-              <Text style={styles.actionButtonText}>Edit</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.deleteButton]}
-              onPress={() => handleDelete(item._id)}
-            >
-              <Icon name="delete" size={18} color="#fff" />
-              <Text style={styles.actionButtonText}>Trash</Text>
-            </TouchableOpacity>
+            {isTrashView(viewMode) ? (
+              <TouchableOpacity
+                style={[styles.actionButton, styles.restoreButton]}
+                onPress={() => handleRestore(item._id)}
+              >
+                <Icon name="restore" size={18} color="#fff" />
+                <Text style={styles.actionButtonText}>Restore</Text>
+              </TouchableOpacity>
+            ) : (
+              <>
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.editButton]}
+                  onPress={() => handleEdit(item._id)}
+                >
+                  <Icon name="edit" size={18} color="#fff" />
+                  <Text style={styles.actionButtonText}>Edit</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.deleteButton]}
+                  onPress={() => handleDelete(item._id)}
+                >
+                  <Icon name="delete" size={18} color="#fff" />
+                  <Text style={styles.actionButtonText}>Trash</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         )}
       </View>
@@ -366,7 +428,7 @@ const PurchaseListScreen = () => {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Material List</Text>
-        {canEdit && (
+        {canEdit && !isTrashView(viewMode) && (
           <TouchableOpacity
             style={styles.addButton}
             onPress={handleAddPurchase}
@@ -374,6 +436,10 @@ const PurchaseListScreen = () => {
             <Text style={styles.addButtonText}>Add New Purchase</Text>
           </TouchableOpacity>
         )}
+      </View>
+
+      <View style={styles.toggleContainer}>
+        <TrashStatusToggle viewMode={viewMode} onChange={setViewMode} />
       </View>
 
       {/* Material Summary Section */}
@@ -576,6 +642,27 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
   },
+  purchaseHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  toggleContainer: {
+    paddingHorizontal: 15,
+    paddingTop: 10,
+    backgroundColor: '#fff',
+  },
+  trashBadge: {
+    backgroundColor: '#ff9800',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  trashBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
   serialNumber: {
     fontSize: 14,
     color: '#666',
@@ -637,6 +724,9 @@ const styles = StyleSheet.create({
   },
   deleteButton: {
     backgroundColor: '#FF3B30',
+  },
+  restoreButton: {
+    backgroundColor: '#28a745',
   },
   actionButtonText: {
     color: '#fff',

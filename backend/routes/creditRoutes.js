@@ -7,7 +7,8 @@ import {
     getCreditsByCompany,
     getMyCompanyCreditBalance,
     updateCredit,
-    deleteCredit
+    deleteCredit,
+    restoreCredit
 } from "../controllers/credit/creditController.js";
 
 const router = express.Router();
@@ -29,6 +30,8 @@ router.get("/company/:companyId", requireSignIn, isAdminOrEmployee, getCreditsBy
 
 // Update Credit || PUT
 router.put("/update/:id", requireSignIn, isAdminOrEmployee, updateCredit);
+
+router.post("/restore/:id", requireSignIn, isAdminOrEmployee, restoreCredit);
 
 // Delete Credit || DELETE
 router.delete("/delete/:id", requireSignIn, isAdminOrEmployee, deleteCredit);

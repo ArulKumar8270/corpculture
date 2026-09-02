@@ -4,12 +4,13 @@ import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import {
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Button, Typography,
-    Select, MenuItem, FormControl, InputLabel, TextField, Pagination, Box
+    Select, MenuItem, FormControl, InputLabel, TextField, Pagination, Box, Chip
 } from '@mui/material';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import { useAuth } from '../../../context/auth';
+import TrashStatusToggle from '../../../components/TrashStatusToggle';
+import TrashActions from '../../../components/TrashActions';
+import { buildTrashListUrl, restoreFromTrash, isTrashView } from '../../../utils/trashApi';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import {
@@ -34,12 +35,13 @@ const RentalProductList = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
     const [exportingExcel, setExportingExcel] = useState(false);
+    const [viewMode, setViewMode] = useState('active');
     const { auth, userPermissions } = useAuth();
 
     useEffect(() => {
         fetchRentalProducts();
-        fetchEmployees(); // Fetch employees when component mounts
-    }, []);
+        fetchEmployees();
+    }, [viewMode]);
 
     // Reset to page 1 when search term changes
     useEffect(() => {
@@ -55,7 +57,8 @@ const RentalProductList = () => {
 
     const fetchRentalProducts = async () => {
         try {
-            const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/rental-products`);
+            const url = buildTrashListUrl(`${import.meta.env.VITE_SERVER_URL}/api/v1/rental-products`, viewMode);
+            const { data } = await axios.get(url);
             if (data?.success) {
                 setRentalProducts(data.rentalProducts || []);
             } else {
@@ -112,6 +115,23 @@ const RentalProductList = () => {
             } catch (error) {
                 console.error('Error moving to trash rental product:', error);
                 toast.error('Something went wrong while deleting the rental product.');
+            }
+        }
+    };
+
+    const handleRestore = async (productId) => {
+        if (window.confirm('Restore this rental product from trash?')) {
+            try {
+                const { data } = await restoreFromTrash(`${import.meta.env.VITE_SERVER_URL}/api/v1/rental-products`, productId);
+                if (data?.success) {
+                    toast.success(data.message || 'Rental product restored successfully!');
+                    fetchRentalProducts();
+                } else {
+                    toast.error(data?.message || 'Failed to restore rental product.');
+                }
+            } catch (error) {
+                console.error('Error restoring rental product:', error);
+                toast.error(error.response?.data?.message || 'Something went wrong while restoring the rental product.');
             }
         }
     };
@@ -250,7 +270,7 @@ const RentalProductList = () => {
                     >
                         {exportingExcel ? 'Preparing Excel…' : 'Download Excel'}
                     </Button>
-                    {canEditRentalProducts ? <Button
+                    {canEditRentalProducts && !isTrashView(viewMode) ? <Button
                         variant="contained"
                         color="primary"
                         onClick={() => navigate('../addRentalProduct')}
@@ -260,6 +280,8 @@ const RentalProductList = () => {
                     </Button> : null}
                 </div>
             </div>
+
+            <TrashStatusToggle viewMode={viewMode} onChange={setViewMode} />
 
             {/* Search Input */}
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 3 }}>
@@ -317,6 +339,7 @@ const RentalProductList = () => {
                                 <TableCell className="font-semibold">Payment Date</TableCell>
                                 <TableCell className="font-semibold">Commission</TableCell> {/* New Table Header */}
                                 <TableCell className="font-semibold">Assigned Employee</TableCell>
+                                {isTrashView(viewMode) ? <TableCell className="font-semibold">Status</TableCell> : null}
                                 {showActions ? <TableCell className="font-semibold">Action</TableCell> : null}
                             </TableRow>
                         </TableHead>
@@ -345,10 +368,11 @@ const RentalProductList = () => {
                                         <TableCell>{product.paymentDate ? formatRentalPaymentDateIst(product.paymentDate) : 'N/A'}</TableCell>
                                         <TableCell>{product.commission ? `${product.commission}%` : 'N/A'}</TableCell> {/* Display Commission */}
                                         <TableCell>
+                                            {!isTrashView(viewMode) ? (
                                             <FormControl variant="outlined" size="small" fullWidth>
                                                 <InputLabel>Employee</InputLabel>
                                                 <Select
-                                                    value={product.employeeId || ''} // Set selected value based on product's assigned employee ID
+                                                    value={product.employeeId || ''}
                                                     onChange={(e) => handleAssignEmployee(product._id, e.target.value, product)}
                                                     label="Employee"
                                                     disabled={auth?.user?.role === 1 ? false : true}
@@ -358,44 +382,36 @@ const RentalProductList = () => {
                                                     </MenuItem>
                                                     {employees.map((employee) => (
                                                         <MenuItem key={employee._id} value={employee._id}>
-                                                            {employee.name} {/* Assuming employee object has a 'fullName' property */}
+                                                            {employee.name}
                                                         </MenuItem>
                                                     ))}
                                                 </Select>
                                             </FormControl>
+                                            ) : (
+                                                getAssignedEmployeeName(product) || 'N/A'
+                                            )}
                                         </TableCell>
+                                        {isTrashView(viewMode) ? (
+                                            <TableCell>
+                                                <Chip label="Trash" size="small" color="warning" />
+                                            </TableCell>
+                                        ) : null}
                                         {showActions ? (
                                             <TableCell>
-                                                {canEditRentalProducts ? (
-                                                    <Button
-                                                        variant="contained"
-                                                        color="primary"
-                                                        size="small"
-                                                        startIcon={<EditIcon />}
-                                                        onClick={() => handleEdit(product._id)}
-                                                        className="mr-2 bg-blue-500 hover:bg-blue-600"
-                                                    >
-                                                        Edit
-                                                    </Button>
-                                                ) : null}
-
-                                                {canDeleteRentalProducts ? (
-                                                    <Button
-                                                        variant="contained"
-                                                        color="error"
-                                                        size="small"
-                                                        startIcon={<DeleteIcon />}
-                                                        onClick={() => handleDelete(product._id)}
-                                                        className="bg-red-500 hover:bg-red-600"
-                                                    >Trash</Button>
-                                                ) : null}
+                                                <TrashActions
+                                                    viewMode={viewMode}
+                                                    onEdit={() => handleEdit(product._id)}
+                                                    onTrash={canDeleteRentalProducts ? () => handleDelete(product._id) : undefined}
+                                                    onRestore={() => handleRestore(product._id)}
+                                                    showEdit={canEditRentalProducts}
+                                                />
                                             </TableCell>
                                         ) : null}
                                     </TableRow>
                                 ))
                             ) : (
                                 <TableRow>
-                                    <TableCell colSpan={showActions ? 12 : 11} className="text-center text-gray-500 py-4">
+                                    <TableCell colSpan={showActions ? (isTrashView(viewMode) ? 13 : 12) : (isTrashView(viewMode) ? 12 : 11)} className="text-center text-gray-500 py-4">
                                         No rental products found.
                                     </TableCell>
                                 </TableRow>

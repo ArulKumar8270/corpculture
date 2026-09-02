@@ -34,7 +34,10 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import axios from 'axios';
 import { useAuth } from '../../../context/auth';
-import * as XLSX from 'xlsx'; // Import xlsx library
+import TrashStatusToggle from '../../../components/TrashStatusToggle';
+import TrashActions from '../../../components/TrashActions';
+import { buildTrashListUrl, restoreFromTrash, isTrashView } from '../../../utils/trashApi';
+import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver'; // Import saveAs from file-saver
 import { collectSignedCopyDownloadCandidates } from '../../../utils/functions';
 
@@ -337,6 +340,7 @@ const ServiceInvoicesReport = (props) => {
     const [balanceAmount, setBalanceAmount] = useState(0);
     const [pendingAmount, setPendingAmount] = useState(0);
     const [savingPayment, setSavingPayment] = useState(false);
+    const [viewMode, setViewMode] = useState('active');
     const { companyId: filterCompanyId } = useParams();
 
     const hasPermission = (key) =>
@@ -394,9 +398,13 @@ const ServiceInvoicesReport = (props) => {
                 limit: currentRowsPerPage,
             };
 
-            const response = await axios.post(
+            const listUrl = buildTrashListUrl(
                 `${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/all`,
-                requestBody, // Send filters and pagination in the request body
+                viewMode
+            );
+            const response = await axios.post(
+                listUrl,
+                requestBody,
                 {
                     headers: { Authorization: auth?.token }
                 }
@@ -425,7 +433,7 @@ const ServiceInvoicesReport = (props) => {
             // Initial fetch with current pagination and filter states
             fetchServiceInvoices(fromDate, toDate, companyNameFilter, invoiceNumberFilter, paymentStatusFilter, page, rowsPerPage);
         }
-    }, [auth?.token, page, rowsPerPage]); // Re-fetch when page or rowsPerPage changes
+    }, [auth?.token, page, rowsPerPage, viewMode]);
 
     const handleView = (invoiceId) => {
         navigate(`../addServiceInvoice/${invoiceId}`);
@@ -532,6 +540,26 @@ const ServiceInvoicesReport = (props) => {
             } catch (err) {
                 console.error('Error moving to trash invoice:', err);
                 toast.error(err.response?.data?.message || 'Something went wrong while deleting invoice.');
+            }
+        }
+    };
+
+    const handleRestore = async (invoiceId) => {
+        if (window.confirm('Restore this invoice from trash?')) {
+            try {
+                const { data } = await restoreFromTrash(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice`,
+                    invoiceId
+                );
+                if (data?.success) {
+                    toast.success(data.message || 'Invoice restored successfully');
+                    fetchServiceInvoices(fromDate, toDate, companyNameFilter, invoiceNumberFilter, paymentStatusFilter, page, rowsPerPage);
+                } else {
+                    toast.error(data?.message || 'Failed to restore invoice.');
+                }
+            } catch (err) {
+                console.error('Error restoring invoice:', err);
+                toast.error(err.response?.data?.message || 'Something went wrong while restoring invoice.');
             }
         }
     };
@@ -850,7 +878,7 @@ const ServiceInvoicesReport = (props) => {
             const requestBody = buildListRequestBody(0, exportLimit);
 
             const response = await axios.post(
-                `${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/all`,
+                buildTrashListUrl(`${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/all`, viewMode),
                 requestBody,
                 { headers: { Authorization: auth?.token } }
             );
@@ -919,6 +947,7 @@ const ServiceInvoicesReport = (props) => {
             <Typography variant="h5" component="h1" gutterBottom sx={{ mb: 3, color: '#019ee3', fontWeight: 'bold' }}>
                 {isQuotationReport ? 'Service Quotations Report' : 'Service Invoices Report'}
             </Typography>
+            <TrashStatusToggle viewMode={viewMode} onChange={setViewMode} />
             <Paper elevation={3} sx={{ p: 2, borderRadius: '8px' }}>
                 {/* Filter Options */}
                 <Box sx={{ mb: 3 }}> {/* Container for all filter rows */}
@@ -1000,13 +1029,15 @@ const ServiceInvoicesReport = (props) => {
                                 <TableCell>Assigned To</TableCell>
                                 {!isQuotationReport ? <TableCell>Payment Details</TableCell> : null}
                                 {!isQuotationReport ? <TableCell>Status</TableCell> : <TableCell>Send Status</TableCell>}
+                                {isTrashView(viewMode) ? <TableCell>Record</TableCell> : null}
                                 <TableCell align="center">PDF</TableCell>
+                                <TableCell align="center">Actions</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
                             {invoices.length === 0 && !loading ? ( // Check loading state to avoid "No data" during initial fetch
                                 <TableRow>
-                                    <TableCell colSpan={8} align="center" sx={{ py: 3, color: 'text.secondary' }}>
+                                    <TableCell colSpan={isTrashView(viewMode) ? 10 : 9} align="center" sx={{ py: 3, color: 'text.secondary' }}>
                                         No service invoices found.
                                     </TableCell>
                                 </TableRow>
@@ -1073,6 +1104,11 @@ const ServiceInvoicesReport = (props) => {
                                                 />
                                             )}
                                         </TableCell>
+                                        {isTrashView(viewMode) ? (
+                                            <TableCell>
+                                                <Chip label="Trash" size="small" color="warning" />
+                                            </TableCell>
+                                        ) : null}
                                         <TableCell align="center">
                                             <Tooltip title={isQuotationReport ? 'Download quotation PDF' : 'Download invoice PDF'}>
                                                 <IconButton
@@ -1108,6 +1144,15 @@ const ServiceInvoicesReport = (props) => {
                                                     <DownloadIcon fontSize="small" />
                                                 </IconButton>
                                             </Tooltip>
+                                        </TableCell>
+                                        <TableCell align="center">
+                                            <TrashActions
+                                                viewMode={viewMode}
+                                                onEdit={() => handleEdit(invoice._id)}
+                                                onTrash={() => handleDelete(invoice._id)}
+                                                onRestore={() => handleRestore(invoice._id)}
+                                                size="small"
+                                            />
                                         </TableCell>
                                     </TableRow>
                                 ))

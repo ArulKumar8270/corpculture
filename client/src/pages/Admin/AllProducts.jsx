@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import axios from "axios";
 import Spinner from "../../components/Spinner";
 import { useAuth } from "../../context/auth";
@@ -8,7 +8,9 @@ import { DataGrid } from "@mui/x-data-grid";
 import Rating from "@mui/material/Rating";
 import Actions from "./Actions";
 import SeoData from "../../SEO/SeoData";
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField } from "@mui/material";
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Chip } from "@mui/material";
+import TrashStatusToggle from "../../components/TrashStatusToggle";
+import { buildTrashListUrl, isTrashView } from "../../utils/trashApi";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 
@@ -17,52 +19,52 @@ const AllProducts = () => {
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [exportingExcel, setExportingExcel] = useState(false);
+    const [viewMode, setViewMode] = useState("active");
 
     const hasPermission = (key) => {
         return userPermissions.some(p => p.key === key && p.actions.includes('edit')) || auth?.user?.role === 1;
     };
 
-    useEffect(() => {
-        const fetchData = async () => {
-            try {
-                const res = await axios.get(
-                    `${import.meta.env.VITE_SERVER_URL
-                    }/api/v1/product/seller-product`,
-                    {
-                        headers: {
-                            Authorization: auth.token,
-                        },
-                    }
-                );
-                // console.log(res.data.products);
+    const fetchProducts = async () => {
+        try {
+            setLoading(true);
+            const url = buildTrashListUrl(
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/product/seller-product`,
+                viewMode
+            );
+            const res = await axios.get(url, {
+                headers: {
+                    Authorization: auth.token,
+                },
+            });
 
-                if (res.data?.products) {
-                    setProducts(res.data.products);
-                }
-                setLoading(false);
-            } catch (error) {
-                console.error("Error fetching data:", error);
-                setLoading(false);
-
-                //server error
-                error.response?.status === 500 &&
-                    toast.error(
-                        "Something went wrong! Please try after sometime."
-                    );
+            if (res.data?.products) {
+                setProducts(res.data.products);
+            } else {
+                setProducts([]);
             }
-        };
-        //initial call to fetch data from server
-        fetchData();
-    }, [auth.token]);
-    //update products details on client side after deletion
-    const updateDeletedProduct = (id) => {
-        setProducts((prevProducts) => {
-            // Filter out the deleted product from the previous products
-            return prevProducts.filter((product) => product._id !== id);
-        });
+            setLoading(false);
+        } catch (error) {
+            console.error("Error fetching data:", error);
+            setLoading(false);
+            error.response?.status === 500 &&
+                toast.error(
+                    "Something went wrong! Please try after sometime."
+                );
+        }
     };
 
-    const columns = [
+    useEffect(() => {
+        if (auth.token) {
+            fetchProducts();
+        }
+    }, [auth.token, viewMode]);
+    //update products details on client side after deletion
+    const updateDeletedProduct = () => {
+        fetchProducts();
+    };
+
+    const columns = useMemo(() => [
         {
             field: "id",
             headerName: "Product ID",
@@ -163,10 +165,19 @@ const AllProducts = () => {
                 );
             },
         },
+        ...(isTrashView(viewMode)
+            ? [{
+                field: "recordStatus",
+                headerName: "Status",
+                minWidth: 100,
+                flex: 0.2,
+                renderCell: () => <Chip label="Trash" size="small" color="warning" />,
+            }]
+            : []),
         ...(hasPermission("salesAllProducts") ? [{
             field: "actions",
             headerName: "Actions",
-            minWidth: 100,
+            minWidth: 160,
             flex: 0.3,
             type: "number",
             sortable: false,
@@ -175,12 +186,14 @@ const AllProducts = () => {
                     <Actions
                         name={params.row.name}
                         updateDeletedProduct={updateDeletedProduct}
+                        onRestore={updateDeletedProduct}
+                        viewMode={viewMode}
                         id={params.row.id}
                     />
                 );
             },
         }] : [])
-    ];
+    ], [viewMode, auth?.user?.role, userPermissions]);
 
     const rows = [];
 
@@ -289,7 +302,7 @@ const AllProducts = () => {
                         <h1 className="text-lg font-bold uppercase text-[#019ee3] tracking-wide">
                             Products
                         </h1>
-                       {hasPermission("salesAllProducts")  ?  <div className="flex gap-2">
+                       {hasPermission("salesAllProducts") && !isTrashView(viewMode) ?  <div className="flex gap-2">
                             <Link
                                 to="/admin/dashboard/add-product"
                                 className="py-2 px-5 rounded-xl shadow font-semibold text-white bg-gradient-to-r from-[#019ee3] to-[#afcb09] hover:from-[#afcb09] hover:to-[#019ee3] transition"
@@ -304,6 +317,8 @@ const AllProducts = () => {
                             </button>
                         </div> : null}
                     </div>
+
+                    <TrashStatusToggle viewMode={viewMode} onChange={setViewMode} />
 
                     {hasPermission("salesAllProducts") ? (
                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 mb-4 bg-gradient-to-r from-[#e6fbff] to-[#f0fff4] border border-[#019ee3] rounded-2xl shadow">

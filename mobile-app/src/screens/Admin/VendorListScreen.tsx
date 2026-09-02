@@ -19,6 +19,13 @@ import axios from 'axios';
 import { getApiBaseUrl } from '../../services/api';
 import Toast from 'react-native-toast-message';
 import { usePermissions } from '../../hooks/usePermissions';
+import TrashStatusToggle from '../../components/TrashStatusToggle';
+import {
+  buildTrashListUrl,
+  restoreFromTrash,
+  isTrashView,
+  type TrashViewMode,
+} from '../../utils/trashApi';
 
 const VendorListScreen = () => {
   const navigation = useNavigation();
@@ -27,6 +34,7 @@ const VendorListScreen = () => {
   const [vendors, setVendors] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [viewMode, setViewMode] = useState<TrashViewMode>('active');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const ROWS_PER_PAGE_OPTIONS = [5, 10, 25, 50, 100];
@@ -35,20 +43,20 @@ const VendorListScreen = () => {
   useFocusEffect(
     useCallback(() => {
       fetchVendors();
-    }, [token])
+    }, [token, viewMode])
   );
 
   const fetchVendors = async () => {
     setLoading(true);
     try {
       const response = await axios.get(
-        `${getApiBaseUrl()}/vendors`,
+        buildTrashListUrl('/vendors', viewMode),
         {
           headers: { Authorization: token || '' },
         }
       );
-      if (response.data?.success && response.data.vendors.length > 0) {
-        setVendors(response.data.vendors);
+      if (response.data?.success) {
+        setVendors(response.data.vendors || []);
       } else {
         setVendors([]);
         if (response.data?.message) {
@@ -125,6 +133,40 @@ const VendorListScreen = () => {
     );
   };
 
+  const handleRestore = (vendorId: string) => {
+    Alert.alert('Restore Vendor', 'Restore this vendor from trash?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Restore',
+        onPress: async () => {
+          try {
+            const response = await restoreFromTrash('/vendors', vendorId, token || '');
+            if (response.data?.success) {
+              Toast.show({
+                type: 'success',
+                text1: 'Success',
+                text2: response.data.message || 'Vendor restored successfully!',
+              });
+              fetchVendors();
+            } else {
+              Toast.show({
+                type: 'error',
+                text1: 'Error',
+                text2: response.data?.message || 'Failed to restore vendor.',
+              });
+            }
+          } catch (error: any) {
+            Toast.show({
+              type: 'error',
+              text1: 'Error',
+              text2: error.response?.data?.message || 'Something went wrong while restoring the vendor.',
+            });
+          }
+        },
+      },
+    ]);
+  };
+
   const filteredVendors = vendors.filter((vendor) => {
     const lowerCaseSearchTerm = searchTerm.toLowerCase();
     const companyName = vendor.companyName?.toLowerCase() || '';
@@ -161,7 +203,14 @@ const VendorListScreen = () => {
         <View style={styles.vendorInfo}>
           <View style={styles.vendorHeader}>
             <Text style={styles.vendorName}>{item.companyName || 'N/A'}</Text>
-            <Text style={styles.serialNumber}>#{page * rowsPerPage + index + 1}</Text>
+            <View style={styles.vendorHeaderRight}>
+              {isTrashView(viewMode) && (
+                <View style={styles.trashBadge}>
+                  <Text style={styles.trashBadgeText}>Trash</Text>
+                </View>
+              )}
+              <Text style={styles.serialNumber}>#{page * rowsPerPage + index + 1}</Text>
+            </View>
           </View>
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>City:</Text>
@@ -186,20 +235,32 @@ const VendorListScreen = () => {
         </View>
         {canEdit && (
           <View style={styles.actionButtons}>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.editButton]}
-              onPress={() => handleEdit(item._id)}
-            >
-              <Icon name="edit" size={18} color="#fff" />
-              <Text style={styles.actionButtonText}>Edit</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.deleteButton]}
-              onPress={() => handleDelete(item._id)}
-            >
-              <Icon name="delete" size={18} color="#fff" />
-              <Text style={styles.actionButtonText}>Trash</Text>
-            </TouchableOpacity>
+            {isTrashView(viewMode) ? (
+              <TouchableOpacity
+                style={[styles.actionButton, styles.restoreButton]}
+                onPress={() => handleRestore(item._id)}
+              >
+                <Icon name="restore" size={18} color="#fff" />
+                <Text style={styles.actionButtonText}>Restore</Text>
+              </TouchableOpacity>
+            ) : (
+              <>
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.editButton]}
+                  onPress={() => handleEdit(item._id)}
+                >
+                  <Icon name="edit" size={18} color="#fff" />
+                  <Text style={styles.actionButtonText}>Edit</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.deleteButton]}
+                  onPress={() => handleDelete(item._id)}
+                >
+                  <Icon name="delete" size={18} color="#fff" />
+                  <Text style={styles.actionButtonText}>Trash</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         )}
       </View>
@@ -212,7 +273,7 @@ const VendorListScreen = () => {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Vendor List</Text>
-        {canAdd && (
+        {canAdd && !isTrashView(viewMode) && (
           <TouchableOpacity
             style={styles.addButton}
             onPress={handleAddVendor}
@@ -220,6 +281,10 @@ const VendorListScreen = () => {
             <Text style={styles.addButtonText}>Add New Vendor</Text>
           </TouchableOpacity>
         )}
+      </View>
+
+      <View style={styles.toggleContainer}>
+        <TrashStatusToggle viewMode={viewMode} onChange={setViewMode} />
       </View>
 
       <View style={styles.searchContainer}>
@@ -376,6 +441,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 10,
   },
+  vendorHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  toggleContainer: {
+    paddingHorizontal: 15,
+    paddingTop: 10,
+  },
+  trashBadge: {
+    backgroundColor: '#ff9800',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  trashBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
   vendorName: {
     fontSize: 18,
     fontWeight: 'bold',
@@ -425,6 +510,9 @@ const styles = StyleSheet.create({
   },
   deleteButton: {
     backgroundColor: '#FF3B30',
+  },
+  restoreButton: {
+    backgroundColor: '#28a745',
   },
   actionButtonText: {
     color: '#fff',

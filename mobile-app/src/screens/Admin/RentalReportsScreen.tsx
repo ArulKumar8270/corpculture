@@ -21,6 +21,13 @@ import { getApiBaseUrl } from '../../services/api';
 import Toast from 'react-native-toast-message';
 import ReportListFilters from '../../components/ReportListFilters';
 import ReportPagination from '../../components/ReportPagination';
+import TrashStatusToggle from '../../components/TrashStatusToggle';
+import {
+  buildTrashListUrl,
+  restoreFromTrash,
+  isTrashView,
+  type TrashViewMode,
+} from '../../utils/trashApi';
 import {
   getReportSendWebhook,
   isOperationalDocumentReportType,
@@ -30,7 +37,6 @@ import {
   getDocumentPermissionKey,
   RENTAL_REPORT_TYPE,
   buildReportListQueryParams,
-  getReportsListUrl,
   ReportListFilterValues,
 } from '../../utils/reportListApi';
 import { collectReportSerialNumbers } from '../../utils/reportSerialNumbers';
@@ -74,6 +80,8 @@ const RentalReportsScreen = () => {
     assignedTo: '',
     serialNo: '',
   });
+  const [viewMode, setViewMode] = useState<TrashViewMode>('active');
+
   const fetchReports = useCallback(
     async (filterValues = filters, currentPage = page, currentRowsPerPage = rowsPerPage) => {
       if (!token) return;
@@ -85,13 +93,11 @@ const RentalReportsScreen = () => {
           currentPage,
           currentRowsPerPage
         );
-        const url = getReportsListUrl(
-          getApiBaseUrl(),
-          reportTypeKey,
-          user?.role,
-          user?._id,
-          query
-        );
+        const path =
+          Number(user?.role) === 3 && user?._id
+            ? `/report/getByassigned/${user._id}/${reportTypeKey}?${query.toString()}`
+            : `/report/${reportTypeKey}?${query.toString()}`;
+        const url = buildTrashListUrl(path, viewMode);
 
         const response = await axios.get(url, {
           headers: { Authorization: token || '' },
@@ -116,12 +122,12 @@ const RentalReportsScreen = () => {
         setLoading(false);
       }
     },
-    [token, user?.role, user?._id, reportTypeKey]
+    [token, user?.role, user?._id, reportTypeKey, viewMode]
   );
 
   useEffect(() => {
     if (token) fetchReports(filters, page, rowsPerPage);
-  }, [token, page, rowsPerPage]);
+  }, [token, page, rowsPerPage, viewMode]);
 
   const handleApplyFilters = () => {
     setPage(0);
@@ -194,6 +200,40 @@ const RentalReportsScreen = () => {
               type: 'error',
               text1: 'Error',
               text2: error.response?.data?.message || 'Failed to move to trash report',
+            });
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleRestore = (reportId: string) => {
+    Alert.alert('Restore Report', 'Restore this report from trash?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Restore',
+        onPress: async () => {
+          try {
+            const response = await restoreFromTrash('/report', reportId, token || '');
+            if (response.data?.success) {
+              Toast.show({
+                type: 'success',
+                text1: 'Success',
+                text2: response.data.message || 'Report restored successfully',
+              });
+              fetchReports();
+            } else {
+              Toast.show({
+                type: 'error',
+                text1: 'Error',
+                text2: response.data?.message || 'Failed to restore report',
+              });
+            }
+          } catch (error: any) {
+            Toast.show({
+              type: 'error',
+              text1: 'Error',
+              text2: error.response?.data?.message || 'Failed to restore report',
             });
           }
         },
@@ -402,6 +442,11 @@ const RentalReportsScreen = () => {
                 ? getDocumentTitle(reportTypeKey)
                 : item.reportType || 'Rental Report'}
             </Text>
+            {isTrashView(viewMode) && (
+              <View style={styles.trashBadge}>
+                <Text style={styles.trashBadgeText}>Trash</Text>
+              </View>
+            )}
             <Text style={styles.companyName}>{item.company?.companyName || 'N/A'}</Text>
             {/* Model/Serial/Usage/Description are now per-product (inside Materials) */}
           </View>
@@ -440,77 +485,90 @@ const RentalReportsScreen = () => {
         </View>
 
         <View style={styles.actionButtons}>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.sendButton]}
-            onPress={() => handleSendReport(item)}
-            disabled={isSendingThis}
-          >
-            {isSendingThis ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <>
-                <Icon name="send" size={18} color="#fff" />
-                <Text style={[styles.actionButtonText, styles.sendButtonText]}>
-                  {isOperationalDocumentReportType(reportTypeKey)
-                    ? `Send ${getDocumentTitle(reportTypeKey)}`
-                    : 'Send'}
-                </Text>
-              </>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.uploadButton]}
-            onPress={() => handleUploadReport(item)}
-            disabled={isUploadingThis}
-          >
-            {isUploadingThis ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <>
-                <Icon name="upload-file" size={18} color="#fff" />
-                <Text style={[styles.actionButtonText, styles.uploadButtonText]}>Upload</Text>
-              </>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.downloadButton]}
-            onPress={() => handleDownloadReport(item)}
-            disabled={isDownloadingThis}
-          >
-            {isDownloadingThis ? (
-              <ActivityIndicator size="small" color="#007AFF" />
-            ) : (
-              <>
-                <Icon name="download" size={18} color="#007AFF" />
-                <Text style={styles.actionButtonText}>Download</Text>
-              </>
-            )}
-          </TouchableOpacity>
-          {(user?.role === 1 || user?.role === 3) && companyIdFromReport(item) ? (
-            <TouchableOpacity
-              style={[styles.actionButton, styles.editButton]}
-              onPress={() => navigatePetrolForm(item)}
-            >
-              <Icon name="playlist-add-check" size={18} color="#007AFF" />
-              <Text style={styles.actionButtonText}>Petrol Form</Text>
-            </TouchableOpacity>
-          ) : null}
-          {(hasPermission(docPermissionKey, 'edit') || user?.role === 1) && (
-            <TouchableOpacity
-              style={[styles.actionButton, styles.editButton]}
-              onPress={() => handleEdit(item)}
-            >
-              <Icon name="edit" size={18} color="#007AFF" />
-              <Text style={styles.actionButtonText}>Edit</Text>
-            </TouchableOpacity>
+          {!isTrashView(viewMode) && (
+            <>
+              <TouchableOpacity
+                style={[styles.actionButton, styles.sendButton]}
+                onPress={() => handleSendReport(item)}
+                disabled={isSendingThis}
+              >
+                {isSendingThis ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <Icon name="send" size={18} color="#fff" />
+                    <Text style={[styles.actionButtonText, styles.sendButtonText]}>
+                      {isOperationalDocumentReportType(reportTypeKey)
+                        ? `Send ${getDocumentTitle(reportTypeKey)}`
+                        : 'Send'}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.actionButton, styles.uploadButton]}
+                onPress={() => handleUploadReport(item)}
+                disabled={isUploadingThis}
+              >
+                {isUploadingThis ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <Icon name="upload-file" size={18} color="#fff" />
+                    <Text style={[styles.actionButtonText, styles.uploadButtonText]}>Upload</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.actionButton, styles.downloadButton]}
+                onPress={() => handleDownloadReport(item)}
+                disabled={isDownloadingThis}
+              >
+                {isDownloadingThis ? (
+                  <ActivityIndicator size="small" color="#007AFF" />
+                ) : (
+                  <>
+                    <Icon name="download" size={18} color="#007AFF" />
+                    <Text style={styles.actionButtonText}>Download</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+              {(user?.role === 1 || user?.role === 3) && companyIdFromReport(item) ? (
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.editButton]}
+                  onPress={() => navigatePetrolForm(item)}
+                >
+                  <Icon name="playlist-add-check" size={18} color="#007AFF" />
+                  <Text style={styles.actionButtonText}>Petrol Form</Text>
+                </TouchableOpacity>
+              ) : null}
+              {(hasPermission(docPermissionKey, 'edit') || user?.role === 1) && (
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.editButton]}
+                  onPress={() => handleEdit(item)}
+                >
+                  <Icon name="edit" size={18} color="#007AFF" />
+                  <Text style={styles.actionButtonText}>Edit</Text>
+                </TouchableOpacity>
+              )}
+              {(hasPermission(docPermissionKey, 'delete') || user?.role === 1) && (
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.deleteButton]}
+                  onPress={() => handleDelete(item._id)}
+                >
+                  <Icon name="delete" size={18} color="#FF3B30" />
+                  <Text style={[styles.actionButtonText, styles.deleteButtonText]}>Trash</Text>
+                </TouchableOpacity>
+              )}
+            </>
           )}
-          {(hasPermission(docPermissionKey, 'delete') || user?.role === 1) && (
+          {isTrashView(viewMode) && (hasPermission(docPermissionKey, 'edit') || hasPermission(docPermissionKey, 'delete') || user?.role === 1) && (
             <TouchableOpacity
-              style={[styles.actionButton, styles.deleteButton]}
-              onPress={() => handleDelete(item._id)}
+              style={[styles.actionButton, styles.restoreButton]}
+              onPress={() => handleRestore(item._id)}
             >
-              <Icon name="delete" size={18} color="#FF3B30" />
-              <Text style={[styles.actionButtonText, styles.deleteButtonText]}>Trash</Text>
+              <Icon name="restore" size={18} color="#fff" />
+              <Text style={[styles.actionButtonText, styles.restoreButtonText]}>Restore</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -623,7 +681,7 @@ const RentalReportsScreen = () => {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>{screenTitle}</Text>
-        {(hasPermission(docPermissionKey, 'edit') || user?.role === 1) && (
+        {(hasPermission(docPermissionKey, 'edit') || user?.role === 1) && !isTrashView(viewMode) && (
           <TouchableOpacity
             style={styles.addButton}
             onPress={() =>
@@ -636,6 +694,10 @@ const RentalReportsScreen = () => {
             <Icon name="add" size={24} color="#fff" />
           </TouchableOpacity>
         )}
+      </View>
+
+      <View style={styles.toggleContainer}>
+        <TrashStatusToggle viewMode={viewMode} onChange={setViewMode} />
       </View>
 
       <ReportListFilters
@@ -712,6 +774,30 @@ const styles = StyleSheet.create({
     backgroundColor: '#007AFF',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  toggleContainer: {
+    paddingHorizontal: 15,
+    paddingTop: 10,
+    backgroundColor: '#fff',
+  },
+  trashBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#ff9800',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginTop: 4,
+  },
+  trashBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  restoreButton: {
+    backgroundColor: '#28a745',
+  },
+  restoreButtonText: {
+    color: '#fff',
   },
   searchContainer: {
     flexDirection: 'row',

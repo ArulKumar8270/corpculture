@@ -1,8 +1,6 @@
 /* eslint-disable react/prop-types */
 import { useState } from "react";
-import { Link } from "react-router-dom";
-import EditIcon from "@mui/icons-material/Edit";
-import DeleteIcon from "@mui/icons-material/Delete";
+import { useNavigate } from "react-router-dom";
 import Dialog from "@mui/material/Dialog";
 import DialogActions from "@mui/material/DialogActions";
 import DialogTitle from "@mui/material/DialogTitle";
@@ -10,10 +8,13 @@ import DialogContent from "@mui/material/DialogContent";
 import axios from "axios";
 import { toast } from "react-toastify";
 import { useAuth } from "../../context/auth";
+import TrashActions from "../../components/TrashActions";
+import { restoreProductFromTrash } from "../../utils/trashApi";
 
-const Actions = ({ id, name, updateDeletedProduct }) => {
+const Actions = ({ id, name, updateDeletedProduct, viewMode = "active", onRestore }) => {
     const [open, setOpen] = useState(false);
     const { auth } = useAuth();
+    const navigate = useNavigate();
 
     const handleClose = () => {
         setOpen(false);
@@ -51,23 +52,31 @@ const Actions = ({ id, name, updateDeletedProduct }) => {
         }
     };
 
+    const handleRestore = async () => {
+        if (!window.confirm("Restore this product from trash?")) return;
+        try {
+            const res = await restoreProductFromTrash(id);
+            if (res.data?.success) {
+                toast.success(res.data.message || "Product restored successfully!");
+                onRestore?.(id);
+            } else {
+                toast.error(res.data?.message || "Failed to restore product.");
+            }
+        } catch (error) {
+            console.error("Error restoring product:", error);
+            toast.error(error.response?.data?.message || "Something went wrong while restoring the product.");
+        }
+    };
+
     return (
         <>
-            <div className="flex justify-between items-center gap-3">
-                <Link
-                    to={`/admin/dashboard/product/${id}`}
-                    className="text-blue-600 hover:bg-blue-200 p-[1px] rounded-full bg-blue-100"
-                >
-                    <EditIcon />
-                </Link>
-
-                <button
-                    onClick={() => setOpen(true)}
-                    className="text-red-600 hover:bg-red-200 p-[1px] rounded-full bg-red-100"
-                >
-                    <DeleteIcon />
-                </button>
-            </div>
+            <TrashActions
+                viewMode={viewMode}
+                onEdit={() => navigate(`/admin/dashboard/product/${id}`)}
+                onTrash={() => setOpen(true)}
+                onRestore={handleRestore}
+                showEdit={viewMode !== "trash"}
+            />
 
             <Dialog
                 open={open}

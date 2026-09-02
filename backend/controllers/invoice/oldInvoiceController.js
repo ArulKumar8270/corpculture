@@ -4,7 +4,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 import OldInvoice from "../../models/oldInvoiceModel.js";
-import { softDeleteById, TRASH_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
+import { softDeleteById, restoreById, getTrashListQuery, mapWithRecordStatus, TRASH_SUCCESS_MESSAGE, RESTORE_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -707,10 +707,12 @@ export const getAllOldInvoices = async (req, res) => {
 
         // Calculate pagination
         const skip = (parseInt(page) - 1) * parseInt(limit);
-        const total = await OldInvoice.countDocuments(query);
+        const { filter, options } = getTrashListQuery(req, query);
+        const total = await OldInvoice.countDocuments(filter).setOptions(options);
 
         // Fetch invoices
-        const invoices = await OldInvoice.find(query)
+        const invoices = await OldInvoice.find(filter)
+            .setOptions(options)
             .sort({ date: -1, createdAt: -1 })
             .skip(skip)
             .limit(parseInt(limit));
@@ -721,7 +723,7 @@ export const getAllOldInvoices = async (req, res) => {
             page: parseInt(page),
             limit: parseInt(limit),
             totalPages: Math.ceil(total / parseInt(limit)),
-            invoices
+            invoices: mapWithRecordStatus(invoices)
         });
 
     } catch (error) {
@@ -874,6 +876,35 @@ export const deleteOldInvoice = async (req, res) => {
         res.status(500).send({
             success: false,
             message: "Error deleting old invoice",
+            error: error.message
+        });
+    }
+};
+
+/**
+ * Restore old invoice from trash
+ */
+export const restoreOldInvoice = async (req, res) => {
+    try {
+        const restoredInvoice = await restoreById(OldInvoice, req.params.id);
+
+        if (!restoredInvoice) {
+            return res.status(404).send({
+                success: false,
+                message: "Old invoice not found in trash."
+            });
+        }
+
+        res.status(200).send({
+            success: true,
+            message: RESTORE_SUCCESS_MESSAGE,
+            invoice: mapWithRecordStatus([restoredInvoice])[0],
+        });
+    } catch (error) {
+        console.error("Error in restoreOldInvoice:", error);
+        res.status(500).send({
+            success: false,
+            message: "Error restoring old invoice",
             error: error.message
         });
     }

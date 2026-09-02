@@ -5,11 +5,12 @@ import { useAuth } from "../../context/auth";
 import SeoData from "../../SEO/SeoData";
 import { Link } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
-import { IconButton } from '@mui/material';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
+import { Chip } from '@mui/material';
 import { toast } from 'react-toastify';
-import TextField from "@mui/material/TextField"; // Import TextField for search input
+import TextField from "@mui/material/TextField";
+import TrashStatusToggle from "../../components/TrashStatusToggle";
+import TrashActions from "../../components/TrashActions";
+import { buildTrashListUrl, restoreFromTrash, isTrashView } from "../../utils/trashApi";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 import DownloadIcon from '@mui/icons-material/Download';
@@ -37,14 +38,14 @@ const AdminEmployees = () => {
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(false);
   const [exportingExcel, setExportingExcel] = useState(false);
-  const [searchQuery, setSearchQuery] = useState(''); // New state for search query
+  const [searchQuery, setSearchQuery] = useState('');
+  const [viewMode, setViewMode] = useState('active');
 
   const fetchEmployees = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(
-        `${import.meta.env.VITE_SERVER_URL}/api/v1/employee/all`,
-        {
+      const url = buildTrashListUrl(`${import.meta.env.VITE_SERVER_URL}/api/v1/employee/all`, viewMode);
+      const response = await axios.get(url, {
           headers: {
             Authorization: auth?.token,
           },
@@ -63,7 +64,7 @@ const AdminEmployees = () => {
     if (auth?.token) {
       fetchEmployees();
     }
-  }, [auth?.token]);
+  }, [auth?.token, viewMode]);
 
   const hasPermission = (key, action) => {
     return userPermissions.some(p => p.key === key && p.actions.includes(action)) || auth?.user?.role === 1;
@@ -92,6 +93,29 @@ const AdminEmployees = () => {
       } catch (error) {
         console.error("Error moving to trash employee:", error);
         toast.error(error.response?.data?.message || "Failed to move to trash employee. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  const handleRestoreEmployee = async (employeeId) => {
+    if (window.confirm("Restore this employee from trash?")) {
+      try {
+        setLoading(true);
+        const { data } = await restoreFromTrash(
+          `${import.meta.env.VITE_SERVER_URL}/api/v1/employee`,
+          employeeId
+        );
+        if (data?.success) {
+          toast.success(data.message || "Employee restored successfully!");
+          fetchEmployees();
+        } else {
+          toast.error(data?.message || "Failed to restore employee.");
+        }
+      } catch (error) {
+        console.error("Error restoring employee:", error);
+        toast.error(error.response?.data?.message || "Failed to restore employee.");
       } finally {
         setLoading(false);
       }
@@ -196,7 +220,7 @@ const AdminEmployees = () => {
             <DownloadIcon fontSize="small" />
             {exportingExcel ? "Preparing Excel…" : "Download Excel"}
           </button>
-          {hasPermission("reportsEmployeeList", "create") ? (
+          {hasPermission("reportsEmployeeList", "create") && !isTrashView(viewMode) ? (
             <button
               onClick={() => navigate('../addEmployee')}
               className="py-2 px-5 rounded-xl shadow font-semibold text-white bg-gradient-to-r from-[#afcb09] to-[#019ee3] hover:from-[#019ee3] hover:to-[#afcb09] transition"
@@ -206,6 +230,8 @@ const AdminEmployees = () => {
           ) : null}
         </div>
       </div>
+
+      <TrashStatusToggle viewMode={viewMode} onChange={setViewMode} />
 
       {/* Search Input Field */}
       <div className="mb-4">
@@ -235,6 +261,7 @@ const AdminEmployees = () => {
                 <th className="py-2 px-3 text-left">Address</th>
                 <th className="py-2 px-3 text-left">Employee Type</th>
                 <th className="py-2 px-3 text-left">Department</th>
+                {isTrashView(viewMode) ? <th className="py-2 px-3 text-left">Status</th> : null}
                 <th className="py-2 px-3 text-center">Actions</th>
               </tr>
             </thead>
@@ -259,24 +286,20 @@ const AdminEmployees = () => {
                     <td className="py-2 px-3">{employee.address}</td>
                     <td className="py-2 px-3">{formatListField(employee.employeeType)}</td>
                     <td className="py-2 px-3">{employee.department?.name || 'N/A'}</td>
+                    {isTrashView(viewMode) ? (
+                      <td className="py-2 px-3">
+                        <Chip label="Trash" size="small" color="warning" />
+                      </td>
+                    ) : null}
                     <td className="py-2 px-3 text-center">
-                      {hasPermission("reportsEmployeeList", "edit") && (
-                        <IconButton
-                          onClick={() => handleEditEmployee(employee._id)}
-                          color="primary"
-                          aria-label="edit employee"
-                        >
-                          <EditIcon />
-                        </IconButton>
-                      )}
-                      {hasPermission("reportsEmployeeList", "delete") && (
-                        <IconButton
-                          onClick={() => handleTrashEmployee(employee._id)}
-                          color="error"
-                          aria-label="trash employee"
-                        >
-                          <DeleteIcon />
-                        </IconButton>
+                      {(hasPermission("reportsEmployeeList", "edit") || hasPermission("reportsEmployeeList", "delete")) && (
+                        <TrashActions
+                          viewMode={viewMode}
+                          onEdit={() => handleEditEmployee(employee._id)}
+                          onTrash={() => handleTrashEmployee(employee._id)}
+                          onRestore={() => handleRestoreEmployee(employee._id)}
+                          showEdit={hasPermission("reportsEmployeeList", "edit")}
+                        />
                       )}
                     </td>
                   </tr>

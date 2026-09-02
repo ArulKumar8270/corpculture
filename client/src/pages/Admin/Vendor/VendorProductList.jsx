@@ -1,20 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { Typography, Paper, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField } from '@mui/material'; // Import TextField
+import { Typography, Paper, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Chip } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
 import toast from 'react-hot-toast';
 import axios from 'axios';
 import { useAuth } from '../../../context/auth';
+import TrashStatusToggle from '../../../components/TrashStatusToggle';
+import TrashActions from '../../../components/TrashActions';
+import { buildTrashListUrl, restoreFromTrash, isTrashView } from '../../../utils/trashApi';
 
 const VendorProductList = () => {
     const navigate = useNavigate();
     const [vendorProducts, setVendorProducts] = useState([]);
-    const [searchTerm, setSearchTerm] = useState(''); // New state for search term
+    const [searchTerm, setSearchTerm] = useState('');
+    const [viewMode, setViewMode] = useState('active');
     const { auth, userPermissions } = useAuth();
     useEffect(() => {
         fetchVendorProducts();
-    }, []);
+    }, [viewMode]);
 
     const hasPermission = (key) => {
         return userPermissions.some(p => p.key === key && p.actions.includes('edit')) || auth?.user?.role === 1;
@@ -22,9 +24,10 @@ const VendorProductList = () => {
 
     const fetchVendorProducts = async () => {
         try {
-            const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/vendor-products`);
-            if (data?.success && data.vendorProducts.length > 0) {
-                setVendorProducts(data.vendorProducts);
+            const url = buildTrashListUrl(`${import.meta.env.VITE_SERVER_URL}/api/v1/vendor-products`, viewMode);
+            const { data } = await axios.get(url);
+            if (data?.success) {
+                setVendorProducts(data.vendorProducts || []);
             } else {
                 toast.error(data?.message || 'Failed to fetch vendor products. Displaying sample data.');
                 setVendorProducts([]);
@@ -64,6 +67,23 @@ const VendorProductList = () => {
         }
     };
 
+    const handleRestore = async (productId) => {
+        if (window.confirm('Restore this vendor product from trash?')) {
+            try {
+                const { data } = await restoreFromTrash(`${import.meta.env.VITE_SERVER_URL}/api/v1/vendor-products`, productId);
+                if (data?.success) {
+                    toast.success(data.message || 'Vendor product restored successfully!');
+                    fetchVendorProducts();
+                } else {
+                    toast.error(data?.message || 'Failed to restore vendor product.');
+                }
+            } catch (error) {
+                console.error('Error restoring vendor product:', error);
+                toast.error(error.response?.data?.message || 'Something went wrong while restoring the vendor product.');
+            }
+        }
+    };
+
     // Filter products based on search term
     const filteredProducts = vendorProducts.filter(product => {
         const lowerCaseSearchTerm = searchTerm.toLowerCase();
@@ -82,7 +102,7 @@ const VendorProductList = () => {
                 <Typography variant="h5" className="font-semibold text-blue-600">
                     Vendor Product List
                 </Typography>
-                {hasPermission("vendorProducts") ? <Button
+                {hasPermission("vendorProducts") && !isTrashView(viewMode) ? <Button
                     variant="contained"
                     className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md"
                     onClick={handleAddVendorProduct}
@@ -90,6 +110,8 @@ const VendorProductList = () => {
                     Add New Vendor Product
                 </Button> : null}
             </div>
+
+            <TrashStatusToggle viewMode={viewMode} onChange={setViewMode} />
 
             {/* Search Input */}
             <TextField
@@ -112,6 +134,7 @@ const VendorProductList = () => {
                                 <TableCell className="font-semibold">GST Type</TableCell>
                                 <TableCell className="font-semibold">Product Code</TableCell>
                                 <TableCell className="font-semibold">Price Per Quantity</TableCell>
+                                {isTrashView(viewMode) ? <TableCell className="font-semibold">Status</TableCell> : null}
                                 {hasPermission("vendorProducts") ? <TableCell className="font-semibold">Action</TableCell> : null}
                             </TableRow>
                         </TableHead>
@@ -133,25 +156,18 @@ const VendorProductList = () => {
                                         </TableCell>
                                         <TableCell>{product.productCode}</TableCell>
                                         <TableCell>{product.pricePerQuantity}</TableCell>
+                                        {isTrashView(viewMode) ? (
+                                            <TableCell>
+                                                <Chip label="Trash" size="small" color="warning" />
+                                            </TableCell>
+                                        ) : null}
                                         {hasPermission("vendorProducts") ? <TableCell>
-                                            <Button
-                                                variant="contained"
-                                                color="primary"
-                                                size="small"
-                                                startIcon={<EditIcon />}
-                                                onClick={() => handleEdit(product._id)}
-                                                className="mr-2 bg-blue-500 hover:bg-blue-600"
-                                            >
-                                                Edit
-                                            </Button>
-                                            <Button
-                                                variant="contained"
-                                                color="error"
-                                                size="small"
-                                                startIcon={<DeleteIcon />}
-                                                onClick={() => handleDelete(product._id)}
-                                                className="bg-red-500 hover:bg-red-600"
-                                            >Trash</Button>
+                                            <TrashActions
+                                                viewMode={viewMode}
+                                                onEdit={() => handleEdit(product._id)}
+                                                onTrash={() => handleDelete(product._id)}
+                                                onRestore={() => handleRestore(product._id)}
+                                            />
                                         </TableCell> : null}
                                     </TableRow>
                                 ))

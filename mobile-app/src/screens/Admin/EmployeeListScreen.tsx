@@ -18,6 +18,13 @@ import axios from 'axios';
 import Toast from 'react-native-toast-message';
 import { usePermissions } from '../../hooks/usePermissions';
 import { getApiBaseUrl } from '../../services/api';
+import TrashStatusToggle from '../../components/TrashStatusToggle';
+import {
+  buildTrashListUrl,
+  restoreFromTrash,
+  isTrashView,
+  type TrashViewMode,
+} from '../../utils/trashApi';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 
@@ -112,24 +119,26 @@ const EmployeeListScreen = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [viewMode, setViewMode] = useState<TrashViewMode>('active');
   const ROWS_PER_PAGE_OPTIONS = [5, 10, 25, 50, 100];
 
   useFocusEffect(
     useCallback(() => {
       fetchEmployees();
-    }, [token])
+    }, [token, viewMode])
   );
 
   const fetchEmployees = async () => {
     try {
       setLoading(true);
-      const API_BASE_URL = getApiBaseUrl();
-      const response = await axios.get(`${API_BASE_URL}/employee/all`, {
+      const response = await axios.get(buildTrashListUrl('/employee/all', viewMode), {
         headers: { Authorization: token || '' },
         timeout: 30000,
       });
       if (response.data?.employees) {
         setEmployees(response.data.employees);
+      } else {
+        setEmployees([]);
       }
     } catch (error: any) {
       console.error('Error fetching employees:', error);
@@ -174,6 +183,47 @@ const EmployeeListScreen = () => {
                 type: 'error',
                 text1: 'Error',
                 text2: error.response?.data?.message || 'Failed to move to trash employee',
+              });
+            } finally {
+              setLoading(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleRestoreEmployee = (employeeId: string) => {
+    Alert.alert(
+      'Restore Employee',
+      'Restore this employee from trash?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Restore',
+          onPress: async () => {
+            try {
+              setLoading(true);
+              const response = await restoreFromTrash('/employee', employeeId, token || '');
+              if (response.data?.success) {
+                Toast.show({
+                  type: 'success',
+                  text1: 'Success',
+                  text2: response.data.message || 'Employee restored successfully',
+                });
+                fetchEmployees();
+              } else {
+                Toast.show({
+                  type: 'error',
+                  text1: 'Error',
+                  text2: response.data?.message || 'Failed to restore employee',
+                });
+              }
+            } catch (error: any) {
+              Toast.show({
+                type: 'error',
+                text1: 'Error',
+                text2: error.response?.data?.message || 'Failed to restore employee',
               });
             } finally {
               setLoading(false);
@@ -290,26 +340,46 @@ const EmployeeListScreen = () => {
     >
       <View style={styles.employeeHeader}>
         <View style={styles.employeeInfo}>
-          <Text style={styles.employeeName}>{item.name}</Text>
+          <View style={styles.employeeNameRow}>
+            <Text style={styles.employeeName}>{item.name}</Text>
+            {isTrashView(viewMode) && (
+              <View style={styles.trashBadge}>
+                <Text style={styles.trashBadgeText}>Trash</Text>
+              </View>
+            )}
+          </View>
           <Text style={styles.employeeEmail}>{item.email}</Text>
         </View>
         {(isAdmin || hasPermission('reportsEmployeeList', 'edit') || hasPermission('reportsEmployeeList', 'delete')) && (
           <View style={styles.actions}>
-            {(isAdmin || hasPermission('reportsEmployeeList', 'edit')) && (
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={() => handleEditEmployee(item._id)}
-              >
-                <Icon name="edit" size={20} color="#019ee3" />
-              </TouchableOpacity>
-            )}
-            {(isAdmin || hasPermission('reportsEmployeeList', 'delete')) && (
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={() => handleTrashEmployee(item._id)}
-              >
-                <Icon name="delete" size={20} color="#dc3545" />
-              </TouchableOpacity>
+            {isTrashView(viewMode) ? (
+              (isAdmin || hasPermission('reportsEmployeeList', 'delete')) && (
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={() => handleRestoreEmployee(item._id)}
+                >
+                  <Icon name="restore" size={20} color="#28a745" />
+                </TouchableOpacity>
+              )
+            ) : (
+              <>
+                {(isAdmin || hasPermission('reportsEmployeeList', 'edit')) && (
+                  <TouchableOpacity
+                    style={styles.actionButton}
+                    onPress={() => handleEditEmployee(item._id)}
+                  >
+                    <Icon name="edit" size={20} color="#019ee3" />
+                  </TouchableOpacity>
+                )}
+                {(isAdmin || hasPermission('reportsEmployeeList', 'delete')) && (
+                  <TouchableOpacity
+                    style={styles.actionButton}
+                    onPress={() => handleTrashEmployee(item._id)}
+                  >
+                    <Icon name="delete" size={20} color="#dc3545" />
+                  </TouchableOpacity>
+                )}
+              </>
             )}
           </View>
         )}
@@ -369,7 +439,7 @@ const EmployeeListScreen = () => {
               </>
             )}
           </TouchableOpacity>
-          {(isAdmin || hasPermission('reportsEmployeeList', 'create')) && (
+          {(isAdmin || hasPermission('reportsEmployeeList', 'create')) && !isTrashView(viewMode) && (
             <TouchableOpacity
               style={styles.addButton}
               onPress={() => (navigation as any).navigate('AddEmployee')}
@@ -379,6 +449,10 @@ const EmployeeListScreen = () => {
             </TouchableOpacity>
           )}
         </View>
+      </View>
+
+      <View style={styles.toggleContainer}>
+        <TrashStatusToggle viewMode={viewMode} onChange={setViewMode} />
       </View>
 
       <View style={styles.searchContainer}>
@@ -565,6 +639,29 @@ const styles = StyleSheet.create({
   },
   employeeInfo: {
     flex: 1,
+  },
+  employeeNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+    marginBottom: 4,
+  },
+  toggleContainer: {
+    paddingHorizontal: 15,
+    paddingTop: 10,
+    backgroundColor: '#fff',
+  },
+  trashBadge: {
+    backgroundColor: '#ff9800',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  trashBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
   },
   employeeName: {
     fontSize: 18,

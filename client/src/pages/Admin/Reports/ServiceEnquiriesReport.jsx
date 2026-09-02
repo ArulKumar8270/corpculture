@@ -22,12 +22,13 @@ import {
     TablePagination
 } from '@mui/material';
 import VisibilityIcon from '@mui/icons-material/Visibility';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import axios from 'axios';
 import { useAuth } from '../../../context/auth';
+import TrashStatusToggle from '../../../components/TrashStatusToggle';
+import TrashActions from '../../../components/TrashActions';
+import { restoreFromTrash, isTrashView } from '../../../utils/trashApi';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 
@@ -45,6 +46,7 @@ const ServiceEnquiriesReport = (props) => {
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [totalCount, setTotalCount] = useState(0);
+    const [viewMode, setViewMode] = useState('active');
 
     const fetchServiceEnquiries = async (
         from = '',
@@ -64,13 +66,17 @@ const ServiceEnquiriesReport = (props) => {
                 toDate: to,
                 companyName: companyName,
                 serviceType: serviceType,
-                status: status,
-                page: currentPage + 1, // Backend usually expects 1-indexed page
+                page: currentPage + 1,
                 limit: currentRowsPerPage,
-            }).toString();
+            });
+            if (!isTrashView(viewMode)) {
+                if (status) queryParams.set('status', status);
+            } else {
+                queryParams.set('trashed', 'true');
+            }
 
             const { data } = await axios.get(
-                `${import.meta.env.VITE_SERVER_URL}/api/v1/${props?.type}/all?${queryParams}`,
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/${props?.type}/all?${queryParams.toString()}`,
                 {
                     headers: {
                         Authorization: auth.token,
@@ -105,7 +111,7 @@ const ServiceEnquiriesReport = (props) => {
                 rowsPerPage
             );
         }
-    }, [auth?.token, page, rowsPerPage]);
+    }, [auth?.token, page, rowsPerPage, viewMode]);
 
     const enquiriesListPath =
         props?.type === 'rental' ? '../rental-enquiries' : '../service-enquiries';
@@ -141,6 +147,34 @@ const ServiceEnquiriesReport = (props) => {
             } catch (err) {
                 console.error('Error moving to trash enquiry:', err);
                 toast.error(err.response?.data?.message || 'Something went wrong while deleting enquiry.');
+            }
+        }
+    };
+
+    const handleRestore = async (enquiryId) => {
+        if (window.confirm('Restore this enquiry from trash?')) {
+            try {
+                const { data } = await restoreFromTrash(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/service`,
+                    enquiryId
+                );
+                if (data?.success) {
+                    toast.success(data.message || 'Enquiry restored successfully');
+                    fetchServiceEnquiries(
+                        fromDate,
+                        toDate,
+                        companyNameFilter,
+                        serviceTypeFilter,
+                        statusFilter,
+                        page,
+                        rowsPerPage
+                    );
+                } else {
+                    toast.error(data?.message || 'Failed to restore enquiry.');
+                }
+            } catch (err) {
+                console.error('Error restoring enquiry:', err);
+                toast.error(err.response?.data?.message || 'Something went wrong while restoring enquiry.');
             }
         }
     };
@@ -228,6 +262,7 @@ const ServiceEnquiriesReport = (props) => {
             <Typography variant="h5" component="h1" gutterBottom sx={{ mb: 3, color: '#019ee3', fontWeight: 'bold' }}>
                 Service Enquiries Report
             </Typography>
+            <TrashStatusToggle viewMode={viewMode} onChange={setViewMode} />
             <Paper elevation={3} sx={{ p: 2, borderRadius: '8px' }}>
                 {/* Filter Options */}
                 <Box sx={{ mb: 3 }}>
@@ -306,13 +341,14 @@ const ServiceEnquiriesReport = (props) => {
                                 <TableCell>Complaint</TableCell>
                                 <TableCell>Status</TableCell>
                                 <TableCell>Created Date</TableCell>
-                                {/* <TableCell>Actions</TableCell> */}
+                                {isTrashView(viewMode) ? <TableCell>Record</TableCell> : null}
+                                <TableCell>Actions</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
                             {enquiries.length === 0 && !loading ? (
                                 <TableRow>
-                                    <TableCell colSpan={8} align="center" sx={{ py: 3, color: 'text.secondary' }}>
+                                    <TableCell colSpan={isTrashView(viewMode) ? 9 : 8} align="center" sx={{ py: 3, color: 'text.secondary' }}>
                                         No service enquiries found.
                                     </TableCell>
                                 </TableRow>
@@ -337,23 +373,20 @@ const ServiceEnquiriesReport = (props) => {
                                             />
                                         </TableCell>
                                         <TableCell>{new Date(enquiry.createdAt).toLocaleDateString()}</TableCell>
-                                        {/* <TableCell>
-                                            <Tooltip title="View Details">
-                                                <IconButton onClick={() => handleView(enquiry._id)} color="info">
-                                                    <VisibilityIcon />
-                                                </IconButton>
-                                            </Tooltip>
-                                            <Tooltip title="Edit Enquiry">
-                                                <IconButton onClick={() => handleEdit(enquiry._id)} color="primary">
-                                                    <EditIcon />
-                                                </IconButton>
-                                            </Tooltip>
-                                            <Tooltip title="Delete Enquiry">
-                                                <IconButton onClick={() => handleDelete(enquiry._id)} color="error">
-                                                    <DeleteIcon />
-                                                </IconButton>
-                                            </Tooltip>
-                                        </TableCell> */}
+                                        {isTrashView(viewMode) ? (
+                                            <TableCell>
+                                                <Chip label="Trash" size="small" color="warning" />
+                                            </TableCell>
+                                        ) : null}
+                                        <TableCell>
+                                            <TrashActions
+                                                viewMode={viewMode}
+                                                onEdit={() => handleEdit(enquiry._id)}
+                                                onTrash={() => handleDelete(enquiry._id)}
+                                                onRestore={() => handleRestore(enquiry._id)}
+                                                size="small"
+                                            />
+                                        </TableCell>
                                     </TableRow>
                                 ))
                             )}

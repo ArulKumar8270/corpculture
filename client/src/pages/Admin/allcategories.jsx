@@ -1,20 +1,20 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import axios from "axios";
 import Spinner from "../../components/Spinner";
 import { useAuth } from "../../context/auth";
 import { toast } from "react-toastify";
-import { Link } from "react-router-dom";
 import { DataGrid } from "@mui/x-data-grid";
 import SeoData from "../../SEO/SeoData";
-import DeleteIcon from "@mui/icons-material/Delete";
-import EditIcon from "@mui/icons-material/Edit";
-import { IconButton } from "@mui/material";
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField } from "@mui/material";
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Chip } from "@mui/material";
+import TrashStatusToggle from "../../components/TrashStatusToggle";
+import TrashActions from "../../components/TrashActions";
+import { buildTrashListUrl, restoreFromTrash, isTrashView } from "../../utils/trashApi";
 
 const AllCategories = () => {
     const { auth, userPermissions } = useAuth();
     const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [viewMode, setViewMode] = useState("active");
     const [categoryModalOpen, setCategoryModalOpen] = useState(false);
     const [categoryForm, setCategoryForm] = useState({ name: "", commission: "0" });
     const [categoryErrors, setCategoryErrors] = useState({});
@@ -93,54 +93,44 @@ const AllCategories = () => {
             }
             setCategoryModalOpen(false);
             setEditingCategoryId(null);
-            // Refresh categories list
-            const res = await axios.get(
-                `${import.meta.env.VITE_SERVER_URL}/api/v1/category/all`,
-                {
-                    headers: {
-                        Authorization: auth?.token,
-                    },
-                }
-            );
-            if (res.status === 200) {
-                setCategories(res.data.categories);
-            }
+            fetchCategories();
         } catch (err) {
             toast.error(err.response?.data?.message || (editingCategoryId ? "Failed to update category" : "Failed to add category"));
         }
         setCategoryLoading(false);
     };
 
-    useEffect(() => {
-        const fetchCategories = async () => {
-            try {
-                const res = await axios.get(
-                    `${import.meta.env.VITE_SERVER_URL}/api/v1/category/all`, // Assuming this is your endpoint
-                    {
-                        headers: {
-                            Authorization: auth?.token,
-                        },
-                    }
-                );
+    const fetchCategories = async () => {
+        try {
+            const url = buildTrashListUrl(
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/category/all`,
+                viewMode
+            );
+            const res = await axios.get(url, {
+                headers: {
+                    Authorization: auth?.token,
+                },
+            });
 
-                if (res.status === 200) {
-                    setCategories(res.data.categories);
-                }
-                setLoading(false);
-            } catch (error) {
-                console.error("Error fetching categories:", error);
-                setLoading(false);
-                toast.error(
-                    error.response?.data?.message ||
-                    "Error fetching categories. Please try again."
-                );
+            if (res.status === 200) {
+                setCategories(res.data.categories);
             }
-        };
+            setLoading(false);
+        } catch (error) {
+            console.error("Error fetching categories:", error);
+            setLoading(false);
+            toast.error(
+                error.response?.data?.message ||
+                "Error fetching categories. Please try again."
+            );
+        }
+    };
 
+    useEffect(() => {
         if (auth?.token) {
             fetchCategories();
         }
-    }, [auth?.token, categoryLoading]);
+    }, [auth?.token, categoryLoading, viewMode]);
 
     // Function to handle category deletion
     const handleTrashCategory = async (categoryId) => { // {{ edit_2 }}
@@ -157,8 +147,7 @@ const AllCategories = () => {
 
                 if (res.status === 200) { // {{ edit_2 }}
                     toast.success("Category moved to trash successfully!"); // {{ edit_2 }}
-                    // Update the categories state to remove the deleted category // {{ edit_2 }}
-                    setCategories(categories.filter(cat => cat._id !== categoryId)); // {{ edit_2 }}
+                    fetchCategories();
                 } // {{ edit_2 }}
             } catch (error) { // {{ edit_2 }}
                 console.error("Error moving to trash category:", error); // {{ edit_2 }}
@@ -170,7 +159,27 @@ const AllCategories = () => {
         } // {{ edit_2 }}
     }; // {{ edit_2 }}
 
-    const columns = [
+    const handleRestoreCategory = async (categoryId) => {
+        if (window.confirm("Restore this category from trash?")) {
+            try {
+                const { data } = await restoreFromTrash(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/category`,
+                    categoryId
+                );
+                if (data?.success) {
+                    toast.success(data.message || "Category restored successfully!");
+                    fetchCategories();
+                } else {
+                    toast.error(data?.message || "Failed to restore category.");
+                }
+            } catch (error) {
+                console.error("Error restoring category:", error);
+                toast.error(error.response?.data?.message || "Something went wrong while restoring the category.");
+            }
+        }
+    };
+
+    const columns = useMemo(() => [
         {
             field: "name",
             headerName: "Name",
@@ -201,36 +210,31 @@ const AllCategories = () => {
         //         );
         //     },
         // },
+        ...(isTrashView(viewMode)
+            ? [{
+                field: "recordStatus",
+                headerName: "Status",
+                minWidth: 100,
+                flex: 0.2,
+                renderCell: () => <Chip label="Trash" size="small" color="warning" />,
+            }]
+            : []),
         {
             field: "actions",
             headerName: "Actions",
-            minWidth: 150,
+            minWidth: 180,
             flex: 0.3,
             sortable: false,
-            renderCell: (params) => {
-                return (
-                    <div className="flex gap-2">
-                        <IconButton
-                            onClick={() => handleEditCategory(params.row.id)}
-                            color="primary"
-                            aria-label="edit category"
-                            size="small"
-                        >
-                            <EditIcon />
-                        </IconButton>
-                        <IconButton
-                            onClick={() => handleTrashCategory(params.row.id)}
-                            color="error"
-                            aria-label="trash category"
-                            size="small"
-                        >
-                            <DeleteIcon />
-                        </IconButton>
-                    </div>
-                );
-            },
+            renderCell: (params) => (
+                <TrashActions
+                    viewMode={viewMode}
+                    onEdit={() => handleEditCategory(params.row.id)}
+                    onTrash={() => handleTrashCategory(params.row.id)}
+                    onRestore={() => handleRestoreCategory(params.row.id)}
+                />
+            ),
         }
-    ];
+    ], [viewMode]);
 
     const rows = [];
 
@@ -254,13 +258,15 @@ const AllCategories = () => {
                         <h1 className="text-lg font-bold uppercase text-[#019ee3] tracking-wide">
                             Categories
                         </h1>
-                        {hasPermission("salesAllProducts") ? <button
+                        {hasPermission("salesAllProducts") && !isTrashView(viewMode) ? <button
                             onClick={handleCategoryOpen}
                             className="py-2 px-5 rounded-xl shadow font-semibold text-white bg-gradient-to-r from-[#afcb09] to-[#019ee3] hover:from-[#019ee3] hover:to-[#afcb09] transition"
                         >
                             + New Category
                         </button> : null}
                     </div>
+
+                    <TrashStatusToggle viewMode={viewMode} onChange={setViewMode} />
 
                     <div className="w-full h-[80vh] bg-white rounded-2xl shadow-xl border border-[#e6fbff] p-2">
                         <DataGrid

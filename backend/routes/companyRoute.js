@@ -2,7 +2,7 @@ import express from "express";
 import { isAdminOrEmployee, requireSignIn } from "../middleware/authMiddleware.js";
 import { requirePermission } from "../middleware/permissionMiddleware.js";
 import companyPublicRoutes from "./public/companyPublicRoutes.js";
-import { deleteCompany, getAllCompanies } from "../controllers/company/companyController.js";
+import { deleteCompany, getAllCompanies, restoreCompany } from "../controllers/company/companyController.js";
 
 const router = express.Router();
 
@@ -18,6 +18,7 @@ router.get(
     getAllCompanies
 );
 
+router.post("/restore/:id", isAdminOrEmployee, restoreCompany);
 router.delete("/delete/:id", isAdminOrEmployee, deleteCompany);
 
 export default router;

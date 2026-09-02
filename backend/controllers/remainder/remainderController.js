@@ -1,7 +1,7 @@
 import Remainder from "../../models/remainderModel.js";
 import Company from "../../models/companyModel.js"; // Assuming you have a Company model
 import ServiceInvoice from "../../models/serviceInvoiceModel.js"; // Import ServiceInvoice model
-import { softDeleteById, TRASH_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
+import { softDeleteById, restoreById, getTrashListQuery, mapWithRecordStatus, TRASH_SUCCESS_MESSAGE, RESTORE_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
 import RentalPaymentEntry from "../../models/rentalPaymentEntryModel.js"; // Import RentalPaymentEntry model
 
 const IST = "Asia/Kolkata";
@@ -88,14 +88,16 @@ export const createRemainder = async (req, res) => {
 // Get all remainders
 export const getAllRemainders = async (req, res) => {
     try {
-        const remainders = await Remainder.find({})
+        const { filter, options } = getTrashListQuery(req);
+        const remainders = await Remainder.find(filter)
+            .setOptions(options)
             .populate('companyId') // Populate company details
             .sort({ createdAt: -1 });
 
         res.status(200).send({
             success: true,
             message: 'All remainders fetched successfully',
-            remainders
+            remainders: mapWithRecordStatus(remainders)
         });
     } catch (error) {
         console.error("Error in getAllRemainders:", error);
@@ -240,6 +242,27 @@ export const deleteRemainder = async (req, res) => {
     } catch (error) {
         console.error("Error in deleteRemainder:", error);
         res.status(500).send({ success: false, message: 'Error in deleting remainder', error });
+    }
+};
+
+// Restore Remainder from trash
+export const restoreRemainder = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const restoredRemainder = await restoreById(Remainder, id);
+
+        if (!restoredRemainder) {
+            return res.status(404).send({ success: false, message: 'Remainder not found in trash.' });
+        }
+
+        res.status(200).send({
+            success: true,
+            message: RESTORE_SUCCESS_MESSAGE,
+            remainder: mapWithRecordStatus([restoredRemainder])[0],
+        });
+    } catch (error) {
+        console.error("Error in restoreRemainder:", error);
+        res.status(500).send({ success: false, message: 'Error in restoring remainder', error });
     }
 };
 

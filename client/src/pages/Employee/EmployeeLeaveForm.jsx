@@ -20,7 +20,6 @@ import {
     TableHead,
     TableRow,
     Chip,
-    IconButton,
     Dialog,
     DialogTitle,
     DialogContent,
@@ -29,9 +28,10 @@ import {
     Checkbox,
     Divider,
 } from "@mui/material";
-import EditIcon from "@mui/icons-material/Edit";
-import DeleteIcon from "@mui/icons-material/Delete";
 import dayjs from "dayjs";
+import TrashStatusToggle from "../../components/TrashStatusToggle";
+import TrashActions from "../../components/TrashActions";
+import { isTrashView, restoreFromTrash } from "../../utils/trashApi";
 
 const LEAVE_TYPE_OPTIONS = [
     { value: "Casual Leave", label: "Casual" },
@@ -69,6 +69,7 @@ const EmployeeLeaveForm = () => {
     const [editId, setEditId] = useState(null);
     const [openEdit, setOpenEdit] = useState(false);
     const [editForm, setEditForm] = useState({ ...formData });
+    const [viewMode, setViewMode] = useState("active");
 
     useEffect(() => {
         const fetchEmployee = async () => {
@@ -90,13 +91,14 @@ const EmployeeLeaveForm = () => {
 
     useEffect(() => {
         if (auth?.token) fetchMyLeaves();
-    }, [auth?.token]);
+    }, [auth?.token, viewMode]);
 
     const fetchMyLeaves = async () => {
         try {
             setLoadingLeaves(true);
+            const trashParam = isTrashView(viewMode) ? "&trashed=true" : "";
             const { data } = await axios.get(
-                `${import.meta.env.VITE_SERVER_URL}/api/v1/employee-leave/my-leaves?limit=100`,
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/employee-leave/my-leaves?limit=100${trashParam}`,
                 { headers: { Authorization: auth?.token } }
             );
             if (data?.success) setLeaves(data.leaves || []);
@@ -306,6 +308,22 @@ const EmployeeLeaveForm = () => {
             } else toast.error(data?.message || "Failed to move to trash.");
         } catch (err) {
             toast.error(err.response?.data?.message || "Failed to move to trash.");
+        }
+    };
+
+    const handleRestore = async (id) => {
+        if (!window.confirm("Restore this leave application from trash?")) return;
+        try {
+            const { data } = await restoreFromTrash(
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/employee-leave`,
+                id
+            );
+            if (data?.success) {
+                toast.success(data.message || "Leave application restored.");
+                fetchMyLeaves();
+            } else toast.error(data?.message || "Failed to restore.");
+        } catch (err) {
+            toast.error(err.response?.data?.message || "Failed to restore.");
         }
     };
 
@@ -567,6 +585,7 @@ const EmployeeLeaveForm = () => {
                 <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
                     My Leave Applications
                 </Typography>
+                <TrashStatusToggle viewMode={viewMode} onChange={setViewMode} sx={{ mb: 2 }} />
                 {loadingLeaves ? (
                     <Typography color="text.secondary">Loading...</Typography>
                 ) : leaves.length === 0 ? (
@@ -581,6 +600,7 @@ const EmployeeLeaveForm = () => {
                                     <TableCell><strong>To</strong></TableCell>
                                     <TableCell><strong>Days</strong></TableCell>
                                     <TableCell><strong>Status</strong></TableCell>
+                                    {isTrashView(viewMode) ? <TableCell><strong>Record</strong></TableCell> : null}
                                     <TableCell align="right"><strong>Actions</strong></TableCell>
                                 </TableRow>
                             </TableHead>
@@ -600,17 +620,27 @@ const EmployeeLeaveForm = () => {
                                                 size="small"
                                             />
                                         </TableCell>
+                                        {isTrashView(viewMode) ? (
+                                            <TableCell>
+                                                <Chip label="Trash" size="small" color="warning" />
+                                            </TableCell>
+                                        ) : null}
                                         <TableCell align="right">
-                                            {row.status === "Pending" && (
-                                                <>
-                                                    <IconButton size="small" onClick={() => handleEditClick(row)}>
-                                                        <EditIcon fontSize="small" />
-                                                    </IconButton>
-                                                    <IconButton size="small" onClick={() => handleTrash(row._id)} aria-label="trash leave">
-                                                        <DeleteIcon fontSize="small" />
-                                                    </IconButton>
-                                                </>
-                                            )}
+                                            {isTrashView(viewMode) ? (
+                                                <TrashActions
+                                                    viewMode={viewMode}
+                                                    showEdit={false}
+                                                    onRestore={() => handleRestore(row._id)}
+                                                    size="small"
+                                                />
+                                            ) : row.status === "Pending" ? (
+                                                <TrashActions
+                                                    viewMode={viewMode}
+                                                    onEdit={() => handleEditClick(row)}
+                                                    onTrash={() => handleTrash(row._id)}
+                                                    size="small"
+                                                />
+                                            ) : null}
                                         </TableCell>
                                     </TableRow>
                                 ))}

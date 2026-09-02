@@ -25,12 +25,15 @@ import {
     Pagination,
     Stack
 } from '@mui/material';
-import { Visibility as VisibilityIcon, UploadFile as UploadFileIcon, Delete as DeleteIcon, Edit as EditIcon } from '@mui/icons-material';
+import { Visibility as VisibilityIcon, UploadFile as UploadFileIcon, Edit as EditIcon } from '@mui/icons-material';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../context/auth';
 import SearchIcon from '@mui/icons-material/Search';
 import InputAdornment from '@mui/material/InputAdornment';
+import TrashStatusToggle from '../../components/TrashStatusToggle';
+import TrashActions from '../../components/TrashActions';
+import { buildTrashListUrl, restoreFromTrash, isTrashView } from '../../utils/trashApi';
 
 function OldInvoicesList() {
     const [loading, setLoading] = useState(true);
@@ -67,10 +70,11 @@ function OldInvoicesList() {
         notes: ''
     });
     const [newEmail, setNewEmail] = useState('');
+    const [viewMode, setViewMode] = useState('active');
 
     useEffect(() => {
         fetchOldInvoices();
-    }, [auth.token, page, filters]);
+    }, [auth.token, page, filters, viewMode]);
 
     useEffect(() => {
         filterInvoices();
@@ -90,9 +94,11 @@ function OldInvoicesList() {
             if (filters.startDate) params.append('startDate', filters.startDate);
             if (filters.endDate) params.append('endDate', filters.endDate);
 
-            const response = await axios.get(
+            const listUrl = buildTrashListUrl(
                 `${import.meta.env.VITE_SERVER_URL}/api/v1/old-invoice/all?${params.toString()}`,
-                {
+                viewMode
+            );
+            const response = await axios.get(listUrl, {
                     headers: {
                         Authorization: auth.token,
                     },
@@ -302,6 +308,28 @@ function OldInvoicesList() {
         }
     };
 
+    const handleRestoreInvoice = async (invoiceId) => {
+        if (!window.confirm('Restore this invoice from trash?')) {
+            return;
+        }
+
+        try {
+            const { data } = await restoreFromTrash(
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/old-invoice`,
+                invoiceId
+            );
+            if (data?.success) {
+                toast.success(data.message || 'Invoice restored successfully');
+                fetchOldInvoices();
+            } else {
+                toast.error(data?.message || 'Failed to restore invoice');
+            }
+        } catch (error) {
+            console.error("Error restoring invoice:", error);
+            toast.error('Error restoring invoice');
+        }
+    };
+
     const getPaymentStatusColor = (status) => {
         switch (status?.toLowerCase()) {
             case 'paid':
@@ -348,12 +376,15 @@ function OldInvoicesList() {
                     onClick={() => setUploadDialogOpen(true)}
                     sx={{
                         bgcolor: '#019ee3',
-                        '&:hover': { bgcolor: '#0180b8' }
+                        '&:hover': { bgcolor: '#0180b8' },
+                        display: isTrashView(viewMode) ? 'none' : undefined,
                     }}
                 >
                     Upload Excel
                 </Button>
             </Box>
+
+            <TrashStatusToggle viewMode={viewMode} onChange={setViewMode} />
 
             {/* Filters */}
             <Paper sx={{ p: 2, mb: 3 }}>
@@ -473,6 +504,7 @@ function OldInvoicesList() {
                                     <TableCell sx={{ fontWeight: 'bold' }}>Total</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold' }}>Payment Status</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold' }}>Due Amount</TableCell>
+                                    {isTrashView(viewMode) ? <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell> : null}
                                     <TableCell sx={{ fontWeight: 'bold' }}>Actions</TableCell>
                                 </TableRow>
                             </TableHead>
@@ -493,6 +525,11 @@ function OldInvoicesList() {
                                             />
                                         </TableCell>
                                         <TableCell>{formatCurrency(invoice.dueAmount)}</TableCell>
+                                        {isTrashView(viewMode) ? (
+                                            <TableCell>
+                                                <Chip label="Trash" size="small" color="warning" />
+                                            </TableCell>
+                                        ) : null}
                                         <TableCell>
                                             <IconButton
                                                 size="small"
@@ -502,22 +539,23 @@ function OldInvoicesList() {
                                             >
                                                 <VisibilityIcon />
                                             </IconButton>
-                                            <IconButton
+                                            {!isTrashView(viewMode) ? (
+                                                <IconButton
+                                                    size="small"
+                                                    onClick={() => handleEditInvoice(invoice)}
+                                                    color="warning"
+                                                    title="Update Payment Status"
+                                                >
+                                                    <EditIcon />
+                                                </IconButton>
+                                            ) : null}
+                                            <TrashActions
+                                                viewMode={viewMode}
+                                                showEdit={false}
+                                                onTrash={() => handleTrashInvoice(invoice._id)}
+                                                onRestore={() => handleRestoreInvoice(invoice._id)}
                                                 size="small"
-                                                onClick={() => handleEditInvoice(invoice)}
-                                                color="warning"
-                                                title="Update Payment Status"
-                                            >
-                                                <EditIcon />
-                                            </IconButton>
-                                            <IconButton
-                                                size="small"
-                                                onClick={() => handleTrashInvoice(invoice._id)}
-                                                color="error"
-                                                title="Trash"
-                                            >
-                                                <DeleteIcon />
-                                            </IconButton>
+                                            />
                                         </TableCell>
                                     </TableRow>
                                 ))}

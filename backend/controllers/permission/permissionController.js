@@ -1,5 +1,5 @@
 import Permission from "../../models/permissionModel.js";
-import { softDeleteOne, TRASH_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
+import { softDeleteOne, restoreOne, getTrashListQuery, mapWithRecordStatus, TRASH_SUCCESS_MESSAGE, RESTORE_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
 
 // Create a new Permission entry
 export const createPermission = async (req, res) => {
@@ -36,8 +36,9 @@ export const createPermission = async (req, res) => {
 // Get all Permission entries
 export const getAllPermissions = async (req, res) => {
   try {
-    const permissions = await Permission.find({}).sort({ key: 1 }); // Sort by key for consistent order
-    res.status(200).send({ success: true, message: 'All permission entries fetched.', permissions });
+    const { filter, options } = getTrashListQuery(req);
+    const permissions = await Permission.find(filter).setOptions(options).sort({ key: 1 }); // Sort by key for consistent order
+    res.status(200).send({ success: true, message: 'All permission entries fetched.', permissions: mapWithRecordStatus(permissions) });
   } catch (error) {
     console.error("Error in getAllPermissions:", error);
     res.status(500).send({ success: false, message: 'Error fetching all permission entries.', error });
@@ -100,6 +101,26 @@ export const deletePermission = async (req, res) => {
   } catch (error) {
     console.error("Error in deletePermission:", error);
     res.status(500).send({ success: false, message: 'Error deleting permission entry.', error });
+  }
+};
+
+// Restore Permission entry from trash by key
+export const restorePermission = async (req, res) => {
+  try {
+    const { key } = req.params;
+    const restoredPermission = await restoreOne(Permission, { key });
+
+    if (!restoredPermission) {
+      return res.status(404).send({ success: false, message: 'Permission entry not found in trash.' });
+    }
+    res.status(200).send({
+      success: true,
+      message: RESTORE_SUCCESS_MESSAGE,
+      permission: mapWithRecordStatus([restoredPermission])[0],
+    });
+  } catch (error) {
+    console.error("Error in restorePermission:", error);
+    res.status(500).send({ success: false, message: 'Error restoring permission entry.', error });
   }
 };
 

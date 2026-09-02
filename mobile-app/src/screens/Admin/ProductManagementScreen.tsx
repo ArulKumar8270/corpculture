@@ -21,6 +21,13 @@ import axios from 'axios';
 import Toast from 'react-native-toast-message';
 import { usePermissions } from '../../hooks/usePermissions';
 import { getApiBaseUrl } from '../../services/api';
+import TrashStatusToggle from '../../components/TrashStatusToggle';
+import {
+  buildTrashListUrl,
+  restoreProductFromTrash,
+  isTrashView,
+  type TrashViewMode,
+} from '../../utils/trashApi';
 
 let XLSX: any;
 try {
@@ -49,19 +56,19 @@ const ProductManagementScreen = () => {
   const [categoryErrors, setCategoryErrors] = useState<{ name?: string; commission?: string }>({});
   const [categoryLoading, setCategoryLoading] = useState(false);
   const [exportingExcel, setExportingExcel] = useState(false);
+  const [viewMode, setViewMode] = useState<TrashViewMode>('active');
 
   useFocusEffect(
     React.useCallback(() => {
       loadProducts();
-    }, [])
+    }, [viewMode])
   );
 
   const loadProducts = async () => {
     setLoading(true);
     try {
-      const API_BASE_URL = getApiBaseUrl();
       const response = await axios.get(
-        `${API_BASE_URL}/product/seller-product`,
+        buildTrashListUrl('/product/seller-product', viewMode),
         {
           headers: {
             Authorization: token || '',
@@ -139,6 +146,40 @@ const ProductManagementScreen = () => {
         },
       ]
     );
+  };
+
+  const handleRestore = (id: string) => {
+    Alert.alert('Restore Product', 'Restore this product from trash?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Restore',
+        onPress: async () => {
+          try {
+            const response = await restoreProductFromTrash(id, token || '');
+            if (response.data?.success) {
+              Toast.show({
+                type: 'success',
+                text1: 'Success',
+                text2: response.data.message || 'Product restored successfully',
+              });
+              loadProducts();
+            } else {
+              Toast.show({
+                type: 'error',
+                text1: 'Error',
+                text2: response.data?.message || 'Failed to restore product',
+              });
+            }
+          } catch (error: any) {
+            Toast.show({
+              type: 'error',
+              text1: 'Error',
+              text2: error.response?.data?.message || 'Failed to restore product',
+            });
+          }
+        },
+      },
+    ]);
   };
 
   const handleCategoryOpen = () => {
@@ -249,6 +290,11 @@ const ProductManagementScreen = () => {
           <Text style={styles.productName} numberOfLines={2}>
             {item.name || 'Unnamed Product'}
           </Text>
+          {isTrashView(viewMode) && (
+            <View style={styles.trashBadge}>
+              <Text style={styles.trashBadgeText}>Trash</Text>
+            </View>
+          )}
           <Text style={styles.productCategory}>{item.category || 'No Category'}</Text>
           <View style={styles.productDetailsRow}>
             <View style={styles.stockContainer}>
@@ -279,18 +325,29 @@ const ProductManagementScreen = () => {
         </View>
         {hasEditPermission && (
           <View style={styles.productActions}>
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => (navigation as any).navigate('ProductCreate', { product: item } as any)}
-            >
-              <Icon name="edit" size={20} color="#019ee3" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => handleDelete(item._id)}
-            >
-              <Icon name="delete" size={20} color="#FF3B30" />
-            </TouchableOpacity>
+            {isTrashView(viewMode) ? (
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={() => handleRestore(item._id)}
+              >
+                <Icon name="restore" size={20} color="#28a745" />
+              </TouchableOpacity>
+            ) : (
+              <>
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={() => (navigation as any).navigate('ProductCreate', { product: item } as any)}
+                >
+                  <Icon name="edit" size={20} color="#019ee3" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={() => handleDelete(item._id)}
+                >
+                  <Icon name="delete" size={20} color="#FF3B30" />
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         )}
       </TouchableOpacity>
@@ -347,7 +404,7 @@ const ProductManagementScreen = () => {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Products</Text>
-        {canManageProducts && (
+        {canManageProducts && !isTrashView(viewMode) && (
           <View style={styles.headerButtons}>
             <TouchableOpacity
               style={styles.newProductButton}
@@ -363,6 +420,10 @@ const ProductManagementScreen = () => {
             </TouchableOpacity>
           </View>
         )}
+      </View>
+
+      <View style={styles.toggleContainer}>
+        <TrashStatusToggle viewMode={viewMode} onChange={setViewMode} />
       </View>
 
       <View style={styles.searchContainer}>
@@ -543,6 +604,24 @@ const styles = StyleSheet.create({
   headerButtons: {
     flexDirection: 'row',
     gap: 10,
+  },
+  toggleContainer: {
+    paddingHorizontal: 15,
+    paddingTop: 10,
+    backgroundColor: '#fff',
+  },
+  trashBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#ff9800',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginBottom: 4,
+  },
+  trashBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
   },
   newProductButton: {
     backgroundColor: '#019ee3',

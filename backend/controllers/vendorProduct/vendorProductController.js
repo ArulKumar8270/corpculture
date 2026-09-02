@@ -1,5 +1,5 @@
 import VendorProduct from "../../models/vendorProductModel.js";
-import { softDeleteById, TRASH_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
+import { softDeleteById, restoreById, getTrashListQuery, mapWithRecordStatus, TRASH_SUCCESS_MESSAGE, RESTORE_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
 import Vendor from "../../models/vendorModel.js"; // Assuming this path is correct
 import GST from "../../models/gstModel.js"; // Assuming this path is correct
 
@@ -54,12 +54,14 @@ export const createVendorProduct = async (req, res) => {
 // Get All Vendor Products
 export const getAllVendorProducts = async (req, res) => {
     try {
-        const vendorProducts = await VendorProduct.find({})
+        const { filter, options } = getTrashListQuery(req);
+        const vendorProducts = await VendorProduct.find(filter)
+            .setOptions(options)
             .populate('vendorCompanyName', 'companyName') // Populate vendor company name
             .populate('gstType', 'gstType gstPercentage') // Populate GST details
             .sort({ createdAt: -1 });
 
-        res.status(200).send({ success: true, message: 'All Vendor Products fetched', vendorProducts });
+        res.status(200).send({ success: true, message: 'All Vendor Products fetched', vendorProducts: mapWithRecordStatus(vendorProducts) });
     } catch (error) {
         console.error("Error in getAllVendorProducts:", error);
         res.status(500).send({ success: false, message: 'Error in getting all vendor products', error });
@@ -188,5 +190,25 @@ export const getProductsByVendorId = async (req, res) => {
             message: 'Error in fetching vendor products by vendor ID',
             error
         });
+    }
+};
+
+// Restore Vendor Product from trash
+export const restoreVendorProduct = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const restoredVendorProduct = await restoreById(VendorProduct, id);
+
+        if (!restoredVendorProduct) {
+            return res.status(404).send({ success: false, message: 'Vendor Product not found in trash.' });
+        }
+        res.status(200).send({
+            success: true,
+            message: RESTORE_SUCCESS_MESSAGE,
+            vendorProduct: mapWithRecordStatus([restoredVendorProduct])[0],
+        });
+    } catch (error) {
+        console.error("Error in restoreVendorProduct:", error);
+        res.status(500).send({ success: false, message: 'Error in restoring vendor product', error });
     }
 };

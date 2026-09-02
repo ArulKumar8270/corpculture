@@ -1,24 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
-import { Select, MenuItem, TextField, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper } from '@mui/material';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
+import { Select, MenuItem, TextField, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Chip } from '@mui/material';
 import { useAuth } from '../../../context/auth';
+import TrashStatusToggle from '../../../components/TrashStatusToggle';
+import TrashActions from '../../../components/TrashActions';
+import { buildTrashListUrl, restoreFromTrash, isTrashView } from '../../../utils/trashApi';
 
 const GST = () => {
     const { auth, userPermissions } = useAuth();
     const [gstType, setGstType] = useState('');
     const [gstPercentage, setGstPercentage] = useState('');
     const [gstList, setGstList] = useState([]);
-    const [editingGst, setEditingGst] = useState(null); // Stores the GST object being edited
+    const [editingGst, setEditingGst] = useState(null);
+    const [viewMode, setViewMode] = useState('active');
 
     const gstTypesOptions = ['SGST', 'CGST', 'IGST'];
 
     // Fetch GST list on component mount
     useEffect(() => {
         fetchGstList();
-    }, []);
+    }, [viewMode]);
 
     const hasPermission = (key) => {
         return userPermissions.some(p => p.key === key && p.actions.includes('edit')) || auth?.user?.role === 1;
@@ -26,7 +28,8 @@ const GST = () => {
 
     const fetchGstList = async () => {
         try {
-            const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/gst`); // Assuming this is your API endpoint
+            const url = buildTrashListUrl(`${import.meta.env.VITE_SERVER_URL}/api/v1/gst`, viewMode);
+            const { data } = await axios.get(url);
             if (data?.success) {
                 setGstList(data.gst);
             } else {
@@ -102,6 +105,23 @@ const GST = () => {
         }
     };
 
+    const handleRestore = async (id) => {
+        if (window.confirm('Restore this GST entry from trash?')) {
+            try {
+                const { data } = await restoreFromTrash(`${import.meta.env.VITE_SERVER_URL}/api/v1/gst`, id);
+                if (data?.success) {
+                    toast.success(data.message || 'GST entry restored successfully');
+                    fetchGstList();
+                } else {
+                    toast.error(data?.message || 'Failed to restore GST.');
+                }
+            } catch (error) {
+                console.error('Error restoring GST:', error);
+                toast.error('Something went wrong while restoring GST.');
+            }
+        }
+    };
+
     const handleCancelEdit = () => {
         setEditingGst(null);
         setGstType('');
@@ -113,7 +133,7 @@ const GST = () => {
             <h1 className="text-2xl font-semibold mb-6">GST Management</h1>
 
             {/* GST Create/Edit Form */}
-            {hasPermission("otherSettingsGst") ? <Paper className="p-6 mb-8 shadow-md">
+            {hasPermission("otherSettingsGst") && !isTrashView(viewMode) ? <Paper className="p-6 mb-8 shadow-md">
                 <h2 className="text-xl font-medium mb-4">{editingGst ? 'Edit GST Entry' : 'Add New GST Entry'}</h2>
                 <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
@@ -171,6 +191,8 @@ const GST = () => {
                 </form>
             </Paper> : null}
 
+            <TrashStatusToggle viewMode={viewMode} onChange={setViewMode} />
+
             {/* GST List Table */}
             <Paper className="p-6 shadow-md">
                 <h2 className="text-xl font-medium mb-4">Existing GST Entries</h2>
@@ -181,6 +203,7 @@ const GST = () => {
                                 <TableCell className="font-semibold">S.No</TableCell>
                                 <TableCell className="font-semibold">GST Type</TableCell>
                                 <TableCell className="font-semibold">GST Percentage</TableCell>
+                                {isTrashView(viewMode) ? <TableCell className="font-semibold">Status</TableCell> : null}
                                 {hasPermission("otherSettingsGst") ? <TableCell className="font-semibold">Action</TableCell> : null}
                             </TableRow>
                         </TableHead>
@@ -191,25 +214,18 @@ const GST = () => {
                                         <TableCell>{index + 1}</TableCell>
                                         <TableCell>{gst.gstType}</TableCell>
                                         <TableCell>{gst.gstPercentage}</TableCell>
+                                        {isTrashView(viewMode) ? (
+                                            <TableCell>
+                                                <Chip label="Trash" size="small" color="warning" />
+                                            </TableCell>
+                                        ) : null}
                                         {hasPermission("otherSettingsGst") ? <TableCell>
-                                            <Button
-                                                variant="contained"
-                                                color="primary"
-                                                size="small"
-                                                startIcon={<EditIcon />}
-                                                onClick={() => handleEdit(gst)}
-                                                className="mr-2 bg-blue-500 hover:bg-blue-600"
-                                            >
-                                                Edit
-                                            </Button>
-                                            <Button
-                                                variant="contained"
-                                                color="error"
-                                                size="small"
-                                                startIcon={<DeleteIcon />}
-                                                onClick={() => handleDelete(gst._id)}
-                                                className="bg-red-500 hover:bg-red-600"
-                                            >Trash</Button>
+                                            <TrashActions
+                                                viewMode={viewMode}
+                                                onEdit={() => handleEdit(gst)}
+                                                onTrash={() => handleDelete(gst._id)}
+                                                onRestore={() => handleRestore(gst._id)}
+                                            />
                                         </TableCell> : null}
                                     </TableRow>
                                 ))

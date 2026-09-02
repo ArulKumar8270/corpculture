@@ -19,6 +19,13 @@ import axios from 'axios';
 import { getApiBaseUrl } from '../../services/api';
 import { getServiceProductDisplayName, getServiceProductSearchText } from '../../utils/serviceProductDisplayName';
 import Toast from 'react-native-toast-message';
+import TrashStatusToggle from '../../components/TrashStatusToggle';
+import {
+  buildTrashListUrl,
+  restoreFromTrash,
+  isTrashView,
+  type TrashViewMode,
+} from '../../utils/trashApi';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 
@@ -44,11 +51,12 @@ const ServiceProductListScreen = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [exportingExcel, setExportingExcel] = useState(false);
+  const [viewMode, setViewMode] = useState<TrashViewMode>('active');
   const ROWS_PER_PAGE_OPTIONS = [5, 10, 25, 50, 100];
 
   useEffect(() => {
     loadProducts();
-  }, []);
+  }, [viewMode]);
 
   useEffect(() => {
     filterProducts();
@@ -57,13 +65,13 @@ const ServiceProductListScreen = () => {
   const loadProducts = async () => {
     setLoading(true);
     try {
-      const { data } = await axios.get(`${getApiBaseUrl()}/service-products`, {
+      const { data } = await axios.get(buildTrashListUrl('/service-products', viewMode), {
         headers: {
           Authorization: token || '',
         },
       });
-      if (data?.success && data.serviceProducts?.length > 0) {
-        setProducts(data.serviceProducts);
+      if (data?.success) {
+        setProducts(data.serviceProducts || []);
       } else {
         setProducts([]);
       }
@@ -132,6 +140,40 @@ const ServiceProductListScreen = () => {
         },
       ]
     );
+  };
+
+  const handleRestore = (productId: string) => {
+    Alert.alert('Restore Product', 'Restore this product from trash?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Restore',
+        onPress: async () => {
+          try {
+            const { data } = await restoreFromTrash('/service-products', productId, token || '');
+            if (data?.success) {
+              Toast.show({
+                type: 'success',
+                text1: 'Success',
+                text2: data.message || 'Product restored successfully!',
+              });
+              loadProducts();
+            } else {
+              Toast.show({
+                type: 'error',
+                text1: 'Error',
+                text2: data?.message || 'Failed to restore product.',
+              });
+            }
+          } catch (error: any) {
+            Toast.show({
+              type: 'error',
+              text1: 'Error',
+              text2: error.response?.data?.message || 'Something went wrong while restoring the product.',
+            });
+          }
+        },
+      },
+    ]);
   };
 
   const filteredProducts = products.filter(product => {
@@ -208,7 +250,14 @@ const ServiceProductListScreen = () => {
   const renderProduct = ({ item, index }: { item: any; index: number }) => (
     <View style={styles.productCard}>
       <View style={styles.productInfo}>
-        <Text style={styles.serialNumber}>{page * rowsPerPage + index + 1}</Text>
+        <View style={styles.productTitleRow}>
+          <Text style={styles.serialNumber}>{page * rowsPerPage + index + 1}</Text>
+          {isTrashView(viewMode) && (
+            <View style={styles.trashBadge}>
+              <Text style={styles.trashBadgeText}>Trash</Text>
+            </View>
+          )}
+        </View>
         <View style={styles.productDetails}>
           <Text style={styles.companyName}>{item.company?.companyName || 'N/A'}</Text>
           <Text style={styles.productName}>
@@ -245,12 +294,29 @@ const ServiceProductListScreen = () => {
       </View>
       {hasPermission('serviceProductList', 'edit') && (
         <View style={styles.productActions}>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => handleEdit(item)}
-          >
-            <Icon name="edit" size={20} color="#007AFF" />
-          </TouchableOpacity>
+          {isTrashView(viewMode) ? (
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => handleRestore(item._id)}
+            >
+              <Icon name="restore" size={20} color="#28a745" />
+            </TouchableOpacity>
+          ) : (
+            <>
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={() => handleEdit(item)}
+              >
+                <Icon name="edit" size={20} color="#007AFF" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={() => handleDelete(item._id)}
+              >
+                <Icon name="delete" size={20} color="#FF3B30" />
+              </TouchableOpacity>
+            </>
+          )}
         </View>
       )}
     </View>
@@ -278,7 +344,7 @@ const ServiceProductListScreen = () => {
               </>
             )}
           </TouchableOpacity>
-          {hasPermission('serviceProductList', 'edit') && (
+          {hasPermission('serviceProductList', 'edit') && !isTrashView(viewMode) && (
             <TouchableOpacity
               style={styles.addButton}
               onPress={() => (navigation as any).navigate('AddServiceProduct')}
@@ -287,6 +353,10 @@ const ServiceProductListScreen = () => {
             </TouchableOpacity>
           )}
         </View>
+      </View>
+
+      <View style={styles.toggleContainer}>
+        <TrashStatusToggle viewMode={viewMode} onChange={setViewMode} />
       </View>
 
       {/* Search Input */}
@@ -452,6 +522,27 @@ const styles = StyleSheet.create({
   productInfo: {
     flex: 1,
     flexDirection: 'row',
+  },
+  productTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  toggleContainer: {
+    paddingHorizontal: 15,
+    paddingTop: 10,
+  },
+  trashBadge: {
+    backgroundColor: '#ff9800',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  trashBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
   },
   serialNumber: {
     fontSize: 16,

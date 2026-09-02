@@ -1,5 +1,5 @@
 import Purchase from "../../models/purchaseModel.js";
-import { softDeleteById, TRASH_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
+import { softDeleteById, restoreById, getTrashListQuery, mapWithRecordStatus, TRASH_SUCCESS_MESSAGE, RESTORE_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
 import Vendor from "../../models/vendorModel.js"; // Assuming this path is correct
 import GST from "../../models/gstModel.js"; // Assuming this path is correct
 
@@ -472,18 +472,21 @@ export const bulkCreatePurchases = async (req, res) => {
 export const getAllPurchases = async (req, res) => {
     try {
         const { category } = req.query; // Get category from query parameters
-        let filter = {};
+        let baseFilter = {};
 
         if (category) {
-            filter.category = category; // Add category to filter if provided
+            baseFilter.category = category; // Add category to filter if provided
         }
 
-        const purchases = await Purchase.find(filter) // Apply the filter
+        const { filter, options } = getTrashListQuery(req, baseFilter);
+
+        const purchases = await Purchase.find(filter)
+            .setOptions(options)
             .populate('vendorCompanyName', 'companyName') // Populate vendor company name
             .populate('productName') // Populate product details
             .sort({ createdAt: -1 });
 
-        res.status(200).send({ success: true, message: 'All Purchases fetched', purchases });
+        res.status(200).send({ success: true, message: 'All Purchases fetched', purchases: mapWithRecordStatus(purchases) });
     } catch (error) {
         console.error("Error in getAllPurchases:", error);
         res.status(500).send({ success: false, message: 'Error in getting all purchases', error });
@@ -605,5 +608,25 @@ export const deletePurchase = async (req, res) => {
     } catch (error) {
         console.error("Error in deletePurchase:", error);
         res.status(500).send({ success: false, message: 'Error in deleting purchase', error });
+    }
+};
+
+// Restore Purchase from trash
+export const restorePurchase = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const restoredPurchase = await restoreById(Purchase, id);
+
+        if (!restoredPurchase) {
+            return res.status(404).send({ success: false, message: 'Purchase not found in trash.' });
+        }
+        res.status(200).send({
+            success: true,
+            message: RESTORE_SUCCESS_MESSAGE,
+            purchase: mapWithRecordStatus([restoredPurchase])[0],
+        });
+    } catch (error) {
+        console.error("Error in restorePurchase:", error);
+        res.status(500).send({ success: false, message: 'Error in restoring purchase', error });
     }
 };

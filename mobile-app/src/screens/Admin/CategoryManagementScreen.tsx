@@ -13,11 +13,22 @@ import {
 } from 'react-native';
 // @ts-ignore - @expo/vector-icons is available via expo dependency
 import { MaterialIcons as Icon } from '@expo/vector-icons';
+import { useSelector } from 'react-redux';
+import { RootState } from '../../store';
 import { categoryService } from '../../services/api';
 import Toast from 'react-native-toast-message';
 import { usePermissions } from '../../hooks/usePermissions';
+import axios from 'axios';
+import TrashStatusToggle from '../../components/TrashStatusToggle';
+import {
+  buildTrashListUrl,
+  restoreFromTrash,
+  isTrashView,
+  type TrashViewMode,
+} from '../../utils/trashApi';
 
 const CategoryManagementScreen = () => {
+  const { token } = useSelector((state: RootState) => state.auth);
   const { hasPermission } = usePermissions();
   const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -33,6 +44,7 @@ const CategoryManagementScreen = () => {
   const [editLoading, setEditLoading] = useState(false);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [viewMode, setViewMode] = useState<TrashViewMode>('active');
   const ROWS_PER_PAGE_OPTIONS = [5, 10, 25, 50, 100];
 
   const paginatedCategories = useMemo(() => {
@@ -42,7 +54,7 @@ const CategoryManagementScreen = () => {
 
   useEffect(() => {
     loadCategories();
-  }, []);
+  }, [viewMode]);
 
   useEffect(() => {
     setPage(0);
@@ -51,7 +63,9 @@ const CategoryManagementScreen = () => {
   const loadCategories = async () => {
     setLoading(true);
     try {
-      const response = await categoryService.getAll();
+      const response = await axios.get(buildTrashListUrl('/category/all', viewMode), {
+        headers: { Authorization: token || '' },
+      });
       setCategories(response.data.categories || []);
     } catch (error: any) {
       Toast.show({
@@ -183,30 +197,82 @@ const CategoryManagementScreen = () => {
     );
   };
 
+  const handleRestore = (id: string) => {
+    Alert.alert('Restore Category', 'Restore this category from trash?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Restore',
+        onPress: async () => {
+          try {
+            const response = await restoreFromTrash('/category', id, token || '');
+            if (response.data?.success) {
+              Toast.show({
+                type: 'success',
+                text1: 'Success',
+                text2: response.data.message || 'Category restored successfully',
+              });
+              loadCategories();
+            } else {
+              Toast.show({
+                type: 'error',
+                text1: 'Error',
+                text2: response.data?.message || 'Failed to restore category',
+              });
+            }
+          } catch (error: any) {
+            Toast.show({
+              type: 'error',
+              text1: 'Error',
+              text2: error.response?.data?.message || 'Failed to restore category',
+            });
+          }
+        },
+      },
+    ]);
+  };
+
   const canManageCategories = hasPermission('salesAllCategory', 'edit');
 
   const renderCategory = ({ item }: { item: any }) => (
     <View style={styles.categoryCard}>
       <View style={styles.categoryInfo}>
-        <Text style={styles.categoryName}>{item.name}</Text>
+        <View style={styles.categoryTitleRow}>
+          <Text style={styles.categoryName}>{item.name}</Text>
+          {isTrashView(viewMode) && (
+            <View style={styles.trashBadge}>
+              <Text style={styles.trashBadgeText}>Trash</Text>
+            </View>
+          )}
+        </View>
         <Text style={styles.categoryCommission}>
           Commission: {item.commission || 0}%
         </Text>
       </View>
       {canManageCategories && (
         <View style={styles.categoryActions}>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => handleEdit(item)}
-          >
-            <Icon name="edit" size={20} color="#019ee3" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => handleDelete(item._id)}
-          >
-            <Icon name="delete" size={20} color="#FF3B30" />
-          </TouchableOpacity>
+          {isTrashView(viewMode) ? (
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => handleRestore(item._id)}
+            >
+              <Icon name="restore" size={20} color="#28a745" />
+            </TouchableOpacity>
+          ) : (
+            <>
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={() => handleEdit(item)}
+              >
+                <Icon name="edit" size={20} color="#019ee3" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={() => handleDelete(item._id)}
+              >
+                <Icon name="delete" size={20} color="#FF3B30" />
+              </TouchableOpacity>
+            </>
+          )}
         </View>
       )}
     </View>
@@ -216,7 +282,7 @@ const CategoryManagementScreen = () => {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Categories</Text>
-        {canManageCategories && (
+        {canManageCategories && !isTrashView(viewMode) && (
           <TouchableOpacity
             style={styles.addButton}
             onPress={() => {
@@ -230,7 +296,11 @@ const CategoryManagementScreen = () => {
         )}
       </View>
 
-      {showAddForm && canManageCategories && (
+      <View style={styles.toggleContainer}>
+        <TrashStatusToggle viewMode={viewMode} onChange={setViewMode} />
+      </View>
+
+      {showAddForm && canManageCategories && !isTrashView(viewMode) && (
         <View style={styles.addForm}>
           <Text style={styles.label}>Category Name *</Text>
           <TextInput
@@ -537,6 +607,27 @@ const styles = StyleSheet.create({
   },
   categoryInfo: {
     flex: 1,
+  },
+  categoryTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  toggleContainer: {
+    paddingHorizontal: 15,
+    paddingTop: 10,
+  },
+  trashBadge: {
+    backgroundColor: '#ff9800',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  trashBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
   },
   categoryName: {
     fontSize: 18,

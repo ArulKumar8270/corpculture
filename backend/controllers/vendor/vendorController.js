@@ -1,5 +1,5 @@
 import Vendor from "../../models/vendorModel.js";
-import { softDeleteById, TRASH_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
+import { softDeleteById, restoreById, getTrashListQuery, withRecordStatus, TRASH_SUCCESS_MESSAGE, RESTORE_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
 
 // Create Vendor
 export const createVendor = async (req, res) => {
@@ -68,8 +68,9 @@ export const createVendor = async (req, res) => {
 // Get All Vendors
 export const getAllVendors = async (req, res) => {
     try {
-        const vendors = await Vendor.find({}).sort({ createdAt: -1 });
-        const normalized = vendors.map((v) => normalizeVendor(v));
+        const { filter, options } = getTrashListQuery(req);
+        const vendors = await Vendor.find(filter).setOptions(options).sort({ createdAt: -1 });
+        const normalized = vendors.map((v) => withRecordStatus(normalizeVendor(v)));
         res.status(200).send({ success: true, message: 'All Vendors fetched', vendors: normalized });
     } catch (error) {
         console.error("Error in getAllVendors:", error);
@@ -190,5 +191,25 @@ export const deleteVendor = async (req, res) => {
     } catch (error) {
         console.error("Error in deleteVendor:", error);
         res.status(500).send({ success: false, message: 'Error in deleting vendor', error });
+    }
+};
+
+// Restore Vendor from trash
+export const restoreVendor = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const restoredVendor = await restoreById(Vendor, id);
+
+        if (!restoredVendor) {
+            return res.status(404).send({ success: false, message: 'Vendor not found in trash.' });
+        }
+        res.status(200).send({
+            success: true,
+            message: RESTORE_SUCCESS_MESSAGE,
+            vendor: withRecordStatus(normalizeVendor(restoredVendor)),
+        });
+    } catch (error) {
+        console.error("Error in restoreVendor:", error);
+        res.status(500).send({ success: false, message: 'Error in restoring vendor', error });
     }
 };

@@ -1,6 +1,6 @@
 import Payslip from "../../models/payslipModel.js";
 import Employee from "../../models/employeeModel.js";
-import { softDeleteById, TRASH_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
+import { softDeleteById, restoreById, getTrashListQuery, mapWithRecordStatus, TRASH_SUCCESS_MESSAGE, RESTORE_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
 
 function buildPayslipFieldsFromBody(body, employee) {
     const earnings = body.earnings && typeof body.earnings === "object" ? body.earnings : {};
@@ -137,18 +137,22 @@ export const getAllPayslipsController = async (req, res) => {
             if (!employee) {
                 return res.status(200).send({ success: true, payslips: [] });
             }
-            const payslips = await Payslip.find({ employeeId: employee._id })
+            const { filter, options } = getTrashListQuery(req, { employeeId: employee._id });
+            const payslips = await Payslip.find(filter)
+                .setOptions(options)
                 .sort({ payDate: -1, createdAt: -1 })
                 .lean();
-            const withTotals = payslips.map((p) => normalizePayslip(p));
+            const withTotals = mapWithRecordStatus(payslips.map((p) => normalizePayslip(p)));
             return res.status(200).send({ success: true, payslips: withTotals });
         }
 
-        const payslips = await Payslip.find({})
+        const { filter, options } = getTrashListQuery(req);
+        const payslips = await Payslip.find(filter)
+            .setOptions(options)
             .populate("employeeId", "name email designation")
             .sort({ payDate: -1, createdAt: -1 })
             .lean();
-        const withTotals = payslips.map((p) => normalizePayslip(p));
+        const withTotals = mapWithRecordStatus(payslips.map((p) => normalizePayslip(p)));
         res.status(200).send({ success: true, payslips: withTotals });
     } catch (error) {
         console.error("Get all payslips error:", error);
@@ -218,5 +222,25 @@ export const getOnePayslipController = async (req, res) => {
     } catch (error) {
         console.error("Get one payslip error:", error);
         res.status(500).send({ success: false, message: "Error fetching payslip", error });
+    }
+};
+
+// Restore payslip from trash
+export const restorePayslipController = async (req, res) => {
+    try {
+        const restoredPayslip = await restoreById(Payslip, req.params.id);
+
+        if (!restoredPayslip) {
+            return res.status(404).send({ success: false, message: "Payslip not found in trash." });
+        }
+
+        res.status(200).send({
+            success: true,
+            message: RESTORE_SUCCESS_MESSAGE,
+            payslip: mapWithRecordStatus([normalizePayslip(restoredPayslip.toObject())])[0],
+        });
+    } catch (error) {
+        console.error("Restore payslip error:", error);
+        res.status(500).send({ success: false, message: "Error restoring payslip", error });
     }
 };

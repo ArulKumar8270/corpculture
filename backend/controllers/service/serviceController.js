@@ -1,7 +1,7 @@
 import ServiceModel from "../../models/serviceModel.js";
 import { resolveNotificationUserId } from "../../utils/resolveNotificationUserId.js";
 import { notifyAssignment } from "../../utils/expoPushNotification.js";
-import { softDeleteById, TRASH_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
+import { softDeleteById, restoreById, getTrashListQuery, mapWithRecordStatus, TRASH_SUCCESS_MESSAGE, RESTORE_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
 import { resolveEnquiryPincode, attachEnquiryPincodes } from "../../utils/resolveEnquiryPincode.js";
 import { tryAutoAssignNewServiceEnquiry } from "../../utils/tryAutoAssignNewEnquiry.js";
 
@@ -85,10 +85,11 @@ export const getAllServices = async (req, res) => {
         const skip = usePagination ? (pageNum - 1) * limitNum : 0;
 
         // Get total count of documents matching the filters (before pagination)
-        const totalCount = await ServiceModel.countDocuments(findQuery);
+        const { filter, options } = getTrashListQuery(req, findQuery);
+        const totalCount = await ServiceModel.countDocuments(filter).setOptions(options);
 
         // Fetch services (with or without pagination: limit=0 or very high means return all)
-        let query = ServiceModel.find(findQuery).sort({ createdAt: -1 }).skip(skip);
+        let query = ServiceModel.find(filter).setOptions(options).sort({ createdAt: -1 }).skip(skip);
         if (usePagination) {
             query = query.limit(limitNum);
         }
@@ -97,7 +98,7 @@ export const getAllServices = async (req, res) => {
         
         res.status(200).send({
             success: true,
-            services: servicesWithPincode,
+            services: mapWithRecordStatus(servicesWithPincode),
             totalCount
         });
     } catch (error) {
@@ -213,6 +214,35 @@ export const deleteService = async (req, res) => {
         res.status(500).send({
             success: false,
             message: "Error in deleting service",
+            error
+        });
+    }
+};
+
+// Restore Service from trash
+export const restoreService = async (req, res) => {
+    try {
+        const serviceId = req.params.id;
+        const restoredService = await restoreById(ServiceModel, serviceId);
+
+        if (!restoredService) {
+            return res.status(404).send({
+                success: false,
+                message: "Service not found in trash.",
+                errorType: "serviceNotFound"
+            });
+        }
+
+        res.status(200).send({
+            success: true,
+            message: RESTORE_SUCCESS_MESSAGE,
+            service: mapWithRecordStatus([restoredService])[0],
+        });
+    } catch (error) {
+        console.error("Error in restoring service:", error);
+        res.status(500).send({
+            success: false,
+            message: "Error in restoring service",
             error
         });
     }

@@ -1,5 +1,5 @@
 import Category from "../../models/categoryModel.js";
-import { softDeleteById, TRASH_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
+import { softDeleteById, restoreById, getTrashListQuery, mapWithRecordStatus, TRASH_SUCCESS_MESSAGE, RESTORE_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
 // Create Category
 export const createCategory = async (req, res) => {
     try {
@@ -22,8 +22,9 @@ export const createCategory = async (req, res) => {
 // Get All Categories
 export const getAllCategories = async (req, res) => {
     try {
-        const categories = await Category.find({});
-        res.status(200).send({ success: true, message: 'All categories fetched', categories });
+        const { filter, options } = getTrashListQuery(req);
+        const categories = await Category.find(filter).setOptions(options);
+        res.status(200).send({ success: true, message: 'All categories fetched', categories: mapWithRecordStatus(categories) });
     } catch (error) {
         console.error(error);
         res.status(500).send({ success: false, message: 'Error in getting all categories', error });
@@ -74,5 +75,23 @@ export const deleteCategory = async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).send({ success: false, message: 'Error in moving category to trash', error });
+    }
+};
+
+// Restore Category from trash
+export const restoreCategory = async (req, res) => {
+    try {
+        const restoredCategory = await restoreById(Category, req.params.id);
+        if (!restoredCategory) {
+            return res.status(404).send({ success: false, message: 'Category not found in trash.' });
+        }
+        res.status(200).send({
+            success: true,
+            message: RESTORE_SUCCESS_MESSAGE,
+            category: mapWithRecordStatus([restoredCategory])[0],
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).send({ success: false, message: 'Error in restoring category', error });
     }
 };

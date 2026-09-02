@@ -6,6 +6,7 @@ import {
     getActivityLogByIdController,
     updateActivityLogController,
     deleteActivityLogController,
+    restoreActivityLogController,
     getAllActivityLogsController,
     updateActivityLogStatusAdminController,
     getActivityLogByIdAdminController,
@@ -31,6 +32,7 @@ router.delete("/delete/:id", requireSignIn, deleteActivityLogController);
 
 // Get All Activity Logs || GET (Admin only)
 router.get("/admin/all", isAdminOrEmployee, getAllActivityLogsController);
+router.post("/admin/restore/:id", isAdminOrEmployee, restoreActivityLogController);
 
 // Update Activity Log Status || PUT (Admin only)
 router.put("/admin/status/:id", isAdminOrEmployee, updateActivityLogStatusAdminController);

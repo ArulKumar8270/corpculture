@@ -29,7 +29,6 @@ import {
 } from '@mui/material';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown'; // Import down arrow icon
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';   // Import up arrow icon
 import SendIcon from '@mui/icons-material/Send'; // Import SendIcon
@@ -40,6 +39,9 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import axios from 'axios';
 import { useAuth } from '../../context/auth';
+import TrashStatusToggle from '../../components/TrashStatusToggle';
+import TrashActions from '../../components/TrashActions';
+import { buildTrashListUrl, restoreFromTrash, isTrashView } from '../../utils/trashApi';
 import {
     collectReportDownloadCandidates,
     REPORT_DOWNLOAD_BASE_URL,
@@ -107,7 +109,8 @@ const ServiceReportsandGatpass = (props) => {
     const [openReassignModal, setOpenReassignModal] = useState(false); // State for reassign modal
     const [selectedReportId, setSelectedReportId] = useState(null); // State for selected report ID
     const [selectedUserId, setSelectedUserId] = useState(''); // State for selected user in reassign modal
-    const [reassigning, setReassigning] = useState(false); // State for reassign loading
+    const [reassigning, setReassigning] = useState(false);
+    const [viewMode, setViewMode] = useState('active');
 
     const hasPermission = (key) => {
         return userPermissions.some(p => p.key === key && p.actions.includes('edit')) || auth?.user?.role === 1;
@@ -151,8 +154,8 @@ const ServiceReportsandGatpass = (props) => {
             }).toString();
 
             const endpoint = auth?.user?.role === 3 
-                ? `${import.meta.env.VITE_SERVER_URL}/api/v1/report/getByassigned/${auth?.user?._id}/${props?.reportType}?${queryParams}`
-                : `${import.meta.env.VITE_SERVER_URL}/api/v1/report/${props?.reportType}?${queryParams}`;
+                ? buildTrashListUrl(`${import.meta.env.VITE_SERVER_URL}/api/v1/report/getByassigned/${auth?.user?._id}/${props?.reportType}?${queryParams}`, viewMode)
+                : buildTrashListUrl(`${import.meta.env.VITE_SERVER_URL}/api/v1/report/${props?.reportType}?${queryParams}`, viewMode);
 
             const response = await axios.get(endpoint, {
                 headers: { Authorization: auth?.token }
@@ -185,7 +188,7 @@ const ServiceReportsandGatpass = (props) => {
             );
             fetchUsers();
         }
-    }, [auth?.token, props?.reportType, page, rowsPerPage]);
+    }, [auth?.token, props?.reportType, page, rowsPerPage, viewMode]);
 
     const fetchUsers = async () => {
         try {
@@ -233,6 +236,34 @@ const ServiceReportsandGatpass = (props) => {
             } catch (err) {
                 console.error('Error moving to trash report:', err);
                 toast.error(err.response?.data?.message || 'Something went wrong while deleting report.');
+            }
+        }
+    };
+
+    const handleRestore = async (reportId) => {
+        if (window.confirm('Restore this report from trash?')) {
+            try {
+                const { data } = await restoreFromTrash(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/report`,
+                    reportId
+                );
+                if (data?.success) {
+                    toast.success(data.message || 'Report restored successfully');
+                    fetchReports(
+                        fromDate,
+                        toDate,
+                        companyNameFilter,
+                        assignedToFilter,
+                        serialNoFilter,
+                        page,
+                        rowsPerPage
+                    );
+                } else {
+                    toast.error(data?.message || 'Failed to restore report.');
+                }
+            } catch (err) {
+                console.error('Error restoring report:', err);
+                toast.error(err.response?.data?.message || 'Something went wrong while restoring report.');
             }
         }
     };
@@ -490,6 +521,7 @@ const ServiceReportsandGatpass = (props) => {
                     </Button>
                 </Typography> */}
             </div>
+            <TrashStatusToggle viewMode={viewMode} onChange={setViewMode} />
             {/* Filter Section */}
             <Paper elevation={2} sx={{ p: 2, mb: 3, borderRadius: '8px' }}>
                 <Typography variant="h6" gutterBottom sx={{ mb: 2, color: '#019ee3' }}>
@@ -578,6 +610,7 @@ const ServiceReportsandGatpass = (props) => {
                                 <TableCell sx={{ ...tableHeadCellSx, minWidth: 140 }}>Serial No</TableCell>
                                 <TableCell sx={tableHeadCellSx}>Submitted At</TableCell>
                                 <TableCell sx={tableHeadCellSx}>Assigned To</TableCell>
+                                {isTrashView(viewMode) ? <TableCell sx={tableHeadCellSx}>Status</TableCell> : null}
                                 <TableCell align="center" sx={tableHeadCellSx}>Actions</TableCell>
                             </TableRow>
                         </TableHead>
@@ -647,7 +680,14 @@ const ServiceReportsandGatpass = (props) => {
                                                     )}
                                                 </Box>
                                             </TableCell>
+                                            {isTrashView(viewMode) ? (
+                                                <TableCell>
+                                                    <Chip label="Trash" size="small" color="warning" />
+                                                </TableCell>
+                                            ) : null}
                                             <TableCell align="center">
+                                                {!isTrashView(viewMode) ? (
+                                                    <>
                                                 <Tooltip title="Send Report">
                                                     <IconButton
                                                         onClick={() => handleSendQuotation(report)}
@@ -686,11 +726,15 @@ const ServiceReportsandGatpass = (props) => {
                                                         <EditIcon />
                                                     </IconButton>
                                                 </Tooltip>
-                                                <Tooltip title="Trash Report">
-                                                    <IconButton onClick={() => handleDelete(report._id)} color="error">
-                                                        <DeleteIcon />
-                                                    </IconButton>
-                                                </Tooltip>
+                                                    </>
+                                                ) : null}
+                                                <TrashActions
+                                                    viewMode={viewMode}
+                                                    showEdit={false}
+                                                    onTrash={() => handleDelete(report._id)}
+                                                    onRestore={() => handleRestore(report._id)}
+                                                    size="small"
+                                                />
                                             </TableCell>
                                         </TableRow>
                                         {/* Expanded row for materials */}

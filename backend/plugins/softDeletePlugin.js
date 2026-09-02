@@ -16,6 +16,12 @@ export function softDeletePlugin(schema) {
         if (this.getOptions().includeDeleted) {
             return next();
         }
+        // Populate resolves refs via find({ _id: { $in: [...] } }) — include trashed
+        // linked records so parent documents still show names/values.
+        const filter = this.getFilter();
+        if (filter._id != null && typeof filter._id === 'object' && Array.isArray(filter._id.$in)) {
+            return next();
+        }
         this.where({ isDeleted: { $ne: true } });
         next();
     };
@@ -37,6 +43,22 @@ export function softDeletePlugin(schema) {
         return this.findOneAndUpdate(
             filter,
             { isDeleted: true, deletedAt: new Date(), deletedBy },
+            { new: true, includeDeleted: true }
+        );
+    };
+
+    schema.statics.restoreById = async function (id) {
+        return this.findOneAndUpdate(
+            { _id: id, isDeleted: true },
+            { isDeleted: false, deletedAt: null, deletedBy: null },
+            { new: true, includeDeleted: true }
+        );
+    };
+
+    schema.statics.restoreOne = async function (filter) {
+        return this.findOneAndUpdate(
+            { ...filter, isDeleted: true },
+            { isDeleted: false, deletedAt: null, deletedBy: null },
             { new: true, includeDeleted: true }
         );
     };

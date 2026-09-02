@@ -18,6 +18,13 @@ import axios from 'axios';
 import { getApiBaseUrl } from '../../services/api';
 import Toast from 'react-native-toast-message';
 import { usePermissions } from '../../hooks/usePermissions';
+import TrashStatusToggle from '../../components/TrashStatusToggle';
+import {
+  buildTrashListUrl,
+  restoreFromTrash,
+  isTrashView,
+  type TrashViewMode,
+} from '../../utils/trashApi';
 
 const VendorProductListScreen = () => {
   const navigation = useNavigation();
@@ -26,24 +33,25 @@ const VendorProductListScreen = () => {
   const [vendorProducts, setVendorProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [viewMode, setViewMode] = useState<TrashViewMode>('active');
 
   useFocusEffect(
     useCallback(() => {
       fetchVendorProducts();
-    }, [token])
+    }, [token, viewMode])
   );
 
   const fetchVendorProducts = async () => {
     setLoading(true);
     try {
       const response = await axios.get(
-        `${getApiBaseUrl()}/vendor-products`,
+        buildTrashListUrl('/vendor-products', viewMode),
         {
           headers: { Authorization: token || '' },
         }
       );
-      if (response.data?.success && response.data.vendorProducts.length > 0) {
-        setVendorProducts(response.data.vendorProducts);
+      if (response.data?.success) {
+        setVendorProducts(response.data.vendorProducts || []);
       } else {
         setVendorProducts([]);
         if (response.data?.message) {
@@ -120,6 +128,40 @@ const VendorProductListScreen = () => {
     );
   };
 
+  const handleRestore = (productId: string) => {
+    Alert.alert('Restore Vendor Product', 'Restore this vendor product from trash?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Restore',
+        onPress: async () => {
+          try {
+            const response = await restoreFromTrash('/vendor-products', productId, token || '');
+            if (response.data?.success) {
+              Toast.show({
+                type: 'success',
+                text1: 'Success',
+                text2: response.data.message || 'Vendor product restored successfully!',
+              });
+              fetchVendorProducts();
+            } else {
+              Toast.show({
+                type: 'error',
+                text1: 'Error',
+                text2: response.data?.message || 'Failed to restore vendor product.',
+              });
+            }
+          } catch (error: any) {
+            Toast.show({
+              type: 'error',
+              text1: 'Error',
+              text2: error.response?.data?.message || 'Something went wrong while restoring the vendor product.',
+            });
+          }
+        },
+      },
+    ]);
+  };
+
   const filteredProducts = vendorProducts.filter((product) => {
     const lowerCaseSearchTerm = searchTerm.toLowerCase();
     const vendorCompanyName = product.vendorCompanyName?.companyName?.toLowerCase() || '';
@@ -139,7 +181,14 @@ const VendorProductListScreen = () => {
         <View style={styles.productInfo}>
           <View style={styles.productHeader}>
             <Text style={styles.productName}>{item.productName || 'N/A'}</Text>
-            <Text style={styles.serialNumber}>#{index + 1}</Text>
+            <View style={styles.productHeaderRight}>
+              {isTrashView(viewMode) && (
+                <View style={styles.trashBadge}>
+                  <Text style={styles.trashBadgeText}>Trash</Text>
+                </View>
+              )}
+              <Text style={styles.serialNumber}>#{index + 1}</Text>
+            </View>
           </View>
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Vendor Company:</Text>
@@ -168,20 +217,32 @@ const VendorProductListScreen = () => {
         </View>
         {canEdit && (
           <View style={styles.actionButtons}>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.editButton]}
-              onPress={() => handleEdit(item._id)}
-            >
-              <Icon name="edit" size={18} color="#fff" />
-              <Text style={styles.actionButtonText}>Edit</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.deleteButton]}
-              onPress={() => handleDelete(item._id)}
-            >
-              <Icon name="delete" size={18} color="#fff" />
-              <Text style={styles.actionButtonText}>Trash</Text>
-            </TouchableOpacity>
+            {isTrashView(viewMode) ? (
+              <TouchableOpacity
+                style={[styles.actionButton, styles.restoreButton]}
+                onPress={() => handleRestore(item._id)}
+              >
+                <Icon name="restore" size={18} color="#fff" />
+                <Text style={styles.actionButtonText}>Restore</Text>
+              </TouchableOpacity>
+            ) : (
+              <>
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.editButton]}
+                  onPress={() => handleEdit(item._id)}
+                >
+                  <Icon name="edit" size={18} color="#fff" />
+                  <Text style={styles.actionButtonText}>Edit</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.deleteButton]}
+                  onPress={() => handleDelete(item._id)}
+                >
+                  <Icon name="delete" size={18} color="#fff" />
+                  <Text style={styles.actionButtonText}>Trash</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         )}
       </View>
@@ -194,7 +255,7 @@ const VendorProductListScreen = () => {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Vendor Product List</Text>
-        {canAdd && (
+        {canAdd && !isTrashView(viewMode) && (
           <TouchableOpacity
             style={styles.addButton}
             onPress={handleAddVendorProduct}
@@ -202,6 +263,10 @@ const VendorProductListScreen = () => {
             <Text style={styles.addButtonText}>Add New Product</Text>
           </TouchableOpacity>
         )}
+      </View>
+
+      <View style={styles.toggleContainer}>
+        <TrashStatusToggle viewMode={viewMode} onChange={setViewMode} />
       </View>
 
       <View style={styles.searchContainer}>
@@ -314,6 +379,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 10,
   },
+  productHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  toggleContainer: {
+    paddingHorizontal: 15,
+    paddingTop: 10,
+  },
+  trashBadge: {
+    backgroundColor: '#ff9800',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  trashBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
   productName: {
     fontSize: 18,
     fontWeight: 'bold',
@@ -363,6 +448,9 @@ const styles = StyleSheet.create({
   },
   deleteButton: {
     backgroundColor: '#FF3B30',
+  },
+  restoreButton: {
+    backgroundColor: '#28a745',
   },
   actionButtonText: {
     color: '#fff',

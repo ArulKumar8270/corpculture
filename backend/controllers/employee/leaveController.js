@@ -1,6 +1,6 @@
 import EmployeeLeave from "../../models/employeeLeaveModel.js";
 import Employee from "../../models/employeeModel.js";
-import { softDeleteById, TRASH_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
+import { softDeleteById, restoreById, getTrashListQuery, mapWithRecordStatus, TRASH_SUCCESS_MESSAGE, RESTORE_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
 
 // Create leave application (Employee)
 export const createLeaveController = async (req, res) => {
@@ -95,21 +95,26 @@ export const getMyLeavesController = async (req, res) => {
 
         const { page = 1, limit = 10, status } = req.query;
         const skip = (Number(page) - 1) * Number(limit);
-        let query = { employeeId: employee._id };
-        if (status) query.status = status;
+        const { filter: trashFilter, options, viewStatus } = getTrashListQuery(req);
+        let query = { employeeId: employee._id, ...trashFilter };
+        if (status && viewStatus !== 'trash') query.status = status;
 
         const [leaves, totalCount] = await Promise.all([
             EmployeeLeave.find(query)
+                .setOptions(options)
                 .sort({ createdAt: -1 })
                 .skip(skip)
                 .limit(Number(limit))
                 .lean(),
-            EmployeeLeave.countDocuments(query),
+            EmployeeLeave.countDocuments(query).setOptions(options),
         ]);
 
         res.status(200).send({
             success: true,
-            leaves,
+            leaves: leaves.map((leave) => ({
+                ...leave,
+                recordStatus: leave.isDeleted ? 'trash' : 'active',
+            })),
             totalCount,
         });
     } catch (error) {
@@ -340,20 +345,23 @@ export const getAllLeavesController = async (req, res) => {
             query.leaveFrom.$lte = end;
         }
 
+        const { filter, options } = getTrashListQuery(req, query);
+
         const [leaves, totalCount] = await Promise.all([
-            EmployeeLeave.find(query)
+            EmployeeLeave.find(filter)
+                .setOptions(options)
                 .populate("employeeId", "name idCradNo phone email")
                 .populate("userId", "name email")
                 .sort({ createdAt: -1 })
                 .skip(skip)
                 .limit(Number(limit))
                 .lean(),
-            EmployeeLeave.countDocuments(query),
+            EmployeeLeave.countDocuments(filter).setOptions(options),
         ]);
 
         res.status(200).send({
             success: true,
-            leaves,
+            leaves: mapWithRecordStatus(leaves),
             totalCount,
         });
     } catch (error) {
@@ -427,6 +435,49 @@ export const updateLeaveStatusAdminController = async (req, res) => {
         res.status(500).send({
             success: false,
             message: "Error updating leave status",
+            error: error.message,
+        });
+    }
+};
+
+// Restore leave application from trash
+export const restoreLeaveController = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = req.user._id;
+        const role = Number(req.user?.role);
+        const isAdminUser = role === 1 || role === 3;
+
+        const trashedLeave = await EmployeeLeave.findOne({ _id: id, isDeleted: true }).setOptions({ includeDeleted: true });
+        if (!trashedLeave) {
+            return res.status(404).send({
+                success: false,
+                message: "Leave application not found in trash.",
+            });
+        }
+
+        if (!isAdminUser) {
+            const employee = await Employee.findOne({ userId });
+            if (!employee || String(trashedLeave.employeeId) !== String(employee._id)) {
+                return res.status(403).send({
+                    success: false,
+                    message: "You can only restore your own leave applications.",
+                });
+            }
+        }
+
+        const restoredLeave = await restoreById(EmployeeLeave, id);
+
+        res.status(200).send({
+            success: true,
+            message: RESTORE_SUCCESS_MESSAGE,
+            leave: mapWithRecordStatus([restoredLeave])[0],
+        });
+    } catch (error) {
+        console.error("Error restoring leave:", error);
+        res.status(500).send({
+            success: false,
+            message: "Error restoring leave application",
             error: error.message,
         });
     }

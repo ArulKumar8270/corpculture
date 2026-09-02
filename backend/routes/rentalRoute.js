@@ -6,6 +6,7 @@ import {
     getRentalById,
     updateRental,
     deleteRental,
+    restoreRental,
 } from "../controllers/rental/rentalController.js";
 import autoAssignRentalEnquiries from "../controllers/enquiry/autoAssignRentalEnquiries.js";
 
@@ -17,6 +18,7 @@ router.get("/all", isAdminOrEmployee, getAllRental);
 router.get("/get/:id", requireSignIn, getRentalById);
 router.put("/update/:id", isAdminOrEmployee, updateRental);
 router.patch("/auto-assign", isAdminOrEmployee, autoAssignRentalEnquiries);
+router.post("/restore/:id", isAdminOrEmployee, restoreRental);
 router.delete("/delete/:id", isAdminOrEmployee, deleteRental);
 
 export default router;

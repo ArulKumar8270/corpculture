@@ -8,6 +8,7 @@ import {
     getOnePayslipController,
     updatePayslipController,
     deletePayslipController,
+    restorePayslipController,
 } from "../controllers/payslip/payslipController.js";
 
 const router = express.Router();
@@ -18,6 +19,7 @@ router.get("/", (req, res) => res.status(200).json({ success: true, message: "Pa
 router.post("/create", isAdminOrEmployee, createPayslipController);
 router.get("/all", requireSignIn, requirePermission("otherSettingsPayslip", "view"), getAllPayslipsController);
 router.get("/my", requireSignIn, getMyPayslipsController);
+router.post("/restore/:id", requireSignIn, requirePermission("otherSettingsPayslip", "delete"), restorePayslipController);
 router.put("/:id", requireSignIn, requirePermission("otherSettingsPayslip", "edit"), updatePayslipController);
 router.delete("/:id", requireSignIn, requirePermission("otherSettingsPayslip", "delete"), deletePayslipController);
 router.get("/:id", requireSignIn, getOnePayslipController);

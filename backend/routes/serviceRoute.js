@@ -6,6 +6,7 @@ import {
     getServiceById,
     updateService,
     deleteService,
+    restoreService,
 } from "../controllers/service/serviceController.js";
 import autoAssignServiceEnquiries from "../controllers/enquiry/autoAssignServiceEnquiries.js";
 
@@ -17,6 +18,7 @@ router.get("/all", isAdminOrEmployee, getAllServices);
 router.get("/get/:id", requireSignIn, getServiceById);
 router.put("/update/:id", isAdminOrEmployee, updateService);
 router.patch("/auto-assign", isAdminOrEmployee, autoAssignServiceEnquiries);
+router.post("/restore/:id", isAdminOrEmployee, restoreService);
 router.delete("/delete/:id", isAdminOrEmployee, deleteService);
 
 export default router;

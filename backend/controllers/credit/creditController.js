@@ -1,7 +1,7 @@
 import Credit from "../../models/creditModel.js";
 import Company from "../../models/companyModel.js";
 import mongoose from "mongoose";
-import { softDeleteById, TRASH_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
+import { softDeleteById, restoreById, getTrashListQuery, mapWithRecordStatus, TRASH_SUCCESS_MESSAGE, RESTORE_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
 import {
     computeCompanyCreditSummary,
     userCanAccessCompany,
@@ -104,11 +104,14 @@ export const getAllCredits = async (req, res) => {
         // Calculate skip for pagination
         const skip = (parseInt(page) - 1) * parseInt(limit);
 
+        const { filter, options } = getTrashListQuery(req, findQuery);
+
         // Get total count
-        const totalCount = await Credit.countDocuments(findQuery);
+        const totalCount = await Credit.countDocuments(filter).setOptions(options);
 
         // Fetch credits with pagination
-        const credits = await Credit.find(findQuery)
+        const credits = await Credit.find(filter)
+            .setOptions(options)
             .populate('companyId', 'companyName billingAddress city state')
             .populate('createdBy', 'name email')
             .sort({ createdAt: -1 })
@@ -117,7 +120,7 @@ export const getAllCredits = async (req, res) => {
 
         res.status(200).send({
             success: true,
-            credits,
+            credits: mapWithRecordStatus(credits),
             totalCount,
             page: parseInt(page),
             limit: parseInt(limit),
@@ -313,6 +316,33 @@ export const deleteCredit = async (req, res) => {
         res.status(500).send({
             success: false,
             message: "Error in deleting credit",
+            error: error.message
+        });
+    }
+};
+
+// Restore Credit from trash
+export const restoreCredit = async (req, res) => {
+    try {
+        const restoredCredit = await restoreById(Credit, req.params.id);
+
+        if (!restoredCredit) {
+            return res.status(404).send({
+                success: false,
+                message: "Credit not found in trash."
+            });
+        }
+
+        res.status(200).send({
+            success: true,
+            message: RESTORE_SUCCESS_MESSAGE,
+            credit: mapWithRecordStatus([restoredCredit])[0],
+        });
+    } catch (error) {
+        console.error("Error in restoring credit:", error);
+        res.status(500).send({
+            success: false,
+            message: "Error in restoring credit",
             error: error.message
         });
     }

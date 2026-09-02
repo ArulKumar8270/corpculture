@@ -1,6 +1,6 @@
 import userModel from "../../models/userModel.js";
 import Employee from "../../models/employeeModel.js";
-import { softDeleteById, TRASH_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
+import { softDeleteById, restoreById, withRecordStatus, TRASH_SUCCESS_MESSAGE, RESTORE_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
 
 const trashLinkedEmployee = async (user, deletedBy) => {
     if (Number(user.role) !== 3) return;
@@ -90,6 +90,48 @@ export const deactivateUserByAdminController = async (req, res) => {
         res.status(500).send({
             success: false,
             message: "Error in moving user account to trash",
+            error,
+        });
+    }
+};
+
+// Admin restore user account from trash
+export const restoreUserByAdminController = async (req, res) => {
+    try {
+        const { userId } = req.body;
+
+        if (!userId) {
+            return res.status(400).send({
+                success: false,
+                message: "User ID is required",
+            });
+        }
+
+        const restoredUser = await restoreById(userModel, userId);
+        if (!restoredUser) {
+            return res.status(404).send({
+                success: false,
+                message: "User not found in trash.",
+            });
+        }
+
+        if (Number(restoredUser.role) === 3) {
+            const employee = await Employee.findOne({ userId: restoredUser._id }).setOptions({ includeDeleted: true });
+            if (employee?.isDeleted) {
+                await restoreById(Employee, employee._id);
+            }
+        }
+
+        res.status(200).send({
+            success: true,
+            message: RESTORE_SUCCESS_MESSAGE,
+            user: withRecordStatus(restoredUser),
+        });
+    } catch (error) {
+        console.log("Admin restore user error: " + error);
+        res.status(500).send({
+            success: false,
+            message: "Error in restoring user account",
             error,
         });
     }

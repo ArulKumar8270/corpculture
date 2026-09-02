@@ -1,5 +1,5 @@
 import RentalProduct from "../../models/rentalProductModel.js";
-import { softDeleteById, TRASH_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
+import { softDeleteById, restoreById, getTrashListQuery, mapWithRecordStatus, TRASH_SUCCESS_MESSAGE, RESTORE_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
 import Company from "../../models/companyModel.js"; // Assuming this path is correct
 import GST from "../../models/gstModel.js"; // Assuming this path is correct
 
@@ -124,12 +124,14 @@ export const createRentalProduct = async (req, res) => {
 // Get All Rental Products
 export const getAllRentalProducts = async (req, res) => {
     try {
-        const rentalProducts = await RentalProduct.find({})
+        const { filter, options } = getTrashListQuery(req);
+        const rentalProducts = await RentalProduct.find(filter)
+            .setOptions(options)
             .populate('company') // Populate company name
             .populate('gstType') // Populate GST details
             .sort({ createdAt: -1 });
 
-        res.status(200).send({ success: true, message: 'All Rental Products fetched', rentalProducts });
+        res.status(200).send({ success: true, message: 'All Rental Products fetched', rentalProducts: mapWithRecordStatus(rentalProducts) });
     } catch (error) {
         console.error("Error in getAllRentalProducts:", error);
         res.status(500).send({ success: false, message: 'Error in getting all rental products', error });
@@ -315,6 +317,26 @@ export const deleteRentalProduct = async (req, res) => {
     } catch (error) {
         console.error("Error in deleteRentalProduct:", error);
         res.status(500).send({ success: false, message: 'Error in deleting rental product', error });
+    }
+};
+
+// Restore Rental Product from trash
+export const restoreRentalProduct = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const restoredRentalProduct = await restoreById(RentalProduct, id);
+
+        if (!restoredRentalProduct) {
+            return res.status(404).send({ success: false, message: 'Rental Product not found in trash.' });
+        }
+        res.status(200).send({
+            success: true,
+            message: RESTORE_SUCCESS_MESSAGE,
+            rentalProduct: mapWithRecordStatus([restoredRentalProduct])[0],
+        });
+    } catch (error) {
+        console.error("Error in restoreRentalProduct:", error);
+        res.status(500).send({ success: false, message: 'Error in restoring rental product', error });
     }
 };
 

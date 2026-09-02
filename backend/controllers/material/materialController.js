@@ -1,5 +1,5 @@
 import Material from '../../models/materialModel.js';
-import { softDeleteById, TRASH_SUCCESS_MESSAGE } from '../../utils/softDelete.js';
+import { softDeleteById, restoreById, getTrashListQuery, mapWithRecordStatus, withRecordStatus, TRASH_SUCCESS_MESSAGE, RESTORE_SUCCESS_MESSAGE } from '../../utils/softDelete.js';
 
 // Create a new material
 export const createMaterial = async (req, res) => {
@@ -41,13 +41,15 @@ export const createMaterial = async (req, res) => {
 // Get all materials
 export const getAllMaterials = async (req, res) => {
     try {
-        const materials = await Material.find({})
+        const { filter, options } = getTrashListQuery(req);
+        const materials = await Material.find(filter)
+            .setOptions(options)
             .sort({ createdAt: -1 });
 
         res.status(200).json({
             success: true,
             count: materials.length,
-            materials
+            materials: mapWithRecordStatus(materials)
         });
     } catch (error) {
         console.error('Error fetching materials:', error);
@@ -170,6 +172,39 @@ export const deleteMaterial = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Error moving material to trash',
+            error: error.message
+        });
+    }
+};
+
+// Restore material from trash
+export const restoreMaterial = async (req, res) => {
+    try {
+        const restored = await restoreById(Material, req.params.id);
+
+        if (!restored) {
+            return res.status(404).json({
+                success: false,
+                message: 'Material not found in trash'
+            });
+        }
+
+        const material = await Material.findByIdAndUpdate(
+            req.params.id,
+            { isActive: true, updatedBy: req.user?._id },
+            { new: true, includeDeleted: true }
+        );
+
+        res.status(200).json({
+            success: true,
+            message: RESTORE_SUCCESS_MESSAGE,
+            material: withRecordStatus(material)
+        });
+    } catch (error) {
+        console.error('Error restoring material:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error restoring material',
             error: error.message
         });
     }

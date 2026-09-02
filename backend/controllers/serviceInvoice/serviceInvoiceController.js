@@ -1,7 +1,7 @@
 import ServiceInvoice from "../../models/serviceInvoiceModel.js";
 import Company from "../../models/companyModel.js"; // Assuming Company model path
 import ServiceProduct from "../../models/serviceProductModel.js"; // Assuming ServiceProduct model path
-import { softDeleteById, TRASH_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
+import { softDeleteById, restoreById, getTrashListQuery, mapWithRecordStatus, TRASH_SUCCESS_MESSAGE, RESTORE_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
 import Material from "../../models/materialModel.js"; // Import Material model for reducing units
 import cloudinary from "cloudinary";
 import CommonDetails from "../../models/commonDetailsModel.js";
@@ -379,10 +379,13 @@ export const getAllServiceInvoices = async (req, res) => {
         // Calculate skip value for pagination
         const skip = (page - 1) * limit;
 
-        // Get total count of documents matching the query (before pagination)
-        const totalCount = await ServiceInvoice.countDocuments(query);
+        const { filter, options } = getTrashListQuery(req, query);
 
-        const serviceInvoices = await ServiceInvoice.find(query)
+        // Get total count of documents matching the query (before pagination)
+        const totalCount = await ServiceInvoice.countDocuments(filter).setOptions(options);
+
+        const serviceInvoices = await ServiceInvoice.find(filter)
+            .setOptions(options)
             .populate({
                 path: "products.productId",
                 populate: [
@@ -405,7 +408,7 @@ export const getAllServiceInvoices = async (req, res) => {
         res.status(200).send({
             success: true,
             message: 'All service invoices fetched',
-            serviceInvoices,
+            serviceInvoices: mapWithRecordStatus(serviceInvoices),
             totalCount // Send total count for frontend pagination
         });
     } catch (error) {
@@ -843,5 +846,26 @@ export const deleteServiceInvoice = async (req, res) => {
     } catch (error) {
         console.error("Error in deleteServiceInvoice:", error);
         res.status(500).send({ success: false, message: 'Error in deleting service invoice', error });
+    }
+};
+
+// Restore Service Invoice from trash
+export const restoreServiceInvoice = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const restoredServiceInvoice = await restoreById(ServiceInvoice, id);
+
+        if (!restoredServiceInvoice) {
+            return res.status(404).send({ success: false, message: 'Service Invoice not found in trash.' });
+        }
+
+        res.status(200).send({
+            success: true,
+            message: RESTORE_SUCCESS_MESSAGE,
+            serviceInvoice: mapWithRecordStatus([restoredServiceInvoice])[0],
+        });
+    } catch (error) {
+        console.error("Error in restoreServiceInvoice:", error);
+        res.status(500).send({ success: false, message: 'Error in restoring service invoice', error });
     }
 };

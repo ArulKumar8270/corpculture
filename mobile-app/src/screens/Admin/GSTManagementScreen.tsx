@@ -20,6 +20,13 @@ import axios from 'axios';
 import Toast from 'react-native-toast-message';
 import { usePermissions } from '../../hooks/usePermissions';
 import { getApiBaseUrl } from '../../services/api';
+import TrashStatusToggle from '../../components/TrashStatusToggle';
+import {
+  buildTrashListUrl,
+  restoreFromTrash,
+  isTrashView,
+  type TrashViewMode,
+} from '../../utils/trashApi';
 
 const GSTManagementScreen = () => {
   const { token, user } = useSelector((state: RootState) => state.auth);
@@ -32,6 +39,7 @@ const GSTManagementScreen = () => {
   const [gstTypePickerVisible, setGstTypePickerVisible] = useState(false);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [viewMode, setViewMode] = useState<TrashViewMode>('active');
   const ROWS_PER_PAGE_OPTIONS = [5, 10, 25, 50, 100];
 
   const gstTypesOptions = ['SGST', 'CGST', 'IGST'];
@@ -48,14 +56,14 @@ const GSTManagementScreen = () => {
   useFocusEffect(
     useCallback(() => {
       fetchGstList();
-    }, [token])
+    }, [token, viewMode])
   );
 
   const fetchGstList = async () => {
     try {
       setLoading(true);
       const response = await axios.get(
-        `${getApiBaseUrl()}/gst`,
+        buildTrashListUrl('/gst', viewMode),
         {
           headers: { Authorization: token || '' },
           timeout: 30000,
@@ -213,32 +221,85 @@ const GSTManagementScreen = () => {
     setGstPercentage('');
   };
 
+  const handleRestore = (id: string) => {
+    Alert.alert('Restore GST', 'Restore this GST entry from trash?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Restore',
+        onPress: async () => {
+          try {
+            const response = await restoreFromTrash('/gst', id, token || '');
+            if (response.data?.success) {
+              Toast.show({
+                type: 'success',
+                text1: 'Success',
+                text2: response.data.message || 'GST restored successfully',
+              });
+              fetchGstList();
+            } else {
+              Toast.show({
+                type: 'error',
+                text1: 'Error',
+                text2: response.data?.message || 'Failed to restore GST.',
+              });
+            }
+          } catch (error: any) {
+            Toast.show({
+              type: 'error',
+              text1: 'Error',
+              text2: error.response?.data?.message || 'Something went wrong while restoring GST.',
+            });
+          }
+        },
+      },
+    ]);
+  };
+
   const renderGst = ({ item, index }: { item: any; index: number }) => {
     const canEdit = hasPermission('otherSettingsGst', 'edit') || user?.role === 1;
 
     return (
       <View style={styles.gstCard}>
         <View style={styles.gstInfo}>
-          <Text style={styles.serialNumber}>#{page * rowsPerPage + index + 1}</Text>
+          <View style={styles.gstTitleRow}>
+            <Text style={styles.serialNumber}>#{page * rowsPerPage + index + 1}</Text>
+            {isTrashView(viewMode) && (
+              <View style={styles.trashBadge}>
+                <Text style={styles.trashBadgeText}>Trash</Text>
+              </View>
+            )}
+          </View>
           <Text style={styles.gstType}>{item.gstType || 'N/A'}</Text>
           <Text style={styles.gstPercentage}>{item.gstPercentage}%</Text>
         </View>
         {canEdit && (
           <View style={styles.actionButtons}>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.editButton]}
-              onPress={() => handleEdit(item)}
-            >
-              <Icon name="edit" size={18} color="#fff" />
-              <Text style={styles.actionButtonText}>Edit</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.deleteButton]}
-              onPress={() => handleDelete(item._id)}
-            >
-              <Icon name="delete" size={18} color="#fff" />
-              <Text style={styles.actionButtonText}>Trash</Text>
-            </TouchableOpacity>
+            {isTrashView(viewMode) ? (
+              <TouchableOpacity
+                style={[styles.actionButton, styles.restoreButton]}
+                onPress={() => handleRestore(item._id)}
+              >
+                <Icon name="restore" size={18} color="#fff" />
+                <Text style={styles.actionButtonText}>Restore</Text>
+              </TouchableOpacity>
+            ) : (
+              <>
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.editButton]}
+                  onPress={() => handleEdit(item)}
+                >
+                  <Icon name="edit" size={18} color="#fff" />
+                  <Text style={styles.actionButtonText}>Edit</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.deleteButton]}
+                  onPress={() => handleDelete(item._id)}
+                >
+                  <Icon name="delete" size={18} color="#fff" />
+                  <Text style={styles.actionButtonText}>Trash</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         )}
       </View>
@@ -261,7 +322,11 @@ const GSTManagementScreen = () => {
         <Text style={styles.title}>GST Management</Text>
       </View>
 
-      {canEdit && (
+      <View style={styles.toggleContainer}>
+        <TrashStatusToggle viewMode={viewMode} onChange={setViewMode} />
+      </View>
+
+      {canEdit && !isTrashView(viewMode) && (
         <View style={styles.formCard}>
           <Text style={styles.formTitle}>
             {editingGst ? 'Edit GST Entry' : 'Add New GST Entry'}
@@ -541,6 +606,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 10,
+    flex: 1,
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  gstTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  toggleContainer: {
+    paddingHorizontal: 15,
+    paddingTop: 10,
+    backgroundColor: '#fff',
+  },
+  trashBadge: {
+    backgroundColor: '#ff9800',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  trashBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
   },
   serialNumber: {
     fontSize: 14,
@@ -582,6 +671,9 @@ const styles = StyleSheet.create({
   },
   deleteButton: {
     backgroundColor: '#FF3B30',
+  },
+  restoreButton: {
+    backgroundColor: '#28a745',
   },
   actionButtonText: {
     color: '#fff',

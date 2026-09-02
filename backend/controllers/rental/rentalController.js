@@ -1,7 +1,7 @@
 import RentalModel from "../../models/rentalModel.js";
 import { resolveNotificationUserId } from "../../utils/resolveNotificationUserId.js";
 import { notifyAssignment } from "../../utils/expoPushNotification.js";
-import { softDeleteById, TRASH_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
+import { softDeleteById, restoreById, getTrashListQuery, mapWithRecordStatus, TRASH_SUCCESS_MESSAGE, RESTORE_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
 import { resolveEnquiryPincode, attachEnquiryPincodes } from "../../utils/resolveEnquiryPincode.js";
 import { tryAutoAssignNewRentalEnquiry } from "../../utils/tryAutoAssignNewEnquiry.js";
 
@@ -81,12 +81,13 @@ export const getAllRental = async (req, res) => {
         const skip = (parseInt(page) - 1) * parseInt(limit);
 
         // Get total count of documents matching the filters (before pagination)
-        const totalCount = await RentalModel.countDocuments(findQuery);
-        const rental = await RentalModel.find(findQuery);
+        const { filter, options } = getTrashListQuery(req, findQuery);
+        const totalCount = await RentalModel.countDocuments(filter).setOptions(options);
+        const rental = await RentalModel.find(filter).setOptions(options);
         const rentalWithPincode = await attachEnquiryPincodes(rental);
         res.status(200).send({
             success: true,
-            rental: rentalWithPincode,
+            rental: mapWithRecordStatus(rentalWithPincode),
             totalCount
         });
     } catch (error) {
@@ -240,6 +241,35 @@ export const deleteRental = async (req, res) => {
         res.status(500).send({
             success: false,
             message: "Error in deleting rental",
+            error
+        });
+    }
+};
+
+// Restore Rental from trash
+export const restoreRental = async (req, res) => {
+    try {
+        const rentalId = req.params.id;
+        const restoredRental = await restoreById(RentalModel, rentalId);
+
+        if (!restoredRental) {
+            return res.status(404).send({
+                success: false,
+                message: "Rental not found in trash.",
+                errorType: "RentalNotFound"
+            });
+        }
+
+        res.status(200).send({
+            success: true,
+            message: RESTORE_SUCCESS_MESSAGE,
+            rental: mapWithRecordStatus([restoredRental])[0],
+        });
+    } catch (error) {
+        console.error("Error in restoring rental:", error);
+        res.status(500).send({
+            success: false,
+            message: "Error in restoring rental",
             error
         });
     }

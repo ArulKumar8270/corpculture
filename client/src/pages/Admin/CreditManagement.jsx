@@ -8,9 +8,10 @@ import {
     Chip
 } from '@mui/material';
 import toast from 'react-hot-toast';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
+import TrashStatusToggle from '../../components/TrashStatusToggle';
+import TrashActions from '../../components/TrashActions';
+import { buildTrashListUrl, restoreFromTrash, isTrashView } from '../../utils/trashApi';
 
 const CreditManagement = () => {
     const { auth } = useAuth();
@@ -45,6 +46,7 @@ const CreditManagement = () => {
         creditType: 'Given'
     });
     const [formLoading, setFormLoading] = useState(false);
+    const [viewMode, setViewMode] = useState('active');
 
     // Fetch companies for dropdown
     useEffect(() => {
@@ -81,10 +83,14 @@ const CreditManagement = () => {
                     companyId: appliedFilters.companyId || '',
                     creditType: appliedFilters.creditType || '',
                     fromDate: appliedFilters.fromDate || '',
-                    toDate: appliedFilters.toDate || ''
+                    toDate: appliedFilters.toDate || '',
                 }).toString();
 
-                const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/credit/all?${queryParams}`, {
+                const listUrl = buildTrashListUrl(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/credit/all?${queryParams}`,
+                    viewMode
+                );
+                const { data } = await axios.get(listUrl, {
                     headers: { Authorization: auth.token }
                 });
 
@@ -107,7 +113,7 @@ const CreditManagement = () => {
         if (auth?.token) {
             fetchCredits();
         }
-    }, [auth?.token, page, rowsPerPage, appliedFilters]);
+    }, [auth?.token, page, rowsPerPage, appliedFilters, viewMode]);
 
     const handleChangePage = (event, newPage) => {
         setPage(newPage);
@@ -225,9 +231,13 @@ const CreditManagement = () => {
                 companyId: appliedFilters.companyId || '',
                 creditType: appliedFilters.creditType || '',
                 fromDate: appliedFilters.fromDate || '',
-                toDate: appliedFilters.toDate || ''
+                toDate: appliedFilters.toDate || '',
             }).toString();
-            const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/credit/all?${queryParams}`, {
+            const listUrl = buildTrashListUrl(
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/credit/all?${queryParams}`,
+                viewMode
+            );
+            const { data } = await axios.get(listUrl, {
                 headers: { Authorization: auth.token }
             });
             if (data?.success) {
@@ -260,9 +270,13 @@ const CreditManagement = () => {
                 companyId: appliedFilters.companyId || '',
                 creditType: appliedFilters.creditType || '',
                 fromDate: appliedFilters.fromDate || '',
-                toDate: appliedFilters.toDate || ''
+                toDate: appliedFilters.toDate || '',
             }).toString();
-            const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/credit/all?${queryParams}`, {
+            const listUrl = buildTrashListUrl(
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/credit/all?${queryParams}`,
+                viewMode
+            );
+            const { data } = await axios.get(listUrl, {
                 headers: { Authorization: auth.token }
             });
             if (data?.success) {
@@ -272,6 +286,46 @@ const CreditManagement = () => {
         } catch (err) {
             console.error('Error moving to trash credit:', err);
             toast.error(err.response?.data?.message || 'Failed to move to trash credit');
+        }
+    };
+
+    const handleRestore = async (creditId) => {
+        if (!window.confirm('Restore this credit entry from trash?')) {
+            return;
+        }
+
+        try {
+            const { data } = await restoreFromTrash(
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/credit`,
+                creditId
+            );
+            if (data?.success) {
+                toast.success(data.message || 'Credit restored successfully!');
+                const queryParams = new URLSearchParams({
+                    page: page + 1,
+                    limit: rowsPerPage,
+                    companyId: appliedFilters.companyId || '',
+                    creditType: appliedFilters.creditType || '',
+                    fromDate: appliedFilters.fromDate || '',
+                    toDate: appliedFilters.toDate || '',
+                }).toString();
+                const listUrl = buildTrashListUrl(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/credit/all?${queryParams}`,
+                    viewMode
+                );
+                const refresh = await axios.get(listUrl, {
+                    headers: { Authorization: auth.token }
+                });
+                if (refresh.data?.success) {
+                    setCredits(refresh.data.credits || []);
+                    setTotalCount(refresh.data.totalCount || 0);
+                }
+            } else {
+                toast.error(data?.message || 'Failed to restore credit');
+            }
+        } catch (err) {
+            console.error('Error restoring credit:', err);
+            toast.error(err.response?.data?.message || 'Failed to restore credit');
         }
     };
 
@@ -301,10 +355,13 @@ const CreditManagement = () => {
                     startIcon={<AddIcon />}
                     onClick={() => handleOpenModal()}
                     className="bg-[#019ee3] hover:bg-[#017bb3] text-white px-4 py-2 rounded"
+                    sx={{ display: isTrashView(viewMode) ? 'none' : undefined }}
                 >
                     Add Credit
                 </Button>
             </div>
+
+            <TrashStatusToggle viewMode={viewMode} onChange={setViewMode} />
 
             {/* Filter Section */}
             <Paper className="p-4 mb-4 shadow-md rounded-xl bg-white">
@@ -422,6 +479,7 @@ const CreditManagement = () => {
                                         <TableCell sx={{ color: 'white' }}>Type</TableCell>
                                         <TableCell sx={{ color: 'white' }}>Description</TableCell>
                                         <TableCell sx={{ color: 'white' }}>Created By</TableCell>
+                                        {isTrashView(viewMode) ? <TableCell sx={{ color: 'white' }}>Record Status</TableCell> : null}
                                         <TableCell sx={{ color: 'white' }}>Actions</TableCell>
                                     </TableRow>
                                 </TableHead>
@@ -453,25 +511,18 @@ const CreditManagement = () => {
                                             <TableCell>
                                                 {credit.createdBy?.name || 'N/A'}
                                             </TableCell>
+                                            {isTrashView(viewMode) ? (
+                                                <TableCell>
+                                                    <Chip label="Trash" size="small" color="warning" />
+                                                </TableCell>
+                                            ) : null}
                                             <TableCell>
-                                                <div className="flex gap-2">
-                                                    <Button
-                                                        variant="outlined"
-                                                        size="small"
-                                                        startIcon={<EditIcon />}
-                                                        onClick={() => handleOpenModal(credit)}
-                                                        color="primary"
-                                                    >
-                                                        Edit
-                                                    </Button>
-                                                    <Button
-                                                        variant="outlined"
-                                                        size="small"
-                                                        startIcon={<DeleteIcon />}
-                                                        onClick={() => handleDelete(credit._id)}
-                                                        color="error"
-                                                    >Trash</Button>
-                                                </div>
+                                                <TrashActions
+                                                    viewMode={viewMode}
+                                                    onEdit={() => handleOpenModal(credit)}
+                                                    onTrash={() => handleDelete(credit._id)}
+                                                    onRestore={() => handleRestore(credit._id)}
+                                                />
                                             </TableCell>
                                         </TableRow>
                                     ))}

@@ -1,7 +1,7 @@
 import ServiceQuotation from "../../models/serviceQuotationModel.js";
 import Company from "../../models/companyModel.js"; // Assuming Company model path
 import ServiceProduct from "../../models/serviceProductModel.js";
-import { softDeleteById, TRASH_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
+import { softDeleteById, restoreById, getTrashListQuery, mapWithRecordStatus, TRASH_SUCCESS_MESSAGE, RESTORE_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
 
 // Helper function to calculate totals
 const calculateQuotationTotals = (products) => {
@@ -122,7 +122,10 @@ export const createServiceQuotation = async (req, res) => {
 export const getAllServiceQuotations = async (req, res) => {
     const { status } = req.params;
     try {
-        const serviceQuotations = await ServiceQuotation.find({ status: status === "unMovedToInvoicing" ? { $ne: "moveToInvoicing" } : {$eq: "moveToInvoicing"} }) // Filter out quotations with status "moveToInvoicing"
+        const statusFilter = { status: status === "unMovedToInvoicing" ? { $ne: "moveToInvoicing" } : { $eq: "moveToInvoicing" } };
+        const { filter, options } = getTrashListQuery(req, statusFilter);
+        const serviceQuotations = await ServiceQuotation.find(filter)
+            .setOptions(options)
             .populate('companyId') // Populate company name
             .populate({
                 path: 'products.productId', // First populate productId
@@ -133,7 +136,7 @@ export const getAllServiceQuotations = async (req, res) => {
             .populate('assignedTo') // Populate product details
             .sort({ createdAt: -1 });
 
-        res.status(200).send({ success: true, message: 'All Service Quotations fetched', serviceQuotations });
+        res.status(200).send({ success: true, message: 'All Service Quotations fetched', serviceQuotations: mapWithRecordStatus(serviceQuotations) });
     } catch (error) {
         console.error("Error in getAllServiceQuotations:", error);
         res.status(500).send({ success: false, message: 'Error in getting service Quotations', error });
@@ -335,5 +338,26 @@ export const deleteServiceQuotation = async (req, res) => {
     } catch (error) {
         console.error("Error in deleteServiceQuotation:", error);
         res.status(500).send({ success: false, message: 'Error in deleting service Quotation', error });
+    }
+};
+
+// Restore Service Quotation from trash
+export const restoreServiceQuotation = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const restoredServiceQuotation = await restoreById(ServiceQuotation, id);
+
+        if (!restoredServiceQuotation) {
+            return res.status(404).send({ success: false, message: 'Service Quotation not found in trash.' });
+        }
+
+        res.status(200).send({
+            success: true,
+            message: RESTORE_SUCCESS_MESSAGE,
+            serviceQuotation: mapWithRecordStatus([restoredServiceQuotation])[0],
+        });
+    } catch (error) {
+        console.error("Error in restoreServiceQuotation:", error);
+        res.status(500).send({ success: false, message: 'Error in restoring service Quotation', error });
     }
 };

@@ -19,6 +19,13 @@ import { RootState } from '../../store';
 import axios from 'axios';
 import Toast from 'react-native-toast-message';
 import { getApiBaseUrl } from '../../services/api';
+import TrashStatusToggle from '../../components/TrashStatusToggle';
+import {
+  buildTrashListUrl,
+  restoreFromTrash,
+  isTrashView,
+  type TrashViewMode,
+} from '../../utils/trashApi';
 
 interface Credit {
   _id: string;
@@ -75,12 +82,13 @@ const CreditManagementScreen = () => {
   const [formLoading, setFormLoading] = useState(false);
   const [companyModalVisible, setCompanyModalVisible] = useState(false);
   const [creditTypeModalVisible, setCreditTypeModalVisible] = useState(false);
+  const [viewMode, setViewMode] = useState<TrashViewMode>('active');
 
   useFocusEffect(
     useCallback(() => {
       fetchCompanies();
       fetchCredits();
-    }, [token, page, rowsPerPage, appliedFilters])
+    }, [token, page, rowsPerPage, appliedFilters, viewMode])
   );
 
   const fetchCompanies = async () => {
@@ -123,7 +131,7 @@ const CreditManagementScreen = () => {
 
       const API_BASE_URL = getApiBaseUrl();
       const { data } = await axios.get(
-        `${API_BASE_URL}/credit/all?${queryParams}`,
+        buildTrashListUrl(`/credit/all?${queryParams}`, viewMode),
         {
           headers: { Authorization: token || '' },
           timeout: 30000,
@@ -302,6 +310,40 @@ const CreditManagementScreen = () => {
     );
   };
 
+  const handleRestore = (creditId: string) => {
+    Alert.alert('Restore Credit', 'Restore this credit entry from trash?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Restore',
+        onPress: async () => {
+          try {
+            const response = await restoreFromTrash('/credit', creditId, token || '');
+            if (response.data?.success) {
+              Toast.show({
+                type: 'success',
+                text1: 'Success',
+                text2: response.data.message || 'Credit restored successfully',
+              });
+              fetchCredits();
+            } else {
+              Toast.show({
+                type: 'error',
+                text1: 'Error',
+                text2: response.data?.message || 'Failed to restore credit',
+              });
+            }
+          } catch (err: any) {
+            Toast.show({
+              type: 'error',
+              text1: 'Error',
+              text2: err.response?.data?.message || 'Failed to restore credit',
+            });
+          }
+        },
+      },
+    ]);
+  };
+
   const getCreditTypeColor = (type: string) => {
     switch (type) {
       case 'Given':
@@ -321,7 +363,14 @@ const CreditManagementScreen = () => {
     <View style={styles.creditCard}>
       <View style={styles.creditHeader}>
         <View style={styles.creditInfo}>
-          <Text style={styles.companyName}>{item.companyId?.companyName || 'N/A'}</Text>
+          <View style={styles.creditTitleRow}>
+            <Text style={styles.companyName}>{item.companyId?.companyName || 'N/A'}</Text>
+            {isTrashView(viewMode) && (
+              <View style={styles.trashBadge}>
+                <Text style={styles.trashBadgeText}>Trash</Text>
+              </View>
+            )}
+          </View>
           <Text style={styles.creditDate}>
             {new Date(item.createdAt).toLocaleDateString()}
           </Text>
@@ -342,20 +391,32 @@ const CreditManagementScreen = () => {
         )}
       </View>
       <View style={styles.creditActions}>
-        <TouchableOpacity
-          style={[styles.actionButton, styles.editButton]}
-          onPress={() => handleOpenModal(item)}
-        >
-          <Icon name="edit" size={18} color="#019ee3" />
-          <Text style={styles.actionButtonText}>Edit</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.actionButton, styles.deleteButton]}
-          onPress={() => handleDelete(item._id)}
-        >
-          <Icon name="delete" size={18} color="#dc3545" />
-          <Text style={[styles.actionButtonText, { color: '#dc3545' }]}>Trash</Text>
-        </TouchableOpacity>
+        {isTrashView(viewMode) ? (
+          <TouchableOpacity
+            style={[styles.actionButton, styles.restoreButton]}
+            onPress={() => handleRestore(item._id)}
+          >
+            <Icon name="restore" size={18} color="#28a745" />
+            <Text style={[styles.actionButtonText, { color: '#28a745' }]}>Restore</Text>
+          </TouchableOpacity>
+        ) : (
+          <>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.editButton]}
+              onPress={() => handleOpenModal(item)}
+            >
+              <Icon name="edit" size={18} color="#019ee3" />
+              <Text style={styles.actionButtonText}>Edit</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.deleteButton]}
+              onPress={() => handleDelete(item._id)}
+            >
+              <Icon name="delete" size={18} color="#dc3545" />
+              <Text style={[styles.actionButtonText, { color: '#dc3545' }]}>Trash</Text>
+            </TouchableOpacity>
+          </>
+        )}
       </View>
     </View>
   );
@@ -372,10 +433,16 @@ const CreditManagementScreen = () => {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Credit Management</Text>
-        <TouchableOpacity style={styles.addButton} onPress={() => handleOpenModal()}>
-          <Icon name="add" size={24} color="#fff" />
-          <Text style={styles.addButtonText}>Add Credit</Text>
-        </TouchableOpacity>
+        {!isTrashView(viewMode) && (
+          <TouchableOpacity style={styles.addButton} onPress={() => handleOpenModal()}>
+            <Icon name="add" size={24} color="#fff" />
+            <Text style={styles.addButtonText}>Add Credit</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      <View style={styles.toggleContainer}>
+        <TrashStatusToggle viewMode={viewMode} onChange={setViewMode} />
       </View>
 
       {/* Filter Section */}
@@ -809,6 +876,29 @@ const styles = StyleSheet.create({
   creditInfo: {
     flex: 1,
   },
+  creditTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+    marginBottom: 4,
+  },
+  toggleContainer: {
+    paddingHorizontal: 15,
+    paddingTop: 10,
+    backgroundColor: '#fff',
+  },
+  trashBadge: {
+    backgroundColor: '#ff9800',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  trashBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
   companyName: {
     fontSize: 18,
     fontWeight: 'bold',
@@ -868,6 +958,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderWidth: 1,
     borderColor: '#dc3545',
+  },
+  restoreButton: {
+    backgroundColor: '#e8f5e9',
+    borderWidth: 1,
+    borderColor: '#28a745',
   },
   actionButtonText: {
     fontSize: 14,

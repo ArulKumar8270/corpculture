@@ -1,21 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { Typography, Paper, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField } from '@mui/material'; // Import TextField
+import { Typography, Paper, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Chip } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
 import toast from 'react-hot-toast';
 import axios from 'axios';
 import { useAuth } from '../../../context/auth';
+import TrashStatusToggle from '../../../components/TrashStatusToggle';
+import TrashActions from '../../../components/TrashActions';
+import { buildTrashListUrl, restoreFromTrash, isTrashView } from '../../../utils/trashApi';
 
 const VendorList = () => {
     const navigate = useNavigate();
     const [vendors, setVendors] = useState([]);
-    const [searchTerm, setSearchTerm] = useState(''); // New state for search term
+    const [searchTerm, setSearchTerm] = useState('');
+    const [viewMode, setViewMode] = useState('active');
     const { auth, userPermissions } = useAuth();
 
     useEffect(() => {
         fetchVendors();
-    }, []);
+    }, [viewMode]);
 
     const hasPermission = (key) => {
         return userPermissions.some(p => p.key === key && p.actions.includes('edit')) || auth?.user?.role === 1;
@@ -23,16 +25,17 @@ const VendorList = () => {
 
     const fetchVendors = async () => {
         try {
-            const { data } = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/vendors`);
-            if (data?.success && data.vendors.length > 0) {
-                setVendors(data.vendors);
+            const url = buildTrashListUrl(`${import.meta.env.VITE_SERVER_URL}/api/v1/vendors`, viewMode);
+            const { data } = await axios.get(url);
+            if (data?.success) {
+                setVendors(data.vendors || []);
             } else {
-                toast.error(data?.message || 'Failed to fetch vendors. Displaying sample data.');
+                toast.error(data?.message || 'Failed to fetch vendors.');
                 setVendors([]);
             }
         } catch (error) {
             console.error('Error fetching vendors:', error);
-            toast.error('Something went wrong while fetching vendors. Displaying sample data.');
+            toast.error('Something went wrong while fetching vendors.');
             setVendors([]);
         }
     };
@@ -52,16 +55,30 @@ const VendorList = () => {
                 const { data } = await axios.delete(`${import.meta.env.VITE_SERVER_URL}/api/v1/vendors/${vendorId}`);
                 if (data?.success) {
                     toast.success(data.message || 'Vendor moved to trash successfully!');
-                    fetchVendors(); // Refresh the list
+                    fetchVendors();
                 } else {
                     toast.error(data?.message || 'Failed to move to trash vendor.');
                 }
-                // The line below is redundant if fetchVendors() is called, as it will refresh the state from the server.
-                // toast.success(`Vendor with ID: ${vendorId} moved to trash successfully (simulated)!`);
-                // setVendors(vendors.filter(vendor => vendor._id !== vendorId));
             } catch (error) {
                 console.error('Error moving to trash vendor:', error);
                 toast.error('Something went wrong while deleting the vendor.');
+            }
+        }
+    };
+
+    const handleRestore = async (vendorId) => {
+        if (window.confirm('Restore this vendor from trash?')) {
+            try {
+                const { data } = await restoreFromTrash(`${import.meta.env.VITE_SERVER_URL}/api/v1/vendors`, vendorId);
+                if (data?.success) {
+                    toast.success(data.message || 'Vendor restored successfully!');
+                    fetchVendors();
+                } else {
+                    toast.error(data?.message || 'Failed to restore vendor.');
+                }
+            } catch (error) {
+                console.error('Error restoring vendor:', error);
+                toast.error(error.response?.data?.message || 'Something went wrong while restoring the vendor.');
             }
         }
     };
@@ -88,7 +105,7 @@ const VendorList = () => {
                 <Typography variant="h5" className="font-semibold text-blue-600">
                     Vendor List
                 </Typography>
-                {hasPermission("vendorList") ? <Button
+                {hasPermission("vendorList") && !isTrashView(viewMode) ? <Button
                     variant="contained"
                     className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md"
                     onClick={handleAddVendor}
@@ -96,6 +113,8 @@ const VendorList = () => {
                     Add New Vendor
                 </Button> : null}
             </div>
+
+            <TrashStatusToggle viewMode={viewMode} onChange={setViewMode} />
 
             {/* Search Input */}
             <TextField
@@ -119,6 +138,7 @@ const VendorList = () => {
                                 <TableCell className="font-semibold">Mobile Number</TableCell>
                                 <TableCell className="font-semibold">Mail Id</TableCell>
                                 <TableCell className="font-semibold">Person Name</TableCell>
+                                {isTrashView(viewMode) ? <TableCell className="font-semibold">Status</TableCell> : null}
                                 {hasPermission("vendorList") ? <TableCell className="font-semibold">Action</TableCell> : null}
                             </TableRow>
                         </TableHead>
@@ -133,25 +153,18 @@ const VendorList = () => {
                                         <TableCell>{vendor.mobileNumber}</TableCell>
                                         <TableCell>{vendor.mailId}</TableCell>
                                         <TableCell>{vendor.personName}</TableCell>
+                                        {isTrashView(viewMode) ? (
+                                            <TableCell>
+                                                <Chip label="Trash" size="small" color="warning" />
+                                            </TableCell>
+                                        ) : null}
                                         {hasPermission("vendorList") ? <TableCell>
-                                            <Button
-                                                variant="contained"
-                                                color="primary"
-                                                size="small"
-                                                startIcon={<EditIcon />}
-                                                onClick={() => handleEdit(vendor._id)}
-                                                className="mr-2 bg-blue-500 hover:bg-blue-600"
-                                            >
-                                                Edit
-                                            </Button>
-                                            <Button
-                                                variant="contained"
-                                                color="error"
-                                                size="small"
-                                                startIcon={<DeleteIcon />}
-                                                onClick={() => handleDelete(vendor._id)}
-                                                className="bg-red-500 hover:bg-red-600"
-                                            >Trash</Button>
+                                            <TrashActions
+                                                viewMode={viewMode}
+                                                onEdit={() => handleEdit(vendor._id)}
+                                                onTrash={() => handleDelete(vendor._id)}
+                                                onRestore={() => handleRestore(vendor._id)}
+                                            />
                                         </TableCell> : null}
                                     </TableRow>
                                 ))

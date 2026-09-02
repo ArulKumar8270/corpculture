@@ -5,6 +5,7 @@ import {
     getServiceProductById,
     updateServiceProduct,
     deleteServiceProduct,
+    restoreServiceProduct,
     getServiceProductsByCompany,
 } from "../../controllers/serviceProduct/serviceProductController.js";
 
@@ -12,6 +13,7 @@ const router = express.Router();
 
 router.post("/", createServiceProduct);
 router.get("/", getAllServiceProducts);
+router.post("/restore/:id", restoreServiceProduct);
 router.get("/getServiceProductsByCompany/:companyId", getServiceProductsByCompany);
 router.get("/:id", getServiceProductById);
 router.put("/:id", updateServiceProduct);

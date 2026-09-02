@@ -1,5 +1,6 @@
 import { hashPassword, comparePassword } from "../../helper/authHelper.js";
 import userModel from "../../models/userModel.js";
+import { getTrashListQuery, mapWithRecordStatus } from "../../utils/softDelete.js";
 
 //POST REGISTER
 export const registerController = async (req, res) => {
@@ -56,11 +57,12 @@ export const registerController = async (req, res) => {
 // GET ALL USERS {{ edit_1 }}
 export const getAllUsersController = async (req, res) => { // {{ edit_1 }}
     try { // {{ edit_1 }}
-        const users = await userModel.find({}); // Fetch all users {{ edit_1 }}
+        const { filter, options } = getTrashListQuery(req);
+        const users = await userModel.find(filter).setOptions(options); // Fetch all users {{ edit_1 }}
         res.status(200).send({ // {{ edit_1 }}
             success: true, // {{ edit_1 }}
             message: "All users fetched successfully", // {{ edit_1 }}
-            users, // {{ edit_1 }}
+            users: mapWithRecordStatus(users), // {{ edit_1 }}
         }); // {{ edit_1 }}
     } catch (error) { // {{ edit_1 }}
         console.error("Error fetching users:", error); // Log the error for debugging {{ edit_1 }}

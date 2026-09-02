@@ -5,7 +5,8 @@ import {
     getAllInvoices,
     getInvoiceById,
     updateInvoice,
-    deleteInvoice
+    deleteInvoice,
+    restoreInvoice
 } from "../controllers/invoice/invoiceController.js";
 
 const router = express.Router();
@@ -21,6 +22,8 @@ router.get("/get/:id", requireSignIn, getInvoiceById);
 
 // Update invoice
 router.put("/update/:id", requireSignIn, isAdminOrEmployee, updateInvoice);
+
+router.post("/restore/:id", requireSignIn, isAdminOrEmployee, restoreInvoice);
 
 // Delete invoice
 router.delete("/delete/:id", requireSignIn, isAdminOrEmployee, deleteInvoice);

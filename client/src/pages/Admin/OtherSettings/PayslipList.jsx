@@ -14,13 +14,18 @@ import {
     TableRow,
     Paper,
     Button,
+    Chip,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
+import TrashStatusToggle from "../../../components/TrashStatusToggle";
+import TrashActions from "../../../components/TrashActions";
+import { buildTrashListUrl, restoreFromTrash, isTrashView } from "../../../utils/trashApi";
 
 const PayslipList = () => {
     const { auth, userPermissions } = useAuth();
     const [payslips, setPayslips] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [viewMode, setViewMode] = useState("active");
 
     const canPayslip = (action) =>
         Number(auth?.user?.role) === 1 ||
@@ -31,10 +36,11 @@ const PayslipList = () => {
     const fetchPayslips = async () => {
         try {
             setLoading(true);
-            const { data } = await axios.get(
+            const url = buildTrashListUrl(
                 `${import.meta.env.VITE_SERVER_URL}/api/v1/payslip/all`,
-                { headers: { Authorization: auth?.token } }
+                viewMode
             );
+            const { data } = await axios.get(url, { headers: { Authorization: auth?.token } });
             if (data?.success) setPayslips(data.payslips || []);
         } catch (err) {
             console.error(err);
@@ -46,7 +52,7 @@ const PayslipList = () => {
 
     useEffect(() => {
         if (auth?.token) fetchPayslips();
-    }, [auth?.token]);
+    }, [auth?.token, viewMode]);
 
     const handleTrash = async (p) => {
         if (!window.confirm(`Move payslip for ${p.employeeName || p.employeeId?.name || "this employee"} to trash?`)) return;
@@ -64,6 +70,22 @@ const PayslipList = () => {
         }
     };
 
+    const handleRestore = async (p) => {
+        if (!window.confirm(`Restore payslip for ${p.employeeName || p.employeeId?.name || "this employee"} from trash?`)) return;
+        try {
+            const { data } = await restoreFromTrash(
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/payslip`,
+                p._id
+            );
+            if (data?.success) {
+                toast.success(data.message || "Payslip restored.");
+                fetchPayslips();
+            } else toast.error(data?.message || "Failed to restore.");
+        } catch (err) {
+            toast.error(err.response?.data?.message || "Failed to restore.");
+        }
+    };
+
     const formatDate = (d) => (d ? new Date(d).toLocaleDateString("en-IN") : "-");
     const formatMoney = (n) => (n != null ? `₹${Number(n).toLocaleString("en-IN")}` : "₹0");
 
@@ -73,7 +95,7 @@ const PayslipList = () => {
             <div className="p-4">
                 <div className="flex justify-between items-center mb-6">
                     <h1 className="text-2xl font-bold text-gray-800">Payslips</h1>
-                    {(Number(auth?.user?.role) === 1 || canPayslip("add")) && (
+                    {(Number(auth?.user?.role) === 1 || canPayslip("add")) && !isTrashView(viewMode) && (
                         <Link to="../addPayslip">
                             <Button
                                 variant="contained"
@@ -85,6 +107,8 @@ const PayslipList = () => {
                         </Link>
                     )}
                 </div>
+
+                <TrashStatusToggle viewMode={viewMode} onChange={setViewMode} />
 
                 {loading ? (
                     <Spinner />
@@ -101,6 +125,7 @@ const PayslipList = () => {
                                     <TableCell><strong>Pay Period</strong></TableCell>
                                     <TableCell><strong>Pay Date</strong></TableCell>
                                     <TableCell align="right"><strong>Net Pay</strong></TableCell>
+                                    {isTrashView(viewMode) ? <TableCell><strong>Status</strong></TableCell> : null}
                                     <TableCell align="center"><strong>Actions</strong></TableCell>
                                 </TableRow>
                             </TableHead>
@@ -111,22 +136,30 @@ const PayslipList = () => {
                                         <TableCell>{p.payPeriod}</TableCell>
                                         <TableCell>{formatDate(p.payDate)}</TableCell>
                                         <TableCell align="right">{formatMoney(p.netPay)}</TableCell>
+                                        {isTrashView(viewMode) ? (
+                                            <TableCell>
+                                                <Chip label="Trash" size="small" color="warning" />
+                                            </TableCell>
+                                        ) : null}
                                         <TableCell align="center">
                                             <div className="flex flex-wrap gap-2 justify-center items-center">
                                                 <Link to={`../payslip/view/${p._id}`} className="text-[#019ee3] font-medium">
                                                     View
                                                 </Link>
-                                                {canPayslip("edit") && (
+                                                {!isTrashView(viewMode) && canPayslip("edit") && (
                                                     <Link to={`../addPayslip?id=${p._id}`} className="text-[#555] font-medium">
                                                         Edit
                                                     </Link>
                                                 )}
                                                 {canPayslip("delete") && (
-                                                    <button
-                                                        type="button"
-                                                        className="text-red-600 font-medium hover:underline"
-                                                        onClick={() => handleTrash(p)}
-                                                    >Trash</button>
+                                                    <TrashActions
+                                                        viewMode={viewMode}
+                                                        showEdit={false}
+                                                        onTrash={() => handleTrash(p)}
+                                                        onRestore={() => handleRestore(p)}
+                                                        trashLabel="Trash"
+                                                        size="small"
+                                                    />
                                                 )}
                                             </div>
                                         </TableCell>
