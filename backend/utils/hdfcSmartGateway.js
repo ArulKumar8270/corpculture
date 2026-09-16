@@ -1,3 +1,5 @@
+import crypto from "crypto";
+
 const SUCCESS_STATUSES = new Set(["CHARGED", "PARTIAL_CHARGED"]);
 const FAILED_STATUSES = new Set([
     "AUTHENTICATION_FAILED",
@@ -26,6 +28,14 @@ export const getHdfcConfig = () => {
     const returnUrl = String(process.env.HDFC_RETURN_URL || "https://corpculture.in/shipping/payment-return").trim();
     const resellerId = String(process.env.HDFC_RESELLER_ID || "").trim();
 
+    const allowUatDummy = (() => {
+        const flag = String(process.env.HDFC_UAT_ALLOW_DUMMY || "").trim().toLowerCase();
+        if (flag === "true" || flag === "1" || flag === "yes") return true;
+        if (flag === "false" || flag === "0" || flag === "no") return false;
+        // Default: allow dummy CHARGED responses on UAT so test payments can create orders.
+        return isUat;
+    })();
+
     return {
         apiKey,
         merchantId,
@@ -33,6 +43,8 @@ export const getHdfcConfig = () => {
         baseUrl,
         returnUrl,
         resellerId,
+        isUat,
+        allowUatDummy,
         responseKey: String(process.env.HDFC_RESPONSE_KEY || "").trim(),
         cardEncodingKey: String(process.env.HDFC_CARD_ENCODING_KEY || "").trim(),
     };
@@ -67,10 +79,11 @@ export const assertHdfcConfigured = () => {
 };
 
 export const makeHdfcOrderId = () => {
+    // HDFC requires order id length strictly less than 21 (alphanumeric, non-sequential).
     const raw = `CC${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
         .replace(/[^a-zA-Z0-9]/g, "")
         .toUpperCase();
-    return raw.slice(0, 21);
+    return raw.slice(0, 20);
 };
 
 export const makeHdfcCustomerId = (userId) => {
@@ -138,6 +151,72 @@ export const getHdfcOrder = async (orderId, customerId) => {
     return parseHdfcResponse(response);
 };
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const orderInquiryFingerprint = (order) =>
+    [
+        String(order?.order_id || order?.id || "").trim().toUpperCase(),
+        String(order?.status || "").trim().toUpperCase(),
+        Number(order?.amount).toFixed(2),
+    ].join("|");
+
+/**
+ * Mandatory dual inquiry: call Status API twice and require matching terminal status/amount.
+ */
+export const getHdfcOrderDualInquiry = async (orderId, customerId, delayMs = 500) => {
+    const first = await getHdfcOrder(orderId, customerId);
+    await sleep(delayMs);
+    const second = await getHdfcOrder(orderId, customerId);
+    const consistent = orderInquiryFingerprint(first) === orderInquiryFingerprint(second);
+    return { first, second, consistent, order: consistent ? second : null };
+};
+
+/** Verify HMAC signature on return_url params using HDFC_RESPONSE_KEY (when signed response is enabled). */
+export const verifyHdfcReturnSignature = (params = {}, secretKey = "") => {
+    const key = String(secretKey || "").trim();
+    const signature = params?.signature != null ? String(params.signature) : "";
+    if (!key) return { ok: false, skipped: true, reason: "response_key_not_configured" };
+    if (!signature) return { ok: false, skipped: true, reason: "signature_absent" };
+
+    const filtered = {};
+    for (const [rawKey, rawValue] of Object.entries(params || {})) {
+        if (rawKey === "signature" || rawKey === "signature_algorithm") continue;
+        if (rawValue == null) continue;
+        filtered[String(rawKey)] = String(rawValue);
+    }
+
+    const encodedPairs = Object.keys(filtered)
+        .map((k) => ({
+            encodedKey: encodeURIComponent(k),
+            encodedValue: encodeURIComponent(filtered[k]),
+        }))
+        .sort((a, b) => (a.encodedKey < b.encodedKey ? -1 : a.encodedKey > b.encodedKey ? 1 : 0));
+
+    const queryStr = encodedPairs.map((p) => `${p.encodedKey}=${p.encodedValue}`).join("&");
+    const message = encodeURIComponent(queryStr);
+    const computed = crypto.createHmac("sha256", key).update(message).digest("base64");
+
+    let received = signature;
+    try {
+        received = decodeURIComponent(signature);
+    } catch {
+        received = signature;
+    }
+    // Some gateways double-encode; accept one extra decode.
+    try {
+        if (received.includes("%")) received = decodeURIComponent(received);
+    } catch {
+        /* keep single-decoded */
+    }
+
+    const ok =
+        computed === received ||
+        encodeURIComponent(computed) === signature ||
+        encodeURIComponent(computed) === encodeURIComponent(received);
+
+    return { ok, skipped: false, reason: ok ? "valid" : "invalid_signature" };
+};
+
 export const refundHdfcOrder = async ({ orderId, customerId, amount, uniqueRequestId }) => {
     const config = assertHdfcConfigured();
     const body = new URLSearchParams({
@@ -183,12 +262,17 @@ const hasValidBankRef = (order) => {
     return !isBlankRef(rrn) || !isBlankRef(epg) || !isBlankRef(authId);
 };
 
-/** Only fulfill after a real capture. Dummy/UPI-collect-in-progress must not create an order. */
+/** Only fulfill after a real capture. On UAT, dummy CHARGED responses may fulfill when allowUatDummy is on. */
 export const isHdfcOrderPaid = (order) => {
     const status = String(order?.status || "").toUpperCase();
     if (!SUCCESS_STATUSES.has(status)) return false;
     const txnStatus = String(order?.txn_detail?.status || "").toUpperCase();
     if (txnStatus && !SUCCESS_STATUSES.has(txnStatus)) return false;
+
+    const { allowUatDummy } = getHdfcConfig();
+    if (allowUatDummy && isDummyHdfcOrder(order)) {
+        return true;
+    }
     if (isDummyHdfcOrder(order)) return false;
 
     const method = String(order?.payment_method_type || order?.payment_method || "").toUpperCase();
@@ -198,6 +282,8 @@ export const isHdfcOrderPaid = (order) => {
         String(order?.txn_flow_type || "").toUpperCase().includes("INTENT");
 
     if (isUpi || !method) {
+        // UAT often returns CHARGED without a bank RRN; allow fulfillment there.
+        if (allowUatDummy) return true;
         return hasValidBankRef(order);
     }
     return true;

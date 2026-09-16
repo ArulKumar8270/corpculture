@@ -26,10 +26,19 @@ const OrderSuccessScreen = () => {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [hasSavedPayment, setHasSavedPayment] = useState(false);
+  const [receipt, setReceipt] = useState<{
+    receiptNumber?: string;
+    hdfcOrderId?: string;
+    orderReferenceNo?: string;
+    amount?: number;
+    orderId?: string;
+    message?: string;
+  } | null>(null);
   const intervalId = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     loadSessionId();
+    loadReceipt();
   }, []);
 
   const loadSessionId = async () => {
@@ -38,6 +47,15 @@ const OrderSuccessScreen = () => {
       setSessionId(storedSessionId);
     } catch (error) {
       console.error('Error loading session ID:', error);
+    }
+  };
+
+  const loadReceipt = async () => {
+    try {
+      const raw = await AsyncStorage.getItem('paymentReceipt');
+      if (raw) setReceipt(JSON.parse(raw));
+    } catch (error) {
+      console.error('Error loading payment receipt:', error);
     }
   };
 
@@ -188,6 +206,38 @@ const OrderSuccessScreen = () => {
           <Icon name="check-circle" size={64} color="#22ba20" />
         </View>
         <Text style={styles.title}>Transaction Successful</Text>
+        <Text style={styles.successMessage}>
+          {receipt?.message || 'Payment successful'}
+        </Text>
+        <View style={styles.receiptBox}>
+          <View style={styles.receiptRow}>
+            <Text style={styles.receiptLabel}>Order number</Text>
+            <Text style={styles.receiptValue}>
+              {receipt?.orderReferenceNo || receipt?.hdfcOrderId || receipt?.orderId || '—'}
+            </Text>
+          </View>
+          {!!receipt?.hdfcOrderId && (
+            <View style={styles.receiptRow}>
+              <Text style={styles.receiptLabel}>Payment order ID</Text>
+              <Text style={styles.receiptValue}>{receipt.hdfcOrderId}</Text>
+            </View>
+          )}
+          <View style={styles.receiptRow}>
+            <Text style={styles.receiptLabel}>Amount</Text>
+            <Text style={styles.receiptValue}>
+              ₹{Number(receipt?.amount || 0).toLocaleString('en-IN', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </Text>
+          </View>
+          {!!receipt?.receiptNumber && (
+            <View style={styles.receiptRow}>
+              <Text style={styles.receiptLabel}>Receipt</Text>
+              <Text style={styles.receiptValue}>{receipt.receiptNumber}</Text>
+            </View>
+          )}
+        </View>
         <Text style={styles.subtitle}>
           Redirecting to orders in {time} sec
         </Text>
@@ -241,8 +291,41 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: 'bold',
     color: '#333',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  successMessage: {
+    fontSize: 16,
+    color: '#15803d',
+    fontWeight: '600',
     marginBottom: 16,
     textAlign: 'center',
+  },
+  receiptBox: {
+    width: '100%',
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 20,
+  },
+  receiptRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 8,
+  },
+  receiptLabel: {
+    fontSize: 13,
+    color: '#64748b',
+  },
+  receiptValue: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#0f172a',
+    flexShrink: 1,
+    textAlign: 'right',
   },
   subtitle: {
     fontSize: 16,

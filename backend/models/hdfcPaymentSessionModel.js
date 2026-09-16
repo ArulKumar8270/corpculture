@@ -56,6 +56,15 @@ const hdfcPaymentSessionSchema = new mongoose.Schema(
             type: mongoose.Schema.ObjectId,
             ref: "Orders",
         },
+        failureReason: {
+            type: String,
+            trim: true,
+            default: "",
+        },
+        lastGatewayResponse: {
+            type: mongoose.Schema.Types.Mixed,
+            default: null,
+        },
         refunds: {
             type: [mongoose.Schema.Types.Mixed],
             default: [],
@@ -63,6 +72,11 @@ const hdfcPaymentSessionSchema = new mongoose.Schema(
         frontendOrigin: {
             type: String,
             trim: true,
+        },
+        receiptNumber: {
+            type: String,
+            trim: true,
+            default: "",
         },
     },
     { timestamps: true }

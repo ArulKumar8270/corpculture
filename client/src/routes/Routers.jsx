@@ -51,6 +51,7 @@ const Routers = () => {
             <Route path="/shipping/payment-return" element={<PaymentReturn />} />
             <Route path="/shipping" element={<PrivateRoute />}>
                 <Route path="" element={<Shipping />} />
+                <Route path="payment-return" element={<PaymentReturn />} />
                 <Route path="confirm" element={<OrderSuccess />} />
                 <Route path="failed" element={<OrderFailed />} />
             </Route>

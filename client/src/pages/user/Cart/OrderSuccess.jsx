@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import { useCart } from "../../../context/cart";
 import { useAuth } from "../../../context/auth";
@@ -7,30 +7,64 @@ import axios from "axios";
 import Spinner from "./../../../components/Spinner";
 import SeoData from "../../../SEO/SeoData";
 
+const readStoredReceipt = () => {
+    try {
+        return JSON.parse(localStorage.getItem("paymentReceipt") || "null");
+    } catch {
+        return null;
+    }
+};
+
 const OrderSuccess = () => {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const [time, setTime] = useState(3);
     const [cartItems, setCartItems, , , , , , , clearCart] = useCart();
     const { auth } = useAuth();
     const [sessionId, setSessionId] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [hasSavedPayment, setHasSavedPayment] = useState(false); // Add a flag to prevent multiple API calls
+    const [hasSavedPayment, setHasSavedPayment] = useState(false);
+    const [receipt, setReceipt] = useState(() => {
+        const stored = readStoredReceipt() || {};
+        return {
+            orderId: (searchParams.get("orderId") || searchParams.get("order_id") || stored.orderId || "").trim(),
+            hdfcOrderId: (searchParams.get("hdfcOrderId") || stored.hdfcOrderId || "").trim(),
+            orderReferenceNo: (searchParams.get("ref") || stored.orderReferenceNo || "").trim(),
+            amount: Number(searchParams.get("amount") || stored.amount || 0),
+            receiptNumber: (searchParams.get("receipt") || stored.receiptNumber || "").trim(),
+            message: stored.message || "Payment successful",
+        };
+    });
 
-
-    // Fetch sessionId from localStorage once on mount
     useEffect(() => {
         const storedSessionId = localStorage.getItem("sessionId");
         setSessionId(storedSessionId);
-    }, []);
+        const orderFromUrl = (
+            searchParams.get("orderId") ||
+            searchParams.get("order_id") ||
+            ""
+        ).trim();
+        if (orderFromUrl) {
+            localStorage.setItem("skipOrderId", orderFromUrl);
+        }
+        const stored = readStoredReceipt() || {};
+        setReceipt((prev) => ({
+            ...prev,
+            orderId: orderFromUrl || prev.orderId || stored.orderId || "",
+            hdfcOrderId: (searchParams.get("hdfcOrderId") || stored.hdfcOrderId || prev.hdfcOrderId || "").trim(),
+            orderReferenceNo: (searchParams.get("ref") || stored.orderReferenceNo || prev.orderReferenceNo || "").trim(),
+            amount: Number(searchParams.get("amount") || stored.amount || prev.amount || 0),
+            receiptNumber: (searchParams.get("receipt") || stored.receiptNumber || prev.receiptNumber || "").trim(),
+            message: stored.message || prev.message || "Payment successful",
+        }));
+    }, [searchParams]);
 
-    // After order placement, remove items from cart and save details to the database
     useEffect(() => {
         const savePayment = async () => {
             try {
                 setLoading(true);
                 const payment = await axios.post(
-                    `${import.meta.env.VITE_SERVER_URL
-                    }/api/v1/user/payment-success`,
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/user/payment-success`,
                     {
                         sessionId: sessionId,
                         orderItems: cartItems,
@@ -65,13 +99,18 @@ const OrderSuccess = () => {
                     setLoading(false);
                     setHasSavedPayment(true);
                 }
-
             } catch (error) {
                 console.log(error);
             }
         };
 
-        const skipOrderId = (localStorage.getItem("skipOrderId") || "").trim();
+        const skipOrderId = (
+            localStorage.getItem("skipOrderId") ||
+            searchParams.get("orderId") ||
+            searchParams.get("order_id") ||
+            ""
+        ).trim();
+
         if (!skipOrderId && !sessionId) {
             if (!hasSavedPayment) {
                 setLoading(false);
@@ -97,11 +136,12 @@ const OrderSuccess = () => {
             localStorage.removeItem("hdfcOrderId");
             localStorage.removeItem("hdfcPaymentUrl");
             localStorage.removeItem("paymentMethod");
+            // Keep paymentReceipt for success UI; cleared on leave via timer/navigate.
             setLoading(false);
             setHasSavedPayment(true);
             return;
         }
-    }, [sessionId, auth?.token, cartItems, hasSavedPayment, setCartItems, clearCart, navigate]);
+    }, [sessionId, auth?.token, cartItems, hasSavedPayment, setCartItems, clearCart, navigate, searchParams]);
 
     const commissionCalculation = (cartItems, amount) => {
         const totalCommission = cartItems.reduce((sum, item) => {
@@ -186,6 +226,35 @@ const OrderSuccess = () => {
                             <h1 className="text-3xl font-bold text-gray-800">
                                 Transaction Successful
                             </h1>
+                        </div>
+                        <p className="text-base text-green-700 font-semibold">
+                            {receipt.message || "Payment successful"}
+                        </p>
+                        <div className="mt-2 w-full max-w-md rounded-xl border border-gray-200 bg-gray-50 px-5 py-4 text-sm text-gray-700 space-y-2">
+                            <div className="flex justify-between gap-4">
+                                <span className="text-gray-500">Order number</span>
+                                <span className="font-semibold text-right break-all">
+                                    {receipt.orderReferenceNo || receipt.hdfcOrderId || receipt.orderId || "—"}
+                                </span>
+                            </div>
+                            {receipt.hdfcOrderId ? (
+                                <div className="flex justify-between gap-4">
+                                    <span className="text-gray-500">Payment order ID</span>
+                                    <span className="font-semibold text-right break-all">{receipt.hdfcOrderId}</span>
+                                </div>
+                            ) : null}
+                            <div className="flex justify-between gap-4">
+                                <span className="text-gray-500">Amount</span>
+                                <span className="font-semibold">
+                                    ₹{Number(receipt.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </span>
+                            </div>
+                            {receipt.receiptNumber ? (
+                                <div className="flex justify-between gap-4">
+                                    <span className="text-gray-500">Receipt</span>
+                                    <span className="font-semibold text-right break-all">{receipt.receiptNumber}</span>
+                                </div>
+                            ) : null}
                         </div>
                         <p className="mt-4 text-lg text-gray-700 font-medium">
                             Redirecting to orders in {time} sec

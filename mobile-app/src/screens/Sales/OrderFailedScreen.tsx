@@ -6,12 +6,55 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { useSelector } from 'react-redux';
+import { RootState } from '../../store';
+import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 // @ts-ignore - @expo/vector-icons is available via expo dependency
 import { MaterialIcons as Icon } from '@expo/vector-icons';
+import { getApiBaseUrl } from '../../services/api';
 
 const OrderFailedScreen = () => {
   const navigation = useNavigation();
-  const [time, setTime] = useState(3);
+  const { token } = useSelector((state: RootState) => state.auth);
+  const [time, setTime] = useState(5);
+  const [reason, setReason] = useState('Your payment could not be completed.');
+
+  useEffect(() => {
+    let cancelled = false;
+    const persistFailure = async () => {
+      const storedReason = (await AsyncStorage.getItem('paymentFailureReason')) || '';
+      if (storedReason && !cancelled) setReason(storedReason);
+
+      const hdfcOrderId = ((await AsyncStorage.getItem('hdfcOrderId')) || '').trim();
+      if (!hdfcOrderId || !token) {
+        await AsyncStorage.removeItem('paymentFailureReason');
+        return;
+      }
+      try {
+        const { data } = await axios.post(
+          `${getApiBaseUrl()}/user/hdfc/verify`,
+          {
+            hdfcOrderId,
+            forceFail: true,
+            failureReason: storedReason || 'Payment failed',
+          },
+          { headers: { Authorization: token } }
+        );
+        if (!cancelled && data?.failureReason) setReason(data.failureReason);
+      } catch {
+        /* still show failure UI */
+      } finally {
+        await AsyncStorage.removeItem('hdfcOrderId');
+        await AsyncStorage.removeItem('hdfcPaymentUrl');
+        await AsyncStorage.removeItem('paymentFailureReason');
+      }
+    };
+    persistFailure();
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
 
   useEffect(() => {
     if (time === 0) {
@@ -32,6 +75,7 @@ const OrderFailedScreen = () => {
           <Icon name="error-outline" size={64} color="#FF3B30" />
         </View>
         <Text style={styles.title}>Transaction Failed</Text>
+        <Text style={styles.reason}>{reason}</Text>
         <Text style={styles.subtitle}>
           Redirecting to cart in {time} sec
         </Text>
@@ -74,6 +118,12 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: 'bold',
     color: '#333',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  reason: {
+    fontSize: 14,
+    color: '#666',
     marginBottom: 16,
     textAlign: 'center',
   },

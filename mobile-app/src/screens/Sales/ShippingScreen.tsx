@@ -322,6 +322,10 @@ const ShippingScreen = () => {
         { headers: { Authorization: token } }
       );
       if (data?.paid && data?.order?._id) return data;
+      // UAT: paid order may already exist even if pending flag is odd
+      if (data?.order?._id && String(data?.order?.paymentStatus || '').toLowerCase() === 'paid') {
+        return { ...data, paid: true };
+      }
       if (!data?.pending) return data;
       if (data?.awaitingUpi) {
         setPaymentStatusMessage(
@@ -330,7 +334,25 @@ const ShippingScreen = () => {
       }
       await new Promise((resolve) => setTimeout(resolve, 3000));
     }
-    return { pending: true };
+    try {
+      const { data } = await axios.post(
+        `${getApiBaseUrl()}/user/hdfc/verify`,
+        {
+          hdfcOrderId,
+          forceFail: true,
+          failureReason: 'Payment confirmation timed out',
+        },
+        { headers: { Authorization: token } }
+      );
+      return data;
+    } catch {
+      return {
+        pending: false,
+        paid: false,
+        failureReason: 'Payment confirmation timed out',
+        message: 'Payment confirmation timed out',
+      };
+    }
   };
 
   const clearPendingPayment = async () => {
@@ -341,7 +363,16 @@ const ShippingScreen = () => {
     await AsyncStorage.removeItem('hdfcPaymentUrl');
   };
 
-  const handlePaymentSuccess = async (orderId: string) => {
+  const handlePaymentSuccess = async (orderId: string, receipt?: any, order?: any) => {
+    const payload = {
+      receiptNumber: receipt?.receiptNumber || '',
+      hdfcOrderId: receipt?.hdfcOrderId || '',
+      orderReferenceNo: receipt?.orderReferenceNo || order?.orderReferenceNo || '',
+      amount: Number(receipt?.amount ?? order?.amount ?? 0),
+      orderId: String(receipt?.orderId || orderId || ''),
+      message: receipt?.message || 'Payment successful',
+    };
+    await AsyncStorage.setItem('paymentReceipt', JSON.stringify(payload));
     await AsyncStorage.setItem('skipOrderId', String(orderId));
     await clearPendingPayment();
     navigation.navigate('OrderSuccess' as never);
@@ -357,7 +388,7 @@ const ShippingScreen = () => {
       const result = await pollHdfcPayment(hdfcOrderId);
       if (result?.cancelled) return;
       if (result?.paid && result?.order?._id) {
-        await handlePaymentSuccess(String(result.order._id));
+        await handlePaymentSuccess(String(result.order._id), result.receipt, result.order);
         return;
       }
       if (result?.pending || result?.resumePayment || result?.awaitingUpi) {
@@ -376,7 +407,14 @@ const ShippingScreen = () => {
         }
         return;
       }
-      await clearPendingPayment();
+      const failReason =
+        result?.failureReason || result?.message || 'Payment failed';
+      await AsyncStorage.setItem('paymentFailureReason', failReason);
+      setPendingHdfcOrderId(null);
+      setHdfcPaymentUrl(null);
+      setPaymentStatusMessage('');
+      await AsyncStorage.removeItem('hdfcPaymentUrl');
+      // Keep hdfcOrderId so OrderFailed can ensure the failed order is stored.
       navigation.navigate('OrderFailed' as never);
     } catch (error: any) {
       console.error('HDFC verify error:', error);
@@ -387,6 +425,14 @@ const ShippingScreen = () => {
           text2: error.response?.data?.message || 'Could not verify payment',
         });
       }
+      await AsyncStorage.setItem(
+        'paymentFailureReason',
+        error.response?.data?.message || 'Could not verify payment'
+      );
+      setPendingHdfcOrderId(null);
+      setHdfcPaymentUrl(null);
+      setPaymentStatusMessage('');
+      navigation.navigate('OrderFailed' as never);
     } finally {
       if (!options.silent) setPaying(false);
     }
@@ -540,6 +586,15 @@ const ShippingScreen = () => {
 
       if (data?.success && data?.order?._id) {
         await AsyncStorage.setItem('skipOrderId', String(data.order._id));
+        await AsyncStorage.setItem(
+          'paymentReceipt',
+          JSON.stringify({
+            orderId: String(data.order._id),
+            orderReferenceNo: data.order.orderReferenceNo || checkout.orderReferenceNo,
+            amount: Number(data.order.amount || 0),
+            message: 'Payment successful',
+          })
+        );
         navigation.navigate('OrderSuccess' as never);
       } else {
         Toast.show({

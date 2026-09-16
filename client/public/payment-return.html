@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Confirming Payment</title>
+    <script>
+      (function () {
+        var params = new URLSearchParams(window.location.search);
+        var orderId =
+          params.get("order_id") ||
+          params.get("orderId") ||
+          localStorage.getItem("hdfcOrderId") ||
+          "";
+        if (orderId) {
+          localStorage.setItem("hdfcOrderId", orderId);
+        }
+        var target = "/?hdfc_return=1";
+        var forwardKeys = [
+          "order_id",
+          "orderId",
+          "status",
+          "status_id",
+          "signature",
+          "signature_algorithm",
+        ];
+        for (var i = 0; i < forwardKeys.length; i++) {
+          var key = forwardKeys[i];
+          var value = params.get(key);
+          if (value) {
+            target += "&" + encodeURIComponent(key) + "=" + encodeURIComponent(value);
+          }
+        }
+        if (orderId && target.indexOf("order_id=") === -1) {
+          target += "&order_id=" + encodeURIComponent(orderId);
+        }
+        window.location.replace(target);
+      })();
+    </script>
+  </head>
+  <body>
+    <p style="font-family: sans-serif; text-align: center; margin-top: 3rem">
+      Redirecting to payment confirmation…
+    </p>
+  </body>
+</html>
