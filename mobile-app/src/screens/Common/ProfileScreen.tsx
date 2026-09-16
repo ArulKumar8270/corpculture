@@ -78,6 +78,7 @@ const ProfileScreen = () => {
   const [balanceAmount, setBalanceAmount] = useState(0);
   const [pendingAmount, setPendingAmount] = useState(0);
   const [companyPendingInvoices, setCompanyPendingInvoices] = useState<any[]>([]);
+  const [loadingPendingInvoices, setLoadingPendingInvoices] = useState(false);
   const [selectedPendingInvoiceId, setSelectedPendingInvoiceId] = useState<string | null>(null);
   const [commissions, setCommissions] = useState<any[]>([]);
   const [commissionSummary, setCommissionSummary] = useState<any>(null);
@@ -253,6 +254,8 @@ const ProfileScreen = () => {
           invoiceType: 'invoice',
           // Match web profile: show unpaid invoices for payment updates
           status: { $ne: 'Paid' },
+          page: 1,
+          limit: 10000,
         },
         { 
           headers: { Authorization: authToken },
@@ -328,6 +331,8 @@ const ProfileScreen = () => {
       const pending = selectedInvoice?.grandTotal - amount;
       setPendingAmount(pending);
       setBalanceAmount(0);
+      setCompanyPendingInvoices([]);
+      setLoadingPendingInvoices(false);
     } else {
       const balance = amount - selectedInvoice?.grandTotal;
       setBalanceAmount(balance);
@@ -335,6 +340,7 @@ const ProfileScreen = () => {
 
       if (balance > 0) {
         try {
+          setLoadingPendingInvoices(true);
           const endpoint = invoiceType === 'rental' 
             ? '/rental-payment/all'
             : '/service-invoice/all';
@@ -344,8 +350,11 @@ const ProfileScreen = () => {
             `${getApiBaseUrl()}${endpoint}`,
             {
               companyId: selectedInvoice?.companyId?._id || selectedInvoice?.companyId,
+              ...(invoiceType === 'service' ? { invoiceType: 'invoice' } : {}),
               tdsAmount: { $eq: null },
               status: { $ne: 'Paid' },
+              page: 1,
+              limit: 10000,
             },
             {
               headers: {
@@ -359,7 +368,13 @@ const ProfileScreen = () => {
           setCompanyPendingInvoices(filteredInvoices);
         } catch (error) {
           console.error('Error fetching pending invoices:', error);
+          setCompanyPendingInvoices([]);
+        } finally {
+          setLoadingPendingInvoices(false);
         }
+      } else {
+        setLoadingPendingInvoices(false);
+        setCompanyPendingInvoices([]);
       }
     }
   };
@@ -1200,31 +1215,40 @@ const ProfileScreen = () => {
             </View>
 
             {/* Balance Amount Display */}
-            {balanceAmount > 0 && companyPendingInvoices.length > 0 && (
+            {(loadingPendingInvoices || (balanceAmount > 0 && companyPendingInvoices.length > 0)) && (
               <>
-                <Text style={styles.balanceText}>
-                  Previous Invoice Balance - Rs {balanceAmount.toFixed(2)}
-                </Text>
+                {balanceAmount > 0 && (
+                  <Text style={styles.balanceText}>
+                    Previous Invoice Balance - Rs {balanceAmount.toFixed(2)}
+                  </Text>
+                )}
                 <View style={styles.modalInputGroup}>
                   <Text style={styles.modalLabel}>Select Pending Invoice</Text>
-                  <TouchableOpacity
-                    style={styles.pickerButton}
-                    onPress={() => setPendingInvoicePickerVisible(true)}
-                  >
-                    <Text style={styles.pickerButtonText}>
-                      {selectedPendingInvoiceId
-                        ? (() => {
-                            const selectedInv = companyPendingInvoices.find(
-                              (inv) => inv._id === selectedPendingInvoiceId
-                            );
-                            return selectedInv
-                              ? `${new Date(selectedInv.createdAt || selectedInv.invoiceDate).toLocaleDateString()} - Rs ${selectedInv.grandTotal?.toFixed(2) || '0.00'}`
-                              : 'Select Invoice';
-                          })()
-                        : '--select Invoice--'}
-                    </Text>
-                    <Icon name="arrow-drop-down" size={24} color="#666" />
-                  </TouchableOpacity>
+                  {loadingPendingInvoices ? (
+                    <View style={[styles.pickerButton, { justifyContent: 'center', flexDirection: 'row', gap: 8 }]}>
+                      <ActivityIndicator size="small" color="#007AFF" />
+                      <Text style={styles.pickerButtonText}>Loading pending invoices...</Text>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      style={styles.pickerButton}
+                      onPress={() => setPendingInvoicePickerVisible(true)}
+                    >
+                      <Text style={styles.pickerButtonText}>
+                        {selectedPendingInvoiceId
+                          ? (() => {
+                              const selectedInv = companyPendingInvoices.find(
+                                (inv) => inv._id === selectedPendingInvoiceId
+                              );
+                              return selectedInv
+                                ? `${new Date(selectedInv.createdAt || selectedInv.invoiceDate).toLocaleDateString()} - Rs ${selectedInv.grandTotal?.toFixed(2) || '0.00'}`
+                                : 'Select Invoice';
+                            })()
+                          : '--select Invoice--'}
+                      </Text>
+                      <Icon name="arrow-drop-down" size={24} color="#666" />
+                    </TouchableOpacity>
+                  )}
                 </View>
               </>
             )}

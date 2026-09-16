@@ -18,6 +18,12 @@ import { RootState } from '../../store';
 import axios from 'axios';
 import Toast from 'react-native-toast-message';
 import { getApiBaseUrl } from '../../services/api';
+import {
+  getCommissionGroupKey,
+  getCommissionGroupLabel,
+  getCommissionProductLabel,
+  isCompanyBasedCommission,
+} from '../../utils/commissionDisplay';
 
 const REQUEST_TIMEOUT_MS = 15000;
 
@@ -42,6 +48,7 @@ interface Commission {
     serialNo?: string;
     commission?: number;
   };
+  companyId?: { _id: string; companyName?: string } | string;
   commissionAmount: number;
   isPaid?: boolean;
   createdAt: string;
@@ -111,10 +118,7 @@ const CommissionScreen = () => {
       const initial = new Set<string>();
       try {
         list.forEach((c: Commission) => {
-          const userId = c.userId
-            ? (typeof c.userId === 'object' ? (c.userId?.name ?? 'Unassigned') : String(c.userId)) || 'Unassigned'
-            : 'Unassigned';
-          initial.add(userId);
+          initial.add(getCommissionGroupKey(c, commissionFrom));
         });
       } catch (_) {
         // ignore parse errors per item
@@ -164,30 +168,44 @@ const CommissionScreen = () => {
     fetchCommissions();
   }, [fetchCommissions]);
 
+  const groupLabel = getCommissionGroupLabel(commissionFrom);
+  const isCompanyBased = isCompanyBasedCommission(commissionFrom);
+
   const filteredCommissions = useMemo(() => {
     const lower = search.toLowerCase();
-    return commissions.filter(
-      (c) =>
+    return commissions.filter((c) => {
+      if (!(Number(c.commissionAmount) > 0)) return false;
+
+      const groupKey = getCommissionGroupKey(c, commissionFrom);
+      const userName =
+        typeof c.userId === 'object' ? c.userId?.name || '' : c.userId || '';
+      const companyName =
+        typeof c.companyId === 'object'
+          ? c.companyId?.companyName || ''
+          : c.companyId || '';
+
+      return (
         (c._id && c._id.toLowerCase().includes(lower)) ||
-        (typeof c.userId === 'object' && c.userId?.name?.toLowerCase().includes(lower)) ||
-        (typeof c.userId === 'string' && c.userId.toLowerCase().includes(lower)) ||
+        groupKey.toLowerCase().includes(lower) ||
+        userName.toLowerCase().includes(lower) ||
+        companyName.toLowerCase().includes(lower) ||
         (c.orderId && String(c.orderId).toLowerCase().includes(lower)) ||
         (c.serviceInvoiceId && String(c.serviceInvoiceId).toLowerCase().includes(lower)) ||
         (c.rentalInvoiceId && String(c.rentalInvoiceId).toLowerCase().includes(lower)) ||
         (c.salesInvoiceId && String(c.salesInvoiceId).toLowerCase().includes(lower))
-    );
-  }, [commissions, search]);
+      );
+    });
+  }, [commissions, search, commissionFrom]);
 
   const groupedCommissions = useMemo(() => {
     const acc: Record<string, Commission[]> = {};
     filteredCommissions.forEach((c) => {
-      const userId =
-        typeof c.userId === 'object' ? c.userId?.name || 'Unassigned' : c.userId || 'Unassigned';
-      if (!acc[userId]) acc[userId] = [];
-      acc[userId].push(c);
+      const groupKey = getCommissionGroupKey(c, commissionFrom);
+      if (!acc[groupKey]) acc[groupKey] = [];
+      acc[groupKey].push(c);
     });
     return acc;
-  }, [filteredCommissions]);
+  }, [filteredCommissions, commissionFrom]);
 
   const toggleExpand = (userId: string) => {
     setExpandedUsers((prev) => {
@@ -239,7 +257,11 @@ const CommissionScreen = () => {
       <View style={styles.searchRow}>
         <TextInput
           style={styles.searchInput}
-          placeholder="Search by ID, employee, order/invoice…"
+          placeholder={
+            isCompanyBased
+              ? 'Search by company, invoice ID…'
+              : 'Search by ID, employee, order/invoice…'
+          }
           placeholderTextColor="#999"
           value={search}
           onChangeText={setSearch}
@@ -289,17 +311,17 @@ const CommissionScreen = () => {
       ) : (
         <FlatList
           data={groupEntries}
-          keyExtractor={([userId]) => userId}
+          keyExtractor={([groupKey]) => groupKey}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#019ee3']} />
           }
-          renderItem={({ item: [userId, userCommissions] }) => {
-            const isExpanded = expandedUsers.has(userId);
+          renderItem={({ item: [groupKey, groupCommissions] }) => {
+            const isExpanded = expandedUsers.has(groupKey);
             return (
               <View style={styles.group}>
                 <TouchableOpacity
                   style={styles.groupHeader}
-                  onPress={() => toggleExpand(userId)}
+                  onPress={() => toggleExpand(groupKey)}
                   activeOpacity={0.7}
                 >
                   <Icon
@@ -307,18 +329,20 @@ const CommissionScreen = () => {
                     size={24}
                     color="#333"
                   />
-                  <Text style={styles.groupTitle}>User: {userId}</Text>
+                  <Text style={styles.groupTitle}>
+                    {groupLabel}: {groupKey}
+                  </Text>
                 </TouchableOpacity>
                 {isExpanded &&
-                  userCommissions.map((c) => {
+                  groupCommissions.map((c) => {
                     const refId = getInvoiceOrOrderId(c);
-                    const userName =
-                      typeof c.userId === 'object' ? c.userId?.name : c.userId || '—';
                     return (
                       <View key={c._id} style={styles.row}>
                         <View style={styles.cell}>
-                          <Text style={styles.cellLabel}>User</Text>
-                          <Text style={styles.cellValue}>{userName}</Text>
+                          <Text style={styles.cellLabel}>{groupLabel}</Text>
+                          <Text style={styles.cellValue}>
+                            {getCommissionGroupKey(c, commissionFrom)}
+                          </Text>
                         </View>
                         <View style={styles.cell}>
                           <Text style={styles.cellLabel}>
@@ -337,11 +361,7 @@ const CommissionScreen = () => {
                         </View>
                         <View style={styles.cell}>
                           <Text style={styles.cellLabel}>Product</Text>
-                          <Text style={styles.cellValue}>
-                            {c.rentalProductId?.modelName
-                              ? `${c.rentalProductId.modelName}${c.rentalProductId.serialNo ? ` (${c.rentalProductId.serialNo})` : ''}`
-                              : c.productId?.productName?.name || c.productId?.sku || '—'}
-                          </Text>
+                          <Text style={styles.cellValue}>{getCommissionProductLabel(c)}</Text>
                         </View>
                         <View style={styles.cell}>
                           <Text style={styles.cellLabel}>Amount</Text>

@@ -4,13 +4,18 @@ import Spinner from "../../components/Spinner";
 import axios from "axios";
 import { useAuth } from "../../context/auth";
 import SeoData from "../../SEO/SeoData";
-import { Link, useParams, useLocation } from "react-router-dom"; // Keep Link if you plan to link to commission/employee/order details
+import { Link, useLocation } from "react-router-dom";
+import {
+    getCommissionGroupKey,
+    getCommissionGroupLabel,
+    getCommissionProductLabel,
+    isCompanyBasedCommission,
+} from "../../utils/commissionDisplay";
 // import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown'; // Removed {{ edit_1 }}
 // import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp'; // Removed {{ edit_1 }}
 
 const AdminCommission = () => {
     const { auth } = useAuth();
-    const params = useParams();
     const location = useLocation();
     const queryParams = new URLSearchParams(location.search);
     const commissionFrom = queryParams.get("commissionFrom") || "Sales";
@@ -43,11 +48,9 @@ const AdminCommission = () => {
             if (response?.data?.commissions) { // Assuming the backend returns an array of commission objects
                 setCommissions(response.data.commissions);
                 setLoading(false);
-                // {{ edit_1 }} Initialize all users as expanded by default
                 const initialExpanded = new Set();
-                response.data.commissions.forEach(commission => {
-                    const userId = commission.userId || 'Unassigned';
-                    initialExpanded.add(userId); // Add all unique user IDs to the set
+                response.data.commissions.forEach((commission) => {
+                    initialExpanded.add(getCommissionGroupKey(commission, commissionFrom));
                 });
                 setExpandedUsers(initialExpanded);
             } else {
@@ -61,26 +64,47 @@ const AdminCommission = () => {
         }
     };
 
-    // Filter commissions based on search input
-    const filteredCommissions = commissions.filter(commission =>
-        commission._id.toLowerCase().includes(search.toLowerCase()) ||
-        commission.userId?.toLowerCase().includes(search.toLowerCase()) || // Assuming commission has employeeName
-        commission.orderId?.toLowerCase().includes(search.toLowerCase()) || // Assuming commission is linked to an order
-        commission.status?.toLowerCase().includes(search.toLowerCase())
-        // Add more fields to search if needed, e.g., commission.notes
-    );
+    const searchLower = search.toLowerCase();
+    const groupLabel = getCommissionGroupLabel(commissionFrom);
+    const isCompanyBased = isCompanyBasedCommission(commissionFrom);
 
-    // Group commissions by userId
+    const filteredCommissions = commissions.filter((commission) => {
+        if (!(Number(commission.commissionAmount) > 0)) return false;
+
+        const groupKey = getCommissionGroupKey(commission, commissionFrom);
+        const userName =
+            commission.userId?.name ||
+            (typeof commission.userId === 'string' ? commission.userId : '');
+        const companyName =
+            commission.companyId?.companyName ||
+            (typeof commission.companyId === 'string' ? commission.companyId : '');
+        const orderId = String(commission.orderId?._id || commission.orderId || '');
+        const serviceInvoiceId = String(
+            commission.serviceInvoiceId?._id || commission.serviceInvoiceId || ''
+        );
+        const rentalInvoiceId = String(
+            commission.rentalInvoiceId?._id || commission.rentalInvoiceId || ''
+        );
+
+        return (
+            commission._id.toLowerCase().includes(searchLower) ||
+            groupKey.toLowerCase().includes(searchLower) ||
+            userName.toLowerCase().includes(searchLower) ||
+            companyName.toLowerCase().includes(searchLower) ||
+            orderId.toLowerCase().includes(searchLower) ||
+            serviceInvoiceId.toLowerCase().includes(searchLower) ||
+            rentalInvoiceId.toLowerCase().includes(searchLower)
+        );
+    });
+
     const groupedCommissions = filteredCommissions.reduce((acc, commission) => {
-        const userId = commission.userId?.name || 'Unassigned'; // Use 'Unassigned' for commissions without a userId
-        if (!acc[userId]) {
-            acc[userId] = [];
+        const groupKey = getCommissionGroupKey(commission, commissionFrom);
+        if (!acc[groupKey]) {
+            acc[groupKey] = [];
         }
-        acc[userId].push(commission);
+        acc[groupKey].push(commission);
         return acc;
     }, {});
-
-    console.log(groupedCommissions, "groupedCommissions3424");
 
     // {{ edit_1 }} Function to toggle expand/collapse for a user ID
     const toggleExpand = (userId) => {
@@ -115,7 +139,11 @@ const AdminCommission = () => {
                                     onChange={(e) => setSearch(e.target.value)}
                                     type="search"
                                     name="search"
-                                    placeholder="Search commissions by ID, Employee, Order ID, Status..."
+                                    placeholder={
+                                        isCompanyBased
+                                            ? "Search commissions by company, invoice ID..."
+                                            : "Search commissions by ID, employee, order ID..."
+                                    }
                                     className="p-3 text-sm outline-none flex-1 rounded-l-2xl bg-[#f7fafd]"
                                 />
                                 <div className="h-full text-sm px-4 py-3 text-white bg-gradient-to-r from-[#019ee3] to-[#afcb09] rounded-r-2xl flex items-center gap-2 font-semibold">
@@ -146,8 +174,10 @@ const AdminCommission = () => {
                                     <table className="min-w-full text-sm">
                                         <thead>
                                             <tr className="bg-gradient-to-r from-[#019ee3] to-[#afcb09] text-white">
-                                                <th className="py-2 px-3 text-left">User Id</th>
-                                                <th className="py-2 px-3 text-left">Order ID</th>
+                                                <th className="py-2 px-3 text-left">{groupLabel}</th>
+                                                <th className="py-2 px-3 text-left">
+                                                    {commissionFrom === 'Sales' ? 'Order ID' : 'Invoice ID'}
+                                                </th>
                                                 <th className="py-2 px-3 text-left">Product</th>
                                                 <th className="py-2 px-3 text-left">Amount</th>
                                                 <th className="py-2 px-3 text-left">Paid</th>
@@ -155,16 +185,15 @@ const AdminCommission = () => {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {Object.entries(groupedCommissions).map(([userId, userCommissions]) => (
-                                                <React.Fragment key={userId}>
+                                            {Object.entries(groupedCommissions).map(([groupKey, groupCommissions]) => (
+                                                <React.Fragment key={groupKey}>
                                                     <tr
                                                         className="bg-gray-200 font-semibold text-gray-800 cursor-pointer hover:bg-gray-300 transition-colors"
-                                                        onClick={() => toggleExpand(userId)}
+                                                        onClick={() => toggleExpand(groupKey)}
                                                     >
-                                                        <td colSpan="6" className="py-2 px-3 text-left flex items-center gap-2"> {/* {{ edit_2 }} Adjusted for SVG icon */}
-                                                            {/* {{ edit_2 }} SVG Icon for expand/collapse */}
+                                                        <td colSpan="6" className="py-2 px-3 text-left flex items-center gap-2">
                                                             <svg
-                                                                className={`w-4 h-4 transform transition-transform ${expandedUsers.has(userId) ? 'rotate-90' : 'rotate-0'}`}
+                                                                className={`w-4 h-4 transform transition-transform ${expandedUsers.has(groupKey) ? 'rotate-90' : 'rotate-0'}`}
                                                                 fill="none"
                                                                 stroke="currentColor"
                                                                 viewBox="0 0 24 24"
@@ -172,16 +201,14 @@ const AdminCommission = () => {
                                                             >
                                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path>
                                                             </svg>
-                                                            <span>User ID: {userId}</span>
+                                                            <span>{groupLabel}: {groupKey}</span>
                                                         </td>
                                                     </tr>
-                                                    {expandedUsers.has(userId) && ( // {{ edit_2 }} Conditionally render commission rows based on Set
-                                                        userCommissions.map(commission => (
+                                                    {expandedUsers.has(groupKey) && (
+                                                        groupCommissions.map(commission => (
                                                             <tr key={commission._id} className="border-b last:border-b-0 hover:bg-gray-50">
                                                                 <td className="py-2 px-3">
-                                                                    {/* <Link to={`#`} className="text-blue-600 hover:underline"> */}
-                                                                        {commission.userId?.name || commission?.userId}
-                                                                    {/* </Link> */}
+                                                                    {getCommissionGroupKey(commission, commissionFrom)}
                                                                 </td>
                                                                 <td className="py-2 px-3">
                                                                     {/* Link to order details if commission is tied to an order */}
@@ -196,9 +223,7 @@ const AdminCommission = () => {
                                                                     ) : 'N/A'}
                                                                 </td>
                                                                 <td className="py-2 px-3">
-                                                                    {commission.rentalProductId?.modelName
-                                                                        ? `${commission.rentalProductId.modelName}${commission.rentalProductId.serialNo ? ` (${commission.rentalProductId.serialNo})` : ''}`
-                                                                        : commission.productId?.productName?.name || commission.productId?.sku || '—'}
+                                                                    {getCommissionProductLabel(commission)}
                                                                 </td>
                                                                 <td className="py-2 px-3">₹ {commission.commissionAmount || '0.00'}</td>
                                                                 <td className="py-2 px-3">{commission.isPaid ? "Yes" : "No"}</td>

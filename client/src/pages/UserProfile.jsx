@@ -25,6 +25,8 @@ import {
     Chip,
     Autocomplete,
     CircularProgress,
+    Box,
+    Typography,
 } from "@mui/material";
 import qrCode from "../assets/images/qrCode.png";
 import {
@@ -56,6 +58,7 @@ const UserProfile = () => {
     const [openPaymentModal, setOpenPaymentModal] = useState(false);
     const [selectedInvoice, setSelectedInvoice] = useState(null);
     const [companyPendingInvoice, setCompanyPendingInvoice] = useState([]);
+    const [loadingPendingInvoices, setLoadingPendingInvoices] = useState(false);
     const [selectedInvoiceId, setSelectedInvoiceId] = useState(null);
     const [balanceAmount, setBalanceAmount] = useState(0);
     const [pendingAmount, setPendingAmount] = useState(0);
@@ -165,6 +168,8 @@ const UserProfile = () => {
                         companyId: selectedCompany,
                         invoiceType: "invoice",
                         status: { $ne: "Paid" },
+                        page: 1,
+                        limit: 10000,
                     },
                     {
                         headers: {
@@ -343,17 +348,23 @@ const UserProfile = () => {
                 let balance = selectedInvoice?.grandTotal - value;
                 setPendingAmount(balance);
                 setBalanceAmount(0);
+                setCompanyPendingInvoice([]);
+                setLoadingPendingInvoices(false);
             } else {
                 let balance = Number(value) - Number(selectedInvoice?.grandTotal);
                 setBalanceAmount(balance);
                 setPendingAmount(0);
                 try {
+                    setLoadingPendingInvoices(true);
                     let response = await axios.post(
                         `${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/all`,
                         {
-                            companyId: selectedInvoice?.companyId,
+                            companyId: selectedInvoice?.companyId?._id || selectedInvoice?.companyId,
+                            invoiceType: "invoice",
                             tdsAmount: { $eq: null },
                             status: { $ne: "Paid" },
+                            page: 1,
+                            limit: 10000,
                         },
                         {
                             headers: {
@@ -364,6 +375,9 @@ const UserProfile = () => {
                     setCompanyPendingInvoice(response.data?.serviceInvoices || []);
                 } catch (err) {
                     console.log(err, "Api error");
+                    setCompanyPendingInvoice([]);
+                } finally {
+                    setLoadingPendingInvoices(false);
                 }
             }
         }
@@ -439,6 +453,9 @@ const UserProfile = () => {
                     {
                         companyId: selectedCompany,
                         invoiceType: "invoice",
+                        status: { $ne: "Paid" },
+                        page: 1,
+                        limit: 10000,
                     },
                     {
                         headers: {
@@ -1103,44 +1120,55 @@ const UserProfile = () => {
                                 size="small"
                             />
 
-                            {companyPendingInvoice?.length > 0 && balanceAmount > 0 && (
+                            {(loadingPendingInvoices || (companyPendingInvoice?.length > 0 && balanceAmount > 0)) && (
                                 <>
-                                    <p className="mt-4 text-sm text-gray-600">
-                                        Previous Invoice Balance - ₹{balanceAmount.toFixed(2)}
-                                    </p>
+                                    {balanceAmount > 0 && (
+                                        <p className="mt-4 text-sm text-gray-600">
+                                            Previous Invoice Balance - ₹{balanceAmount.toFixed(2)}
+                                        </p>
+                                    )}
                                     <FormControl fullWidth margin="normal" size="small">
                                         <InputLabel id="pending-invoice-label">
                                             Select Pending Invoice
                                         </InputLabel>
-                                        <Select
-                                            labelId="pending-invoice-label"
-                                            id="selectedInvoiceId"
-                                            name="selectedInvoiceId"
-                                            value={selectedInvoiceId}
-                                            onChange={(e) =>
-                                                setSelectedInvoiceId(e.target.value)
-                                            }
-                                            label="Select Pending Invoice"
-                                        >
-                                            <MenuItem value="">--select Invoice--</MenuItem>
-                                            {companyPendingInvoice
-                                                ?.filter(
-                                                    (pendingInv) =>
-                                                        pendingInv._id !== selectedInvoice?._id
-                                                )
-                                                .map((pendingInv) => (
-                                                    <MenuItem
-                                                        key={pendingInv._id}
-                                                        value={pendingInv._id}
-                                                    >
-                                                        {new Date(
-                                                            pendingInv.invoiceDate
-                                                        ).toLocaleDateString() +
-                                                            " - ₹" +
-                                                            pendingInv?.grandTotal}
-                                                    </MenuItem>
-                                                ))}
-                                        </Select>
+                                        {loadingPendingInvoices ? (
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1, py: 1.5 }}>
+                                                <CircularProgress size={20} />
+                                                <Typography variant="body2" color="text.secondary">
+                                                    Loading pending invoices...
+                                                </Typography>
+                                            </Box>
+                                        ) : (
+                                            <Select
+                                                labelId="pending-invoice-label"
+                                                id="selectedInvoiceId"
+                                                name="selectedInvoiceId"
+                                                value={selectedInvoiceId}
+                                                onChange={(e) =>
+                                                    setSelectedInvoiceId(e.target.value)
+                                                }
+                                                label="Select Pending Invoice"
+                                            >
+                                                <MenuItem value="">--select Invoice--</MenuItem>
+                                                {companyPendingInvoice
+                                                    ?.filter(
+                                                        (pendingInv) =>
+                                                            pendingInv._id !== selectedInvoice?._id
+                                                    )
+                                                    .map((pendingInv) => (
+                                                        <MenuItem
+                                                            key={pendingInv._id}
+                                                            value={pendingInv._id}
+                                                        >
+                                                            {new Date(
+                                                                pendingInv.invoiceDate
+                                                            ).toLocaleDateString() +
+                                                                " - ₹" +
+                                                                pendingInv?.grandTotal}
+                                                        </MenuItem>
+                                                    ))}
+                                            </Select>
+                                        )}
                                     </FormControl>
                                 </>
                             )}
@@ -1754,44 +1782,55 @@ const UserProfile = () => {
                                 size="small"
                             />
 
-                            {companyPendingInvoice?.length > 0 && balanceAmount > 0 && (
+                            {(loadingPendingInvoices || (companyPendingInvoice?.length > 0 && balanceAmount > 0)) && (
                                 <>
-                                    <p className="mt-4 text-sm text-gray-600">
-                                        Previous Invoice Balance - ₹{balanceAmount.toFixed(2)}
-                                    </p>
+                                    {balanceAmount > 0 && (
+                                        <p className="mt-4 text-sm text-gray-600">
+                                            Previous Invoice Balance - ₹{balanceAmount.toFixed(2)}
+                                        </p>
+                                    )}
                                     <FormControl fullWidth margin="normal" size="small">
                                         <InputLabel id="pending-invoice-label">
                                             Select Pending Invoice
                                         </InputLabel>
-                                        <Select
-                                            labelId="pending-invoice-label"
-                                            id="selectedInvoiceId"
-                                            name="selectedInvoiceId"
-                                            value={selectedInvoiceId}
-                                            onChange={(e) =>
-                                                setSelectedInvoiceId(e.target.value)
-                                            }
-                                            label="Select Pending Invoice"
-                                        >
-                                            <MenuItem value="">--select Invoice--</MenuItem>
-                                            {companyPendingInvoice
-                                                ?.filter(
-                                                    (pendingInv) =>
-                                                        pendingInv._id !== selectedInvoice?._id
-                                                )
-                                                .map((pendingInv) => (
-                                                    <MenuItem
-                                                        key={pendingInv._id}
-                                                        value={pendingInv._id}
-                                                    >
-                                                        {new Date(
-                                                            pendingInv.invoiceDate
-                                                        ).toLocaleDateString() +
-                                                            " - ₹" +
-                                                            pendingInv?.grandTotal}
-                                                    </MenuItem>
-                                                ))}
-                                        </Select>
+                                        {loadingPendingInvoices ? (
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1, py: 1.5 }}>
+                                                <CircularProgress size={20} />
+                                                <Typography variant="body2" color="text.secondary">
+                                                    Loading pending invoices...
+                                                </Typography>
+                                            </Box>
+                                        ) : (
+                                            <Select
+                                                labelId="pending-invoice-label"
+                                                id="selectedInvoiceId"
+                                                name="selectedInvoiceId"
+                                                value={selectedInvoiceId}
+                                                onChange={(e) =>
+                                                    setSelectedInvoiceId(e.target.value)
+                                                }
+                                                label="Select Pending Invoice"
+                                            >
+                                                <MenuItem value="">--select Invoice--</MenuItem>
+                                                {companyPendingInvoice
+                                                    ?.filter(
+                                                        (pendingInv) =>
+                                                            pendingInv._id !== selectedInvoice?._id
+                                                    )
+                                                    .map((pendingInv) => (
+                                                        <MenuItem
+                                                            key={pendingInv._id}
+                                                            value={pendingInv._id}
+                                                        >
+                                                            {new Date(
+                                                                pendingInv.invoiceDate
+                                                            ).toLocaleDateString() +
+                                                                " - ₹" +
+                                                                pendingInv?.grandTotal}
+                                                        </MenuItem>
+                                                    ))}
+                                            </Select>
+                                        )}
                                     </FormControl>
                                 </>
                             )}

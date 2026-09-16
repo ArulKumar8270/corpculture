@@ -32,6 +32,11 @@ import {
 } from '../../utils/functions';
 import { fetchAssignableUsers } from '../../utils/fetchAssignableUsers';
 import { normalizeMongoId } from '../../utils/normalizeMongoId';
+import {
+  canMoveRentalInvoiceToOverallReport,
+  getRentalInvoiceOverallReportStatus,
+  getRentalInvoiceStatusFlags,
+} from '../../utils/rentalQuotationMoveGate';
 
 const RENTAL_INVOICE_DOWNLOAD_BASE_URL = 'https://pub-bcab85dac0c64221ba6b6a756f991c46.r2.dev';
 /** n8n: rental payment saved (payload aligned with web RentalInvoiceList). */
@@ -138,6 +143,7 @@ const RentalInvoiceListScreen = () => {
   const [balanceAmount, setBalanceAmount] = useState(0);
   const [pendingAmount, setPendingAmount] = useState(0);
   const [companyPendingInvoices, setCompanyPendingInvoices] = useState<any[]>([]);
+  const [loadingPendingInvoices, setLoadingPendingInvoices] = useState(false);
   const [selectedPendingInvoiceId, setSelectedPendingInvoiceId] = useState<string | null>(null);
 
   const isSameLocalDay = (a: any, b: Date) => {
@@ -677,6 +683,37 @@ const RentalInvoiceListScreen = () => {
     );
   };
 
+  const fetchCompanyPendingInvoices = async (entry: any) => {
+    if (!entry || !token) return;
+    try {
+      setLoadingPendingInvoices(true);
+      const response = await axios.post(
+        `${getApiBaseUrl()}/rental-payment/all`,
+        {
+          companyId: entry?.companyId?._id || entry?.companyId,
+          tdsAmount: { $eq: null },
+          status: { $ne: 'Paid' },
+          page: 1,
+          limit: 10000,
+        },
+        {
+          headers: {
+            Authorization: token || '',
+          },
+        }
+      );
+      const filteredInvoices = (response.data?.entries || []).filter(
+        (inv: any) => inv._id !== entry?._id
+      );
+      setCompanyPendingInvoices(filteredInvoices);
+    } catch (error) {
+      console.error('Error fetching pending invoices:', error);
+      setCompanyPendingInvoices([]);
+    } finally {
+      setLoadingPendingInvoices(false);
+    }
+  };
+
   const handleOpenPaymentModal = (entry: any) => {
     setSelectedEntry(entry);
     let initialPaymentAmount = 0;
@@ -690,6 +727,7 @@ const RentalInvoiceListScreen = () => {
       initialPaymentAmountType = 'Pending';
     }
 
+    const grand = rentalInvoiceDisplayGrandTotal(entry);
     setPaymentForm({
       modeOfPayment: entry.modeOfPayment || 'CASH',
       bankName: entry.bankName || '',
@@ -700,13 +738,25 @@ const RentalInvoiceListScreen = () => {
       otherPaymentMode: entry.otherPaymentMode || '',
       paymentAmount: initialPaymentAmount.toString(),
       paymentAmountType: initialPaymentAmountType,
-      grandTotal: rentalInvoiceDisplayGrandTotal(entry),
+      grandTotal: grand,
       paymentContactEmails: invoicePaymentEmailsFromRecord(entry),
     });
-    setBalanceAmount(0);
-    setPendingAmount(0);
-    setCompanyPendingInvoices([]);
     setSelectedPendingInvoiceId(null);
+
+    if (initialPaymentAmount > 0 && initialPaymentAmount < grand) {
+      setPendingAmount(grand - initialPaymentAmount);
+      setBalanceAmount(0);
+      setCompanyPendingInvoices([]);
+    } else if (initialPaymentAmount > grand) {
+      setBalanceAmount(initialPaymentAmount - grand);
+      setPendingAmount(0);
+      fetchCompanyPendingInvoices(entry);
+    } else {
+      setBalanceAmount(0);
+      setPendingAmount(0);
+      setCompanyPendingInvoices([]);
+    }
+
     setPaymentModalVisible(true);
   };
 
@@ -719,36 +769,18 @@ const RentalInvoiceListScreen = () => {
       const pending = cap - amount;
       setPendingAmount(pending);
       setBalanceAmount(0);
+      setCompanyPendingInvoices([]);
+      setSelectedPendingInvoiceId(null);
     } else {
       const balance = amount - cap;
       setBalanceAmount(balance);
       setPendingAmount(0);
 
       if (balance > 0) {
-        try {
-          const response = await axios.post(
-            `${getApiBaseUrl()}/rental-payment/all`,
-            {
-              companyId: selectedEntry?.companyId?._id || selectedEntry?.companyId,
-              tdsAmount: { $eq: null },
-              status: { $ne: 'Paid' },
-              page: 1,
-              limit: 10000,
-            },
-            {
-              headers: {
-                Authorization: token || '',
-              },
-            }
-          );
-          // Filter out the current invoice
-          const filteredInvoices = (response.data?.entries || []).filter(
-            (inv: any) => inv._id !== selectedEntry?._id
-          );
-          setCompanyPendingInvoices(filteredInvoices);
-        } catch (error) {
-          console.error('Error fetching pending invoices:', error);
-        }
+        await fetchCompanyPendingInvoices(selectedEntry);
+      } else {
+        setCompanyPendingInvoices([]);
+        setSelectedPendingInvoiceId(null);
       }
     }
   };
@@ -793,6 +825,24 @@ const RentalInvoiceListScreen = () => {
       } else {
         status = 'Unpaid';
       }
+
+      const invoiceId = balanceAmountParam
+        ? selectedPendingInvoiceId
+        : selectedPendingInvoiceId || selectedEntry._id;
+      const targetInvoice =
+        companyPendingInvoices.find((i) => i._id === invoiceId) ||
+        (invoiceId === selectedEntry._id ? selectedEntry : null) ||
+        selectedEntry;
+
+      if (status === 'Paid' && !canMoveRentalInvoiceToOverallReport(targetInvoice)) {
+        const gate = getRentalInvoiceOverallReportStatus(targetInvoice);
+        Toast.show({
+          type: 'error',
+          text1: 'Statuses incomplete',
+          text2: gate.message,
+        });
+        return;
+      }
       
       const payEmails = normalizePaymentContactPayload(paymentForm.paymentContactEmails);
       const payload: any = {
@@ -819,8 +869,6 @@ const RentalInvoiceListScreen = () => {
       } else if (paymentForm.paymentAmountType === 'Pending') {
         payload.pendingAmount = pendingAmount || 0;
       }
-
-      const invoiceId = balanceAmountParam ? selectedPendingInvoiceId : (selectedPendingInvoiceId || selectedEntry._id);
       
       if (invoiceId) {
         const res = await axios.put(
@@ -921,8 +969,6 @@ const RentalInvoiceListScreen = () => {
       );
 
       if (res.data?.success) {
-        // Invoice count is now incremented automatically by the backend
-        // No need to call increment-invoice endpoint
         fetchRentalEntries({ silent: true });
         Toast.show({
           type: 'success',
@@ -941,7 +987,9 @@ const RentalInvoiceListScreen = () => {
       Toast.show({
         type: 'error',
         text1: 'Error',
-        text2: error.response?.data?.message || 'Something went wrong while updating status details.',
+        text2:
+          error.response?.data?.message ||
+          'Something went wrong while updating status details.',
       });
     }
   };
@@ -1093,6 +1141,9 @@ const RentalInvoiceListScreen = () => {
     const isDeletingThis = deletingLink === rowId;
     const isSendingThis = sendingInvoice === rowId;
     const isDownloadingThis = downloadingEntryId === rowId;
+    const statusFlags = getRentalInvoiceStatusFlags(item);
+    const canUpdatePayment =
+      invoiceType !== 'quotation' && canMoveRentalInvoiceToOverallReport(item);
 
     // Get first product for display (for backward compatibility with single product)
     const firstProduct = item.products && item.products.length > 0 
@@ -1122,10 +1173,12 @@ const RentalInvoiceListScreen = () => {
             </View>
           </View>
           <View style={styles.entryHeaderRight}>
-            {item.invoiceLink?.length === 0 && (
+            {!statusFlags.hasUploaded && (
               <View style={styles.warningBadge}>
                 <Icon name="warning" size={16} color="#FF3B30" />
-                <Text style={styles.warningText}>Invoice Upload Pending</Text>
+                <Text style={styles.warningText}>
+                  {invoiceType === 'quotation' ? 'Quotation Upload Pending' : 'Invoice Upload Pending'}
+                </Text>
               </View>
             )}
             <Icon
@@ -1135,6 +1188,70 @@ const RentalInvoiceListScreen = () => {
             />
           </View>
         </TouchableOpacity>
+
+        <View style={styles.statusChipColumn}>
+          <View
+            style={[
+              styles.statusChip,
+              statusFlags.isSent ? styles.statusChipOk : styles.statusChipBad,
+            ]}
+          >
+            <Text style={styles.statusChipText}>
+              {invoiceType === 'quotation'
+                ? statusFlags.isSent
+                  ? 'Quotation Sent'
+                  : 'Quotation Not Sent'
+                : statusFlags.isSent
+                  ? 'Invoice Sent'
+                  : 'Invoice Not Sent'}
+            </Text>
+          </View>
+          <View
+            style={[
+              styles.statusChip,
+              statusFlags.hasPaymentDetails ? styles.statusChipOk : styles.statusChipBad,
+            ]}
+          >
+            <Text style={styles.statusChipText}>
+              {statusFlags.hasPaymentDetails
+                ? 'Payment Details Updated'
+                : 'Payment Details Not Updated'}
+            </Text>
+          </View>
+          <View
+            style={[
+              styles.statusChip,
+              statusFlags.hasSignedCopy ? styles.statusChipOk : styles.statusChipBad,
+            ]}
+          >
+            <Text style={styles.statusChipText}>
+              {statusFlags.hasSignedCopy
+                ? 'Signed Copy Uploaded'
+                : 'Signed Copy Not Uploaded'}
+            </Text>
+          </View>
+          {!statusFlags.hasUploaded && (
+            <View style={[styles.statusChip, styles.statusChipBad]}>
+              <Text style={styles.statusChipText}>
+                {invoiceType === 'quotation' ? 'Quotation Upload Pending' : 'Invoice Upload Pending'}
+              </Text>
+            </View>
+          )}
+          {item.status && item.status !== 'InvoiceSent' ? (
+            <View
+              style={[
+                styles.statusChip,
+                item.status === 'Paid'
+                  ? styles.statusChipOk
+                  : item.status === 'Unpaid'
+                    ? styles.statusChipBad
+                    : styles.statusChipWarn,
+              ]}
+            >
+              <Text style={styles.statusChipText}>{item.status}</Text>
+            </View>
+          ) : null}
+        </View>
 
         <View style={styles.entryDetails}>
           <View style={styles.sendDetailsBlock}>
@@ -1256,11 +1373,37 @@ const RentalInvoiceListScreen = () => {
           )}
           {!item?.tdsAmount && invoiceType !== 'quotation' && (
             <TouchableOpacity
-              style={[styles.actionButton, styles.paymentButton]}
-              onPress={() => handleOpenPaymentModal(item)}
+              style={[
+                styles.actionButton,
+                styles.paymentButton,
+                !canUpdatePayment && styles.actionButtonDisabled,
+              ]}
+              disabled={!canUpdatePayment}
+              onPress={() => {
+                if (!canUpdatePayment) {
+                  Toast.show({
+                    type: 'error',
+                    text1: 'Statuses incomplete',
+                    text2: getRentalInvoiceOverallReportStatus(item).message,
+                  });
+                  return;
+                }
+                handleOpenPaymentModal(item);
+              }}
             >
-              <Icon name="payment" size={18} color="#007AFF" />
-              <Text style={styles.actionButtonText}>Update Payment</Text>
+              <Icon
+                name="payment"
+                size={18}
+                color={canUpdatePayment ? '#007AFF' : '#999'}
+              />
+              <Text
+                style={[
+                  styles.actionButtonText,
+                  !canUpdatePayment && styles.actionButtonTextDisabled,
+                ]}
+              >
+                Update Payment
+              </Text>
             </TouchableOpacity>
           )}
           <TouchableOpacity
@@ -1853,31 +1996,40 @@ const RentalInvoiceListScreen = () => {
             </View>
 
             {/* Balance Amount Display */}
-            {balanceAmount > 0 && companyPendingInvoices.length > 0 && (
+            {(loadingPendingInvoices || (balanceAmount > 0 && companyPendingInvoices.length > 0)) && (
               <>
-                <Text style={styles.balanceText}>
-                  Previous Invoice Balance - Rs {balanceAmount.toFixed(2)}
-                </Text>
+                {balanceAmount > 0 && (
+                  <Text style={styles.balanceText}>
+                    Previous Invoice Balance - Rs {balanceAmount.toFixed(2)}
+                  </Text>
+                )}
                 <View style={styles.modalInputGroup}>
                   <Text style={styles.modalLabel}>Select Pending Invoice</Text>
-                  <TouchableOpacity
-                    style={styles.pickerButton}
-                    onPress={() => setPendingInvoicePickerVisible(true)}
-                  >
-                    <Text style={styles.pickerButtonText}>
-                      {selectedPendingInvoiceId
-                        ? (() => {
-                            const selectedInv = companyPendingInvoices.find(
-                              (inv) => inv._id === selectedPendingInvoiceId
-                            );
-                            return selectedInv
-                              ? `${new Date(selectedInv.createdAt || selectedInv.invoiceDate).toLocaleDateString()} - Rs ${rentalInvoiceDisplayGrandTotal(selectedInv).toFixed(2)}`
-                              : 'Select Invoice';
-                          })()
-                        : '--select Invoice--'}
-                    </Text>
-                    <Icon name="arrow-drop-down" size={24} color="#666" />
-                  </TouchableOpacity>
+                  {loadingPendingInvoices ? (
+                    <View style={[styles.pickerButton, { justifyContent: 'center', flexDirection: 'row', gap: 8 }]}>
+                      <ActivityIndicator size="small" color="#007AFF" />
+                      <Text style={styles.pickerButtonText}>Loading pending invoices...</Text>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      style={styles.pickerButton}
+                      onPress={() => setPendingInvoicePickerVisible(true)}
+                    >
+                      <Text style={styles.pickerButtonText}>
+                        {selectedPendingInvoiceId
+                          ? (() => {
+                              const selectedInv = companyPendingInvoices.find(
+                                (inv) => inv._id === selectedPendingInvoiceId
+                              );
+                              return selectedInv
+                                ? `${new Date(selectedInv.createdAt || selectedInv.invoiceDate).toLocaleDateString()} - Rs ${rentalInvoiceDisplayGrandTotal(selectedInv).toFixed(2)}`
+                                : 'Select Invoice';
+                            })()
+                          : '--select Invoice--'}
+                      </Text>
+                      <Icon name="arrow-drop-down" size={24} color="#666" />
+                    </TouchableOpacity>
+                  )}
                 </View>
               </>
             )}
@@ -2491,6 +2643,31 @@ const styles = StyleSheet.create({
     color: '#FF3B30',
     marginLeft: 5,
   },
+  statusChipColumn: {
+    paddingHorizontal: 12,
+    paddingBottom: 8,
+    gap: 6,
+  },
+  statusChip: {
+    alignSelf: 'flex-start',
+    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  statusChipOk: {
+    backgroundColor: '#2e7d32',
+  },
+  statusChipBad: {
+    backgroundColor: '#d32f2f',
+  },
+  statusChipWarn: {
+    backgroundColor: '#ed6c02',
+  },
+  statusChipText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
   entryDetails: {
     padding: 15,
   },
@@ -2555,6 +2732,13 @@ const styles = StyleSheet.create({
   },
   moveButton: {
     backgroundColor: '#e3f2fd',
+  },
+  actionButtonDisabled: {
+    opacity: 0.5,
+    backgroundColor: '#f0f0f0',
+  },
+  actionButtonTextDisabled: {
+    color: '#999',
   },
   paymentButton: {
     backgroundColor: '#e3f2fd',

@@ -234,17 +234,6 @@ const RentalProductListScreen = () => {
   };
 
   const filteredProducts = products.filter((product) => {
-    // Filter to show only assigned products (products with employeeId)
-    const isAssigned = product.employeeId && (
-      (typeof product.employeeId === 'object' && product.employeeId._id) ||
-      (typeof product.employeeId === 'string' && product.employeeId.trim() !== '')
-    );
-    
-    if (!isAssigned) {
-      return false;
-    }
-
-    // Apply search filter
     const lowerCaseSearchTerm = searchTerm.toLowerCase();
     const companyName = product.company?.companyName?.toLowerCase() || '';
     const modelName = product.modelName?.toLowerCase() || '';
@@ -252,6 +241,8 @@ const RentalProductListScreen = () => {
     const paymentDate = product.paymentDate
       ? new Date(product.paymentDate).toLocaleDateString().toLowerCase()
       : '';
+
+    if (!lowerCaseSearchTerm) return true;
 
     return (
       companyName.includes(lowerCaseSearchTerm) ||

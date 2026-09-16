@@ -33,9 +33,9 @@ const serviceInvoiceSchema = new mongoose.Schema({
                 ref: 'ServiceProduct', // Reference to the ServiceProduct model
                 required: true,
             },
-            productName: { // Storing name for quick access, can be populated from productId
-                type:  mongoose.Schema.Types.ObjectId,
-                ref: "Purchase",
+            productName: { // Material ref (same as ServiceProduct.productName)
+                type: mongoose.Schema.Types.ObjectId,
+                ref: "Material",
                 required: true,
             },
             quantity: {

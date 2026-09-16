@@ -161,7 +161,14 @@ const ServiceReportsandGatpass = (props) => {
                 headers: { Authorization: auth?.token }
             });
             if (response.data.success) {
-                setReports(response.data.reports);
+                const expectedType = props?.reportType || '';
+                const rows = response.data.reports || [];
+                // Gate Pass / DC / Returnable: only keep that document type on this list page.
+                const filtered =
+                    isOperationalDocumentReportType(expectedType)
+                        ? rows.filter((r) => r?.reportType === expectedType)
+                        : rows;
+                setReports(filtered);
                 setTotalCount(response.data.totalCount || 0);
             } else {
                 toast.error(response.data.message || 'Failed to fetch reports.');
@@ -603,7 +610,11 @@ const ServiceReportsandGatpass = (props) => {
                         <TableHead>
                             <TableRow>
                                 <TableCell sx={{ ...tableHeadCellSx, width: 72 }}>S.No</TableCell>
-                                <TableCell sx={tableHeadCellSx}>Report Type</TableCell>
+                                <TableCell sx={tableHeadCellSx}>
+                                    {isOperationalDocumentReportType(props?.reportType)
+                                        ? 'Document Type'
+                                        : 'Report Type'}
+                                </TableCell>
                                 <TableCell sx={tableHeadCellSx}>Company</TableCell>
                                 <TableCell sx={tableHeadCellSx}>Problem Report</TableCell>
                                 <TableCell sx={tableHeadCellSx}>Branch</TableCell>
@@ -636,7 +647,9 @@ const ServiceReportsandGatpass = (props) => {
                                                 {page * rowsPerPage + index + 1}
                                             </TableCell>
                                             <TableCell sx={{ whiteSpace: 'nowrap' }}>
-                                                {formatReportTypeLabel(report.reportType)}
+                                                {isOperationalDocumentReportType(props?.reportType)
+                                                    ? getDocumentTitle(props?.reportType)
+                                                    : formatReportTypeLabel(report.reportType)}
                                             </TableCell>
                                             <CellWithTooltip
                                                 value={report.company?.companyName || 'N/A'}

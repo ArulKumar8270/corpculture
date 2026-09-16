@@ -43,6 +43,7 @@ const AddServiceInvoice = () => {
     const invoiceType = searchParams.get("invoiceType");
     const serviceId = searchParams.get("serviceId");
     const companyIdFromParams = searchParams.get("companyId"); // Renamed to avoid conflict
+    const isEmployee = Number(auth?.user?.role) === 3;
     const [invoices, setInvoices] = useState(null);
     const [globalInvoiceFormat, setGlobalInvoiceFormat] = useState('');
     // State for form fields
@@ -457,7 +458,9 @@ const AddServiceInvoice = () => {
         if (!invoiceId && invoiceType !== "quotation") {
             // REMOVED: handleUpdateInvoiceCount() - Backend now handles increment automatically
             // handleUpdateInvoiceCount()
-            updateEmployeeBenefit(invoice)
+            if (isEmployee) {
+                updateEmployeeBenefit(invoice);
+            }
             updateMatrialDta()
         }
         updateCommissionDetails(invoice);
@@ -544,16 +547,30 @@ const AddServiceInvoice = () => {
             console.log(error);
         }
     };
+    const hasMyBenefitsValues = (product) => {
+        const hasBenefitQty =
+            product.benefitQuantity !== '' &&
+            product.benefitQuantity != null &&
+            Number(product.benefitQuantity) > 0;
+        const hasRework = product.reInstall === true;
+        const hasOtherProducts =
+            product.otherProducts != null && String(product.otherProducts).trim() !== '';
+        return hasBenefitQty || hasRework || hasOtherProducts;
+    };
+
     const resolveBenefitQuantity = (product) => {
         if (product.benefitQuantity !== '' && product.benefitQuantity != null) {
-            return Number(product.benefitQuantity);
+            return Number(product.benefitQuantity) || 0;
         }
-        return Number(product.quantity || 0);
+        return 0;
     };
 
     const updateEmployeeBenefit = async (invoice) => {
         try {
-            for (const product of productsInTable) {
+            const benefitProducts = productsInTable.filter(hasMyBenefitsValues);
+            if (!benefitProducts.length) return;
+
+            for (const product of benefitProducts) {
                 const apiParams = {
                     employeeId: invoice?.assignedTo?._id,
                     invoiceId: invoice?._id,
@@ -577,7 +594,6 @@ const AddServiceInvoice = () => {
                     console.log("Benefit updated:", data.message);
                 }
             }
-            alert("All benefits updated successfully!");
         } catch (err) {
             console.error("Error updating benefit:", err);
         }
@@ -766,7 +782,7 @@ const AddServiceInvoice = () => {
                                 noOptionsText={loading ? "Loading products..." : "No products found"}
                             />
                         </FormControl>
-                        {invoiceData.productId && (
+                        {isEmployee && invoiceData.productId && (
                             <Grid container spacing={3}>
                                 <Grid item xs={12} sm={4}>
                                     <FormControl fullWidth margin="normal" size="small">

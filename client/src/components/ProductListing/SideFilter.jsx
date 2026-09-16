@@ -7,11 +7,11 @@ import Slider from "@mui/material/Slider";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import StarIcon from "@mui/icons-material/Star";
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo, forwardRef } from "react";
 import TextField from "@mui/material/TextField";
 import { useFrontHomeSettings } from "../../context/frontHomeSettings";
 
-const SideFilter = ({
+const SideFilter = forwardRef(({
     price,
     category,
     ratings,
@@ -19,7 +19,7 @@ const SideFilter = ({
     setCategory,
     setRatings,
     categories
-}) => {
+}, ref) => {
     const [categoryToggle, setCategoryToggle] = useState(true);
     const [ratingsToggle, setRatingsToggle] = useState(true);
     const [categoryQuery, setCategoryQuery] = useState("");
@@ -33,15 +33,11 @@ const SideFilter = ({
         return categories.filter((c) => c.name?.toLowerCase().includes(q));
     }, [categories, categoryQuery]);
 
-
-
-    // Debounce priceHandler to prevent multiple API calls on slider change
     const priceHandler = (_, newPrice) => {
         if (debounceTimeout.current) {
             clearTimeout(debounceTimeout.current);
         }
         debounceTimeout.current = setTimeout(() => {
-            // Round the price values to the nearest multiple of 1000
             let newVal = [
                 Math.round(newPrice[0] / 1000) * 1000,
                 Math.round(newPrice[1] / 1000) * 1000,
@@ -52,7 +48,6 @@ const SideFilter = ({
 
     useEffect(() => {
         return () => {
-            // Clean up the timeout when the component unmounts
             if (debounceTimeout.current) {
                 clearTimeout(debounceTimeout.current);
             }
@@ -66,8 +61,11 @@ const SideFilter = ({
     };
 
     return (
-        <div className="hidden sm:flex flex-col w-1/5 px-1">
-            <div className="flex flex-col bg-white rounded-2xl shadow-xl border border-[#e6fbff]">
+        <div className="hidden sm:flex flex-col w-1/5 px-1 self-start">
+            <div
+                ref={ref}
+                className="flex flex-col bg-white rounded-2xl shadow-xl border border-[#e6fbff]"
+            >
                 <div className="flex items-center justify-between gap-5 px-4 py-3 border-b rounded-t-2xl">
                     <p className="text-lg font-bold text-[#019ee3]">Filters</p>
                     <span
@@ -79,7 +77,6 @@ const SideFilter = ({
                 </div>
 
                 <div className="flex flex-col gap-2 py-3 text-sm overflow-hidden">
-                    {/* Price slider filter */}
                     <div className="flex flex-col gap-2 border-b px-4">
                         <span className="font-semibold text-xs text-[#afcb09]">PRICE</span>
                         <Slider
@@ -103,7 +100,6 @@ const SideFilter = ({
                         </div>
                     </div>
 
-                    {/* Category filter */}
                     <div className="flex flex-col border-b px-4">
                         <div
                             className="flex justify-between cursor-pointer py-2 pb-4 items-center"
@@ -160,7 +156,6 @@ const SideFilter = ({
                         )}
                     </div>
 
-                    {/* Ratings filter */}
                     <div className="flex flex-col border-b px-4 -mb-4">
                         <div
                             className="flex justify-between cursor-pointer py-2 pb-4 items-center"
@@ -215,6 +210,8 @@ const SideFilter = ({
             </div>
         </div>
     );
-};
+});
+
+SideFilter.displayName = "SideFilter";
 
 export default SideFilter;

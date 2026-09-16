@@ -340,10 +340,16 @@ export function excelBufferToBase64(excelBuffer: ArrayBuffer | Uint8Array | numb
       : excelBuffer instanceof Uint8Array
         ? excelBuffer
         : new Uint8Array(excelBuffer);
+  // Avoid String.fromCharCode(...bytes) — Hermes throws on large TypedArray spreads.
   let binary = '';
-  const chunk = 0x8000;
-  for (let i = 0; i < bytes.length; i += chunk) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  const chunkSize = 0x2000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const end = Math.min(i + chunkSize, bytes.length);
+    let chunk = '';
+    for (let j = i; j < end; j++) {
+      chunk += String.fromCharCode(bytes[j]);
+    }
+    binary += chunk;
   }
   return btoa(binary);
 }

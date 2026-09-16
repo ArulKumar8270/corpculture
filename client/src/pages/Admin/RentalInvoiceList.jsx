@@ -46,6 +46,11 @@ import {
     compareInvoiceNumbers,
     collectRentalOfficialInvoiceDownloadCandidates,
 } from '../../utils/functions';
+import {
+    canMoveRentalInvoiceToOverallReport,
+    getRentalInvoiceOverallReportStatus,
+    getRentalInvoiceStatusFlags,
+} from '../../utils/rentalQuotationMoveGate';
 
 /** Grand total aligned with PDF: uses frozen meter readings on the invoice when present (see sumRentalProductPreTax). */
 function rentalInvoiceDisplayGrandTotal(entry) {
@@ -104,6 +109,7 @@ function RentalInvoiceList(props) {
     const [filteredRentalEntries, setFilteredRentalEntries] = useState([]); // State for filtered entries
     const [listTab, setListTab] = useState(0); // 0 = Active, 1 = Cancelled
     const [companyPendingInvoice, setCompanyPendingInvoice] = useState([])
+    const [loadingPendingInvoices, setLoadingPendingInvoices] = useState(false)
     const [selectedInvoiceIds, setSelectedInvoiceIds] = useState([])
     const [balanceAmount, setBalanceAmount] = useState(0)
     const [pendingAmount, setPendingAmount] = useState(0)
@@ -627,19 +633,31 @@ function RentalInvoiceList(props) {
                 let balanceAmount = cap - value;
                 setPendingAmount(balanceAmount);
                 setBalanceAmount(0);
+                setCompanyPendingInvoice([]);
+                setLoadingPendingInvoices(false);
             } else {
                 let balanceAmount = value - cap;
                 setBalanceAmount(balanceAmount);
                 setPendingAmount(0);
                 try {
+                    setLoadingPendingInvoices(true);
                     let response = await axios.post(
                         `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/all`,
-                        { companyId: currentInvoice?.companyId || paymentForm?.companyId, tdsAmount: { $eq: null }, status: { $ne: "Paid" } },
+                        {
+                            companyId: currentInvoice?.companyId?._id || currentInvoice?.companyId || paymentForm?.companyId,
+                            tdsAmount: { $eq: null },
+                            status: { $ne: "Paid" },
+                            page: 1,
+                            limit: 10000,
+                        },
                         { headers: { Authorization: auth.token } }
                     );
                     setCompanyPendingInvoice(response.data?.entries || []);
                 } catch (err) {
                     console.log(err, "Api error");
+                    setCompanyPendingInvoice([]);
+                } finally {
+                    setLoadingPendingInvoices(false);
                 }
             }
         }
@@ -680,6 +698,11 @@ function RentalInvoiceList(props) {
                     amountArg,
                     amountArg >= (targetInv ? rentalInvoiceDisplayGrandTotal(targetInv) : 0)
                 );
+                if (payload.status === 'Paid' && targetInv && !canMoveRentalInvoiceToOverallReport(targetInv)) {
+                    const gate = getRentalInvoiceOverallReportStatus(targetInv);
+                    toast.error(gate.message);
+                    throw new Error(gate.message);
+                }
                 await axios.put(
                     `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/${targetInvoiceIdArg}`,
                     payload,
@@ -696,6 +719,20 @@ function RentalInvoiceList(props) {
                 currentInvoicePayment,
                 Number(paymentForm?.paymentAmount) >= formCap || paymentForm.paymentAmountType === 'TDS'
             );
+
+            const primaryInvoice =
+                companyPendingInvoice?.find((i) => i._id === paymentForm?.invoiceId) ||
+                rentalEntries?.find((i) => i._id === paymentForm?.invoiceId);
+
+            if (
+                currentPayload.status === 'Paid' &&
+                primaryInvoice &&
+                !canMoveRentalInvoiceToOverallReport(primaryInvoice)
+            ) {
+                const gate = getRentalInvoiceOverallReportStatus(primaryInvoice);
+                toast.error(gate.message);
+                return;
+            }
 
             await axios.put(
                 `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/${paymentForm?.invoiceId}`,
@@ -1264,28 +1301,12 @@ function RentalInvoiceList(props) {
                                                 <TableCell>
                                                     {(() => {
                                                         const isQuotation = props?.invoice === "quotation";
-                                                        const isInvoiceSent =
-                                                            entry?.invoiceSendStatus === "Sent" ||
-                                                            !!entry?.invoiceSentAt ||
-                                                            entry?.status === "InvoiceSent" ||
-                                                            (Array.isArray(entry?.invoiceLink) &&
-                                                                entry.invoiceLink.length > 0);
-
-                                                        const hasPaymentDetails =
-                                                            (Number(entry?.paymentAmount) || 0) > 0 ||
-                                                            !!entry?.paymentAmountType ||
-                                                            (Number(entry?.pendingAmount) || 0) > 0 ||
-                                                            (Number(entry?.tdsAmount) || 0) > 0 ||
-                                                            !!entry?.bankName ||
-                                                            !!entry?.transactionDetails ||
-                                                            !!entry?.chequeDate ||
-                                                            !!entry?.transferDate ||
-                                                            !!entry?.companyNamePayment ||
-                                                            !!entry?.otherPaymentMode;
-
-                                                        const hasSignedCopy =
-                                                            Array.isArray(entry?.signedInvoiceLink) &&
-                                                            entry.signedInvoiceLink.length > 0;
+                                                        const {
+                                                            hasUploaded,
+                                                            isSent: isInvoiceSent,
+                                                            hasSignedCopy,
+                                                            hasPaymentDetails,
+                                                        } = getRentalInvoiceStatusFlags(entry);
                                                         const showSignedChip = Object.prototype.hasOwnProperty.call(entry || {}, "signedInvoiceLink");
 
                                                         const sentLabel = isQuotation
@@ -1319,7 +1340,7 @@ function RentalInvoiceList(props) {
                                                                         color={hasSignedCopy ? "success" : "error"}
                                                                     />
                                                                 ) : null}
-                                                                {(!entry?.invoiceLink || entry.invoiceLink.length <= 0) ? (
+                                                                {!hasUploaded ? (
                                                                     <Chip
                                                                         label={isQuotation ? "Quotation Upload Pending" : "Invoice Upload Pending"}
                                                                         size="small"
@@ -1364,11 +1385,27 @@ function RentalInvoiceList(props) {
                                                         </Button>
                                                         {props?.invoice === "quotation" ? <Button variant="outlined" size="small" sx={{ my: 1 }} onClick={() => onMoveToInvoice("invoice", entry)}>Move to invoice</Button>
                                                             : null}
-                                                        {!entry?.tdsAmount && props?.invoice !== "quotation" ? <Button variant="outlined" size="small" onClick={() => {
-                                                            handleOpenPaymentDetailsModal(entry)
-                                                        }}>
-                                                            Update Payment Details
-                                                        </Button> : null}
+                                                        {!entry?.tdsAmount && props?.invoice !== "quotation" ? (
+                                                            <Button
+                                                                variant="outlined"
+                                                                size="small"
+                                                                disabled={!canMoveRentalInvoiceToOverallReport(entry)}
+                                                                title={
+                                                                    canMoveRentalInvoiceToOverallReport(entry)
+                                                                        ? "Update Payment Details"
+                                                                        : getRentalInvoiceOverallReportStatus(entry).message
+                                                                }
+                                                                onClick={() => {
+                                                                    if (!canMoveRentalInvoiceToOverallReport(entry)) {
+                                                                        toast.error(getRentalInvoiceOverallReportStatus(entry).message);
+                                                                        return;
+                                                                    }
+                                                                    handleOpenPaymentDetailsModal(entry);
+                                                                }}
+                                                            >
+                                                                Update Payment Details
+                                                            </Button>
+                                                        ) : null}
                                                         {!entry?.tdsAmount && props?.invoice !== "quotation" ? (
                                                             <IconButton
                                                                 size="small"
@@ -1763,50 +1800,65 @@ function RentalInvoiceList(props) {
                         size="small"
                     />
 
-                    {companyPendingInvoice?.length > 0 && balanceAmount > 0 && (
+                    {(loadingPendingInvoices || (companyPendingInvoice?.length > 0 && balanceAmount > 0)) && (
                         <>
-                            <p>Previous Invoice Balance - Rs {balanceAmount.toFixed(2)}</p>
-                            <p><strong>Allocated to selected invoices - Rs {selectedAllocatedTotal.toFixed(2)}</strong></p>
-                            {remainingToAllocate > 0 && (
-                                <p style={{ color: '#666' }}>Remaining to allocate - Rs {remainingToAllocate.toFixed(2)} (select more invoices so total equals balance)</p>
-                            )}
-                            {remainingToAllocate === 0 && selectedInvoiceIds.length > 0 && (
-                                <p style={{ color: 'green' }}>Amount fully allocated.</p>
+                            {balanceAmount > 0 && (
+                                <>
+                                    <p>Previous Invoice Balance - Rs {balanceAmount.toFixed(2)}</p>
+                                    {!loadingPendingInvoices && (
+                                        <>
+                                            <p><strong>Allocated to selected invoices - Rs {selectedAllocatedTotal.toFixed(2)}</strong></p>
+                                            {remainingToAllocate > 0 && (
+                                                <p style={{ color: '#666' }}>Remaining to allocate - Rs {remainingToAllocate.toFixed(2)} (select more invoices so total equals balance)</p>
+                                            )}
+                                            {remainingToAllocate === 0 && selectedInvoiceIds.length > 0 && (
+                                                <p style={{ color: 'green' }}>Amount fully allocated.</p>
+                                            )}
+                                        </>
+                                    )}
+                                </>
                             )}
                             <FormControl fullWidth margin="normal" size="small">
                                 <InputLabel id="select-pending-invoices-label" shrink>Select Pending Invoices</InputLabel>
-                                <Box sx={{ mt: 1, maxHeight: 220, overflow: 'auto', border: '1px solid #ccc', borderRadius: 1, p: 1 }}>
-                                    {companyPendingInvoice
-                                        ?.filter((pendingInv) => pendingInv._id !== currentInvoice?._id)
-                                        .map((pendingInv) => {
-                                            const invAmount = rentalInvoiceDisplayGrandTotal(pendingInv);
-                                            const canSelect = invAmount <= remainingToAllocate || selectedInvoiceIds.includes(pendingInv._id);
-                                            const dateStr = pendingInv.invoiceDate || pendingInv.entryDate || pendingInv.createdAt;
-                                            return (
-                                                <Box
-                                                    key={pendingInv._id}
-                                                    onClick={() => canSelect && togglePendingInvoiceSelection(pendingInv)}
-                                                    sx={{
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        gap: 1,
-                                                        py: 0.5,
-                                                        px: 1,
-                                                        cursor: canSelect ? 'pointer' : 'not-allowed',
-                                                        bgcolor: selectedInvoiceIds.includes(pendingInv._id) ? 'action.selected' : 'transparent',
-                                                        borderRadius: 1,
-                                                    }}
-                                                >
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={selectedInvoiceIds.includes(pendingInv._id)}
-                                                        onChange={() => {}}
-                                                        disabled={!canSelect}
-                                                    />
-                                                    <span>{dateStr ? new Date(dateStr).toLocaleDateString() : 'N/A'} - Rs {invAmount.toFixed(2)}</span>
-                                                </Box>
-                                            );
-                                        })}
+                                <Box sx={{ mt: 1, maxHeight: 220, overflow: 'auto', border: '1px solid #ccc', borderRadius: 1, p: 1, minHeight: 56 }}>
+                                    {loadingPendingInvoices ? (
+                                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, py: 2 }}>
+                                            <CircularProgress size={22} />
+                                            <Typography variant="body2" color="text.secondary">Loading pending invoices...</Typography>
+                                        </Box>
+                                    ) : (
+                                        companyPendingInvoice
+                                            ?.filter((pendingInv) => pendingInv._id !== currentInvoice?._id)
+                                            .map((pendingInv) => {
+                                                const invAmount = rentalInvoiceDisplayGrandTotal(pendingInv);
+                                                const canSelect = invAmount <= remainingToAllocate || selectedInvoiceIds.includes(pendingInv._id);
+                                                const dateStr = pendingInv.invoiceDate || pendingInv.entryDate || pendingInv.createdAt;
+                                                return (
+                                                    <Box
+                                                        key={pendingInv._id}
+                                                        onClick={() => canSelect && togglePendingInvoiceSelection(pendingInv)}
+                                                        sx={{
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: 1,
+                                                            py: 0.5,
+                                                            px: 1,
+                                                            cursor: canSelect ? 'pointer' : 'not-allowed',
+                                                            bgcolor: selectedInvoiceIds.includes(pendingInv._id) ? 'action.selected' : 'transparent',
+                                                            borderRadius: 1,
+                                                        }}
+                                                    >
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={selectedInvoiceIds.includes(pendingInv._id)}
+                                                            onChange={() => {}}
+                                                            disabled={!canSelect}
+                                                        />
+                                                        <span>{dateStr ? new Date(dateStr).toLocaleDateString() : 'N/A'} - Rs {invAmount.toFixed(2)}</span>
+                                                    </Box>
+                                                );
+                                            })
+                                    )}
                                 </Box>
                             </FormControl>
                         </>

@@ -284,14 +284,14 @@ const OrderManagementScreen = () => {
       const ws = XLSX.utils.json_to_sheet(rows);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Overall Products');
-      const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      // Use base64 directly — spreading Uint8Array into String.fromCharCode
+      // throws "iterator method is callable" on Hermes for large exports.
+      const base64 = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
       const fileName = `admin_orders_overall_products_${new Date().toISOString().slice(0, 10)}.xlsx`;
       const fileUri = `${FileSystem.documentDirectory}${fileName}`;
-      await FileSystem.writeAsStringAsync(
-        fileUri,
-        btoa(String.fromCharCode(...excelBuffer)),
-        { encoding: FileSystem.EncodingType.Base64 }
-      );
+      await FileSystem.writeAsStringAsync(fileUri, base64, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
 
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(fileUri);

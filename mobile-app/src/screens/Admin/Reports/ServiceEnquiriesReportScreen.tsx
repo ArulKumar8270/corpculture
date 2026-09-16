@@ -169,12 +169,12 @@ const ServiceEnquiriesReportScreen = () => {
       const ws = XLSX.utils.json_to_sheet(dataToExport);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Service Enquiries');
-      const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      const base64 = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
 
       const fileName = `service_enquiries_report_${Date.now()}.xlsx`;
       const fileUri = `${FileSystem.documentDirectory}${fileName}`;
 
-      await FileSystem.writeAsStringAsync(fileUri, btoa(String.fromCharCode(...excelBuffer)), {
+      await FileSystem.writeAsStringAsync(fileUri, base64, {
         encoding: FileSystem.EncodingType.Base64,
       });
 

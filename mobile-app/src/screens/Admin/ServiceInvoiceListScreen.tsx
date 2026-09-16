@@ -124,6 +124,7 @@ const ServiceInvoiceListScreen = () => {
   const [balanceAmount, setBalanceAmount] = useState(0);
   const [pendingAmount, setPendingAmount] = useState(0);
   const [companyPendingInvoices, setCompanyPendingInvoices] = useState<any[]>([]);
+  const [loadingPendingInvoices, setLoadingPendingInvoices] = useState(false);
   const [selectedPendingInvoiceId, setSelectedPendingInvoiceId] = useState<string | null>(null);
   const [modeOfPaymentPickerVisible, setModeOfPaymentPickerVisible] = useState(false);
   const [amountTypePickerVisible, setAmountTypePickerVisible] = useState(false);
@@ -532,6 +533,38 @@ const ServiceInvoiceListScreen = () => {
     );
   };
 
+  const fetchCompanyPendingInvoices = async (invoice: any) => {
+    if (!invoice || !token) return;
+    try {
+      setLoadingPendingInvoices(true);
+      const response = await axios.post(
+        `${getApiBaseUrl()}/service-invoice/all`,
+        {
+          companyId: invoice?.companyId?._id || invoice?.companyId,
+          invoiceType: 'invoice',
+          tdsAmount: { $eq: null },
+          status: { $ne: 'Paid' },
+          page: 1,
+          limit: 10000,
+        },
+        {
+          headers: {
+            Authorization: token || '',
+          },
+        }
+      );
+      const filteredInvoices = (response.data?.serviceInvoices || []).filter(
+        (inv: any) => inv._id !== invoice?._id
+      );
+      setCompanyPendingInvoices(filteredInvoices);
+    } catch (error) {
+      console.error('Error fetching pending invoices:', error);
+      setCompanyPendingInvoices([]);
+    } finally {
+      setLoadingPendingInvoices(false);
+    }
+  };
+
   const handleOpenPaymentModal = (invoice: any) => {
     setSelectedInvoice(invoice);
     let initialPaymentAmount = 0;
@@ -546,6 +579,7 @@ const ServiceInvoiceListScreen = () => {
       initialPaymentAmountType = 'Pending';
     }
 
+    const grand = Number(invoice.grandTotal) || 0;
     setPaymentForm({
       modeOfPayment: invoice.modeOfPayment || '',
       bankName: invoice.bankName || '',
@@ -559,10 +593,22 @@ const ServiceInvoiceListScreen = () => {
       grandTotal: invoice.grandTotal || 0,
       paymentContactEmails: invoicePaymentEmailsFromRecord(invoice),
     });
-    setBalanceAmount(0);
-    setPendingAmount(0);
-    setCompanyPendingInvoices([]);
     setSelectedPendingInvoiceId(null);
+
+    if (initialPaymentAmount > 0 && initialPaymentAmount < grand) {
+      setPendingAmount(grand - initialPaymentAmount);
+      setBalanceAmount(0);
+      setCompanyPendingInvoices([]);
+    } else if (initialPaymentAmount > grand) {
+      setBalanceAmount(initialPaymentAmount - grand);
+      setPendingAmount(0);
+      fetchCompanyPendingInvoices(invoice);
+    } else {
+      setBalanceAmount(0);
+      setPendingAmount(0);
+      setCompanyPendingInvoices([]);
+    }
+
     setPaymentModalVisible(true);
   };
 
@@ -574,36 +620,18 @@ const ServiceInvoiceListScreen = () => {
       const pending = selectedInvoice?.grandTotal - amount;
       setPendingAmount(pending);
       setBalanceAmount(0);
+      setCompanyPendingInvoices([]);
+      setSelectedPendingInvoiceId(null);
     } else {
       const balance = amount - selectedInvoice?.grandTotal;
       setBalanceAmount(balance);
       setPendingAmount(0);
 
       if (balance > 0) {
-        try {
-          const response = await axios.post(
-            `${getApiBaseUrl()}/service-invoice/all`,
-            {
-              companyId: selectedInvoice?.companyId?._id || selectedInvoice?.companyId,
-              tdsAmount: { $eq: null },
-              status: { $ne: 'Paid' },
-              page: 1,
-              limit: 10000,
-            },
-            {
-              headers: {
-                Authorization: token || '',
-              },
-            }
-          );
-          // Filter out the current invoice from pending invoices
-          const filteredInvoices = (response.data?.serviceInvoices || []).filter(
-            (inv: any) => inv._id !== selectedInvoice?._id
-          );
-          setCompanyPendingInvoices(filteredInvoices);
-        } catch (error) {
-          console.error('Error fetching pending invoices:', error);
-        }
+        await fetchCompanyPendingInvoices(selectedInvoice);
+      } else {
+        setCompanyPendingInvoices([]);
+        setSelectedPendingInvoiceId(null);
       }
     }
   };
@@ -1520,31 +1548,40 @@ const ServiceInvoiceListScreen = () => {
             </View>
 
             {/* Balance Amount Display */}
-            {balanceAmount > 0 && companyPendingInvoices.length > 0 && (
+            {(loadingPendingInvoices || (balanceAmount > 0 && companyPendingInvoices.length > 0)) && (
               <>
-                <Text style={styles.balanceText}>
-                  Previous Invoice Balance - Rs {balanceAmount.toFixed(2)}
-                </Text>
+                {balanceAmount > 0 && (
+                  <Text style={styles.balanceText}>
+                    Previous Invoice Balance - Rs {balanceAmount.toFixed(2)}
+                  </Text>
+                )}
                 <View style={styles.modalInputGroup}>
                   <Text style={styles.modalLabel}>Select Pending Invoice</Text>
-                  <TouchableOpacity
-                    style={styles.pickerButton}
-                    onPress={() => setPendingInvoicePickerVisible(true)}
-                  >
-                    <Text style={styles.pickerButtonText}>
-                      {selectedPendingInvoiceId
-                        ? (() => {
-                            const selectedInv = companyPendingInvoices.find(
-                              (inv) => inv._id === selectedPendingInvoiceId
-                            );
-                            return selectedInv
-                              ? `${new Date(selectedInv.invoiceDate).toLocaleDateString()} - Rs ${selectedInv.grandTotal?.toFixed(2) || '0.00'}`
-                              : 'Select Invoice';
-                          })()
-                        : '--select Invoice--'}
-                    </Text>
-                    <Icon name="arrow-drop-down" size={24} color="#666" />
-                  </TouchableOpacity>
+                  {loadingPendingInvoices ? (
+                    <View style={[styles.pickerButton, { justifyContent: 'center', flexDirection: 'row', gap: 8 }]}>
+                      <ActivityIndicator size="small" color="#007AFF" />
+                      <Text style={styles.pickerButtonText}>Loading pending invoices...</Text>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      style={styles.pickerButton}
+                      onPress={() => setPendingInvoicePickerVisible(true)}
+                    >
+                      <Text style={styles.pickerButtonText}>
+                        {selectedPendingInvoiceId
+                          ? (() => {
+                              const selectedInv = companyPendingInvoices.find(
+                                (inv) => inv._id === selectedPendingInvoiceId
+                              );
+                              return selectedInv
+                                ? `${new Date(selectedInv.invoiceDate).toLocaleDateString()} - Rs ${selectedInv.grandTotal?.toFixed(2) || '0.00'}`
+                                : 'Select Invoice';
+                            })()
+                          : '--select Invoice--'}
+                      </Text>
+                      <Icon name="arrow-drop-down" size={24} color="#666" />
+                    </TouchableOpacity>
+                  )}
                 </View>
               </>
             )}

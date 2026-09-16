@@ -37,6 +37,10 @@ import { useAuth } from '../../../context/auth';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import { collectSignedCopyDownloadCandidates } from '../../../utils/functions';
+import {
+    canMoveRentalInvoiceToOverallReport,
+    getRentalInvoiceOverallReportStatus,
+} from '../../../utils/rentalQuotationMoveGate';
 
 const RENTAL_INVOICE_DOWNLOAD_BASE_URL = 'https://pub-bcab85dac0c64221ba6b6a756f991c46.r2.dev';
 const PAYMENT_COPY_DOWNLOAD_BASE_URL = 'https://pub-982db31d50054adebd29fa1792b12fb8.r2.dev';
@@ -660,9 +664,11 @@ const RentalInvoiceReport = (props) => {
                 const response = await axios.post(
                     `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/all/`,
                     {
-                        companyId: invoice?.companyId,
+                        companyId: invoice?.companyId?._id || invoice?.companyId,
                         tdsAmount: { $eq: null },
                         status: { $ne: 'Paid' },
+                        page: 1,
+                        limit: 10000,
                     },
                     { headers: { Authorization: auth.token } }
                 );
@@ -724,9 +730,14 @@ const RentalInvoiceReport = (props) => {
                     const response = await axios.post(
                         `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/all/`,
                         {
-                            companyId: paymentInvoice?.companyId || paymentForm?.companyId,
+                            companyId:
+                                paymentInvoice?.companyId?._id ||
+                                paymentInvoice?.companyId ||
+                                paymentForm?.companyId,
                             tdsAmount: { $eq: null },
                             status: { $ne: 'Paid' },
+                            page: 1,
+                            limit: 10000,
                         },
                         { headers: { Authorization: auth.token } }
                     );
@@ -777,6 +788,11 @@ const RentalInvoiceReport = (props) => {
                     amountArg,
                     amountArg >= (Number(pendingInv?.grandTotal) || 0)
                 );
+                if (payload.status === 'Paid' && pendingInv && !canMoveRentalInvoiceToOverallReport(pendingInv)) {
+                    const gate = getRentalInvoiceOverallReportStatus(pendingInv);
+                    toast.error(gate.message);
+                    throw new Error(gate.message);
+                }
                 await axios.put(
                     `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/${targetInvoiceIdArg}`,
                     payload,
@@ -793,6 +809,16 @@ const RentalInvoiceReport = (props) => {
             const currentInvoicePayment = covers ? gt : payNum;
             const isFullPayment = covers || paymentForm.paymentAmountType === 'TDS';
             const currentPayload = buildPaymentPayload(currentInvoicePayment, isFullPayment);
+
+            if (
+                currentPayload.status === 'Paid' &&
+                inv &&
+                !canMoveRentalInvoiceToOverallReport(inv)
+            ) {
+                const gate = getRentalInvoiceOverallReportStatus(inv);
+                toast.error(gate.message);
+                return;
+            }
 
             await axios.put(
                 `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-payment/${inv._id}`,

@@ -178,6 +178,28 @@ const enrichReportsWithEmployeeDetails = async (reports) => {
 };
 
 /** Match service/rental reports or gate passes by URL scope (exact type, not combined). */
+const OPERATIONAL_SERVICE_TYPES = [
+    "Service_Gate_Pass",
+    "Service_Delivery_Challan",
+    "Service_Returnable_Challan",
+];
+const OPERATIONAL_RENTAL_TYPES = [
+    "Rental_Gate_Pass",
+    "Rental_Delivery_Challan",
+    "Rental_Returnable_Challan",
+];
+
+/** Exact document scope: prefer reportType; allow legacy reportFor only when reportType is not another document. */
+const exactOperationalScope = (type, siblingTypes) => ({
+    $or: [
+        { reportType: type },
+        {
+            reportFor: type,
+            reportType: { $nin: siblingTypes.filter((t) => t !== type) },
+        },
+    ],
+});
+
 const buildReportScopeFilter = (urlScope) => {
     if (!urlScope) return null;
     const scope = String(urlScope);
@@ -188,55 +210,43 @@ const buildReportScopeFilter = (urlScope) => {
                 { reportType: "Service_Report" },
                 {
                     reportFor: { $in: ["service", "Service_Report"] },
-                    reportType: { $nin: ["Service_Gate_Pass", "Service_Delivery_Challan", "Service_Returnable_Challan"] },
+                    reportType: { $nin: OPERATIONAL_SERVICE_TYPES },
                 },
             ],
         },
-        Service_Gate_Pass: {
-            $or: [
-                { reportType: "Service_Gate_Pass" },
-                { reportFor: "Service_Gate_Pass" },
-            ],
-        },
-        Service_Delivery_Challan: {
-            $or: [
-                { reportType: "Service_Delivery_Challan" },
-                { reportFor: "Service_Delivery_Challan" },
-            ],
-        },
-        Service_Returnable_Challan: {
-            $or: [
-                { reportType: "Service_Returnable_Challan" },
-                { reportFor: "Service_Returnable_Challan" },
-            ],
-        },
+        Service_Gate_Pass: exactOperationalScope("Service_Gate_Pass", [
+            ...OPERATIONAL_SERVICE_TYPES,
+            "Service_Report",
+        ]),
+        Service_Delivery_Challan: exactOperationalScope("Service_Delivery_Challan", [
+            ...OPERATIONAL_SERVICE_TYPES,
+            "Service_Report",
+        ]),
+        Service_Returnable_Challan: exactOperationalScope("Service_Returnable_Challan", [
+            ...OPERATIONAL_SERVICE_TYPES,
+            "Service_Report",
+        ]),
         Rental_Report: {
             $or: [
                 { reportType: "Rental_Report" },
                 {
                     reportFor: { $in: ["rental", "Rental_Report"] },
-                    reportType: { $nin: ["Rental_Gate_Pass", "Rental_Delivery_Challan", "Rental_Returnable_Challan"] },
+                    reportType: { $nin: OPERATIONAL_RENTAL_TYPES },
                 },
             ],
         },
-        Rental_Gate_Pass: {
-            $or: [
-                { reportType: "Rental_Gate_Pass" },
-                { reportFor: "Rental_Gate_Pass" },
-            ],
-        },
-        Rental_Delivery_Challan: {
-            $or: [
-                { reportType: "Rental_Delivery_Challan" },
-                { reportFor: "Rental_Delivery_Challan" },
-            ],
-        },
-        Rental_Returnable_Challan: {
-            $or: [
-                { reportType: "Rental_Returnable_Challan" },
-                { reportFor: "Rental_Returnable_Challan" },
-            ],
-        },
+        Rental_Gate_Pass: exactOperationalScope("Rental_Gate_Pass", [
+            ...OPERATIONAL_RENTAL_TYPES,
+            "Rental_Report",
+        ]),
+        Rental_Delivery_Challan: exactOperationalScope("Rental_Delivery_Challan", [
+            ...OPERATIONAL_RENTAL_TYPES,
+            "Rental_Report",
+        ]),
+        Rental_Returnable_Challan: exactOperationalScope("Rental_Returnable_Challan", [
+            ...OPERATIONAL_RENTAL_TYPES,
+            "Rental_Report",
+        ]),
     };
 
     if (exactScopeFilters[scope]) {
@@ -247,16 +257,16 @@ const buildReportScopeFilter = (urlScope) => {
     if (lower === "service") {
         return {
             $or: [
-                { reportFor: { $in: ["service", "Service_Report", "Service_Gate_Pass"] } },
-                { reportType: { $in: ["Service_Report", "Service_Gate_Pass"] } },
+                { reportFor: { $in: ["service", "Service_Report"] } },
+                { reportType: "Service_Report" },
             ],
         };
     }
     if (lower === "rental") {
         return {
             $or: [
-                { reportFor: { $in: ["rental", "Rental_Report", "Rental_Gate_Pass"] } },
-                { reportType: { $in: ["Rental_Report", "Rental_Gate_Pass"] } },
+                { reportFor: { $in: ["rental", "Rental_Report"] } },
+                { reportType: "Rental_Report" },
             ],
         };
     }

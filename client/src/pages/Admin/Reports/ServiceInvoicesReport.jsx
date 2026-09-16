@@ -616,9 +616,12 @@ const ServiceInvoicesReport = (props) => {
                 const response = await axios.post(
                     `${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/all`,
                     {
-                        companyId: invoice?.companyId,
+                        companyId: invoice?.companyId?._id || invoice?.companyId,
+                        invoiceType: 'invoice',
                         tdsAmount: { $eq: null },
                         status: { $ne: 'Paid' },
+                        page: 1,
+                        limit: 10000,
                     },
                     { headers: { Authorization: auth.token } }
                 );
@@ -679,9 +682,12 @@ const ServiceInvoicesReport = (props) => {
                     const response = await axios.post(
                         `${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/all`,
                         {
-                            companyId: paymentInvoice?.companyId,
+                            companyId: paymentInvoice?.companyId?._id || paymentInvoice?.companyId,
+                            invoiceType: 'invoice',
                             tdsAmount: { $eq: null },
                             status: { $ne: 'Paid' },
+                            page: 1,
+                            limit: 10000,
                         },
                         { headers: { Authorization: auth.token } }
                     );

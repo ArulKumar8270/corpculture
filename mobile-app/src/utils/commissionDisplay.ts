@@ -1,3 +1,27 @@
+type CommissionFrom = 'Sales' | 'Service' | 'Rental';
+
+export const isCompanyBasedCommission = (commissionFrom: CommissionFrom | string) =>
+  commissionFrom === 'Service' || commissionFrom === 'Rental';
+
+export const getCommissionGroupKey = (commission: any, commissionFrom: CommissionFrom | string) => {
+  if (isCompanyBasedCommission(commissionFrom)) {
+    return (
+      commission?.companyId?.companyName ||
+      (typeof commission?.companyId === 'string' ? commission.companyId : null) ||
+      'Unassigned'
+    );
+  }
+
+  const userId = commission?.userId;
+  if (typeof userId === 'object') {
+    return userId?.name || 'Unassigned';
+  }
+  return userId || 'Unassigned';
+};
+
+export const getCommissionGroupLabel = (commissionFrom: CommissionFrom | string) =>
+  isCompanyBasedCommission(commissionFrom) ? 'Company' : 'User';
+
 export const formatCommissionAmount = (amount: unknown) =>
   `₹${Number(amount || 0).toLocaleString('en-IN', {
     minimumFractionDigits: 2,

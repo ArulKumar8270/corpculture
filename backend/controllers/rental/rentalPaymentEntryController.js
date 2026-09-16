@@ -12,6 +12,10 @@ import {
     isQuotationType,
     reserveNextInvoiceNumber,
 } from "../../utils/invoiceConversionUtil.js";
+import {
+    canMoveRentalInvoiceToOverallReport,
+    getRentalInvoiceOverallReportStatus,
+} from "../../utils/rentalQuotationMoveGate.js";
 
 /** Unpaid rental invoices for a company (excludes Paid, Cancelled, quotations, TDS rows). */
 const buildCompanyUnpaidInvoiceFilter = (companyId) => ({
@@ -881,6 +885,22 @@ export const updateRentalPaymentEntry = async (req, res) => {
         const wasQuotation = isQuotationType(entry.invoiceType);
         const wantsInvoice = isInvoiceType(invoiceType);
         const isMovingToInvoice = wantsInvoice && wasQuotation;
+
+        // Invoice → overall report (Paid) only when upload, sent, and signed copy are complete
+        const nextStatus = status != null ? status : entry.status;
+        const becomingPaid =
+            String(nextStatus) === "Paid" && String(entry.status) !== "Paid";
+        const isInvoiceRecord = isInvoiceType(invoiceType || entry.invoiceType);
+        if (becomingPaid && isInvoiceRecord && !canMoveRentalInvoiceToOverallReport(entry)) {
+            const gate = getRentalInvoiceOverallReportStatus(entry);
+            return res.status(400).send({
+                success: false,
+                message:
+                    gate.message ||
+                    "Complete all invoice statuses before moving to overall report.",
+                missingStatuses: gate.missing,
+            });
+        }
 
         // Generate invoice number when converting quotation -> invoice (atomic global count)
         let finalInvoiceNumber = invoiceNumber;

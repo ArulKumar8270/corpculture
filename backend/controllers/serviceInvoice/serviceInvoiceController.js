@@ -23,6 +23,37 @@ const buildCompanyUnpaidInvoiceFilter = (companyId) => ({
     status: "Unpaid",
 });
 
+/** Shared populate so list + get-by-id return the same product/GST/company shape. */
+const applyServiceInvoicePopulates = (query) =>
+    query
+        .populate("companyId")
+        .populate({
+            path: "products.productId",
+            populate: [
+                { path: "gstType" },
+                { path: "productName" },
+            ],
+        })
+        .populate({
+            path: "products.productName",
+            model: "Material",
+            select: "name unit description",
+        })
+        .populate("assignedTo")
+        .populate("serviceId", "serviceTitle");
+
+/** Match get-by-id: expand sendTo emails into contact objects using company.contactPersons. */
+const formatServiceInvoicePayload = (invoice) => {
+    if (!invoice) return invoice;
+    const payload =
+        typeof invoice.toObject === "function" ? invoice.toObject() : { ...invoice };
+    payload.sendTo = enrichSendTo(
+        payload.sendTo,
+        payload.companyId?.contactPersons
+    );
+    return payload;
+};
+
 const calculateInvoiceTotals = (products) => {
     let subtotal = 0;
     for (const item of products) {
@@ -272,21 +303,9 @@ export const createServiceInvoice = async (req, res) => {
         }
 
         // Fetch the newly created invoice and populate necessary fields
-        const populatedInvoice = await ServiceInvoice.findById(newServiceInvoice._id)
-            .populate('companyId') // Populate company details
-            .populate({
-                path: 'products.productId', // Populate product details
-                populate: [
-                    {
-                        path: 'gstType',        // Then populate gstType inside the product
-                    },
-                    {
-                        path: 'productName',    // Populate productName (Material) inside the product
-                        // Material model doesn't have nested productName, so no further populate needed
-                    }
-                ]
-            })
-            .populate('assignedTo'); // Populate assignedTo user details
+        const populatedInvoice = await applyServiceInvoicePopulates(
+            ServiceInvoice.findById(newServiceInvoice._id)
+        );
 
         if (req.user?._id && populatedInvoice.invoiceType !== 'quotation') {
             try {
@@ -299,7 +318,11 @@ export const createServiceInvoice = async (req, res) => {
             }
         }
 
-        res.status(201).send({ success: true, message: 'Service Invoice created successfully', serviceInvoice: populatedInvoice });
+        res.status(201).send({
+            success: true,
+            message: 'Service Invoice created successfully',
+            serviceInvoice: formatServiceInvoicePayload(populatedInvoice),
+        });
 
     } catch (error) {
         console.error("Error in createServiceInvoice:", error);
@@ -384,31 +407,21 @@ export const getAllServiceInvoices = async (req, res) => {
         // Get total count of documents matching the query (before pagination)
         const totalCount = await ServiceInvoice.countDocuments(filter).setOptions(options);
 
-        const serviceInvoices = await ServiceInvoice.find(filter)
-            .setOptions(options)
-            .populate({
-                path: "products.productId",
-                populate: [
-                    {
-                        path: "gstType", // populate gstType inside productId
-                    },
-                    {
-                        path: "productName", // populate productName (Material) inside productId
-                        // Material model doesn't have nested productName, so no further populate needed
-                    },
-                ],
-            })
-            .populate('companyId')
-            .populate('assignedTo')
-            .populate('serviceId', 'serviceTitle') // include service title for invoice list
+        const serviceInvoices = await applyServiceInvoicePopulates(
+            ServiceInvoice.find(filter).setOptions(options)
+        )
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(limit);
 
+        const formattedInvoices = mapWithRecordStatus(serviceInvoices).map((invoice) =>
+            formatServiceInvoicePayload(invoice)
+        );
+
         res.status(200).send({
             success: true,
             message: 'All service invoices fetched',
-            serviceInvoices: mapWithRecordStatus(serviceInvoices),
+            serviceInvoices: formattedInvoices,
             totalCount // Send total count for frontend pagination
         });
     } catch (error) {
@@ -439,27 +452,17 @@ export const getServiceInvoicesAssignedTo = async (req, res) => {
                 tdsAmount: { $eq: null },
             };
         }
-        const serviceInvoices = await ServiceInvoice.find(query)
-            .populate('companyId') // Populate company name
-            .populate({
-                path: "products.productId",
-                populate: [
-                    {
-                        path: "gstType", // populate gstType inside productId
-                    },
-                    {
-                        path: "productName", // populate productName (Material) inside productId
-                        // Material model doesn't have nested productName, so no further populate needed
-                    },
-                ],
-            })
-            .populate('assignedTo') // Populate product details
-            .populate('serviceId', 'serviceTitle') // include service title for invoice list
-            .sort({ createdAt: -1 }); // Find services by phone number
+        const serviceInvoices = await applyServiceInvoicePopulates(
+            ServiceInvoice.find(query)
+        ).sort({ createdAt: -1 }); // Find services by phone number
+
+        const formattedInvoices = (serviceInvoices || []).map((invoice) =>
+            formatServiceInvoicePayload(invoice)
+        );
 
         res.status(200).send({
             success: true,
-            serviceInvoices: serviceInvoices || [],
+            serviceInvoices: formattedInvoices,
         });
     } catch (error) {
         console.error("Error in getting ServiceInvoice by phone:", error); // Log the error
@@ -475,30 +478,14 @@ export const getServiceInvoicesAssignedTo = async (req, res) => {
 export const getServiceInvoiceById = async (req, res) => {
     try {
         const { id } = req.params;
-        const serviceInvoice = await ServiceInvoice.findById(id)
-            .populate('companyId') // Populate company name
-            .populate({
-                path: "products.productId",
-                populate: [
-                    {
-                        path: "gstType", // populate gstType inside productId
-                    },
-                    {
-                        path: "productName", // populate productName (Material) inside productId
-                        // Material model doesn't have nested productName, so no further populate needed
-                    },
-                ],
-            })
-            .populate('assignedTo') // Populate product details
+        const serviceInvoice = await applyServiceInvoicePopulates(
+            ServiceInvoice.findById(id)
+        );
         if (!serviceInvoice) {
             return res.status(404).send({ success: false, message: 'Service Invoice not found.' });
         }
 
-        const invoicePayload = serviceInvoice.toObject();
-        invoicePayload.sendTo = enrichSendTo(
-            invoicePayload.sendTo,
-            invoicePayload.companyId?.contactPersons
-        );
+        const invoicePayload = formatServiceInvoicePayload(serviceInvoice);
 
         const companyId =
             serviceInvoice.companyId?._id ?? serviceInvoice.companyId;
@@ -796,20 +783,10 @@ export const updateServiceInvoice = async (req, res) => {
             console.log(`[Material Reduction] Skipping - isMovingToInvoice: ${isMovingToInvoice}, products length: ${serviceInvoice.products?.length || 0}`);
         }
 
-        // Populate the products field after saving
-        // This will replace the `productName` ID with the actual document
-        const updatedInvoice = await serviceInvoice.populate({
-            path: "products.productId",
-            populate: [
-                {
-                    path: "gstType", // populate gstType inside productId
-                },
-                {
-                    path: "productName", // populate productName (Material) inside productId
-                    // Material model doesn't have nested productName, so no further populate needed
-                },
-            ],
-        });
+        // Re-fetch with full populate so response matches get/list (GST, products, sendTo)
+        const updatedInvoice = await applyServiceInvoicePopulates(
+            ServiceInvoice.findById(serviceInvoice._id)
+        );
 
         if (req.user?._id && updatedInvoice.invoiceType !== 'quotation') {
             try {
@@ -825,7 +802,7 @@ export const updateServiceInvoice = async (req, res) => {
         res.status(200).send({
             success: true,
             message: 'Service Invoice updated successfully',
-            serviceInvoice: updatedInvoice // Send the populated invoice
+            serviceInvoice: formatServiceInvoicePayload(updatedInvoice),
         });
 
     } catch (error) {

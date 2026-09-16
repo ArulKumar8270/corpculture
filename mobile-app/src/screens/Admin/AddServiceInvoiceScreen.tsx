@@ -61,6 +61,7 @@ const AddServiceInvoiceScreen = () => {
   const paramCompanyName =
     typeof params?.companyName === 'string' ? params.companyName.trim() : '';
   const initialCompanyId = companyIdFromParams;
+  const isEmployee = Number(user?.role) === 3;
 
   const [invoiceData, setInvoiceData] = useState({
     companyId: initialCompanyId,
@@ -679,7 +680,9 @@ const AddServiceInvoiceScreen = () => {
         if (!invoiceId && invoiceType !== 'quotation') {
           // Invoice count is now incremented automatically by the backend
           // await updateInvoiceCount();
-          await updateEmployeeBenefit(response.data.serviceInvoice);
+          if (isEmployee) {
+            await updateEmployeeBenefit(response.data.serviceInvoice);
+          }
           await updateMaterialData();
         }
         await updateCommissionDetails(response.data.serviceInvoice);
@@ -794,16 +797,28 @@ const AddServiceInvoiceScreen = () => {
     }
   };
 
+  const hasMyBenefitsValues = (product: ProductInTable) => {
+    const hasBenefitQty =
+      product.benefitQuantity != null && Number(product.benefitQuantity) > 0;
+    const hasRework = product.reInstall === true;
+    const hasOtherProducts =
+      product.otherProducts != null && String(product.otherProducts).trim() !== '';
+    return hasBenefitQty || hasRework || hasOtherProducts;
+  };
+
   const resolveBenefitQuantity = (product: ProductInTable) => {
-    if (product.benefitQuantity != null) {
-      return Number(product.benefitQuantity);
+    if (product.benefitQuantity != null && product.benefitQuantity !== ('' as any)) {
+      return Number(product.benefitQuantity) || 0;
     }
-    return Number(product.quantity || 0);
+    return 0;
   };
 
   const updateEmployeeBenefit = async (invoice: any) => {
     try {
-      for (const product of productsInTable) {
+      const benefitProducts = productsInTable.filter(hasMyBenefitsValues);
+      if (!benefitProducts.length) return;
+
+      for (const product of benefitProducts) {
         await axios.post(
           `${getApiBaseUrl()}/employee-benefits`,
           {
@@ -950,8 +965,8 @@ const AddServiceInvoiceScreen = () => {
             )}
           </TouchableOpacity>
 
-          {/* Rework, Other Product, Benefit Quantity Fields */}
-          {invoiceData.productId && (
+          {/* Rework, Other Product, Benefit Quantity Fields — employee login only */}
+          {isEmployee && invoiceData.productId && (
             <View style={styles.productOptions}>
               <View style={styles.optionRow}>
                 <Text style={styles.optionLabel}>Rework:</Text>

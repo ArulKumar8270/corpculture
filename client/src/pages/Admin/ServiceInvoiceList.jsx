@@ -79,6 +79,7 @@ function InvoiceRow(props) {
     const [loading, setLoading] = useState(false);
     const [deletingLink, setDeletingLink] = useState(false); // New state for link deletion loading
     const [companyPendingInvoice, setCompanyPendingInvoice] = useState([])
+    const [loadingPendingInvoices, setLoadingPendingInvoices] = useState(false)
     const [selectedInvoiceIds, setSelectedInvoiceIds] = useState([]) // multi-select: invoice IDs to allocate balance to
     const [balanceAmount, setBalanceAmount] = useState(0)
     const [pendingAmount, setPendingAmount] = useState(0)
@@ -283,24 +284,36 @@ function InvoiceRow(props) {
             setPendingAmount(grand - initialPay);
             setBalanceAmount(0);
             setCompanyPendingInvoice([]);
+            setLoadingPendingInvoices(false);
         } else if (initialPay > grand) {
             setBalanceAmount(initialPay - grand);
             setPendingAmount(0);
             try {
+                setLoadingPendingInvoices(true);
                 const response = await axios.post(
                     `${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/all`,
-                    { companyId: invoice?.companyId, tdsAmount: { $eq: null }, status: { $ne: 'Paid' } },
+                    {
+                        companyId: invoice?.companyId?._id || invoice?.companyId,
+                        invoiceType: 'invoice',
+                        tdsAmount: { $eq: null },
+                        status: { $ne: 'Paid' },
+                        page: 1,
+                        limit: 10000,
+                    },
                     { headers: { Authorization: auth.token } }
                 );
                 setCompanyPendingInvoice(response.data?.serviceInvoices || []);
             } catch (err) {
                 console.log(err, 'Api error');
                 setCompanyPendingInvoice([]);
+            } finally {
+                setLoadingPendingInvoices(false);
             }
         } else {
             setPendingAmount(0);
             setBalanceAmount(0);
             setCompanyPendingInvoice([]);
+            setLoadingPendingInvoices(false);
         }
 
         setPaymentForm({
@@ -359,23 +372,35 @@ function InvoiceRow(props) {
                 setPendingAmount(balanceAmount)
                 setBalanceAmount(0)
                 setCompanyPendingInvoice([])
+                setLoadingPendingInvoices(false)
             } else {
                 let balanceAmount = numVal - grand;
                 setBalanceAmount(balanceAmount)
                 setPendingAmount(0)
                 try {
+                    setLoadingPendingInvoices(true)
                     let response = await axios.post(
                         `${import.meta.env.VITE_SERVER_URL}/api/v1/service-invoice/all`,
-                        { companyId: invoice?.companyId, tdsAmount: { $eq: null }, status: { $ne: "Paid" } }, // Send invoiceType in the request body
+                        {
+                            companyId: invoice?.companyId?._id || invoice?.companyId,
+                            invoiceType: 'invoice',
+                            tdsAmount: { $eq: null },
+                            status: { $ne: "Paid" },
+                            page: 1,
+                            limit: 10000,
+                        },
                         {
                             headers: {
                                 Authorization: auth.token,
                             },
                         }
                     );
-                    setCompanyPendingInvoice(response.data?.serviceInvoices)
+                    setCompanyPendingInvoice(response.data?.serviceInvoices || [])
                 } catch (err) {
                     console.log(err, "Api error")
+                    setCompanyPendingInvoice([])
+                } finally {
+                    setLoadingPendingInvoices(false)
                 }
             }
 
@@ -1244,49 +1269,64 @@ function InvoiceRow(props) {
                         size="small"
                     />
 
-                    {companyPendingInvoice?.length > 0 && balanceAmount > 0 && (
+                    {(loadingPendingInvoices || (companyPendingInvoice?.length > 0 && balanceAmount > 0)) && (
                         <>
-                            <p>Previous Invoice Balance - Rs {balanceAmount.toFixed(2)}</p>
-                            <p><strong>Allocated to selected invoices - Rs {selectedAllocatedTotal.toFixed(2)}</strong></p>
-                            {remainingToAllocate > 0 && (
-                                <p style={{ color: '#666' }}>Remaining to allocate - Rs {remainingToAllocate.toFixed(2)} (select more invoices so total equals balance)</p>
-                            )}
-                            {remainingToAllocate === 0 && selectedInvoiceIds.length > 0 && (
-                                <p style={{ color: 'green' }}>Amount fully allocated.</p>
+                            {balanceAmount > 0 && (
+                                <>
+                                    <p>Previous Invoice Balance - Rs {balanceAmount.toFixed(2)}</p>
+                                    {!loadingPendingInvoices && (
+                                        <>
+                                            <p><strong>Allocated to selected invoices - Rs {selectedAllocatedTotal.toFixed(2)}</strong></p>
+                                            {remainingToAllocate > 0 && (
+                                                <p style={{ color: '#666' }}>Remaining to allocate - Rs {remainingToAllocate.toFixed(2)} (select more invoices so total equals balance)</p>
+                                            )}
+                                            {remainingToAllocate === 0 && selectedInvoiceIds.length > 0 && (
+                                                <p style={{ color: 'green' }}>Amount fully allocated.</p>
+                                            )}
+                                        </>
+                                    )}
+                                </>
                             )}
                             <FormControl fullWidth margin="normal" size="small">
                                 <InputLabel id="select-pending-invoices-label" shrink>Select Pending Invoices</InputLabel>
-                                <Box sx={{ mt: 1, maxHeight: 220, overflow: 'auto', border: '1px solid #ccc', borderRadius: 1, p: 1 }}>
-                                    {companyPendingInvoice
-                                        ?.filter((pendingInv) => pendingInv._id !== invoice._id)
-                                        .map((pendingInv) => {
-                                            const invAmount = Number(pendingInv?.grandTotal || 0);
-                                            const canSelect = invAmount <= remainingToAllocate || selectedInvoiceIds.includes(pendingInv._id);
-                                            return (
-                                                <Box
-                                                    key={pendingInv._id}
-                                                    onClick={() => canSelect && togglePendingInvoiceSelection(pendingInv)}
-                                                    sx={{
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        gap: 1,
-                                                        py: 0.5,
-                                                        px: 1,
-                                                        cursor: canSelect ? 'pointer' : 'not-allowed',
-                                                        bgcolor: selectedInvoiceIds.includes(pendingInv._id) ? 'action.selected' : 'transparent',
-                                                        borderRadius: 1,
-                                                    }}
-                                                >
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={selectedInvoiceIds.includes(pendingInv._id)}
-                                                        onChange={() => {}}
-                                                        disabled={!canSelect}
-                                                    />
-                                                    <span>{new Date(pendingInv.invoiceDate).toLocaleDateString()} - Rs {pendingInv?.grandTotal}</span>
-                                                </Box>
-                                            );
-                                        })}
+                                <Box sx={{ mt: 1, maxHeight: 220, overflow: 'auto', border: '1px solid #ccc', borderRadius: 1, p: 1, minHeight: 56 }}>
+                                    {loadingPendingInvoices ? (
+                                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, py: 2 }}>
+                                            <CircularProgress size={22} />
+                                            <Typography variant="body2" color="text.secondary">Loading pending invoices...</Typography>
+                                        </Box>
+                                    ) : (
+                                        companyPendingInvoice
+                                            ?.filter((pendingInv) => pendingInv._id !== invoice._id)
+                                            .map((pendingInv) => {
+                                                const invAmount = Number(pendingInv?.grandTotal || 0);
+                                                const canSelect = invAmount <= remainingToAllocate || selectedInvoiceIds.includes(pendingInv._id);
+                                                return (
+                                                    <Box
+                                                        key={pendingInv._id}
+                                                        onClick={() => canSelect && togglePendingInvoiceSelection(pendingInv)}
+                                                        sx={{
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: 1,
+                                                            py: 0.5,
+                                                            px: 1,
+                                                            cursor: canSelect ? 'pointer' : 'not-allowed',
+                                                            bgcolor: selectedInvoiceIds.includes(pendingInv._id) ? 'action.selected' : 'transparent',
+                                                            borderRadius: 1,
+                                                        }}
+                                                    >
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={selectedInvoiceIds.includes(pendingInv._id)}
+                                                            onChange={() => {}}
+                                                            disabled={!canSelect}
+                                                        />
+                                                        <span>{new Date(pendingInv.invoiceDate).toLocaleDateString()} - Rs {pendingInv?.grandTotal}</span>
+                                                    </Box>
+                                                );
+                                            })
+                                    )}
                                 </Box>
                             </FormControl>
                         </>

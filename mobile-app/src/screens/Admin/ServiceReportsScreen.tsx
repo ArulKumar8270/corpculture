@@ -105,7 +105,11 @@ const ServiceReportsScreen = () => {
         });
 
         if (response.data?.success) {
-          setReports(response.data.reports || []);
+          const rows = response.data.reports || [];
+          const filtered = isOperationalDocumentReportType(reportTypeKey)
+            ? rows.filter((r: any) => r?.reportType === reportTypeKey)
+            : rows;
+          setReports(filtered);
           setTotalCount(response.data.totalCount || 0);
         } else {
           setReports([]);
