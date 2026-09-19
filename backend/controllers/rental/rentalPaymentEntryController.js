@@ -16,6 +16,7 @@ import {
     canMoveRentalInvoiceToOverallReport,
     getRentalInvoiceOverallReportStatus,
 } from "../../utils/rentalQuotationMoveGate.js";
+import { applyCompanyIdFilter } from "../../utils/mongoFilterUtils.js";
 
 /** Unpaid rental invoices for a company (excludes Paid, Cancelled, quotations, TDS rows). */
 const buildCompanyUnpaidInvoiceFilter = (companyId) => ({
@@ -576,6 +577,7 @@ export const getAllRentalPaymentEntries = async (req, res) => {
             fromDate,
             toDate,
             companyName,
+            companyId,
             invoiceNumber,
             paymentStatus, // This will map to 'status' in the schema
             invoiceType, // Assuming this can also be a filter
@@ -600,6 +602,18 @@ export const getAllRentalPaymentEntries = async (req, res) => {
         // Map paymentStatus to schema's 'status' field
         if (paymentStatus) {
             query.status = paymentStatus;
+        }
+
+        // Handle companyId (plain id, { $eq }, { $in }, { _id }) — cast to ObjectId
+        if (companyId != null && companyId !== '') {
+            if (!applyCompanyIdFilter(query, companyId)) {
+                return res.status(200).send({
+                    success: true,
+                    message: 'No rental invoices found for the specified company.',
+                    entries: [],
+                    totalCount: 0,
+                });
+            }
         }
 
         // Handle companyName filter
@@ -627,15 +641,17 @@ export const getAllRentalPaymentEntries = async (req, res) => {
             }
         }
 
-        // Add any other direct filters from req.body
+        // Add any other direct filters from req.body (skip companyId — already normalized)
         for (const key in otherFilters) {
-            if (otherFilters.hasOwnProperty(key)) {
-                query[key] = otherFilters[key];
-            }
+            if (!Object.prototype.hasOwnProperty.call(otherFilters, key)) continue;
+            if (key === 'companyId') continue;
+            query[key] = otherFilters[key];
         }
 
         // Calculate skip value for pagination
-        const skip = (page - 1) * limit;
+        const pageNum = Math.max(1, parseInt(page, 10) || 1);
+        const limitNum = Math.max(1, parseInt(limit, 10) || 10);
+        const skip = (pageNum - 1) * limitNum;
 
         // Get total count of documents matching the query (before pagination)
         const totalCount = await RentalPaymentEntry.countDocuments(query);
@@ -658,7 +674,7 @@ export const getAllRentalPaymentEntries = async (req, res) => {
             .populate('rentalId', 'rentalTitle rentalType') // For reports / GSTR-style export labels
             .sort({ createdAt: -1 })
             .skip(skip)
-            .limit(limit);
+            .limit(limitNum);
 
         res.status(200).send({
             success: true,

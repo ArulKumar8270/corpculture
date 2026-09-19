@@ -1,8 +1,11 @@
 const DEFAULT_ORIGINS = [
     "https://corpculture.in",
+    "https://www.corpculture.in",
     "http://localhost:5173",
     "http://localhost:3000",
     "http://127.0.0.1:5173",
+    "http://10.158.211.147:5173",
+    "http://10.158.211.147",
 ];
 
 /** Allowed frontend origins for CORS and payment redirect validation. */
