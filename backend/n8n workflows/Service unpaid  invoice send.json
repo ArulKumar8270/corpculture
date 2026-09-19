@@ -6,7 +6,7 @@
         "url": "https://app.corpculture.tech/api/v1/service-invoice/all",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n    \"invoiceType\": \"invoice\",\n    \"tdsAmount\": {\n        \"$eq\": null\n    },\n    \"status\": {\n        \"$ne\": \"Paid\"\n    },\n   \"companyId\" : {\n       \"$eq\" : \"{{ $json.companyId._id }}\"\n   }\n}",
+        "jsonBody": "={{ {\n    invoiceType: \"invoice\",\n    status: { $ne: \"Paid\" },\n    companyId: { $eq: $json.companyId?._id || $json.companyId },\n    unpaidServiceInvoices: $json.unpaidServiceInvoices || [],\n    limit: 10000\n} }}",
         "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",

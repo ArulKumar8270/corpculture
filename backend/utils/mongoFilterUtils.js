@@ -42,6 +42,22 @@ export function normalizeCompanyIdFilter(companyId) {
 }
 
 /**
+ * Normalize a list of ids from:
+ * - ["...", ...]
+ * - [{ _id: "..." }, ...]
+ * - { $in: ["...", ...] }
+ */
+export function toObjectIdList(value) {
+    if (value == null || value === "") return [];
+    const arr = Array.isArray(value)
+        ? value
+        : Array.isArray(value.$in)
+            ? value.$in
+            : [value];
+    return arr.map((item) => toObjectId(item)).filter(Boolean);
+}
+
+/**
  * Apply normalized companyId onto a query object (mutates query).
  * Returns false if companyId was provided but invalid (caller should return empty list).
  */

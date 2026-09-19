@@ -14,7 +14,7 @@ import {
     isQuotationType,
     reserveNextInvoiceNumber,
 } from "../../utils/invoiceConversionUtil.js";
-import { applyCompanyIdFilter } from "../../utils/mongoFilterUtils.js";
+import { applyCompanyIdFilter, toObjectIdList } from "../../utils/mongoFilterUtils.js";
 
 /** Unpaid service invoices for a company (excludes Paid, Cancelled, quotations, TDS rows). */
 const buildCompanyUnpaidInvoiceFilter = (companyId) => ({
@@ -342,9 +342,10 @@ export const getAllServiceInvoices = async (req, res) => {
             invoiceNumber,
             paymentStatus, // This will map to 'status' in the schema
             invoiceType, // Assuming this can also be a filter
-            page = 1, // Default to page 1
-            limit = 10, // Default to 10 items per page
+            page,
+            limit,
             status, // Add status filter
+            unpaidServiceInvoices,
             ...otherFilters // Catch any other direct filters
         } = req.body;
 
@@ -354,8 +355,8 @@ export const getAllServiceInvoices = async (req, res) => {
             query.status = status;
         }
         // Add invoiceType filter if provided (case-insensitive for legacy data)
-        if (invoiceType) {
-            query.invoiceType = { $regex: new RegExp(`^${String(invoiceType).trim()}$`, "i") };
+        if (typeof invoiceType === "string" && invoiceType.trim()) {
+            query.invoiceType = { $regex: `^${invoiceType.trim()}$`, $options: "i" };
         }
 
         // Add invoiceNumber filter if provided
@@ -406,16 +407,54 @@ export const getAllServiceInvoices = async (req, res) => {
             }
         }
 
-        // Add any other direct filters from req.body (skip companyId — already normalized)
+        // Reminder flow: fetch the exact unpaid invoices already resolved for the company
+        const unpaidInvoiceIds = toObjectIdList(unpaidServiceInvoices);
+        if (unpaidInvoiceIds.length) {
+            query._id = { $in: unpaidInvoiceIds };
+        } else if (otherFilters._id != null) {
+            const explicitIds = toObjectIdList(otherFilters._id);
+            if (Array.isArray(otherFilters._id?.$in) && !explicitIds.length) {
+                return res.status(200).send({
+                    success: true,
+                    message: 'All service invoices fetched',
+                    serviceInvoices: [],
+                    totalCount: 0,
+                });
+            }
+            if (explicitIds.length === 1 && !otherFilters._id?.$in) {
+                query._id = explicitIds[0];
+            } else if (explicitIds.length) {
+                query._id = { $in: explicitIds };
+            }
+        }
+
+        // Only apply known schema fields. Remainder payloads include extra keys
+        // (remainderMail, unpaidServiceInvoices, etc.) that would otherwise match 0 invoices.
+        const schemaPaths = ServiceInvoice.schema.paths;
+        const skipFilterKeys = new Set([
+            'companyId',
+            '_id',
+            'unpaidServiceInvoices',
+            'unpaidRentalInvoices',
+            'remainderType',
+            'remainderMail',
+            'ccMails',
+            'remainderDates',
+            '__v',
+        ]);
         for (const key in otherFilters) {
             if (!Object.prototype.hasOwnProperty.call(otherFilters, key)) continue;
-            if (key === 'companyId') continue;
+            if (skipFilterKeys.has(key)) continue;
+            if (!schemaPaths[key]) continue;
+            // Remainder already selected unpaid invoices; don't drop TDS-unpaid rows.
+            if (unpaidInvoiceIds.length && key === 'tdsAmount') continue;
             query[key] = otherFilters[key];
         }
 
-        // Calculate skip value for pagination
+        // n8n / automations omit limit; admin UI always sends one. Default high enough to return all matches.
         const pageNum = Math.max(1, parseInt(page, 10) || 1);
-        const limitNum = Math.max(1, parseInt(limit, 10) || 10);
+        const hasExplicitLimit = limit !== undefined && limit !== null && limit !== '';
+        const limitNum = hasExplicitLimit ? Math.max(1, parseInt(limit, 10) || 10) : 10000;
         const skip = (pageNum - 1) * limitNum;
 
         const { filter, options } = getTrashListQuery(req, query);

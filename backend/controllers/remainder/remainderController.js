@@ -296,17 +296,21 @@ export const getRemaindersByTodayDate = async (req, res) => {
             remainders.map(async (remainder) => {
                 const companyObjectId = remainder.companyId?._id || remainder.companyId;
 
-                const unpaidServiceInvoices = await ServiceInvoice.find({
+                const unpaidInvoiceQuery = {
                     companyId: companyObjectId,
                     status: "Unpaid",
-                    invoiceType: "invoice"
-                }, { _id: 1 });
+                    invoiceType: { $regex: /^invoice$/i },
+                };
 
-                const unpaidRentalInvoices = await RentalPaymentEntry.find({
-                    companyId: companyObjectId,
-                    status: "Unpaid",
-                    invoiceType: "invoice"
-                }, { _id: 1 });
+                const unpaidServiceInvoices = await ServiceInvoice.find(
+                    unpaidInvoiceQuery,
+                    { _id: 1 }
+                );
+
+                const unpaidRentalInvoices = await RentalPaymentEntry.find(
+                    unpaidInvoiceQuery,
+                    { _id: 1 }
+                );
 
                 return {
                     ...remainder.toObject(),
