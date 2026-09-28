@@ -266,71 +266,121 @@ export const restoreRemainder = async (req, res) => {
     }
 };
 
+const unpaidInvoiceQueryForCompany = (companyObjectId) => ({
+    companyId: companyObjectId,
+    status: "Unpaid",
+    invoiceType: { $regex: /^invoice$/i },
+});
+
+const findRemaindersDueToday = async (req, remainderType) => {
+    const dayOfMonth = parseDayOfMonth(req);
+    const query = {
+        remainderDates: { $in: [dayOfMonth] },
+    };
+    if (remainderType) {
+        query.remainderType = remainderType;
+    }
+    return Remainder.find(query)
+        .populate("companyId", "_id")
+        .sort({ createdAt: -1 });
+};
+
+const mapRemaindersWithUnpaidInvoices = async (remainders, invoiceKind) => {
+    return Promise.all(
+        remainders.map(async (remainder) => {
+            const companyObjectId = remainder.companyId?._id || remainder.companyId;
+            const unpaidInvoiceQuery = unpaidInvoiceQueryForCompany(companyObjectId);
+            const result = { ...remainder.toObject() };
+
+            if (invoiceKind === "service" || invoiceKind === "both") {
+                result.unpaidServiceInvoices = await ServiceInvoice.find(
+                    unpaidInvoiceQuery,
+                    { _id: 1 }
+                );
+            }
+            if (invoiceKind === "rental" || invoiceKind === "both") {
+                result.unpaidRentalInvoices = await RentalPaymentEntry.find(
+                    unpaidInvoiceQuery,
+                    { _id: 1 }
+                );
+            }
+
+            return result;
+        })
+    );
+};
+
+const sendTodayRemainders = async (req, res, { remainderType, invoiceKind, emptyMessage, successMessage }) => {
+    const remainders = await findRemaindersDueToday(req, remainderType);
+    if (!remainders || remainders.length === 0) {
+        return res.status(404).send({
+            success: false,
+            message: emptyMessage,
+        });
+    }
+
+    const remaindersWithInvoices = await mapRemaindersWithUnpaidInvoices(remainders, invoiceKind);
+    return res.status(200).send({
+        success: true,
+        message: successMessage,
+        remainders: remaindersWithInvoices,
+    });
+};
+
 // Get remainders by today's date (or a payload date in IST)
 export const getRemaindersByTodayDate = async (req, res) => {
     try {
-        const dayOfMonth = parseDayOfMonth(req);
         const remainderType = req.query.remainderType || req.body?.remainderType;
-
-        const query = {
-            remainderDates: { $in: [dayOfMonth] }
-        };
-
-        if (remainderType) {
-            query.remainderType = remainderType;
-        }
-
-        // Match remainders by date only (day of month), ignore time
-        const remainders = await Remainder.find(query)
-            .populate('companyId', '_id')
-            .sort({ createdAt: -1 });
-
-        if (!remainders || remainders.length === 0) {
-            return res.status(404).send({
-                success: false,
-                message: 'No remainders found for today.'
-            });
-        }
-
-        const remaindersWithInvoices = await Promise.all(
-            remainders.map(async (remainder) => {
-                const companyObjectId = remainder.companyId?._id || remainder.companyId;
-
-                const unpaidInvoiceQuery = {
-                    companyId: companyObjectId,
-                    status: "Unpaid",
-                    invoiceType: { $regex: /^invoice$/i },
-                };
-
-                const unpaidServiceInvoices = await ServiceInvoice.find(
-                    unpaidInvoiceQuery,
-                    { _id: 1 }
-                );
-
-                const unpaidRentalInvoices = await RentalPaymentEntry.find(
-                    unpaidInvoiceQuery,
-                    { _id: 1 }
-                );
-
-                return {
-                    ...remainder.toObject(),
-                    unpaidServiceInvoices,
-                    unpaidRentalInvoices
-                };
-            })
-        );
-
-        res.status(200).send({
-            success: true,
-            message: 'Remainders for today fetched successfully with associated unpaid invoices',
-            remainders: remaindersWithInvoices
+        await sendTodayRemainders(req, res, {
+            remainderType,
+            invoiceKind: "both",
+            emptyMessage: "No remainders found for today.",
+            successMessage: "Remainders for today fetched successfully with associated unpaid invoices",
         });
     } catch (error) {
         console.error("Error in getRemaindersByTodayDate:", error);
         res.status(500).send({
             success: false,
-            message: 'Error in fetching remainders for today',
-            error: error.message
+            message: "Error in fetching remainders for today",
+            error: error.message,
+        });
+    }
+};
+
+// Service remainders due today, with unpaid service invoices only
+export const getServiceRemaindersByTodayDate = async (req, res) => {
+    try {
+        await sendTodayRemainders(req, res, {
+            remainderType: "ServiceInvoice",
+            invoiceKind: "service",
+            emptyMessage: "No service remainders found for today.",
+            successMessage: "Service remainders for today fetched successfully with unpaid service invoices",
+        });
+    } catch (error) {
+        console.error("Error in getServiceRemaindersByTodayDate:", error);
+        res.status(500).send({
+            success: false,
+            message: "Error in fetching service remainders for today",
+            error: error.message,
+        });
+    }
+};
+
+// Rental remainders due today, with unpaid rental invoices only
+export const getRentalRemaindersByTodayDate = async (req, res) => {
+    try {
+        await sendTodayRemainders(req, res, {
+            remainderType: "RentalInvoice",
+            invoiceKind: "rental",
+            emptyMessage: "No rental remainders found for today.",
+            successMessage: "Rental remainders for today fetched successfully with unpaid rental invoices",
+        });
+    } catch (error) {
+        console.error("Error in getRentalRemaindersByTodayDate:", error);
+        res.status(500).send({
+            success: false,
+            message: "Error in fetching rental remainders for today",
+            error: error.message,
         });
     }
 };

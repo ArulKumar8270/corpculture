@@ -35,7 +35,7 @@ const commissionSchema = new mongoose.Schema({
     },
     rentalInvoiceId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'RentalInvoice', // Reference to the rental invoice this commission is based on
+        ref: 'RentalPaymentEntry', // Rental invoices are stored as RentalPaymentEntry
     },
     commissionAmount: {
         type: Number,

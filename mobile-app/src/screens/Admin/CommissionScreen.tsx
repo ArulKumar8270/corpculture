@@ -21,7 +21,9 @@ import { getApiBaseUrl } from '../../services/api';
 import {
   getCommissionGroupKey,
   getCommissionGroupLabel,
+  getCommissionInvoiceNumber,
   getCommissionProductLabel,
+  getCommissionRefId,
   isCompanyBasedCommission,
 } from '../../utils/commissionDisplay';
 
@@ -34,9 +36,9 @@ interface Commission {
   commissionFrom?: string;
   userId?: { _id: string; name: string } | string;
   orderId?: string | { _id: string };
-  salesInvoiceId?: string | { _id: string };
-  serviceInvoiceId?: string | { _id: string };
-  rentalInvoiceId?: string | { _id: string };
+  salesInvoiceId?: string | { _id: string; invoiceNumber?: string };
+  serviceInvoiceId?: string | { _id: string; invoiceNumber?: string };
+  rentalInvoiceId?: string | { _id: string; invoiceNumber?: string };
   productId?: {
     _id: string;
     sku?: string;
@@ -184,15 +186,22 @@ const CommissionScreen = () => {
           ? c.companyId?.companyName || ''
           : c.companyId || '';
 
+      const invoiceNumber = getCommissionInvoiceNumber(c) || '';
+      const orderId = getCommissionRefId(c.orderId) || '';
+      const serviceInvoiceId = getCommissionRefId(c.serviceInvoiceId) || '';
+      const rentalInvoiceId = getCommissionRefId(c.rentalInvoiceId) || '';
+      const salesInvoiceId = getCommissionRefId(c.salesInvoiceId) || '';
+
       return (
         (c._id && c._id.toLowerCase().includes(lower)) ||
         groupKey.toLowerCase().includes(lower) ||
         userName.toLowerCase().includes(lower) ||
         companyName.toLowerCase().includes(lower) ||
-        (c.orderId && String(c.orderId).toLowerCase().includes(lower)) ||
-        (c.serviceInvoiceId && String(c.serviceInvoiceId).toLowerCase().includes(lower)) ||
-        (c.rentalInvoiceId && String(c.rentalInvoiceId).toLowerCase().includes(lower)) ||
-        (c.salesInvoiceId && String(c.salesInvoiceId).toLowerCase().includes(lower))
+        orderId.toLowerCase().includes(lower) ||
+        serviceInvoiceId.toLowerCase().includes(lower) ||
+        rentalInvoiceId.toLowerCase().includes(lower) ||
+        salesInvoiceId.toLowerCase().includes(lower) ||
+        invoiceNumber.toLowerCase().includes(lower)
       );
     });
   }, [commissions, search, commissionFrom]);
@@ -216,23 +225,19 @@ const CommissionScreen = () => {
     });
   };
 
-  const getInvoiceOrOrderId = (c: Commission): string | null => {
-    const o = c.orderId;
-    const s = c.serviceInvoiceId;
-    const r = c.rentalInvoiceId;
-    const sales = c.salesInvoiceId;
-    if (o) return typeof o === 'object' ? o._id : o;
-    if (s) return typeof s === 'object' ? s._id : s;
-    if (r) return typeof r === 'object' ? r._id : r;
-    if (sales) return typeof sales === 'object' ? sales._id : sales;
-    return null;
-  };
+  const getInvoiceOrOrderId = (c: Commission): string | null =>
+    getCommissionRefId(c.orderId) ||
+    getCommissionRefId(c.serviceInvoiceId) ||
+    getCommissionRefId(c.rentalInvoiceId) ||
+    getCommissionRefId(c.salesInvoiceId);
 
   const handlePressInvoiceOrOrder = (c: Commission) => {
     const id = getInvoiceOrOrderId(c);
     if (!id) return;
     if (commissionFrom === 'Sales') {
       navigation.navigate('Orders', { screen: 'OrderUpdate', params: { orderId: id } });
+    } else if (commissionFrom === 'Rental') {
+      navigation.navigate('AddRentalInvoice', { id, entryId: id, invoiceType: 'invoice' });
     } else {
       navigation.navigate('AddServiceInvoice', { invoiceId: id });
     }
@@ -259,7 +264,7 @@ const CommissionScreen = () => {
           style={styles.searchInput}
           placeholder={
             isCompanyBased
-              ? 'Search by company, invoice ID…'
+              ? 'Search by company, invoice no…'
               : 'Search by ID, employee, order/invoice…'
           }
           placeholderTextColor="#999"
@@ -336,6 +341,10 @@ const CommissionScreen = () => {
                 {isExpanded &&
                   groupCommissions.map((c) => {
                     const refId = getInvoiceOrOrderId(c);
+                    const invoiceLabel =
+                      commissionFrom === 'Sales'
+                        ? refId
+                        : getCommissionInvoiceNumber(c) || refId;
                     return (
                       <View key={c._id} style={styles.row}>
                         <View style={styles.cell}>
@@ -346,14 +355,14 @@ const CommissionScreen = () => {
                         </View>
                         <View style={styles.cell}>
                           <Text style={styles.cellLabel}>
-                            {commissionFrom === 'Sales' ? 'Order' : 'Invoice'} ID
+                            {commissionFrom === 'Sales' ? 'Order ID' : 'Invoice No'}
                           </Text>
-                          {refId ? (
+                          {invoiceLabel ? (
                             <TouchableOpacity
                               onPress={() => handlePressInvoiceOrOrder(c)}
                               activeOpacity={0.7}
                             >
-                              <Text style={styles.link}>{refId}</Text>
+                              <Text style={styles.link}>{invoiceLabel}</Text>
                             </TouchableOpacity>
                           ) : (
                             <Text style={styles.cellValue}>—</Text>

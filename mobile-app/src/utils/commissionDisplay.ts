@@ -28,22 +28,39 @@ export const formatCommissionAmount = (amount: unknown) =>
     maximumFractionDigits: 2,
   })}`;
 
+export const getCommissionRefId = (ref: any): string | null => {
+  if (!ref) return null;
+  if (typeof ref === 'object') return ref._id ? String(ref._id) : null;
+  return String(ref);
+};
+
+export const getCommissionInvoiceNumber = (commission: any): string | null => {
+  const invoice =
+    commission?.serviceInvoiceId ||
+    commission?.rentalInvoiceId ||
+    commission?.salesInvoiceId;
+  if (invoice && typeof invoice === 'object' && invoice.invoiceNumber) {
+    return String(invoice.invoiceNumber);
+  }
+  return getCommissionRefId(invoice);
+};
+
 export const getCommissionReferenceLabel = (commission: any) => {
   if (commission?.orderId) {
     const id = commission.orderId?._id || commission.orderId;
     return `Order ${String(id).slice(-6)}`;
   }
   if (commission?.serviceInvoiceId) {
-    const id = commission.serviceInvoiceId?._id || commission.serviceInvoiceId;
-    return `Service Invoice ${String(id).slice(-6)}`;
+    const number = getCommissionInvoiceNumber(commission);
+    return number ? `Service Invoice ${number}` : 'Service Invoice';
   }
   if (commission?.rentalInvoiceId) {
-    const id = commission.rentalInvoiceId?._id || commission.rentalInvoiceId;
-    return `Rental Invoice ${String(id).slice(-6)}`;
+    const number = getCommissionInvoiceNumber(commission);
+    return number ? `Rental Invoice ${number}` : 'Rental Invoice';
   }
   if (commission?.salesInvoiceId) {
-    const id = commission.salesInvoiceId?._id || commission.salesInvoiceId;
-    return `Sales Invoice ${String(id).slice(-6)}`;
+    const number = getCommissionInvoiceNumber(commission);
+    return number ? `Sales Invoice ${number}` : 'Sales Invoice';
   }
   return '—';
 };

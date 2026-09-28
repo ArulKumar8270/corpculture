@@ -45,6 +45,23 @@ export const getCompanyShippingDefaults = (company, userPhone = '') => {
     };
 };
 
+/** Invoice-style label: "address - pincode" */
+export const formatServiceDeliveryAddress = (addr) => {
+    if (!addr) return '';
+    if (typeof addr === 'string') return addr.trim();
+    const address = String(addr.address || '').trim();
+    const pincode = String(addr.pincode || '').trim();
+    if (address && pincode) return `${address} - ${pincode}`;
+    return address || pincode;
+};
+
+export const listServiceDeliveryAddresses = (company) => {
+    const deliveries = Array.isArray(company?.serviceDeliveryAddresses)
+        ? company.serviceDeliveryAddresses
+        : [];
+    return deliveries.map(formatServiceDeliveryAddress).filter(Boolean);
+};
+
 export const storeCompanyShippingInfo = (company, userPhone = '') => {
     const defaults = getCompanyShippingDefaults(company, userPhone);
     if (!defaults?.address) return false;

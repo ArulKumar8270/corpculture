@@ -67,16 +67,7 @@
     },
     {
       "parameters": {
-        "url": "https://app.corpculture.tech/api/v1/remainders/getByToday/remainder",
-        "sendQuery": true,
-        "queryParameters": {
-          "parameters": [
-            {
-              "name": "remainderType",
-              "value": "RentalInvoice"
-            }
-          ]
-        },
+        "url": "https://app.corpculture.tech/api/v1/remainders/getByToday/rental",
         "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",

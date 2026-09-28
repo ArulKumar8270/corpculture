@@ -1,5 +1,52 @@
 import commissionModel from "../../models/commissionModel.js";
-import { softDeleteById, restoreById, getTrashListQuery, mapWithRecordStatus, TRASH_SUCCESS_MESSAGE, RESTORE_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
+import ServiceInvoice from "../../models/serviceInvoiceModel.js";
+import RentalPaymentEntry from "../../models/rentalPaymentEntryModel.js";
+import { softDeleteById, restoreById, getTrashListQuery, mapWithRecordStatus, findLinkedRefs, TRASH_SUCCESS_MESSAGE, RESTORE_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
+
+const toRefId = (value) => {
+    if (!value) return null;
+    if (typeof value === "object") return value._id ? String(value._id) : null;
+    return String(value);
+};
+
+const attachInvoiceNumbers = async (commissions = []) => {
+    const docs = commissions.map((c) =>
+        typeof c?.toObject === "function" ? c.toObject() : { ...c }
+    );
+
+    const serviceIds = [...new Set(docs.map((c) => toRefId(c.serviceInvoiceId)).filter(Boolean))];
+    const rentalIds = [...new Set(docs.map((c) => toRefId(c.rentalInvoiceId)).filter(Boolean))];
+
+    const [serviceInvoices, rentalInvoices] = await Promise.all([
+        serviceIds.length
+            ? findLinkedRefs(ServiceInvoice, { _id: { $in: serviceIds } }).select("invoiceNumber").lean()
+            : [],
+        rentalIds.length
+            ? RentalPaymentEntry.find({ _id: { $in: rentalIds } }).select("invoiceNumber").lean()
+            : [],
+    ]);
+
+    const serviceMap = new Map(serviceInvoices.map((i) => [String(i._id), i.invoiceNumber]));
+    const rentalMap = new Map(rentalInvoices.map((i) => [String(i._id), i.invoiceNumber]));
+
+    return docs.map((c) => {
+        const serviceId = toRefId(c.serviceInvoiceId);
+        if (serviceId) {
+            c.serviceInvoiceId = {
+                _id: serviceId,
+                ...(serviceMap.get(serviceId) ? { invoiceNumber: serviceMap.get(serviceId) } : {}),
+            };
+        }
+        const rentalId = toRefId(c.rentalInvoiceId);
+        if (rentalId) {
+            c.rentalInvoiceId = {
+                _id: rentalId,
+                ...(rentalMap.get(rentalId) ? { invoiceNumber: rentalMap.get(rentalId) } : {}),
+            };
+        }
+        return c;
+    });
+};
 
 const buildCommissionSummary = (commissions = []) => {
     const totalEarned = commissions.reduce(
@@ -113,7 +160,7 @@ export const getAllCommissions = async (req, res) => {
 
         res.status(200).send({
             success: true,
-            commissions: mapWithRecordStatus(commissions)
+            commissions: mapWithRecordStatus(await attachInvoiceNumbers(commissions))
         });
     } catch (error) {
         console.error("Error in getting commissions:", error);
@@ -257,20 +304,22 @@ export const getMyCommissions = async (req, res) => {
             });
         }
 
-        const commissions = await commissionModel
-            .find({ userId })
-            .populate("companyId", "companyName")
-            .populate({
-                path: "productId",
-                select: "sku commission productName",
-                populate: { path: "productName", select: "name" },
-            })
-            .populate({
-                path: "rentalProductId",
-                select: "modelName serialNo commission",
-            })
-            .sort({ createdAt: -1 })
-            .lean();
+        const commissions = await attachInvoiceNumbers(
+            await commissionModel
+                .find({ userId })
+                .populate("companyId", "companyName")
+                .populate({
+                    path: "productId",
+                    select: "sku commission productName",
+                    populate: { path: "productName", select: "name" },
+                })
+                .populate({
+                    path: "rentalProductId",
+                    select: "modelName serialNo commission",
+                })
+                .sort({ createdAt: -1 })
+                .lean()
+        );
 
         res.status(200).send({
             success: true,
@@ -301,20 +350,22 @@ export const getCommissionsByUser = async (req, res) => {
             });
         }
 
-        const commissions = await commissionModel
-            .find({ userId: requestedUserId })
-            .populate("companyId", "companyName")
-            .populate({
-                path: "productId",
-                select: "sku commission productName",
-                populate: { path: "productName", select: "name" },
-            })
-            .populate({
-                path: "rentalProductId",
-                select: "modelName serialNo commission",
-            })
-            .sort({ createdAt: -1 })
-            .lean();
+        const commissions = await attachInvoiceNumbers(
+            await commissionModel
+                .find({ userId: requestedUserId })
+                .populate("companyId", "companyName")
+                .populate({
+                    path: "productId",
+                    select: "sku commission productName",
+                    populate: { path: "productName", select: "name" },
+                })
+                .populate({
+                    path: "rentalProductId",
+                    select: "modelName serialNo commission",
+                })
+                .sort({ createdAt: -1 })
+                .lean()
+        );
 
         res.status(200).send({
             success: true,

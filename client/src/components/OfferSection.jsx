@@ -3,6 +3,7 @@ import { ShoppingCart } from 'lucide-react';
 import axios from "axios";
 import { useAuth } from '../context/auth';
 import { useFrontHomeSettings } from '../context/frontHomeSettings';
+import { listServiceDeliveryAddresses } from '../utils/companyShipping';
 
 const BookShowcase = ({ books: booksProp = [], categoryBanners = [] }) => {
   const { sales, rentalDefaultImage } = useFrontHomeSettings();
@@ -12,6 +13,7 @@ const BookShowcase = ({ books: booksProp = [], categoryBanners = [] }) => {
   const [fetchError, setFetchError] = useState(null); // Error state for phone lookup
   const [fetchedServices, setFetchedServices] = useState([]); // State to store fetched services
   const [fetchedCompanies, setFetchedCompanies] = useState([]); // New state for fetched companies
+  const [deliveryAddressOptions, setDeliveryAddressOptions] = useState([]);
   const { auth } = useAuth();
 
   const handleServiceClick = (service) => {
@@ -38,6 +40,7 @@ const BookShowcase = ({ books: booksProp = [], categoryBanners = [] }) => {
     setFetchError(null);
     setIsFetchingServices(false);
     setFetchedCompanies([]); // Reset fetched companies
+    setDeliveryAddressOptions([]);
   };
 
   const closeModal = () => {
@@ -64,6 +67,7 @@ const BookShowcase = ({ books: booksProp = [], categoryBanners = [] }) => {
     setFetchError(null);
     setIsFetchingServices(false);
     setFetchedCompanies([]); // Reset fetched companies
+    setDeliveryAddressOptions([]);
   };
 
 
@@ -116,6 +120,7 @@ const BookShowcase = ({ books: booksProp = [], categoryBanners = [] }) => {
     if (!phoneNumber || phoneNumber.length < 9) { // Only fetch if phone is 10 digits
       setFetchError(null); // Clear previous error
       setFetchedCompanies([]); // Clear fetched companies
+      setDeliveryAddressOptions([]);
       // Optionally clear form fields related to previous customer if phone number is cleared/invalidated
       setForm(prevForm => ({
         ...prevForm,
@@ -154,8 +159,33 @@ const BookShowcase = ({ books: booksProp = [], categoryBanners = [] }) => {
         // Do NOT auto-populate form fields here. User will select a company.
       } else {
         setFetchedCompanies([]); // No companies found
-        setFetchError("No existing company found for this phone number.");
-        // Clear company-related form fields if no company found
+        setDeliveryAddressOptions([]);
+        if (phoneNumber.length >= 10) {
+          setFetchError("No existing company found for this phone number.");
+          setForm(prevForm => ({
+            ...prevForm,
+            companyName: "",
+            companyId : "",
+            contactPerson: "",
+            email: "",
+            address: "",
+            location: "",
+          }));
+        } else {
+          setFetchError(null);
+        }
+      }
+    } catch (err) {
+      console.error("Error fetching companies by phone:", err);
+      setFetchedCompanies([]);
+      setDeliveryAddressOptions([]);
+      const isNotFound = err.response && err.response.status === 404;
+      if (phoneNumber.length >= 10) {
+        setFetchError(
+          isNotFound
+            ? "No existing company found for this phone number."
+            : "Failed to fetch company details. Please try again."
+        );
         setForm(prevForm => ({
           ...prevForm,
           companyName: "",
@@ -165,25 +195,9 @@ const BookShowcase = ({ books: booksProp = [], categoryBanners = [] }) => {
           address: "",
           location: "",
         }));
-      }
-    } catch (err) {
-      console.error("Error fetching companies by phone:", err);
-      setFetchedCompanies([]);
-      if (err.response && err.response.status === 404) {
-        setFetchError("No existing company found for this phone number.");
       } else {
-        setFetchError("Failed to fetch company details. Please try again.");
+        setFetchError(null);
       }
-      // Clear company-related form fields on error
-      setForm(prevForm => ({
-        ...prevForm,
-        companyName: "",
-        companyId : "",
-        contactPerson: "",
-        email: "",
-        address: "",
-        location: "",
-      }));
     } finally {
       setIsFetchingServices(false); // Clear loading state
     }
@@ -192,6 +206,9 @@ const BookShowcase = ({ books: booksProp = [], categoryBanners = [] }) => {
   // New function to handle company selection
   const handleCompanySelect = (company) => {
     console.log(company, "company7549023784")
+    const options = listServiceDeliveryAddresses(company);
+    const selectedLocation = options[0] || "";
+    setDeliveryAddressOptions(options);
     setForm(prevForm => ({
       ...prevForm,
       customerType: "New", // Assuming a new service request for an existing company
@@ -199,8 +216,8 @@ const BookShowcase = ({ books: booksProp = [], categoryBanners = [] }) => {
       companyId: company._id || "",
       contactPerson: company.contactPersons?.[0]?.name || "", // Assuming first contact person
       email: company.contactPersons?.[0]?.email || "", // Assuming first contact person
-      address: company.billingAddress || "", // Map billingAddress to form.address
-      location: company.billingAddress || "", // Map city to form.location
+      address: selectedLocation || company.billingAddress || "",
+      location: selectedLocation,
       rentalType: selectedService?.id,
       // Do not set oldServiceId here, as it's for Rework type
     }));
@@ -216,6 +233,9 @@ const BookShowcase = ({ books: booksProp = [], categoryBanners = [] }) => {
       // If customerType changes, clear oldServiceId if not Rework
       if (name === 'customerType' && value !== 'Rework') {
         newForm.oldServiceId = '';
+      }
+      if (name === 'location') {
+        newForm.address = value;
       }
       if (name === 'serviceImage') {
         newForm.serviceImage = e.target.files[0];
@@ -291,6 +311,7 @@ const BookShowcase = ({ books: booksProp = [], categoryBanners = [] }) => {
       setFetchedServices([]); // Clear fetched services after successful submission
       setFetchError(null); // Clear fetch error after successful submission
       setFetchedCompanies([]); // Clear fetched companies after successful submission
+      setDeliveryAddressOptions([]);
     } catch (err) {
       console.error("Service submission error:", err); // Log the error
       setSubmitStatus(false);
@@ -530,14 +551,31 @@ const BookShowcase = ({ books: booksProp = [], categoryBanners = [] }) => {
                     {errors.address && <span className="text-red-500 text-xs">{errors.address}</span>}
                   </div> */}
                   <div>
-                    <label className="block font-semibold mb-1 text-gray-700">address Detail</label>
-                    <input
-                      type="text"
-                      name="location"
-                      value={form.location}
-                      onChange={handleChange}
-                      className={`w-full rounded-lg px-3 py-2 border ${errors.location ? "border-red-400" : "border-gray-300"} focus:border-sky-500 focus:ring-2 focus:ring-200 transition bg-white`}
-                    />
+                    <label className="block font-semibold mb-1 text-gray-700">Location Detail</label>
+                    {deliveryAddressOptions.length > 0 ? (
+                      <select
+                        name="location"
+                        value={form.location}
+                        onChange={handleChange}
+                        className={`w-full rounded-lg px-3 py-2 border ${errors.location ? "border-red-400" : "border-gray-300"} focus:border-sky-500 focus:ring-2 focus:ring-sky-200 transition bg-white`}
+                      >
+                        <option value="">Select Service / Delivery Address</option>
+                        {deliveryAddressOptions.map((option, index) => (
+                          <option key={`${option}-${index}`} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        type="text"
+                        name="location"
+                        value={form.location}
+                        onChange={handleChange}
+                        placeholder="Enter location / delivery address"
+                        className={`w-full rounded-lg px-3 py-2 border ${errors.location ? "border-red-400" : "border-gray-300"} focus:border-sky-500 focus:ring-2 focus:ring-200 transition bg-white`}
+                      />
+                    )}
                     {errors.location && <span className="text-red-500 text-xs">{errors.location}</span>}
                   </div>
                   <div>

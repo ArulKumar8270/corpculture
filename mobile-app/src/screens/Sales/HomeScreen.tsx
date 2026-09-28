@@ -29,6 +29,7 @@ import { getApiBaseUrl } from '../../services/api';
 import CompanyToggleHeader from '../../components/CompanyToggleHeader';
 import { useFrontHomeSettings } from '../../hooks/useFrontHomeSettings';
 import HomeCategorySearch from '../../components/HomeCategorySearch';
+import { listEnquiryDeliveryAddresses } from '../../utils/enquiryDeliveryAddresses';
 
 const { width } = Dimensions.get('window');
 
@@ -48,6 +49,7 @@ const HomeScreen = () => {
   const [companies, setCompanies] = useState<any[]>([]);
   const [fetchedServices, setFetchedServices] = useState<any[]>([]);
   const [fetchedCompanies, setFetchedCompanies] = useState<any[]>([]);
+  const [enquiryDeliveryAddresses, setEnquiryDeliveryAddresses] = useState<string[]>([]);
   const [isFetchingServices, setIsFetchingServices] = useState(false);
   const [isCompanyEnabled, setIsCompanyEnabled] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState<string>('');
@@ -271,11 +273,12 @@ const HomeScreen = () => {
     setFormErrors({});
     setFetchedServices([]);
     setFetchedCompanies([]);
+    setEnquiryDeliveryAddresses([]);
     setIsFetchingServices(false);
   };
 
   const fetchServicesByPhone = async (phoneNumber: string) => {
-    if (!phoneNumber || phoneNumber.length !== 10) {
+    if (!phoneNumber || phoneNumber.length < 9) {
       setFetchedServices([]);
       return;
     }
@@ -315,8 +318,9 @@ const HomeScreen = () => {
   };
 
   const fetchCompaniesByPhone = async (phoneNumber: string) => {
-    if (!phoneNumber || phoneNumber.length !== 10) {
+    if (!phoneNumber || phoneNumber.length < 9) {
       setFetchedCompanies([]);
+      setEnquiryDeliveryAddresses([]);
       return;
     }
     
@@ -1048,9 +1052,13 @@ const HomeScreen = () => {
                 onChangeText={(text) => {
                   const cleaned = text.replace(/[^0-9]/g, '').slice(0, 10);
                   setFormData({ ...formData, phone: cleaned });
-                  if (cleaned.length === 10) {
+                  if (cleaned.length >= 9) {
                     fetchServicesByPhone(cleaned);
                     fetchCompaniesByPhone(cleaned);
+                  } else {
+                    setFetchedCompanies([]);
+                    setFetchedServices([]);
+                    setEnquiryDeliveryAddresses([]);
                   }
                 }}
                 keyboardType="phone-pad"
@@ -1069,7 +1077,9 @@ const HomeScreen = () => {
                       key={company._id}
                       style={styles.suggestionItem}
                       onPress={() => {
-                        // Auto-fill all fields from company data
+                        const options = listEnquiryDeliveryAddresses(company);
+                        const selectedLocation = options[0] || '';
+                        setEnquiryDeliveryAddresses(options);
                         setFormData({
                           ...formData,
                           customerType: 'New', // Set to New when selecting existing company
@@ -1077,8 +1087,8 @@ const HomeScreen = () => {
                           companyId: company._id || '',
                           contactPerson: company.contactPersons?.[0]?.name || '',
                           email: company.contactPersons?.[0]?.email || '',
-                          address: company.billingAddress || '',
-                          location: company.city || '',
+                          address: selectedLocation || company.billingAddress || '',
+                          location: selectedLocation,
                         });
                         // Clear the fetched companies list after selection
                         setFetchedCompanies([]);
@@ -1146,12 +1156,33 @@ const HomeScreen = () => {
               {formErrors.address && <Text style={styles.errorText}>{formErrors.address}</Text>}
 
               <Text style={styles.formLabel}>Location Detail *</Text>
-              <TextInput
-                style={[styles.formInput, formErrors.location && styles.formInputError]}
-                placeholder="Enter location details"
-                value={formData.location}
-                onChangeText={(text) => setFormData({ ...formData, location: text })}
-              />
+              {enquiryDeliveryAddresses.length > 0 ? (
+                <View style={styles.pickerContainer}>
+                  {enquiryDeliveryAddresses.map((option, index) => (
+                    <TouchableOpacity
+                      key={`${option}-${index}`}
+                      style={[
+                        styles.serviceOption,
+                        formData.location === option && styles.serviceOptionSelected,
+                      ]}
+                      onPress={() =>
+                        setFormData({ ...formData, location: option, address: option })
+                      }
+                    >
+                      <Text style={styles.serviceOptionText}>{option}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              ) : (
+                <TextInput
+                  style={[styles.formInput, formErrors.location && styles.formInputError]}
+                  placeholder="Enter location details"
+                  value={formData.location}
+                  onChangeText={(text) =>
+                    setFormData({ ...formData, location: text, address: text })
+                  }
+                />
+              )}
               {formErrors.location && <Text style={styles.errorText}>{formErrors.location}</Text>}
 
               {formData.customerType === 'Rework' && (
@@ -1305,9 +1336,13 @@ const HomeScreen = () => {
                 onChangeText={(text) => {
                   const cleaned = text.replace(/[^0-9]/g, '').slice(0, 10);
                   setFormData({ ...formData, phone: cleaned });
-                  if (cleaned.length === 10) {
+                  if (cleaned.length >= 9) {
                     fetchServicesByPhone(cleaned);
                     fetchCompaniesByPhone(cleaned);
+                  } else {
+                    setFetchedCompanies([]);
+                    setFetchedServices([]);
+                    setEnquiryDeliveryAddresses([]);
                   }
                 }}
                 keyboardType="phone-pad"
@@ -1326,7 +1361,9 @@ const HomeScreen = () => {
                       key={company._id}
                       style={styles.suggestionItem}
                       onPress={() => {
-                        // Auto-fill all fields from company data
+                        const options = listEnquiryDeliveryAddresses(company);
+                        const selectedLocation = options[0] || '';
+                        setEnquiryDeliveryAddresses(options);
                         setFormData({
                           ...formData,
                           customerType: 'New', // Set to New when selecting existing company
@@ -1334,8 +1371,8 @@ const HomeScreen = () => {
                           companyId: company._id || '',
                           contactPerson: company.contactPersons?.[0]?.name || '',
                           email: company.contactPersons?.[0]?.email || '',
-                          address: company.billingAddress || '',
-                          location: company.city || '',
+                          address: selectedLocation || company.billingAddress || '',
+                          location: selectedLocation,
                         });
                         // Clear the fetched companies list after selection
                         setFetchedCompanies([]);
@@ -1403,12 +1440,33 @@ const HomeScreen = () => {
               {formErrors.address && <Text style={styles.errorText}>{formErrors.address}</Text>}
 
               <Text style={styles.formLabel}>Location Detail *</Text>
-              <TextInput
-                style={[styles.formInput, formErrors.location && styles.formInputError]}
-                placeholder="Enter location details"
-                value={formData.location}
-                onChangeText={(text) => setFormData({ ...formData, location: text })}
-              />
+              {enquiryDeliveryAddresses.length > 0 ? (
+                <View style={styles.pickerContainer}>
+                  {enquiryDeliveryAddresses.map((option, index) => (
+                    <TouchableOpacity
+                      key={`${option}-${index}`}
+                      style={[
+                        styles.serviceOption,
+                        formData.location === option && styles.serviceOptionSelected,
+                      ]}
+                      onPress={() =>
+                        setFormData({ ...formData, location: option, address: option })
+                      }
+                    >
+                      <Text style={styles.serviceOptionText}>{option}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              ) : (
+                <TextInput
+                  style={[styles.formInput, formErrors.location && styles.formInputError]}
+                  placeholder="Enter location details"
+                  value={formData.location}
+                  onChangeText={(text) =>
+                    setFormData({ ...formData, location: text, address: text })
+                  }
+                />
+              )}
               {formErrors.location && <Text style={styles.errorText}>{formErrors.location}</Text>}
 
               {formData.customerType === 'Rework' && (

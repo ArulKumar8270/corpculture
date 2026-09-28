@@ -8,7 +8,10 @@ import { Link, useLocation } from "react-router-dom";
 import {
     getCommissionGroupKey,
     getCommissionGroupLabel,
+    getCommissionInvoiceLinkPath,
+    getCommissionInvoiceNumber,
     getCommissionProductLabel,
+    getCommissionRefId,
     isCompanyBasedCommission,
 } from "../../utils/commissionDisplay";
 // import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown'; // Removed {{ edit_1 }}
@@ -85,6 +88,7 @@ const AdminCommission = () => {
         const rentalInvoiceId = String(
             commission.rentalInvoiceId?._id || commission.rentalInvoiceId || ''
         );
+        const invoiceNumber = String(getCommissionInvoiceNumber(commission) || '');
 
         return (
             commission._id.toLowerCase().includes(searchLower) ||
@@ -93,7 +97,8 @@ const AdminCommission = () => {
             companyName.toLowerCase().includes(searchLower) ||
             orderId.toLowerCase().includes(searchLower) ||
             serviceInvoiceId.toLowerCase().includes(searchLower) ||
-            rentalInvoiceId.toLowerCase().includes(searchLower)
+            rentalInvoiceId.toLowerCase().includes(searchLower) ||
+            invoiceNumber.toLowerCase().includes(searchLower)
         );
     });
 
@@ -141,7 +146,7 @@ const AdminCommission = () => {
                                     name="search"
                                     placeholder={
                                         isCompanyBased
-                                            ? "Search commissions by company, invoice ID..."
+                                            ? "Search commissions by company, invoice no..."
                                             : "Search commissions by ID, employee, order ID..."
                                     }
                                     className="p-3 text-sm outline-none flex-1 rounded-l-2xl bg-[#f7fafd]"
@@ -176,7 +181,7 @@ const AdminCommission = () => {
                                             <tr className="bg-gradient-to-r from-[#019ee3] to-[#afcb09] text-white">
                                                 <th className="py-2 px-3 text-left">{groupLabel}</th>
                                                 <th className="py-2 px-3 text-left">
-                                                    {commissionFrom === 'Sales' ? 'Order ID' : 'Invoice ID'}
+                                                    {commissionFrom === 'Sales' ? 'Order ID' : 'Invoice No'}
                                                 </th>
                                                 <th className="py-2 px-3 text-left">Product</th>
                                                 <th className="py-2 px-3 text-left">Amount</th>
@@ -205,20 +210,29 @@ const AdminCommission = () => {
                                                         </td>
                                                     </tr>
                                                     {expandedUsers.has(groupKey) && (
-                                                        groupCommissions.map(commission => (
+                                                        groupCommissions.map(commission => {
+                                                            const invoiceLink = getCommissionInvoiceLinkPath(commission);
+                                                            const invoiceNo = getCommissionInvoiceNumber(commission);
+                                                            const orderId = getCommissionRefId(commission.orderId);
+                                                            return (
                                                             <tr key={commission._id} className="border-b last:border-b-0 hover:bg-gray-50">
                                                                 <td className="py-2 px-3">
                                                                     {getCommissionGroupKey(commission, commissionFrom)}
                                                                 </td>
                                                                 <td className="py-2 px-3">
-                                                                    {/* Link to order details if commission is tied to an order */}
-                                                                    {commission.orderId ? (
-                                                                        <Link to={`../order_details/${commission.orderId || commission?.serviceInvoiceId || commission?.rentalInvoiceId}`} className="text-blue-600 hover:underline">
-                                                                            {commission.orderId }
+                                                                    {orderId ? (
+                                                                        <Link
+                                                                            to={`../order_details/${orderId}`}
+                                                                            className="text-blue-600 hover:underline"
+                                                                        >
+                                                                            {orderId}
                                                                         </Link>
-                                                                    ) : commission?.serviceInvoiceId || commission?.rentalInvoiceId ? (
-                                                                        <Link to={`../addServiceInvoice/${commission?.serviceInvoiceId || commission?.rentalInvoiceId}`} className="text-blue-600 hover:underline">
-                                                                            {commission?.serviceInvoiceId || commission?.rentalInvoiceId}
+                                                                    ) : invoiceLink ? (
+                                                                        <Link
+                                                                            to={invoiceLink}
+                                                                            className="text-blue-600 hover:underline"
+                                                                        >
+                                                                            {invoiceNo}
                                                                         </Link>
                                                                     ) : 'N/A'}
                                                                 </td>
@@ -229,7 +243,8 @@ const AdminCommission = () => {
                                                                 <td className="py-2 px-3">{commission.isPaid ? "Yes" : "No"}</td>
                                                                 <td className="py-2 px-3">{commission.createdAt}</td>
                                                             </tr>
-                                                        ))
+                                                            );
+                                                        })
                                                     )}
                                                 </React.Fragment>
                                             ))}

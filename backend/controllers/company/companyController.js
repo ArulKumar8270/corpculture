@@ -330,11 +330,27 @@ export const getCompanyByPhone = async (req, res) => {
             });
         }
 
-        // Search for a company where any contact person's mobile matches the provided phone
-        const last8 = phone.slice(-8);
+        const digits = String(phone).replace(/\D/g, "");
+        if (digits.length < 8) {
+            return res.status(400).send({
+                success: false,
+                message: "Enter at least 8 digits of the phone number",
+            });
+        }
 
+        const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const escaped = escapeRegex(digits);
+        const last8 = escapeRegex(digits.slice(-8));
+
+        // Prefix match so 9 digits (e.g. 827056499) still finds 8270564998.
+        // Keep last-8 suffix match for existing last-digit lookups.
         const company = await companyModel.find({
-            "contactPersons.mobile": { $regex: last8 + '$' }
+            $or: [
+                { "contactPersons.mobile": digits },
+                { "contactPersons.mobile": { $regex: `^${escaped}` } },
+                { "contactPersons.mobile": { $regex: `${escaped}$` } },
+                { "contactPersons.mobile": { $regex: `${last8}$` } },
+            ],
         });
 
 
