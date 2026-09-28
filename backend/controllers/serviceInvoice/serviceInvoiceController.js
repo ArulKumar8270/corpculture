@@ -16,6 +16,24 @@ import {
 } from "../../utils/invoiceConversionUtil.js";
 import { applyCompanyIdFilter, toObjectIdList } from "../../utils/mongoFilterUtils.js";
 
+const unwrapEqFilter = (value) =>
+    value && typeof value === "object" && !Array.isArray(value) && value.$eq !== undefined
+        ? value.$eq
+        : value;
+
+/** Web treats signed copies / invoice links / sent-at as "in record", even if invoiceSendStatus stayed NotSent. */
+const isSentInvoiceSendStatus = (value) =>
+    String(unwrapEqFilter(value) || "").trim().toLowerCase() === "sent";
+
+const sentOrRecordedInvoiceFilter = () => ({
+    $or: [
+        { invoiceSendStatus: "Sent" },
+        { invoiceSentAt: { $ne: null } },
+        { "invoiceLink.0": { $exists: true } },
+        { "signedInvoiceLink.0": { $exists: true } },
+    ],
+});
+
 /** Unpaid service invoices for a company (excludes Paid, Cancelled, quotations, TDS rows). */
 const buildCompanyUnpaidInvoiceFilter = (companyId) => ({
     companyId,
@@ -559,6 +577,10 @@ export const getAllServiceInvoices = async (req, res) => {
             if (!schemaPaths[key]) continue;
             // Remainder already selected unpaid invoices; don't drop TDS-unpaid rows.
             if (unpaidInvoiceIds.length && key === 'tdsAmount') continue;
+            if (key === "invoiceSendStatus" && isSentInvoiceSendStatus(otherFilters[key])) {
+                query.$and = [...(query.$and || []), sentOrRecordedInvoiceFilter()];
+                continue;
+            }
             query[key] = otherFilters[key];
         }
 
