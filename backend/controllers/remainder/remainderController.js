@@ -3,6 +3,7 @@ import Company from "../../models/companyModel.js"; // Assuming you have a Compa
 import ServiceInvoice from "../../models/serviceInvoiceModel.js"; // Import ServiceInvoice model
 import { softDeleteById, restoreById, getTrashListQuery, mapWithRecordStatus, TRASH_SUCCESS_MESSAGE, RESTORE_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
 import RentalPaymentEntry from "../../models/rentalPaymentEntryModel.js"; // Import RentalPaymentEntry model
+import { sentOrRecordedInvoiceFilter } from "../../utils/invoiceSendStatusFilter.js";
 
 const IST = "Asia/Kolkata";
 
@@ -270,6 +271,7 @@ const unpaidInvoiceQueryForCompany = (companyObjectId) => ({
     companyId: companyObjectId,
     status: "Unpaid",
     invoiceType: { $regex: /^invoice$/i },
+    ...sentOrRecordedInvoiceFilter(),
 });
 
 const findRemaindersDueToday = async (req, remainderType) => {
@@ -320,10 +322,26 @@ const sendTodayRemainders = async (req, res, { remainderType, invoiceKind, empty
     }
 
     const remaindersWithInvoices = await mapRemaindersWithUnpaidInvoices(remainders, invoiceKind);
+    const remaindersWithRecordedInvoices = remaindersWithInvoices.filter((remainder) => {
+        if (invoiceKind === "service") return (remainder.unpaidServiceInvoices || []).length > 0;
+        if (invoiceKind === "rental") return (remainder.unpaidRentalInvoices || []).length > 0;
+        return (
+            (remainder.unpaidServiceInvoices || []).length > 0 ||
+            (remainder.unpaidRentalInvoices || []).length > 0
+        );
+    });
+
+    if (!remaindersWithRecordedInvoices.length) {
+        return res.status(404).send({
+            success: false,
+            message: emptyMessage,
+        });
+    }
+
     return res.status(200).send({
         success: true,
         message: successMessage,
-        remainders: remaindersWithInvoices,
+        remainders: remaindersWithRecordedInvoices,
     });
 };
 

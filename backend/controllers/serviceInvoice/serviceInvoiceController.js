@@ -15,25 +15,7 @@ import {
     reserveNextInvoiceNumber,
 } from "../../utils/invoiceConversionUtil.js";
 import { applyCompanyIdFilter, toObjectIdList } from "../../utils/mongoFilterUtils.js";
-
-const unwrapEqFilter = (value) =>
-    value && typeof value === "object" && !Array.isArray(value) && value.$eq !== undefined
-        ? value.$eq
-        : value;
-
-/** Web treats signed copies / invoice links / sent-at as "in record", even if invoiceSendStatus stayed NotSent. */
-const isSentInvoiceSendStatus = (value) =>
-    String(unwrapEqFilter(value) || "").trim().toLowerCase() === "sent";
-
-const sentOrRecordedInvoiceFilter = () => ({
-    $or: [
-        { invoiceSendStatus: "Sent" },
-        { invoiceSentAt: { $ne: null } },
-        { "invoiceLink.0": { $exists: true } },
-        { "signedInvoiceLink.0": { $exists: true } },
-    ],
-});
-
+import { isSentInvoiceSendStatus, sentOrRecordedInvoiceFilter } from "../../utils/invoiceSendStatusFilter.js";
 /** Unpaid service invoices for a company (excludes Paid, Cancelled, quotations, TDS rows). */
 const buildCompanyUnpaidInvoiceFilter = (companyId) => ({
     companyId,
