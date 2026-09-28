@@ -1,7 +1,7 @@
 import ServiceInvoice from "../../models/serviceInvoiceModel.js";
 import Company from "../../models/companyModel.js"; // Assuming Company model path
 import ServiceProduct from "../../models/serviceProductModel.js"; // Assuming ServiceProduct model path
-import { softDeleteById, restoreById, getTrashListQuery, mapWithRecordStatus, TRASH_SUCCESS_MESSAGE, RESTORE_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
+import { softDeleteById, restoreById, getTrashListQuery, mapWithRecordStatus, findLinkedRefs, TRASH_SUCCESS_MESSAGE, RESTORE_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
 import Material from "../../models/materialModel.js"; // Import Material model for reducing units
 import cloudinary from "cloudinary";
 import CommonDetails from "../../models/commonDetailsModel.js";
@@ -30,9 +30,10 @@ const applyServiceInvoicePopulates = (query) =>
         .populate("companyId")
         .populate({
             path: "products.productId",
+            options: { includeDeleted: true },
             populate: [
-                { path: "gstType" },
-                { path: "productName" },
+                { path: "gstType", select: "gstType gstPercentage" },
+                { path: "productName", select: "name unit description" },
             ],
         })
         .populate({
@@ -40,8 +41,115 @@ const applyServiceInvoicePopulates = (query) =>
             model: "Material",
             select: "name unit description",
         })
-        .populate("assignedTo")
+        .populate({ path: "assignedTo", select: "-password" })
         .populate("serviceId", "serviceTitle");
+
+const refId = (value) => {
+    if (!value) return null;
+    if (typeof value === "object") return value._id ? String(value._id) : null;
+    return String(value);
+};
+
+const slimGstType = (gstType) => {
+    if (!Array.isArray(gstType)) return [];
+    return gstType
+        .map((g) => {
+            if (!g || typeof g !== "object") return null;
+            return {
+                _id: g._id,
+                gstType: g.gstType,
+                gstPercentage: g.gstPercentage,
+            };
+        })
+        .filter(Boolean);
+};
+
+const slimServiceProduct = (product) => {
+    if (!product) return null;
+    return {
+        _id: product._id,
+        sku: product.sku,
+        hsn: product.hsn,
+        rate: product.rate,
+        gstType: slimGstType(product.gstType),
+        productName: product.productName,
+        company: product.company,
+    };
+};
+
+const serviceProductDetailQuery = (filter) =>
+    findLinkedRefs(ServiceProduct, filter)
+        .populate({ path: "gstType", select: "gstType gstPercentage" })
+        .populate({ path: "productName", select: "name unit description" });
+
+const attachProductDetails = async (invoices = []) => {
+    const docs = invoices.map((invoice) =>
+        typeof invoice?.toObject === "function" ? invoice.toObject() : { ...invoice }
+    );
+
+    const productIds = toObjectIdList(
+        docs.flatMap((invoice) => (invoice.products || []).map((line) => line.productId))
+    );
+    const foundProducts = productIds.length
+        ? await serviceProductDetailQuery({ _id: { $in: productIds } }).lean()
+        : [];
+    const productMap = new Map(foundProducts.map((product) => [String(product._id), product]));
+
+    const missingMaterialIds = toObjectIdList(
+        docs.flatMap((invoice) =>
+            (invoice.products || [])
+                .filter((line) => !productMap.get(refId(line.productId)))
+                .map((line) => line.productName)
+        )
+    );
+
+    const fallbackProducts = missingMaterialIds.length
+        ? await serviceProductDetailQuery({ productName: { $in: missingMaterialIds } })
+            .sort({ updatedAt: -1 })
+            .lean()
+        : [];
+
+    const fallbacksByMaterial = new Map();
+    for (const product of fallbackProducts) {
+        const materialId = refId(product.productName);
+        if (!materialId) continue;
+        if (!fallbacksByMaterial.has(materialId)) fallbacksByMaterial.set(materialId, []);
+        fallbacksByMaterial.get(materialId).push(product);
+    }
+
+    for (const invoice of docs) {
+        const companyId = refId(invoice.companyId);
+        for (const line of invoice.products || []) {
+            const productId = refId(line.productId);
+            let detail = productId ? productMap.get(productId) : null;
+            if (!detail) {
+                const materialId = refId(line.productName);
+                const candidates = fallbacksByMaterial.get(materialId) || [];
+                const byCompany = candidates.find((candidate) => String(candidate.company) === companyId);
+                if (byCompany) {
+                    detail = byCompany;
+                } else if (candidates.length) {
+                    const hsnCounts = new Map();
+                    for (const candidate of candidates) {
+                        const hsn = String(candidate.hsn || "");
+                        hsnCounts.set(hsn, (hsnCounts.get(hsn) || 0) + 1);
+                    }
+                    detail = [...candidates].sort((a, b) =>
+                        (hsnCounts.get(String(b.hsn || "")) || 0) - (hsnCounts.get(String(a.hsn || "")) || 0)
+                    )[0];
+                }
+            }
+            if (detail) {
+                line.productId = slimServiceProduct(detail);
+            }
+        }
+        if (invoice.assignedTo && typeof invoice.assignedTo === "object") {
+            delete invoice.assignedTo.password;
+        }
+    }
+
+    return docs;
+};
 
 /** Match get-by-id: expand sendTo emails into contact objects using company.contactPersons. */
 const formatServiceInvoicePayload = (invoice) => {
@@ -52,6 +160,9 @@ const formatServiceInvoicePayload = (invoice) => {
         payload.sendTo,
         payload.companyId?.contactPersons
     );
+    if (payload.assignedTo && typeof payload.assignedTo === "object") {
+        delete payload.assignedTo.password;
+    }
     return payload;
 };
 
@@ -322,7 +433,7 @@ export const createServiceInvoice = async (req, res) => {
         res.status(201).send({
             success: true,
             message: 'Service Invoice created successfully',
-            serviceInvoice: formatServiceInvoicePayload(populatedInvoice),
+            serviceInvoice: formatServiceInvoicePayload((await attachProductDetails([populatedInvoice]))[0]),
         });
 
     } catch (error) {
@@ -469,9 +580,9 @@ export const getAllServiceInvoices = async (req, res) => {
             .skip(skip)
             .limit(limitNum);
 
-        const formattedInvoices = mapWithRecordStatus(serviceInvoices).map((invoice) =>
-            formatServiceInvoicePayload(invoice)
-        );
+        const formattedInvoices = mapWithRecordStatus(
+            await attachProductDetails(serviceInvoices)
+        ).map((invoice) => formatServiceInvoicePayload(invoice));
 
         res.status(200).send({
             success: true,
@@ -511,9 +622,9 @@ export const getServiceInvoicesAssignedTo = async (req, res) => {
             ServiceInvoice.find(query)
         ).sort({ createdAt: -1 }); // Find services by phone number
 
-        const formattedInvoices = (serviceInvoices || []).map((invoice) =>
-            formatServiceInvoicePayload(invoice)
-        );
+        const formattedInvoices = mapWithRecordStatus(
+            await attachProductDetails(serviceInvoices || [])
+        ).map((invoice) => formatServiceInvoicePayload(invoice));
 
         res.status(200).send({
             success: true,
@@ -540,7 +651,9 @@ export const getServiceInvoiceById = async (req, res) => {
             return res.status(404).send({ success: false, message: 'Service Invoice not found.' });
         }
 
-        const invoicePayload = formatServiceInvoicePayload(serviceInvoice);
+        const invoicePayload = formatServiceInvoicePayload(
+            (await attachProductDetails([serviceInvoice]))[0]
+        );
 
         const companyId =
             serviceInvoice.companyId?._id ?? serviceInvoice.companyId;
@@ -857,7 +970,7 @@ export const updateServiceInvoice = async (req, res) => {
         res.status(200).send({
             success: true,
             message: 'Service Invoice updated successfully',
-            serviceInvoice: formatServiceInvoicePayload(updatedInvoice),
+            serviceInvoice: formatServiceInvoicePayload((await attachProductDetails([updatedInvoice]))[0]),
         });
 
     } catch (error) {
