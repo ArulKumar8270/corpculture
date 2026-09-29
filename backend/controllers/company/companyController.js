@@ -3,6 +3,7 @@ import ServiceInvoice from "../../models/serviceInvoiceModel.js"; // Import Serv
 import Report from "../../models/reportModel.js"; // Import Report model
 import RentalPaymentEntry from "../../models/rentalPaymentEntryModel.js"; // Import RentalPaymentEntry model
 import { softDeleteById, restoreById, getTrashListQuery, withRecordStatus, TRASH_SUCCESS_MESSAGE, RESTORE_SUCCESS_MESSAGE } from "../../utils/softDelete.js";
+import { notPaidRecordedInvoiceFilter } from "../../utils/invoiceSendStatusFilter.js";
 
 const sanitizeCompanyPayload = (body = {}) => {
     const payload = { ...body };
@@ -121,18 +122,10 @@ export const getAllCompanies = async (req, res) => {
                 rentalQuotationCount,
                 rentalReportCount
             ] = await Promise.all([
-                ServiceInvoice.countDocuments({
-                    companyId: company._id,
-                    invoiceType: "invoice",
-                    status: "Unpaid",
-                }),
+                ServiceInvoice.countDocuments(notPaidRecordedInvoiceFilter(company._id)),
                 ServiceInvoice.countDocuments({ companyId: company._id, invoiceType: "quotation" }),
                 Report.countDocuments({ company: company._id, reportType: "service" }),
-                RentalPaymentEntry.countDocuments({
-                    companyId: company._id,
-                    invoiceType: "invoice",
-                    status: "Unpaid",
-                }),
+                RentalPaymentEntry.countDocuments(notPaidRecordedInvoiceFilter(company._id)),
                 RentalPaymentEntry.countDocuments({ companyId: company._id, invoiceType: "quotation" }),
                 Report.countDocuments({ company: company._id, reportType: "rental" })
             ]);

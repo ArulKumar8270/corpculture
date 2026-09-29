@@ -391,6 +391,9 @@ const ServiceInvoicesReport = (props) => {
                 fromDate: from,
                 toDate: to,
                 ...(filterCompanyId ? { companyId: filterCompanyId } : {}),
+                ...(filterCompanyId && props?.type === 'invoice'
+                    ? { status: { $ne: 'Paid' }, invoiceSendStatus: { $eq: 'Sent' } }
+                    : {}),
                 companyName: companyName,
                 invoiceNumber: invoiceNumber,
                 paymentStatus: paymentStatus,
@@ -862,6 +865,9 @@ const ServiceInvoicesReport = (props) => {
         fromDate: fromDate,
         toDate: toDate,
         ...(filterCompanyId ? { companyId: filterCompanyId } : {}),
+        ...(filterCompanyId && props?.type === 'invoice'
+            ? { status: { $ne: 'Paid' }, invoiceSendStatus: { $eq: 'Sent' } }
+            : {}),
         companyName: companyNameFilter,
         invoiceNumber: invoiceNumberFilter,
         paymentStatus: paymentStatusFilter,

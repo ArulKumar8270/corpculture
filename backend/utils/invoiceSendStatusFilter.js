@@ -15,3 +15,15 @@ export const sentOrRecordedInvoiceFilter = () => ({
         { "signedInvoiceLink.0": { $exists: true } },
     ],
 });
+
+/**
+ * Same query POST /service-invoice/all builds for the reminder payload:
+ * invoiceType invoice, status not Paid, invoiceSendStatus Sent
+ * (sent, or a sent time / invoice link / signed copy).
+ */
+export const notPaidRecordedInvoiceFilter = (companyId) => ({
+    companyId,
+    invoiceType: { $regex: /^invoice$/i },
+    status: { $ne: "Paid" },
+    $and: [sentOrRecordedInvoiceFilter()],
+});

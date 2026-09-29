@@ -17,6 +17,7 @@ import {
     getRentalInvoiceOverallReportStatus,
 } from "../../utils/rentalQuotationMoveGate.js";
 import { applyCompanyIdFilter } from "../../utils/mongoFilterUtils.js";
+import { isSentInvoiceSendStatus, sentOrRecordedInvoiceFilter } from "../../utils/invoiceSendStatusFilter.js";
 
 /** Unpaid rental invoices for a company (excludes Paid, Cancelled, quotations, TDS rows). */
 const buildCompanyUnpaidInvoiceFilter = (companyId) => ({
@@ -581,12 +582,17 @@ export const getAllRentalPaymentEntries = async (req, res) => {
             invoiceNumber,
             paymentStatus, // This will map to 'status' in the schema
             invoiceType, // Assuming this can also be a filter
+            status,
             page = 1, // Default to page 1
             limit = 10, // Default to 10 items per page
             ...otherFilters // Catch any other direct filters
         } = req.body;
 
         let query = {};
+
+        if (status) {
+            query.status = status;
+        }
 
         // Add invoiceType filter if provided (case-insensitive for legacy data)
         if (invoiceType) {
@@ -645,6 +651,10 @@ export const getAllRentalPaymentEntries = async (req, res) => {
         for (const key in otherFilters) {
             if (!Object.prototype.hasOwnProperty.call(otherFilters, key)) continue;
             if (key === 'companyId') continue;
+            if (key === "invoiceSendStatus" && isSentInvoiceSendStatus(otherFilters[key])) {
+                query.$and = [...(query.$and || []), sentOrRecordedInvoiceFilter()];
+                continue;
+            }
             query[key] = otherFilters[key];
         }
 

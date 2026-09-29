@@ -72,12 +72,12 @@ const CompanyReports = () => {
                         companyName: c.companyName,
                         companyAddress: c.billingAddress || c.addressDetail || '',
                         mobileNumber: c.mobileNumber || c.phone || 'N/A',
-                        // Assuming these counts are now returned by the backend for each company
-                        // Backend returns unpaid service invoices only for this count
+                        // Same filter as POST /service-invoice/all for reminders:
+                        // invoice, status not Paid, and sent or already on record.
                         serviceInvoiceCount: c.serviceInvoiceCount ?? 0,
                         serviceQuotationCount: c.serviceQuotationCount || 0,
                         serviceReportCount: c.serviceReportCount || 0,
-                        // Backend returns unpaid rental invoices only for this count
+                        // Same not-paid + sent/on-record filter as service invoices.
                         rentalInvoiceCount: c.rentalInvoiceCount ?? 0,
                         rentalQuotationCount: c.rentalQuotationCount || 0,
                         rentalReportCount: c.rentalReportCount || 0,

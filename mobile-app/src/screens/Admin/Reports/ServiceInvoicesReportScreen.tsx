@@ -85,6 +85,9 @@ const ServiceInvoicesReportScreen = () => {
         fromDate: from,
         toDate: to,
         ...(filterCompanyId ? { companyId: filterCompanyId } : {}),
+        ...(filterCompanyId && reportType === 'invoice'
+          ? { status: { $ne: 'Paid' }, invoiceSendStatus: { $eq: 'Sent' } }
+          : {}),
         companyName: companyName,
         invoiceNumber: invoiceNumber,
         paymentStatus: paymentStatus,
@@ -164,6 +167,9 @@ const ServiceInvoicesReportScreen = () => {
         fromDate,
         toDate,
         ...(filterCompanyId ? { companyId: filterCompanyId } : {}),
+        ...(filterCompanyId && reportType === 'invoice'
+          ? { status: { $ne: 'Paid' }, invoiceSendStatus: { $eq: 'Sent' } }
+          : {}),
         companyName: companyNameFilter,
         invoiceNumber: invoiceNumberFilter,
         paymentStatus: paymentStatusFilter,
