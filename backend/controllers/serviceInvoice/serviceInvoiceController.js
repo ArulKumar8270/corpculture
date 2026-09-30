@@ -15,7 +15,7 @@ import {
     reserveNextInvoiceNumber,
 } from "../../utils/invoiceConversionUtil.js";
 import { applyCompanyIdFilter, toObjectIdList } from "../../utils/mongoFilterUtils.js";
-import { isSentInvoiceSendStatus, sentOrRecordedInvoiceFilter } from "../../utils/invoiceSendStatusFilter.js";
+import { isSentInvoiceSendStatus, sentOrRecordedInvoiceFilter, withoutPaidOrCancelled } from "../../utils/invoiceSendStatusFilter.js";
 /** Unpaid service invoices for a company (excludes Paid, Cancelled, quotations, TDS rows). */
 const buildCompanyUnpaidInvoiceFilter = (companyId) => ({
     companyId,
@@ -463,7 +463,7 @@ export const getAllServiceInvoices = async (req, res) => {
         let query = {};
 
         if (status) {
-            query.status = status;
+            query.status = withoutPaidOrCancelled(status);
         }
         // Add invoiceType filter if provided (case-insensitive for legacy data)
         if (typeof invoiceType === "string" && invoiceType.trim()) {

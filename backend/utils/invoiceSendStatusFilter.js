@@ -6,6 +6,16 @@ export const unwrapEqFilter = (value) =>
 export const isSentInvoiceSendStatus = (value) =>
     String(unwrapEqFilter(value) || "").trim().toLowerCase() === "sent";
 
+/** `{ $ne: "Paid" }` also matches Cancelled. Reminder and company-report lists should not. */
+export const withoutPaidOrCancelled = (status) => {
+    if (!status || typeof status !== "object" || Array.isArray(status)) return status;
+    const keys = Object.keys(status);
+    if (keys.length === 1 && keys[0] === "$ne" && String(status.$ne).trim().toLowerCase() === "paid") {
+        return { $nin: ["Paid", "Cancelled"] };
+    }
+    return status;
+};
+
 /** Web treats signed copies / invoice links / sent-at as in record, even if invoiceSendStatus stayed NotSent. */
 export const sentOrRecordedInvoiceFilter = () => ({
     $or: [
@@ -24,6 +34,6 @@ export const sentOrRecordedInvoiceFilter = () => ({
 export const notPaidRecordedInvoiceFilter = (companyId) => ({
     companyId,
     invoiceType: { $regex: /^invoice$/i },
-    status: { $ne: "Paid" },
+    status: { $nin: ["Paid", "Cancelled"] },
     $and: [sentOrRecordedInvoiceFilter()],
 });

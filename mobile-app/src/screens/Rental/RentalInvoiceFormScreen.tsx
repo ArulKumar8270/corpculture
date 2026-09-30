@@ -1006,29 +1006,28 @@ const RentalInvoiceFormScreen = () => {
   };
 
   const updateRentalProduct = async (product: any, a3Config: ProductConfig, a4Config: ProductConfig, a5Config: ProductConfig) => {
+    const productId = product?._id;
+    if (!productId) return;
     const apiPayload = {
-      ...product,
+      countsOnly: true,
       a3Config: {
-        ...product?.a3Config,
         bwOldCount: Number(a3Config.bwNewCount) || 0,
         colorOldCount: Number(a3Config.colorNewCount) || 0,
         colorScanningOldCount: Number(a3Config.colorScanningNewCount) || 0,
       },
       a4Config: {
-        ...product?.a4Config,
         bwOldCount: Number(a4Config.bwNewCount) || 0,
         colorOldCount: Number(a4Config.colorNewCount) || 0,
         colorScanningOldCount: Number(a4Config.colorScanningNewCount) || 0,
       },
       a5Config: {
-        ...product?.a5Config,
         bwOldCount: Number(a5Config.bwNewCount) || 0,
         colorOldCount: Number(a5Config.colorNewCount) || 0,
         colorScanningOldCount: Number(a5Config.colorScanningNewCount) || 0,
       },
     };
     try {
-      await axios.put(`${getApiBaseUrl()}/rental-products/${product?._id}`, apiPayload, {
+      await axios.put(`${getApiBaseUrl()}/rental-products/${productId}`, apiPayload, {
         headers: {
           Authorization: token || '',
         },

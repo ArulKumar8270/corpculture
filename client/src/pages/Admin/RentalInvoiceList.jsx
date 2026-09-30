@@ -64,6 +64,17 @@ function rentalInvoiceDisplayGrandTotal(entry) {
     return parseFloat(entry?.grandTotal) || 0;
 }
 
+/** Next whole rupee. 3499.88 becomes 3500. */
+function roundUpRupee(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return 0;
+    return Math.ceil(n);
+}
+
+function paymentModalGrandTotal(entry) {
+    return roundUpRupee(rentalInvoiceDisplayGrandTotal(entry));
+}
+
 const RENTAL_INVOICE_DOWNLOAD_BASE_URL = 'https://pub-bcab85dac0c64221ba6b6a756f991c46.r2.dev';
 const PAYMENT_COPY_DOWNLOAD_BASE_URL = 'https://pub-982db31d50054adebd29fa1792b12fb8.r2.dev';
 /** n8n: rental payment saved (not service invoice). */
@@ -590,9 +601,9 @@ function RentalInvoiceList(props) {
             paymentContactEmails: invoicePaymentEmailsFromRecord(invoice),
             otherPaymentMode: invoice?.otherPaymentMode || '',
             invoiceId: invoice?._id,
-            paymentAmount: invoice?.paymentAmount ? invoice?.paymentAmount : initialPaymentAmount,
+            paymentAmount: roundUpRupee(invoice?.paymentAmount ? invoice.paymentAmount : initialPaymentAmount),
             paymentAmountType: initialPaymentAmountType,
-            grandTotal: rentalInvoiceDisplayGrandTotal(invoice),
+            grandTotal: paymentModalGrandTotal(invoice),
             companyId: invoice?.companyId
         });
         setOpenPaymentModal(true);
@@ -607,17 +618,17 @@ function RentalInvoiceList(props) {
 
     const selectedAllocatedTotal = companyPendingInvoice
         ?.filter((inv) => selectedInvoiceIds.includes(inv._id))
-        .reduce((sum, inv) => sum + rentalInvoiceDisplayGrandTotal(inv), 0) || 0;
+        .reduce((sum, inv) => sum + paymentModalGrandTotal(inv), 0) || 0;
     const remainingToAllocate = Math.max(0, (balanceAmount || 0) - selectedAllocatedTotal);
 
     const togglePendingInvoiceSelection = (pendingInv) => {
         const id = pendingInv._id;
-        const amount = rentalInvoiceDisplayGrandTotal(pendingInv);
+        const amount = paymentModalGrandTotal(pendingInv);
         setSelectedInvoiceIds((prev) => {
             if (prev.includes(id)) return prev.filter((x) => x !== id);
             const currentTotal = companyPendingInvoice
                 ?.filter((inv) => prev.includes(inv._id))
-                .reduce((s, inv) => s + rentalInvoiceDisplayGrandTotal(inv), 0) || 0;
+                .reduce((s, inv) => s + paymentModalGrandTotal(inv), 0) || 0;
             if (currentTotal + amount <= (balanceAmount || 0)) return [...prev, id];
             return prev;
         });
@@ -628,16 +639,15 @@ function RentalInvoiceList(props) {
         setPaymentForm(prev => ({ ...prev, [name]: value }));
         if (name === "paymentAmount") {
             setSelectedInvoiceIds([]);
-            const cap = rentalInvoiceDisplayGrandTotal(currentInvoice);
-            if (value < cap) {
-                let balanceAmount = cap - value;
-                setPendingAmount(balanceAmount);
+            const cap = paymentModalGrandTotal(currentInvoice);
+            const paid = Number(value);
+            if (paid < cap) {
+                setPendingAmount(roundUpRupee(cap - paid));
                 setBalanceAmount(0);
                 setCompanyPendingInvoice([]);
                 setLoadingPendingInvoices(false);
             } else {
-                let balanceAmount = value - cap;
-                setBalanceAmount(balanceAmount);
+                setBalanceAmount(roundUpRupee(paid - cap));
                 setPendingAmount(0);
                 try {
                     setLoadingPendingInvoices(true);
@@ -696,7 +706,7 @@ function RentalInvoiceList(props) {
                 const targetInv = companyPendingInvoice?.find((i) => i._id === targetInvoiceIdArg);
                 const payload = buildPaymentPayload(
                     amountArg,
-                    amountArg >= (targetInv ? rentalInvoiceDisplayGrandTotal(targetInv) : 0)
+                    amountArg >= (targetInv ? paymentModalGrandTotal(targetInv) : 0)
                 );
                 if (payload.status === 'Paid' && targetInv && !canMoveRentalInvoiceToOverallReport(targetInv)) {
                     const gate = getRentalInvoiceOverallReportStatus(targetInv);
@@ -742,7 +752,7 @@ function RentalInvoiceList(props) {
 
             for (const invId of selectedInvoiceIds) {
                 const pendingInv = companyPendingInvoice?.find((i) => i._id === invId);
-                const amt = rentalInvoiceDisplayGrandTotal(pendingInv);
+                const amt = paymentModalGrandTotal(pendingInv);
                 if (amt <= 0) continue;
                 await handleSavePaymentDetails(invId, amt);
             }
@@ -755,9 +765,9 @@ function RentalInvoiceList(props) {
                 return inv
                     ? {
                           invoiceId: inv._id,
-                          amount: rentalInvoiceDisplayGrandTotal(inv),
+                          amount: paymentModalGrandTotal(inv),
                           invoiceDate: inv?.invoiceDate || inv?.entryDate || inv?.createdAt,
-                          grandTotal: rentalInvoiceDisplayGrandTotal(inv),
+                          grandTotal: paymentModalGrandTotal(inv),
                       }
                     : null;
             }).filter(Boolean);
@@ -766,7 +776,7 @@ function RentalInvoiceList(props) {
                 invoiceId: currentInvoice?._id,
                 invoice: {
                     _id: currentInvoice?._id,
-                    grandTotal: rentalInvoiceDisplayGrandTotal(currentInvoice),
+                    grandTotal: paymentModalGrandTotal(currentInvoice),
                     invoiceDate: currentInvoice?.invoiceDate || currentInvoice?.entryDate || currentInvoice?.createdAt,
                     companyId: currentInvoice?.companyId,
                     invoiceNumber: currentInvoice?.invoiceNumber,
@@ -1295,7 +1305,7 @@ function RentalInvoiceList(props) {
                                                 </TableCell>
                                                 <TableCell>
                                                     <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#1976d2' }}>
-                                                        ₹{rentalInvoiceDisplayGrandTotal(entry).toFixed(2)}
+                                                        ₹{roundUpRupee(rentalInvoiceDisplayGrandTotal(entry))}
                                                     </Typography>
                                                 </TableCell>
                                                 <TableCell>
@@ -1516,7 +1526,7 @@ function RentalInvoiceList(props) {
                                                                                     </TableCell>
                                                                                     <TableCell align="right">
                                                                                         <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
-                                                                                            ₹{Number.isFinite(lineDisplay) ? lineDisplay.toFixed(2) : '0.00'}
+                                                                                            ₹{Number.isFinite(lineDisplay) ? roundUpRupee(lineDisplay) : 0}
                                                                                         </Typography>
                                                                                     </TableCell>
                                                                                 </TableRow>
@@ -1527,7 +1537,7 @@ function RentalInvoiceList(props) {
                                                                                 Grand Total:
                                                                             </TableCell>
                                                                             <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: '1.1rem', color: '#1976d2' }}>
-                                                                                ₹{rentalInvoiceDisplayGrandTotal(entry).toFixed(2)}
+                                                                                ₹{roundUpRupee(rentalInvoiceDisplayGrandTotal(entry))}
                                                                             </TableCell>
                                                                         </TableRow>
                                                                     </TableBody>
@@ -1598,7 +1608,7 @@ function RentalInvoiceList(props) {
             </Paper>
             {/* Payment Details Update Modal */}
             <Dialog open={openPaymentModal} onClose={handleClosePaymentDetailsModal}>
-                <DialogTitle>Payment Details (RS: {paymentForm?.grandTotal})</DialogTitle>
+                <DialogTitle>Payment Details (RS: {roundUpRupee(paymentForm?.grandTotal)})</DialogTitle>
                 <DialogContent>
                     <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
                         Invoice company: {currentInvoice?.companyId?.companyName || 'N/A'}
@@ -1804,12 +1814,12 @@ function RentalInvoiceList(props) {
                         <>
                             {balanceAmount > 0 && (
                                 <>
-                                    <p>Previous Invoice Balance - Rs {balanceAmount.toFixed(2)}</p>
+                                    <p>Previous Invoice Balance - Rs {roundUpRupee(balanceAmount)}</p>
                                     {!loadingPendingInvoices && (
                                         <>
-                                            <p><strong>Allocated to selected invoices - Rs {selectedAllocatedTotal.toFixed(2)}</strong></p>
+                                            <p><strong>Allocated to selected invoices - Rs {roundUpRupee(selectedAllocatedTotal)}</strong></p>
                                             {remainingToAllocate > 0 && (
-                                                <p style={{ color: '#666' }}>Remaining to allocate - Rs {remainingToAllocate.toFixed(2)} (select more invoices so total equals balance)</p>
+                                                <p style={{ color: '#666' }}>Remaining to allocate - Rs {roundUpRupee(remainingToAllocate)} (select more invoices so total equals balance)</p>
                                             )}
                                             {remainingToAllocate === 0 && selectedInvoiceIds.length > 0 && (
                                                 <p style={{ color: 'green' }}>Amount fully allocated.</p>
@@ -1830,7 +1840,7 @@ function RentalInvoiceList(props) {
                                         companyPendingInvoice
                                             ?.filter((pendingInv) => pendingInv._id !== currentInvoice?._id)
                                             .map((pendingInv) => {
-                                                const invAmount = rentalInvoiceDisplayGrandTotal(pendingInv);
+                                                const invAmount = paymentModalGrandTotal(pendingInv);
                                                 const canSelect = invAmount <= remainingToAllocate || selectedInvoiceIds.includes(pendingInv._id);
                                                 const dateStr = pendingInv.invoiceDate || pendingInv.entryDate || pendingInv.createdAt;
                                                 return (
@@ -1854,7 +1864,7 @@ function RentalInvoiceList(props) {
                                                             onChange={() => {}}
                                                             disabled={!canSelect}
                                                         />
-                                                        <span>{dateStr ? new Date(dateStr).toLocaleDateString() : 'N/A'} - Rs {invAmount.toFixed(2)}</span>
+                                                        <span>{dateStr ? new Date(dateStr).toLocaleDateString() : 'N/A'} - Rs {invAmount}</span>
                                                     </Box>
                                                 );
                                             })

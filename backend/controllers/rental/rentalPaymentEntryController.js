@@ -17,7 +17,7 @@ import {
     getRentalInvoiceOverallReportStatus,
 } from "../../utils/rentalQuotationMoveGate.js";
 import { applyCompanyIdFilter } from "../../utils/mongoFilterUtils.js";
-import { isSentInvoiceSendStatus, sentOrRecordedInvoiceFilter } from "../../utils/invoiceSendStatusFilter.js";
+import { isSentInvoiceSendStatus, sentOrRecordedInvoiceFilter, withoutPaidOrCancelled } from "../../utils/invoiceSendStatusFilter.js";
 
 /** Unpaid rental invoices for a company (excludes Paid, Cancelled, quotations, TDS rows). */
 const buildCompanyUnpaidInvoiceFilter = (companyId) => ({
@@ -29,6 +29,95 @@ const buildCompanyUnpaidInvoiceFilter = (companyId) => ({
 
 const resolveCommissionUserId = (req, entry) =>
     req.user?._id || entry?.assignedTo?._id || entry?.assignedTo;
+
+const rateConfigSnapshot = (cfg = {}) => ({
+    freeCopiesBw: cfg.freeCopiesBw ?? 0,
+    extraAmountBw: cfg.extraAmountBw ?? 0,
+    bwUnlimited: !!cfg.bwUnlimited,
+    freeCopiesColor: cfg.freeCopiesColor ?? 0,
+    extraAmountColor: cfg.extraAmountColor ?? 0,
+    colorUnlimited: !!cfg.colorUnlimited,
+    freeCopiesColorScanning: cfg.freeCopiesColorScanning ?? 0,
+    extraAmountColorScanning: cfg.extraAmountColorScanning ?? 0,
+    colorScanningUnlimited: !!cfg.colorScanningUnlimited,
+});
+
+/** Price, GST, and copy rates from the product at invoice create. */
+const buildRateSnapshot = (machine) => {
+    if (!machine) return undefined;
+    const gst = Array.isArray(machine.gstType) ? machine.gstType : [];
+    return {
+        basePrice: machine.basePrice ?? 0,
+        hsn: machine.hsn || "",
+        modelName: machine.modelName || "",
+        serialNo: machine.serialNo || "",
+        commission: machine.commission ?? 0,
+        gstType: gst.map((g) => ({
+            _id: g._id,
+            gstType: g.gstType,
+            gstPercentage: g.gstPercentage,
+        })),
+        a3Config: rateConfigSnapshot(machine.a3Config),
+        a4Config: rateConfigSnapshot(machine.a4Config),
+        a5Config: rateConfigSnapshot(machine.a5Config),
+    };
+};
+
+/** Use the saved rates when this invoice has them. Legacy invoices keep the live product. */
+const machineWithSnapshot = (machine, snapshot) => {
+    if (!snapshot || typeof snapshot !== "object") return machine;
+    const base = machine && typeof machine === "object" ? { ...machine } : {};
+    return {
+        ...base,
+        basePrice: snapshot.basePrice ?? base.basePrice,
+        hsn: snapshot.hsn ?? base.hsn,
+        modelName: snapshot.modelName || base.modelName,
+        serialNo: snapshot.serialNo || base.serialNo,
+        commission: snapshot.commission ?? base.commission,
+        gstType: Array.isArray(snapshot.gstType) && snapshot.gstType.length ? snapshot.gstType : base.gstType,
+        a3Config: { ...(base.a3Config || {}), ...(snapshot.a3Config || {}) },
+        a4Config: { ...(base.a4Config || {}), ...(snapshot.a4Config || {}) },
+        a5Config: { ...(base.a5Config || {}), ...(snapshot.a5Config || {}) },
+    };
+};
+
+const plainMachine = (machine) =>
+    machine && typeof machine.toObject === "function" ? machine.toObject() : machine;
+
+/** Dates stored on the invoice line. Missing keys mean a legacy invoice with no snapshot. */
+const billingDatesFrom = (source) => {
+    if (!source) return {};
+    const dates = {};
+    if (source.paymentDate != null) dates.paymentDate = source.paymentDate;
+    if (source.openingDate != null) dates.openingDate = source.openingDate;
+    if (source.closingDate != null) dates.closingDate = source.closingDate;
+    return dates;
+};
+
+/** Show the invoice's saved dates and rates, not the product's current values. */
+const withFrozenBillingDates = (entry) => {
+    if (!entry) return entry;
+    const obj = typeof entry.toObject === "function" ? entry.toObject() : { ...entry };
+    const apply = (holder, machineKey) => {
+        const machine = holder?.[machineKey];
+        if (!machine || typeof machine !== "object") return;
+        const frozen = holder.rateSnapshot
+            ? machineWithSnapshot(machine, holder.rateSnapshot)
+            : { ...machine };
+        const dates = billingDatesFrom(holder);
+        if (dates.paymentDate != null) frozen.paymentDate = dates.paymentDate;
+        if (dates.openingDate != null) frozen.openingDate = dates.openingDate;
+        if (dates.closingDate != null) frozen.closingDate = dates.closingDate;
+        holder[machineKey] = frozen;
+    };
+    apply(obj, "machineId");
+    if (Array.isArray(obj.products)) {
+        for (const line of obj.products) {
+            apply(line, "machineId");
+        }
+    }
+    return obj;
+};
 
 /** Use opening meter from the invoice line when both old+new readings exist (PDF snapshot); else live machine opening (legacy). */
 const hasInvoiceReadingPair = (entryOld, entryNew) => {
@@ -294,6 +383,8 @@ export const createRentalPaymentEntry = async (req, res) => {
                 a5Config,
                 grandTotal: grandTotal.toFixed(2),
                 status: status || 'Unpaid',
+                ...billingDatesFrom(machine),
+                rateSnapshot: buildRateSnapshot(machine),
             };
 
             // Only include assignedTo if it's a valid value (not undefined, null, or empty string)
@@ -378,7 +469,7 @@ export const createRentalPaymentEntry = async (req, res) => {
             return res.status(201).send({
                 success: true,
                 message: "Rental Payment Entry created successfully",
-                entry: populatedInvoice,
+                entry: withFrozenBillingDates(populatedInvoice),
             });
         }
 
@@ -440,6 +531,8 @@ export const createRentalPaymentEntry = async (req, res) => {
                     a5Config,
                     countImageUpload: productImageUrl,
                     productTotal: parseFloat(productTotal.toFixed(2)),
+                    ...billingDatesFrom(machine),
+                    rateSnapshot: buildRateSnapshot(machine),
                 });
 
                 grandTotal += productTotal;
@@ -557,7 +650,7 @@ export const createRentalPaymentEntry = async (req, res) => {
             return res.status(201).send({
                 success: true,
                 message: "Rental Payment Entry created successfully with multiple products",
-                entry: populatedInvoice,
+                entry: withFrozenBillingDates(populatedInvoice),
             });
         }
 
@@ -591,7 +684,7 @@ export const getAllRentalPaymentEntries = async (req, res) => {
         let query = {};
 
         if (status) {
-            query.status = status;
+            query.status = withoutPaidOrCancelled(status);
         }
 
         // Add invoiceType filter if provided (case-insensitive for legacy data)
@@ -689,7 +782,7 @@ export const getAllRentalPaymentEntries = async (req, res) => {
         res.status(200).send({
             success: true,
             message: 'All rental payment entries fetched successfully',
-            entries,
+            entries: entries.map(withFrozenBillingDates),
             totalCount
         });
     } catch (error) {
@@ -748,7 +841,7 @@ export const getRentalPaymentEntryById = async (req, res) => {
         res.status(200).send({
             success: true,
             message: 'Rental Payment Entry fetched successfully',
-            entry,
+            entry: withFrozenBillingDates(entry),
             companyPendingInvoicesTotal,
         });
     } catch (error) {
@@ -811,7 +904,7 @@ export const getRentalInvoiceAssignedTo = async (req, res) => {
 
         res.status(200).send({
             success: true,
-            entries
+            entries: entries.map(withFrozenBillingDates),
         });
     } catch (error) {
         console.error("Error in getting entries by phone:", error); // Log the error
@@ -999,9 +1092,6 @@ export const updateRentalPaymentEntry = async (req, res) => {
                 const a4Config = typeof prodA4Config === 'string' ? JSON.parse(prodA4Config) : (prodA4Config || {});
                 const a5Config = typeof prodA5Config === 'string' ? JSON.parse(prodA5Config) : (prodA5Config || {});
 
-                // Calculate product total
-                const productTotal = calculateProductTotal(machine, a3Config, a4Config, a5Config);
-
                 // Handle product image upload if provided
                 let productImageUrl = null;
                 if (prodCountImageUpload) {
@@ -1037,7 +1127,17 @@ export const updateRentalPaymentEntry = async (req, res) => {
                     }
                 }
 
-                // Add to products array
+                // Keep the dates stored when the line was created. A newly added machine is snapshotted now.
+                const existingLine = entry.products?.find((p) => String(p.machineId) === String(prodMachineId));
+                const frozenDates = billingDatesFrom(existingLine);
+                const lineDates = Object.keys(frozenDates).length
+                    ? frozenDates
+                    : (existingLine ? {} : billingDatesFrom(machine));
+                const pricedMachine = machineWithSnapshot(plainMachine(machine), existingLine?.rateSnapshot);
+                const productTotal = calculateProductTotal(pricedMachine, a3Config, a4Config, a5Config);
+                const lineSnapshot = existingLine?.rateSnapshot
+                    || (existingLine ? undefined : buildRateSnapshot(machine));
+
                 productsArray.push({
                     machineId: prodMachineId,
                     serialNo: serialNo || machine.serialNo,
@@ -1046,6 +1146,8 @@ export const updateRentalPaymentEntry = async (req, res) => {
                     a5Config,
                     countImageUpload: productImageUrl,
                     productTotal: parseFloat(productTotal.toFixed(2)),
+                    ...lineDates,
+                    ...(lineSnapshot ? { rateSnapshot: lineSnapshot } : {}),
                 });
 
                 grandTotal += productTotal;
@@ -1061,6 +1163,7 @@ export const updateRentalPaymentEntry = async (req, res) => {
             const a4Config = req.body.a4Config ? JSON.parse(req.body.a4Config) : undefined;
             const a5Config = req.body.a5Config ? JSON.parse(req.body.a5Config) : undefined;
 
+            const previousMachineId = String(entry.machineId || "");
             // Update machineId
             entry.machineId = machineId || entry.machineId;
 
@@ -1093,8 +1196,20 @@ export const updateRentalPaymentEntry = async (req, res) => {
             // Recalculate grand total for single product
             const machine = await rentalProductModel.findById(machineId).populate("gstType");
             if (machine) {
-                const productTotal = calculateProductTotal(machine, entry.a3Config, entry.a4Config, entry.a5Config);
+                const machineChanged = String(machineId || "") !== "" && String(machineId) !== previousMachineId;
+                const pricedMachine = machineWithSnapshot(
+                    plainMachine(machine),
+                    machineChanged ? undefined : entry.rateSnapshot
+                );
+                const productTotal = calculateProductTotal(pricedMachine, entry.a3Config, entry.a4Config, entry.a5Config);
                 entry.grandTotal = productTotal.toFixed(2);
+                if (machineChanged) {
+                    const dates = billingDatesFrom(machine);
+                    entry.paymentDate = dates.paymentDate;
+                    entry.openingDate = dates.openingDate;
+                    entry.closingDate = dates.closingDate;
+                    entry.rateSnapshot = buildRateSnapshot(machine);
+                }
             }
         }
 
@@ -1216,7 +1331,7 @@ export const updateRentalPaymentEntry = async (req, res) => {
         res.status(200).send({
             success: true,
             message: 'Rental Payment Entry updated successfully',
-            entry: populatedInvoice,
+            entry: withFrozenBillingDates(populatedInvoice),
         });
 
     } catch (error) {

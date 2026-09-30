@@ -2,11 +2,14 @@ import commissionModel from "../models/commissionModel.js";
 import rentalProductModel from "../models/rentalProductModel.js";
 import { calculateRentalLineCommission } from "./rentalCommissionCalc.js";
 
-const resolveMachineDoc = async (machineRef) => {
+const resolveMachineDoc = async (machineRef, rateSnapshot) => {
+    const machineId = machineRef?._id || machineRef;
+    if (rateSnapshot && typeof rateSnapshot === "object" && rateSnapshot.basePrice != null) {
+        return { ...rateSnapshot, _id: machineId };
+    }
     if (machineRef && typeof machineRef === "object" && machineRef.basePrice != null) {
         return machineRef;
     }
-    const machineId = machineRef?._id || machineRef;
     if (!machineId) return null;
     return rentalProductModel.findById(machineId).populate("gstType").lean();
 };
@@ -15,6 +18,7 @@ const collectRentalLines = (entry) => {
     if (entry?.products?.length) {
         return entry.products.map((line) => ({
             machineRef: line.machineId,
+            rateSnapshot: line.rateSnapshot,
             a3Config: line.a3Config,
             a4Config: line.a4Config,
             a5Config: line.a5Config,
@@ -25,6 +29,7 @@ const collectRentalLines = (entry) => {
         return [
             {
                 machineRef: entry.machineId,
+                rateSnapshot: entry.rateSnapshot,
                 a3Config: entry.a3Config,
                 a4Config: entry.a4Config,
                 a5Config: entry.a5Config,
@@ -55,7 +60,7 @@ export const syncRentalInvoiceCommissions = async ({ entry, userId }) => {
     });
 
     for (const line of lines) {
-        const machineDoc = await resolveMachineDoc(line.machineRef);
+        const machineDoc = await resolveMachineDoc(line.machineRef, line.rateSnapshot);
         const rentalProductId = machineDoc?._id || line.machineRef?._id || line.machineRef;
         if (!machineDoc || !rentalProductId) continue;
 

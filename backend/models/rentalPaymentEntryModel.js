@@ -49,6 +49,11 @@ const productEntrySchema = new mongoose.Schema({
         type: Number,
         default: 0,
     },
+    // Frozen at invoice create. Later product edits must not change this line.
+    paymentDate: { type: Date },
+    openingDate: { type: Date },
+    closingDate: { type: Date },
+    rateSnapshot: { type: mongoose.Schema.Types.Mixed },
 }, { _id: true });
 
 const rentalPaymentEntrySchema = new mongoose.Schema({
@@ -205,6 +210,11 @@ const rentalPaymentEntrySchema = new mongoose.Schema({
         type: Number,
         trim: true,
     },
+    // Single-machine invoices: frozen product values from the moment the invoice was created.
+    paymentDate: { type: Date },
+    openingDate: { type: Date },
+    closingDate: { type: Date },
+    rateSnapshot: { type: mongoose.Schema.Types.Mixed },
 }, { timestamps: true });
 
 function coerceSendDetailsToOnDoc(doc) {

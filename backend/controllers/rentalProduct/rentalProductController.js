@@ -193,6 +193,39 @@ export const updateRentalProduct = async (req, res) => {
             modelSpecs, a3Config, a4Config, a5Config, employeeId, commission, employeeCommission
         } = req.body;
 
+        const countsOnly = req.body.countsOnly === true || req.body.countsOnly === "true";
+        if (countsOnly) {
+            const $set = {};
+            for (const size of ["a3Config", "a4Config", "a5Config"]) {
+                const cfg = req.body[size];
+                if (!cfg || typeof cfg !== "object") continue;
+                for (const field of ["bwOldCount", "colorOldCount", "colorScanningOldCount"]) {
+                    if (cfg[field] !== undefined && cfg[field] !== null && cfg[field] !== "") {
+                        $set[`${size}.${field}`] = Number(cfg[field]) || 0;
+                    }
+                }
+            }
+            if (!Object.keys($set).length) {
+                return res.status(400).send({
+                    success: false,
+                    message: "No meter counts to update.",
+                });
+            }
+            const updatedRentalProduct = await RentalProduct.findByIdAndUpdate(
+                id,
+                { $set },
+                { new: true }
+            );
+            if (!updatedRentalProduct) {
+                return res.status(404).send({ success: false, message: "Rental Product not found for update." });
+            }
+            return res.status(200).send({
+                success: true,
+                message: "Rental product meter counts updated",
+                rentalProduct: updatedRentalProduct,
+            });
+        }
+
         const hasAnyDateField =
             paymentDate !== undefined ||
             openingDate !== undefined ||

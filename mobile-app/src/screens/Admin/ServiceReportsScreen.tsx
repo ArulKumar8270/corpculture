@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   TextInput,
   Alert,
+  Modal,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
@@ -43,6 +44,7 @@ import { collectReportSerialNumbers } from '../../utils/reportSerialNumbers';
 import { downloadReportAndOpen } from '../../utils/reportDownload';
 import { getServiceProductDisplayName } from '../../utils/serviceProductDisplayName';
 import { presentDocumentSentNotification } from '../../services/pushNotifications';
+import { fetchAssignableUsers } from '../../utils/fetchAssignableUsers';
 
 function companyIdFromReport(report: any): string | undefined {
   const c = report?.company;
@@ -81,6 +83,11 @@ const ServiceReportsScreen = () => {
     serialNo: '',
   });
   const [viewMode, setViewMode] = useState<TrashViewMode>('active');
+  const [assignableUsers, setAssignableUsers] = useState<any[]>([]);
+  const [reassignModalVisible, setReassignModalVisible] = useState(false);
+  const [reassignReport, setReassignReport] = useState<any | null>(null);
+  const [selectedReassignUserId, setSelectedReassignUserId] = useState('');
+  const [reassigning, setReassigning] = useState(false);
 
   const fetchReports = useCallback(
     async (filterValues = filters, currentPage = page, currentRowsPerPage = rowsPerPage) => {
@@ -133,6 +140,25 @@ const ServiceReportsScreen = () => {
   useEffect(() => {
     if (token) fetchReports(filters, page, rowsPerPage);
   }, [token, page, rowsPerPage, viewMode]);
+
+  useEffect(() => {
+    if (!token) {
+      setAssignableUsers([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const list = await fetchAssignableUsers(token);
+        if (!cancelled) setAssignableUsers(list);
+      } catch {
+        if (!cancelled) setAssignableUsers([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
 
   const handleApplyFilters = () => {
     setPage(0);
@@ -266,6 +292,51 @@ const ServiceReportsScreen = () => {
       (navigation as any).navigate('Employees', { screen: 'ActivityLogForm', params });
     } else {
       (navigation as any).navigate('Profile', { screen: 'ActivityLogForm', params });
+    }
+  };
+
+  const openReassignModal = (report: any) => {
+    setReassignReport(report);
+    setSelectedReassignUserId(report?.assignedTo?._id != null ? String(report.assignedTo._id) : '');
+    setReassignModalVisible(true);
+  };
+
+  const closeReassignModal = () => {
+    setReassignModalVisible(false);
+    setReassignReport(null);
+    setSelectedReassignUserId('');
+  };
+
+  const handleConfirmReassign = async () => {
+    if (!reassignReport?._id) {
+      Toast.show({ type: 'error', text1: 'Missing document' });
+      return;
+    }
+    if (!selectedReassignUserId) {
+      Toast.show({ type: 'error', text1: 'Select a user to assign' });
+      return;
+    }
+    setReassigning(true);
+    try {
+      const res = await axios.put(
+        `${getApiBaseUrl()}/report/${reassignReport._id}`,
+        { assignedTo: selectedReassignUserId },
+        { headers: { Authorization: token || '' } }
+      );
+      if (res.data?.success) {
+        Toast.show({ type: 'success', text1: 'Assigned successfully' });
+        closeReassignModal();
+        fetchReports();
+      } else {
+        Toast.show({ type: 'error', text1: res.data?.message || 'Assign failed' });
+      }
+    } catch (e: any) {
+      Toast.show({
+        type: 'error',
+        text1: e?.response?.data?.message || 'Assign failed',
+      });
+    } finally {
+      setReassigning(false);
     }
   };
 
@@ -564,12 +635,21 @@ const ServiceReportsScreen = () => {
                   </>
                 )}
               </TouchableOpacity>
-              {(user?.role === 1 || user?.role === 3) && companyIdFromReport(item) ? (
+              {hasPermission(docPermissionKey, 'edit') ? (
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.reassignButton]}
+                  onPress={() => openReassignModal(item)}
+                >
+                  <Icon name="person" size={18} color="#6a1b9a" />
+                  <Text style={[styles.actionButtonText, styles.reassignButtonText]}>Assign To</Text>
+                </TouchableOpacity>
+              ) : null}
+              {companyIdFromReport(item) ? (
                 <TouchableOpacity
                   style={[styles.actionButton, styles.editButton]}
                   onPress={() => navigatePetrolForm(item)}
                 >
-                  <Icon name="playlist-add-check" size={18} color="#007AFF" />
+                  <Icon name="local-gas-station" size={18} color="#007AFF" />
                   <Text style={styles.actionButtonText}>Petrol Form</Text>
                 </TouchableOpacity>
               ) : null}
@@ -770,6 +850,69 @@ const ServiceReportsScreen = () => {
           setPage(0);
         }}
       />
+      <Modal
+        visible={reassignModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={closeReassignModal}
+      >
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={closeReassignModal}>
+          <View style={styles.pickerModalContent} onStartShouldSetResponder={() => true}>
+            <Text style={styles.pickerModalTitle}>Assign To</Text>
+            <Text style={styles.reassignHint} numberOfLines={2}>
+              All staff linked to an employee record ({assignableUsers.length} users)
+            </Text>
+            <FlatList
+              data={assignableUsers}
+              keyExtractor={(u) => String(u._id)}
+              style={{ maxHeight: 360 }}
+              ListEmptyComponent={
+                <View style={styles.pickerEmptyContainer}>
+                  <Text style={styles.pickerEmptyText}>No assignable users</Text>
+                </View>
+              }
+              renderItem={({ item: u }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.pickerOption,
+                    String(u._id) === selectedReassignUserId && styles.pickerOptionSelected,
+                  ]}
+                  onPress={() => setSelectedReassignUserId(String(u._id))}
+                >
+                  <Text style={styles.pickerOptionText}>
+                    {u.name || '—'}
+                    {u.email ? ` (${u.email})` : ''}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalCancelButton]}
+                onPress={closeReassignModal}
+                disabled={reassigning}
+              >
+                <Text style={styles.modalCancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.modalButton,
+                  styles.modalSaveButton,
+                  (!selectedReassignUserId || reassigning) && { opacity: 0.5 },
+                ]}
+                onPress={handleConfirmReassign}
+                disabled={!selectedReassignUserId || reassigning}
+              >
+                {reassigning ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.modalSaveButtonText}>Save</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 };
@@ -1058,6 +1201,34 @@ const styles = StyleSheet.create({
   pageBtnDisabled: { backgroundColor: '#ccc', opacity: 0.8 },
   pageBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
   pageInfo: { fontSize: 14, color: '#333' },
+  reassignButton: { backgroundColor: '#f3e5f5' },
+  reassignButtonText: { color: '#6a1b9a' },
+  reassignHint: { fontSize: 12, color: '#666', marginBottom: 10, textAlign: 'center' },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+  },
+  pickerModalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 20,
+    maxHeight: '70%',
+    width: '90%',
+    alignSelf: 'center',
+  },
+  pickerModalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 8, textAlign: 'center' },
+  pickerOption: { padding: 15, borderBottomWidth: 1, borderBottomColor: '#e0e0e0' },
+  pickerOptionSelected: { backgroundColor: '#e6f7ff' },
+  pickerOptionText: { fontSize: 16, color: '#333' },
+  pickerEmptyContainer: { padding: 20, alignItems: 'center' },
+  pickerEmptyText: { fontSize: 14, color: '#999' },
+  modalActions: { flexDirection: 'row', gap: 10, marginTop: 16 },
+  modalButton: { flex: 1, padding: 15, borderRadius: 8, alignItems: 'center' },
+  modalCancelButton: { backgroundColor: '#e0e0e0' },
+  modalSaveButton: { backgroundColor: '#007AFF' },
+  modalCancelButtonText: { fontSize: 16, color: '#333', fontWeight: '600' },
+  modalSaveButtonText: { fontSize: 16, color: '#fff', fontWeight: '600' },
 });
 
 export default ServiceReportsScreen;

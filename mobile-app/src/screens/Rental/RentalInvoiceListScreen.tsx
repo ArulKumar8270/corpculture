@@ -99,6 +99,17 @@ function rentalInvoiceDisplayGrandTotal(entry: any): number {
   return parseFloat(String(entry?.grandTotal)) || 0;
 }
 
+/** Next whole rupee. 3499.88 becomes 3500. */
+function roundUpRupee(value: number | string | null | undefined): number {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return Math.ceil(n);
+}
+
+function paymentModalGrandTotal(entry: any): number {
+  return roundUpRupee(rentalInvoiceDisplayGrandTotal(entry));
+}
+
 const RentalInvoiceListScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
@@ -727,7 +738,8 @@ const RentalInvoiceListScreen = () => {
       initialPaymentAmountType = 'Pending';
     }
 
-    const grand = rentalInvoiceDisplayGrandTotal(entry);
+    const grand = paymentModalGrandTotal(entry);
+    const paid = roundUpRupee(initialPaymentAmount);
     setPaymentForm({
       modeOfPayment: entry.modeOfPayment || 'CASH',
       bankName: entry.bankName || '',
@@ -736,19 +748,19 @@ const RentalInvoiceListScreen = () => {
       transferDate: entry.transferDate ? new Date(entry.transferDate).toISOString().split('T')[0] : '',
       companyNamePayment: entry.companyNamePayment || '',
       otherPaymentMode: entry.otherPaymentMode || '',
-      paymentAmount: initialPaymentAmount.toString(),
+      paymentAmount: initialPaymentAmount > 0 ? String(paid) : initialPaymentAmount.toString(),
       paymentAmountType: initialPaymentAmountType,
       grandTotal: grand,
       paymentContactEmails: invoicePaymentEmailsFromRecord(entry),
     });
     setSelectedPendingInvoiceId(null);
 
-    if (initialPaymentAmount > 0 && initialPaymentAmount < grand) {
-      setPendingAmount(grand - initialPaymentAmount);
+    if (initialPaymentAmount > 0 && paid < grand) {
+      setPendingAmount(roundUpRupee(grand - paid));
       setBalanceAmount(0);
       setCompanyPendingInvoices([]);
-    } else if (initialPaymentAmount > grand) {
-      setBalanceAmount(initialPaymentAmount - grand);
+    } else if (paid > grand) {
+      setBalanceAmount(roundUpRupee(paid - grand));
       setPendingAmount(0);
       fetchCompanyPendingInvoices(entry);
     } else {
@@ -764,15 +776,14 @@ const RentalInvoiceListScreen = () => {
     setPaymentForm({ ...paymentForm, paymentAmount: value });
     const amount = parseFloat(value) || 0;
 
-    const cap = rentalInvoiceDisplayGrandTotal(selectedEntry);
+    const cap = paymentModalGrandTotal(selectedEntry);
     if (amount < cap) {
-      const pending = cap - amount;
-      setPendingAmount(pending);
+      setPendingAmount(roundUpRupee(cap - amount));
       setBalanceAmount(0);
       setCompanyPendingInvoices([]);
       setSelectedPendingInvoiceId(null);
     } else {
-      const balance = amount - cap;
+      const balance = roundUpRupee(amount - cap);
       setBalanceAmount(balance);
       setPendingAmount(0);
 
@@ -812,8 +823,8 @@ const RentalInvoiceListScreen = () => {
     try {
       const paymentAmount = parseFloat(paymentForm.paymentAmount) || 0;
       const grandTotal =
-        parseFloat(String(paymentForm.grandTotal)) ||
-        rentalInvoiceDisplayGrandTotal(selectedEntry) ||
+        roundUpRupee(paymentForm.grandTotal) ||
+        paymentModalGrandTotal(selectedEntry) ||
         0;
       
       // Calculate status based on payment amount and balance
@@ -894,7 +905,7 @@ const RentalInvoiceListScreen = () => {
             try {
               const inv = selectedEntry;
               const formCap =
-                Number(paymentForm?.grandTotal) || rentalInvoiceDisplayGrandTotal(inv) || 0;
+                roundUpRupee(paymentForm?.grandTotal) || paymentModalGrandTotal(inv) || 0;
               const payNum = parseFloat(String(paymentForm.paymentAmount)) || 0;
               const currentInvoicePayment = payNum >= formCap ? formCap : payNum;
               const invDate = inv.invoiceDate || inv.entryDate || inv.createdAt;
@@ -902,7 +913,7 @@ const RentalInvoiceListScreen = () => {
                 invoiceId: inv._id,
                 invoice: {
                   _id: inv._id,
-                  grandTotal: rentalInvoiceDisplayGrandTotal(inv),
+                  grandTotal: paymentModalGrandTotal(inv),
                   invoiceDate: invDate,
                   companyId: inv.companyId,
                   invoiceNumber: inv.invoiceNumber,
@@ -1272,7 +1283,7 @@ const RentalInvoiceListScreen = () => {
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Grand Total:</Text>
               <Text style={[styles.detailValue, { fontWeight: 'bold', color: '#1976d2' }]}>
-                ₹{rentalInvoiceDisplayGrandTotal(item).toFixed(2)}
+                ₹{roundUpRupee(rentalInvoiceDisplayGrandTotal(item))}
               </Text>
             </View>
           )}
@@ -1536,14 +1547,14 @@ const RentalInvoiceListScreen = () => {
                     <View style={styles.productRow}>
                       <Text style={styles.productLabel}>Product Total:</Text>
                       <Text style={[styles.productValue, { fontWeight: 'bold' }]}>
-                        ₹{getRentalProductLineDisplayTotal(machineObj, product).toFixed(2)}
+                        ₹{roundUpRupee(getRentalProductLineDisplayTotal(machineObj, product))}
                       </Text>
                     </View>
                   ) : product.productTotal ? (
                     <View style={styles.productRow}>
                       <Text style={styles.productLabel}>Product Total:</Text>
                       <Text style={[styles.productValue, { fontWeight: 'bold' }]}>
-                        ₹{parseFloat(String(product.productTotal)).toFixed(2)}
+                        ₹{roundUpRupee(parseFloat(String(product.productTotal)))}
                       </Text>
                     </View>
                   ) : null}
@@ -1587,7 +1598,7 @@ const RentalInvoiceListScreen = () => {
               <View style={styles.grandTotalSection}>
                 <Text style={styles.grandTotalLabel}>Grand Total:</Text>
                 <Text style={styles.grandTotalValue}>
-                  ₹{rentalInvoiceDisplayGrandTotal(item).toFixed(2)}
+                  ₹{roundUpRupee(rentalInvoiceDisplayGrandTotal(item))}
                 </Text>
               </View>
             )}
@@ -1801,9 +1812,10 @@ const RentalInvoiceListScreen = () => {
           >
             <Text style={styles.modalTitle}>
               Payment Details (RS:{' '}
-              {paymentForm?.grandTotal ||
-                (selectedEntry ? rentalInvoiceDisplayGrandTotal(selectedEntry) : 0) ||
-                '0.00'}
+              {roundUpRupee(
+                paymentForm?.grandTotal ||
+                  (selectedEntry ? rentalInvoiceDisplayGrandTotal(selectedEntry) : 0)
+              ) || '0'}
             </Text>
 
             {selectedEntry ? (
@@ -2000,7 +2012,7 @@ const RentalInvoiceListScreen = () => {
               <>
                 {balanceAmount > 0 && (
                   <Text style={styles.balanceText}>
-                    Previous Invoice Balance - Rs {balanceAmount.toFixed(2)}
+                    Previous Invoice Balance - Rs {roundUpRupee(balanceAmount)}
                   </Text>
                 )}
                 <View style={styles.modalInputGroup}>
@@ -2022,7 +2034,7 @@ const RentalInvoiceListScreen = () => {
                                 (inv) => inv._id === selectedPendingInvoiceId
                               );
                               return selectedInv
-                                ? `${new Date(selectedInv.createdAt || selectedInv.invoiceDate).toLocaleDateString()} - Rs ${rentalInvoiceDisplayGrandTotal(selectedInv).toFixed(2)}`
+                                ? `${new Date(selectedInv.createdAt || selectedInv.invoiceDate).toLocaleDateString()} - Rs ${paymentModalGrandTotal(selectedInv)}`
                                 : 'Select Invoice';
                             })()
                           : '--select Invoice--'}
@@ -2201,7 +2213,7 @@ const RentalInvoiceListScreen = () => {
                 >
                   <Text style={styles.pickerOptionText}>
                     {new Date(item.createdAt || item.invoiceDate).toLocaleDateString()} - Rs{' '}
-                    {rentalInvoiceDisplayGrandTotal(item).toFixed(2)}
+                    {paymentModalGrandTotal(item)}
                   </Text>
                 </TouchableOpacity>
               )}

@@ -906,62 +906,44 @@ const RentalInvoiceForm = () => {
         }
     };
 
+    const meterAdvancePayload = (a3Config, a4Config, a5Config) => ({
+        countsOnly: true,
+        a3Config: {
+            bwOldCount: Number(a3Config?.bwNewCount) || 0,
+            colorOldCount: Number(a3Config?.colorNewCount) || 0,
+            colorScanningOldCount: Number(a3Config?.colorScanningNewCount) || 0,
+        },
+        a4Config: {
+            bwOldCount: Number(a4Config?.bwNewCount) || 0,
+            colorOldCount: Number(a4Config?.colorNewCount) || 0,
+            colorScanningOldCount: Number(a4Config?.colorScanningNewCount) || 0,
+        },
+        a5Config: {
+            bwOldCount: Number(a5Config?.bwNewCount) || 0,
+            colorOldCount: Number(a5Config?.colorNewCount) || 0,
+            colorScanningOldCount: Number(a5Config?.colorScanningNewCount) || 0,
+        },
+    });
+
     const updateRentalProduct = async (product, a3Config, a4Config, a5Config) => {
-        const apiPayload = {
-            ...product,
-            a3Config: {
-                ...product?.a3Config,
-                bwOldCount: Number(a3Config.bwNewCount) || 0,
-                colorOldCount: Number(a3Config.colorNewCount) || 0,
-                colorScanningOldCount: Number(a3Config.colorScanningNewCount) || 0,
-            },
-            a4Config: {
-                ...product?.a4Config,
-                bwOldCount: Number(a4Config.bwNewCount) || 0,
-                colorOldCount: Number(a4Config.colorNewCount) || 0,
-                colorScanningOldCount: Number(a4Config.colorScanningNewCount) || 0,
-            },
-            a5Config: {
-                ...product?.a5Config,
-                bwOldCount: Number(a5Config.bwNewCount) || 0,
-                colorOldCount: Number(a5Config.colorNewCount) || 0,
-                colorScanningOldCount: Number(a5Config.colorScanningNewCount) || 0,
-            }
-        };
+        const productId = product?._id;
+        if (!productId) return;
         try {
-            await axios.put(`${import.meta.env.VITE_SERVER_URL}/api/v1/rental-products/${product?._id}`, apiPayload);
+            await axios.put(
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-products/${productId}`,
+                meterAdvancePayload(a3Config, a4Config, a5Config)
+            );
         } catch (error) {
             console.error('Error updating rental product:', error);
         }
     };
 
     const onUpdateRentalProduct = async (e) => {
-        const apiPayload = {
-            ...selectedProduct,
-            a3Config: {
-                ...selectedProduct?.a3Config,
-                bwOldCount: Number(formData?.a3Config.bwNewCount) || 0,
-                colorOldCount: Number(formData?.a3Config.colorNewCount) || 0,
-                colorScanningOldCount: Number(formData?.a3Config.colorScanningNewCount) || 0,
-
-            },
-            a4Config: {
-                ...selectedProduct?.a4Config,
-                bwOldCount: Number(formData?.a4Config.bwNewCount) || 0,
-                colorOldCount: Number(formData.a4Config.colorNewCount) || 0,
-                colorScanningOldCount: Number(formData?.a4Config.colorScanningNewCount) || 0,
-
-            },
-            a5Config: {
-                ...selectedProduct?.a5Config,
-                bwOldCount: Number(formData?.a5Config.bwNewCount) || 0,
-                colorOldCount: Number(formData?.a5Config.colorNewCount) || 0,
-                colorScanningOldCount: Number(formData?.a5Config.colorScanningNewCount) || 0,
-            }
-        }
         try {
-            // Update existing product
-            const { data } = await axios.put(`${import.meta.env.VITE_SERVER_URL}/api/v1/rental-products/${selectedProduct?._id}`, apiPayload);
+            const { data } = await axios.put(
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/rental-products/${selectedProduct?._id}`,
+                meterAdvancePayload(formData?.a3Config, formData?.a4Config, formData?.a5Config)
+            );
             if (data?.success) {
                 setFormData({
                     companyId: '',
