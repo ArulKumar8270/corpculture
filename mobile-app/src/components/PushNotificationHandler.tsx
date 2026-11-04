@@ -18,13 +18,17 @@ const PushNotificationHandler = () => {
 
   useEffect(() => {
     if (!shouldRegisterPush) return;
-    setupPushNotificationsForUser();
+    setupPushNotificationsForUser().catch((err) =>
+      console.error('Push notification setup failed:', err)
+    );
   }, [shouldRegisterPush, user?._id]);
 
   useEffect(() => {
     if (!shouldRegisterPush) return undefined;
     return subscribeToAppStatePushRefresh(true, () => {
-      setupPushNotificationsForUser();
+      setupPushNotificationsForUser().catch((err) =>
+        console.error('Push notification refresh failed:', err)
+      );
     });
   }, [shouldRegisterPush, user?._id]);
 

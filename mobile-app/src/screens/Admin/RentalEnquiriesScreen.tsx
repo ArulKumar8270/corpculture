@@ -157,7 +157,7 @@ const RentalEnquiriesScreen = () => {
       if (!enquiry.employeeId) {
         newCounts.new++;
       }
-      if (enquiry.employeeId && enquiry.status !== 'Cancelled') {
+      if (enquiry.employeeId && enquiry.status !== 'Cancelled' && enquiry.status !== 'Completed') {
         newCounts.assigned++;
       }
       if (enquiry.status === 'Cancelled') {
@@ -183,7 +183,10 @@ const RentalEnquiriesScreen = () => {
         break;
       case 'assigned':
         finalFilteredRentals = currentFilteredRentals.filter(
-          (enquiry) => !!enquiry.employeeId && enquiry.status !== 'Cancelled'
+          (enquiry) =>
+            !!enquiry.employeeId &&
+            enquiry.status !== 'Cancelled' &&
+            enquiry.status !== 'Completed'
         );
         break;
       case 'w_u':
@@ -406,7 +409,7 @@ const RentalEnquiriesScreen = () => {
     (navigation as any).navigate('AddRentalReport', {
       employeeName,
       employeeId: employeeUserId, // Pass employee ID for assignedTo
-      reportType: 'rental',
+      reportType: 'Rental_Report',
       rentalId: enquiry._id,
       companyId: companyIdStr || undefined,
       companyName: enquiry?.companyName,
@@ -988,8 +991,11 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   actionMenuText: {
+    flex: 1,
+    flexShrink: 1,
     fontSize: 16,
     color: '#007AFF',
+    includeFontPadding: false,
   },
   actionMenuTextDanger: {
     color: '#FF3B30',

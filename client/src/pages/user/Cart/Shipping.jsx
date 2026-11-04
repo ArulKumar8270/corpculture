@@ -171,16 +171,10 @@ const Shipping = () => {
             }
             localStorage.setItem("hdfcOrderId", data.hdfcOrderId);
             localStorage.setItem("hdfcPaymentUrl", payUrl);
+            localStorage.removeItem("hdfcUpiLink");
             localStorage.setItem("paymentMethod", "online");
-            // Use real public file so Chrome never 404s on deep-link refresh.
-            const waitingPath = `/payment-return.html?order_id=${encodeURIComponent(data.hdfcOrderId)}`;
-            const paymentWindow = window.open(payUrl, "_blank", "noopener,noreferrer");
-            if (!paymentWindow) {
-                toast.info("Allow popups, then try again — or continue on the payment page.");
-                window.location.assign(payUrl);
-                return;
-            }
-            window.location.assign(waitingPath);
+            // Full HDFC page: card, net banking, UPI, and QR. Return URL brings the shopper back.
+            window.location.assign(payUrl);
         } catch (error) {
             console.error(error);
             toast.error(error.response?.data?.message || "Could not start payment");

@@ -79,6 +79,11 @@ const makeReceiptNumber = (hdfcOrderId) =>
         .slice(0, 18)
         .toUpperCase()}`;
 
+const sessionUpiLink = (session) => {
+    const link = String(session?.paymentLinks?.upi || "").trim();
+    return link.startsWith("upi:") ? link : "";
+};
+
 const receiptPayload = (session, order = null) => ({
     receiptNumber: session?.receiptNumber || makeReceiptNumber(session?.hdfcOrderId),
     hdfcOrderId: session?.hdfcOrderId || "",
@@ -230,6 +235,7 @@ export const initiateHdfcPayment = async (req, res) => {
             amount,
             paymentUrl,
             paymentLinks,
+            upiLink: "",
             sdkPayload: hdfcSession?.sdk_payload || null,
             paymentSessionId: paymentSession._id,
             returnUrl,
@@ -330,8 +336,19 @@ const fulfillPaidSession = async (session, hdfcOrder) => {
     return order;
 };
 
+const restoreStock = async (products = []) => {
+    for (const item of products) {
+        const product = await productModel.findById(item?.productId);
+        const quantity = Number(item?.quantity) || 0;
+        if (product && quantity > 0) {
+            product.stock += quantity;
+            await product.save();
+        }
+    }
+};
+
 /** Persist a Failed order when payment does not complete. Does not reduce stock. */
-const fulfillFailedSession = async (session, hdfcOrder, reason) => {
+const fulfillFailedSession = async (session, hdfcOrder, reason, options = {}) => {
     session.status = "failed";
     session.hdfcStatus = String(hdfcOrder?.status || session.hdfcStatus || "FAILED").toUpperCase();
     session.failureReason = String(reason || "Payment failed").slice(0, 500);
@@ -343,11 +360,15 @@ const fulfillFailedSession = async (session, hdfcOrder, reason) => {
     if (session.createdOrderId) {
         const existing = await orderModel.findById(session.createdOrderId);
         if (existing) {
-            if (existing.paymentStatus === "Paid") {
+            if (existing.paymentStatus === "Paid" && !options.reversePaid) {
                 await session.save();
                 return existing;
             }
+            if (existing.paymentStatus === "Paid" && options.reversePaid) {
+                await restoreStock(existing.products);
+            }
             existing.paymentStatus = "Failed";
+            existing.orderStatus = "Cancelled";
             await existing.save();
             await session.save();
             return existing;
@@ -356,8 +377,14 @@ const fulfillFailedSession = async (session, hdfcOrder, reason) => {
 
     let order = await orderModel.findOne({ hdfcOrderId: session.hdfcOrderId });
     if (order) {
-        if (order.paymentStatus !== "Paid") {
+        if (order.paymentStatus === "Paid" && options.reversePaid) {
+            await restoreStock(order.products);
             order.paymentStatus = "Failed";
+            order.orderStatus = "Cancelled";
+            await order.save();
+        } else if (order.paymentStatus !== "Paid") {
+            order.paymentStatus = "Failed";
+            order.orderStatus = "Cancelled";
             await order.save();
         }
         session.createdOrderId = order._id;
@@ -407,6 +434,7 @@ export const verifyHdfcPayment = async (req, res) => {
         if (!session) {
             return res.status(404).send({ success: false, message: "Payment session not found" });
         }
+        const upiLink = sessionUpiLink(session);
 
         // Response tampering: if gateway sent a signed return payload, validate with RESPONSE_KEY.
         const { responseKey } = getHdfcConfig();
@@ -436,16 +464,24 @@ export const verifyHdfcPayment = async (req, res) => {
         }
 
         if (session.status === "paid" && session.createdOrderId) {
-            const order = await orderModel.findById(session.createdOrderId);
-            return res.status(200).send({
-                success: true,
-                paid: true,
-                hdfcStatus: session.hdfcStatus,
-                paymentUrl: sessionPaymentUrl(session),
-                order,
-                receipt: receiptPayload(session, order),
-                message: "Payment successful",
+            const storedGateway = session.lastGatewayResponse;
+            const storedWasReal = !storedGateway || isHdfcOrderPaid({
+                ...storedGateway,
+                status: storedGateway.status || session.hdfcStatus || "CHARGED",
             });
+            if (storedWasReal) {
+                const order = await orderModel.findById(session.createdOrderId);
+                return res.status(200).send({
+                    success: true,
+                    paid: true,
+                    hdfcStatus: session.hdfcStatus,
+                    paymentUrl: sessionPaymentUrl(session),
+                    upiLink,
+                    order,
+                    receipt: receiptPayload(session, order),
+                    message: "Payment successful",
+                });
+            }
         }
 
         if (session.status === "failed" && session.createdOrderId && !forceFail) {
@@ -455,6 +491,7 @@ export const verifyHdfcPayment = async (req, res) => {
                 paid: false,
                 hdfcStatus: session.hdfcStatus,
                 paymentUrl: sessionPaymentUrl(session),
+                upiLink,
                 order,
                 failureReason: session.failureReason,
                 message: session.failureReason || "Payment failed",
@@ -492,6 +529,7 @@ export const verifyHdfcPayment = async (req, res) => {
                     resumePayment: Boolean(sessionPaymentUrl(session)),
                     hdfcStatus,
                     paymentUrl: sessionPaymentUrl(session),
+                upiLink,
                     message: "Confirming payment with bank (dual inquiry). Please wait...",
                     receipt: receiptPayload(session),
                 });
@@ -508,6 +546,7 @@ export const verifyHdfcPayment = async (req, res) => {
                     resumePayment: Boolean(sessionPaymentUrl(session)),
                     hdfcStatus: session.hdfcStatus,
                     paymentUrl: sessionPaymentUrl(session),
+                upiLink,
                     message: "Could not reach payment gateway. Retrying...",
                     receipt: receiptPayload(session),
                 });
@@ -516,13 +555,11 @@ export const verifyHdfcPayment = async (req, res) => {
 
         const paymentUrl = sessionPaymentUrl(session);
         const { allowUatDummy } = getHdfcConfig();
-        // On UAT, any gateway success status is enough to create the order and show success UI.
-        const uatCharged =
-            allowUatDummy && hdfcOrder && isHdfcPaymentSuccess(hdfcStatus);
         const paidOk =
             dualConsistent &&
-            ((hdfcOrder && isHdfcPaymentSuccess(hdfcStatus) && isHdfcOrderPaid(hdfcOrder)) ||
-                uatCharged);
+            hdfcOrder &&
+            isHdfcPaymentSuccess(hdfcStatus) &&
+            isHdfcOrderPaid(hdfcOrder);
 
         if (paidOk) {
             const paidAmount = Number(hdfcOrder?.amount);
@@ -572,6 +609,26 @@ export const verifyHdfcPayment = async (req, res) => {
             });
         }
 
+        if (hdfcOrder && isHdfcPaymentSuccess(hdfcStatus) && !isHdfcOrderPaid(hdfcOrder)) {
+            const order = await fulfillFailedSession(
+                session,
+                hdfcOrder,
+                "Test gateway charge is not a real payment",
+                { reversePaid: true }
+            );
+            return res.status(200).send({
+                success: false,
+                paid: false,
+                hdfcStatus,
+                paymentUrl,
+                upiLink,
+                order,
+                failureReason: session.failureReason,
+                message: "Payment was not received. The order is not confirmed.",
+                receipt: receiptPayload(session, order),
+            });
+        }
+
         if (forceFail || (hdfcOrder && isHdfcPaymentFailed(hdfcStatus))) {
             const reason = forceFail
                 ? String(req.body?.failureReason || "Payment confirmation timed out").slice(0, 500)
@@ -604,8 +661,9 @@ export const verifyHdfcPayment = async (req, res) => {
             resumePayment: false,
             hdfcStatus,
             paymentUrl,
+            upiLink,
             message: awaitingUpi
-                ? "Waiting for UPI approval. Do not close the payment page."
+                ? "Scan the QR with PhonePe, GPay, or any UPI app. The payment request opens in that app."
                 : "Payment is still pending",
             receipt: receiptPayload(session),
         });

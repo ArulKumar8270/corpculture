@@ -112,11 +112,15 @@ const CustomDrawerContent = (props: CustomDrawerContentProps) => {
       'AddCompany': 'Settings',
       'OldInvoicesList': 'Settings',
       'MenuSettings': 'Settings',
+      'GlobalSettings': 'Settings',
+      'FrontHomeSettings': 'Settings',
       'CreditSettings': 'Settings',
       'GiftSettings': 'Settings',
       'AdminPayslipList': 'Settings',
       'AddPayslip': 'Settings',
       'AdminPayslipView': 'Settings',
+      'OldInvoiceUpload': 'Settings',
+      'OldInvoiceDetail': 'Settings',
       'ActivityLogList': 'Profile',
       'ProductCreate': 'Products',
       'ProductList': 'Products',
@@ -825,6 +829,22 @@ const CustomDrawerContent = (props: CustomDrawerContentProps) => {
                 onPress={() => navigateToScreen('MenuSettings')}
               >
                 <Text style={styles.menuItemText}>Menu setting</Text>
+              </TouchableOpacity>
+            )}
+            {(isAdmin || hasPermission('otherSettings', 'view')) && (
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => navigateToScreen('GlobalSettings')}
+              >
+                <Text style={styles.menuItemText}>FY Invoice / Settings</Text>
+              </TouchableOpacity>
+            )}
+            {(isAdmin || hasPermission('otherSettings', 'view')) && (
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => navigateToScreen('FrontHomeSettings')}
+              >
+                <Text style={styles.menuItemText}>Front Home</Text>
               </TouchableOpacity>
             )}
             {(isAdmin || hasPermission('otherSettingsPayslip', 'view')) && (

@@ -44,9 +44,12 @@ const AdminDashboardScreen = () => {
     setLoading(true);
     try {
       const response = await adminService.getDashboardStats();
-      dispatch(setDashboardStats(response.data.stats));
+      if (response?.data?.stats) {
+        dispatch(setDashboardStats(response.data.stats));
+      }
     } catch (error) {
-      console.error('Error loading stats:', error);
+      // Stats endpoint is optional; dashboard menus still work without it.
+      console.warn('Dashboard stats unavailable');
     } finally {
       setLoading(false);
     }
@@ -56,9 +59,11 @@ const AdminDashboardScreen = () => {
     // Open as direct Drawer.Screen so back button always goes to Dashboard (no stack history)
     const directDrawerScreens = [
       'ServiceEnquiries', 'ServiceProductList', 'ServiceInvoiceList', 'ServiceQuotationList', 'ServiceReports',
-      'AddServiceProduct', 'AddServiceInvoice', 'AddServiceQuotation',
+      'ServiceGatePass', 'ServiceDeliveryChallan', 'ServiceReturnableChallan',
+      'AddServiceProduct', 'AddServiceInvoice', 'AddServiceQuotation', 'AddServiceReport',
       'RentalEnquiries', 'RentalProductList', 'RentalInvoiceList', 'RentalQuotationList', 'RentalReports',
-      'AddRentalProduct', 'AddRentalInvoice',
+      'RentalGatePass', 'RentalDeliveryChallan', 'RentalReturnableChallan',
+      'AddRentalProduct', 'AddRentalInvoice', 'AddRentalReport',
       'Commission', 'ServicePartners', 'RentalPartners',
       'AddCompany', 'MenuSettings', 'CreditSettings', 'GiftSettings',
     ];
@@ -91,10 +96,21 @@ const AdminDashboardScreen = () => {
       'ServiceInvoiceList': 'Services',
       'ServiceQuotationList': 'Services',
       'ServiceReports': 'Services',
+      'ServiceGatePass': 'Services',
+      'ServiceDeliveryChallan': 'Services',
+      'ServiceReturnableChallan': 'Services',
+      'ServicePartners': 'Services',
+      'AddServiceReport': 'Services',
       'RentalEnquiries': 'Rentals',
       'RentalProductList': 'Rentals',
       'RentalInvoiceList': 'Rentals',
       'RentalQuotationList': 'Rentals',
+      'RentalReports': 'Rentals',
+      'RentalGatePass': 'Rentals',
+      'RentalDeliveryChallan': 'Rentals',
+      'RentalReturnableChallan': 'Rentals',
+      'RentalPartners': 'Rentals',
+      'AddRentalReport': 'Rentals',
       'Address': 'Profile',
       'PanCard': 'Profile',
       'Deactivate': 'Profile',
@@ -225,6 +241,30 @@ const AdminDashboardScreen = () => {
       color: '#795548',
     },
     {
+      id: 'serviceGatePass',
+      title: 'Gate Pass',
+      icon: 'badge',
+      screen: 'ServiceGatePass',
+      permissionKey: 'serviceGatePass',
+      color: '#5C6BC0',
+    },
+    {
+      id: 'serviceDeliveryChallan',
+      title: 'Delivery Challan (DC Copy)',
+      icon: 'local-shipping',
+      screen: 'ServiceDeliveryChallan',
+      permissionKey: 'serviceDeliveryChallan',
+      color: '#26A69A',
+    },
+    {
+      id: 'serviceReturnableChallan',
+      title: 'Returnable Challan',
+      icon: 'assignment-return',
+      screen: 'ServiceReturnableChallan',
+      permissionKey: 'serviceReturnableChallan',
+      color: '#8D6E63',
+    },
+    {
       id: 'servicePartners',
       title: 'Partners',
       icon: 'people',
@@ -275,6 +315,30 @@ const AdminDashboardScreen = () => {
       screen: 'RentalReports',
       permissionKey: 'rentalReport',
       color: '#F44336',
+    },
+    {
+      id: 'rentalGatePass',
+      title: 'Gate Pass',
+      icon: 'badge',
+      screen: 'RentalGatePass',
+      permissionKey: 'rentalGatePass',
+      color: '#5C6BC0',
+    },
+    {
+      id: 'rentalDeliveryChallan',
+      title: 'Delivery Challan (DC Copy)',
+      icon: 'local-shipping',
+      screen: 'RentalDeliveryChallan',
+      permissionKey: 'rentalDeliveryChallan',
+      color: '#26A69A',
+    },
+    {
+      id: 'rentalReturnableChallan',
+      title: 'Returnable Challan',
+      icon: 'assignment-return',
+      screen: 'RentalReturnableChallan',
+      permissionKey: 'rentalReturnableChallan',
+      color: '#8D6E63',
     },
     {
       id: 'rentalPartners',
@@ -532,6 +596,26 @@ const AdminDashboardScreen = () => {
         key={item.id}
         style={[styles.menuCard, { borderLeftColor: item.color || '#019ee3' }]}
         onPress={() => {
+          const reportScreenParams: Record<string, { reportTypeKey: string; screenTitle: string }> = {
+            ServiceGatePass: { reportTypeKey: 'Service_Gate_Pass', screenTitle: 'Gate Pass' },
+            ServiceDeliveryChallan: {
+              reportTypeKey: 'Service_Delivery_Challan',
+              screenTitle: 'Delivery Challan (DC Copy)',
+            },
+            ServiceReturnableChallan: {
+              reportTypeKey: 'Service_Returnable_Challan',
+              screenTitle: 'Returnable Challan',
+            },
+            RentalGatePass: { reportTypeKey: 'Rental_Gate_Pass', screenTitle: 'Gate Pass' },
+            RentalDeliveryChallan: {
+              reportTypeKey: 'Rental_Delivery_Challan',
+              screenTitle: 'Delivery Challan (DC Copy)',
+            },
+            RentalReturnableChallan: {
+              reportTypeKey: 'Rental_Returnable_Challan',
+              screenTitle: 'Returnable Challan',
+            },
+          };
           const params =
             item.screen === 'ServicePartners'
               ? { commissionFrom: 'Service' }
@@ -539,7 +623,7 @@ const AdminDashboardScreen = () => {
                 ? { commissionFrom: 'Rental' }
                 : item.screen === 'Commission'
                   ? { commissionFrom: 'Sales' }
-                  : undefined;
+                  : reportScreenParams[item.screen];
           navigateToScreen(item.screen, params);
         }}
       >

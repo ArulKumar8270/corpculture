@@ -95,11 +95,15 @@ const AddServiceQuotationScreen = () => {
 
   const fetchQuotationsCount = async () => {
     try {
-      const { data } = await axios.get(`${getApiBaseUrl()}/service-invoice/all`, {
-        headers: {
-          Authorization: user?.token || '',
-        },
-      });
+      const { data } = await axios.post(
+        `${getApiBaseUrl()}/service-invoice/all`,
+        { invoiceType: 'quotation' },
+        {
+          headers: {
+            Authorization: user?.token || '',
+          },
+        }
+      );
       if (data?.success) {
         setInvoices((data.serviceInvoices?.length || 0) + 1);
       }

@@ -5,6 +5,7 @@ import { toast } from "react-toastify";
 import { useAuth } from "../../../context/auth";
 import Spinner from "../../../components/Spinner";
 import SeoData from "../../../SEO/SeoData";
+import { QRCodeCanvas } from "qrcode.react";
 
 const MAX_POLL_ATTEMPTS = 60;
 
@@ -23,6 +24,7 @@ const PaymentReturn = () => {
     const { auth } = useAuth();
     const [message, setMessage] = useState("Confirming your payment...");
     const [paymentUrl, setPaymentUrl] = useState(localStorage.getItem("hdfcPaymentUrl") || "");
+    const [upiLink, setUpiLink] = useState(localStorage.getItem("hdfcUpiLink") || "");
     const [checking, setChecking] = useState(false);
     const attemptsRef = useRef(0);
     const cancelledRef = useRef(false);
@@ -70,6 +72,7 @@ const PaymentReturn = () => {
             localStorage.setItem("skipOrderId", id);
             localStorage.removeItem("hdfcOrderId");
             localStorage.removeItem("hdfcPaymentUrl");
+            localStorage.removeItem("hdfcUpiLink");
             localStorage.removeItem("paymentFailureReason");
             localStorage.setItem("cart", JSON.stringify([]));
             const qs = new URLSearchParams({
@@ -89,6 +92,7 @@ const PaymentReturn = () => {
             if (reason) localStorage.setItem("paymentFailureReason", reason);
             if (receipt) storeReceipt(receipt, null);
             localStorage.removeItem("hdfcPaymentUrl");
+            localStorage.removeItem("hdfcUpiLink");
             navigate("/shipping/failed", { replace: true });
         },
         [navigate]
@@ -123,6 +127,10 @@ const PaymentReturn = () => {
                 localStorage.setItem("hdfcPaymentUrl", data.paymentUrl);
                 setPaymentUrl(data.paymentUrl);
             }
+            if (data?.upiLink) {
+                localStorage.setItem("hdfcUpiLink", data.upiLink);
+                setUpiLink(data.upiLink);
+            }
 
             if (data?.receipt) storeReceipt(data.receipt, data?.order);
 
@@ -138,8 +146,8 @@ const PaymentReturn = () => {
 
             if (data?.pending) {
                 setMessage(
-                    data?.awaitingUpi
-                        ? "Waiting for UPI approval. Open PhonePe/GPay and approve the request. Stay on this page until payment completes."
+                    data?.awaitingUpi || upiLink
+                        ? "Scan the QR with PhonePe, GPay, or any UPI app. The payment request opens in that app."
                         : data?.message || "Payment is still processing. Please wait..."
                 );
                 return { done: false, pending: true, data };
@@ -148,7 +156,7 @@ const PaymentReturn = () => {
             goFailed(data?.failureReason || data?.message || "Payment failed", data?.receipt);
             return { done: true };
         },
-        [auth?.token, goFailed, goSuccess, hdfcOrderId, returnParams]
+        [auth?.token, goFailed, goSuccess, hdfcOrderId, returnParams, upiLink]
     );
 
     const scheduleNext = useCallback(
@@ -217,8 +225,24 @@ const PaymentReturn = () => {
         <>
             <SeoData title="Confirming Payment" />
             <main className="min-h-screen flex flex-col items-center justify-center gap-4 bg-gradient-to-br from-[#e6fbff] to-[#f7fafd] p-8">
-                <Spinner />
-                <p className="text-gray-700 font-medium mt-24 text-center max-w-md">{message}</p>
+                {upiLink ? (
+                    <div className="bg-white rounded-2xl p-6 shadow-sm flex flex-col items-center gap-3">
+                        <p className="text-lg font-semibold text-gray-900">Scan to pay</p>
+                        <QRCodeCanvas value={upiLink} size={220} includeMargin />
+                        <a
+                            href={upiLink}
+                            className="bg-[#019ee3] text-white font-semibold px-6 py-3 rounded-xl"
+                        >
+                            Open UPI app
+                        </a>
+                        <p className="text-sm text-gray-500 text-center max-w-xs">
+                            Scan this code, or open it on your phone. Approve the request in PhonePe, GPay, or any UPI app.
+                        </p>
+                    </div>
+                ) : (
+                    <Spinner />
+                )}
+                <p className={`text-gray-700 font-medium text-center max-w-md ${upiLink ? "" : "mt-24"}`}>{message}</p>
                 {hdfcOrderId ? (
                     <p className="text-sm text-gray-500">Order: {hdfcOrderId}</p>
                 ) : null}

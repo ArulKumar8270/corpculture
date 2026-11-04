@@ -41,7 +41,9 @@ const AddCompanyScreen = () => {
   });
 
   const [serviceDeliveryAddresses, setServiceDeliveryAddresses] = useState([{ address: '', pincode: '' }]);
-  const [contactPersons, setContactPersons] = useState([{ name: '', mobile: '', email: '' }]);
+  const [contactPersons, setContactPersons] = useState([
+    { name: '', mobile: '', email: '', designation: '', dob: '' },
+  ]);
   const [loading, setLoading] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
 
@@ -113,8 +115,18 @@ const AddCompanyScreen = () => {
         );
         setContactPersons(
           company.contactPersons?.length > 0
-            ? company.contactPersons
-            : [{ name: '', mobile: '', email: '' }]
+            ? company.contactPersons.map((person: any) => ({
+                name: person.name || '',
+                mobile: person.mobile || '',
+                email: person.email || '',
+                designation: person.designation || '',
+                dob: person.dob
+                  ? String(person.dob).includes('T')
+                    ? String(person.dob).split('T')[0]
+                    : String(person.dob)
+                  : '',
+              }))
+            : [{ name: '', mobile: '', email: '', designation: '', dob: '' }]
         );
       }
     } catch (error: any) {
@@ -174,7 +186,11 @@ const AddCompanyScreen = () => {
     );
     const partialContact = contactPersons.some(
       (person) =>
-        (person.name.trim() !== '' || person.mobile.trim() !== '' || person.email.trim() !== '') &&
+        (person.name.trim() !== '' ||
+          person.mobile.trim() !== '' ||
+          person.email.trim() !== '' ||
+          person.designation.trim() !== '' ||
+          person.dob.trim() !== '') &&
         (!person.name.trim() || !person.mobile.trim())
     );
     if (partialContact) {
@@ -238,7 +254,10 @@ const AddCompanyScreen = () => {
   };
 
   const addContactPerson = () => {
-    setContactPersons([...contactPersons, { name: '', mobile: '', email: '' }]);
+    setContactPersons([
+      ...contactPersons,
+      { name: '', mobile: '', email: '', designation: '', dob: '' },
+    ]);
   };
 
   const removeContactPerson = (index: number) => {
@@ -404,6 +423,26 @@ const AddCompanyScreen = () => {
               keyboardType="email-address"
               autoCapitalize="none"
             />
+            <TextInput
+              style={styles.input}
+              value={person.designation}
+              onChangeText={(text) => {
+                const newPersons = [...contactPersons];
+                newPersons[index].designation = text;
+                setContactPersons(newPersons);
+              }}
+              placeholder="Designation"
+            />
+            <TextInput
+              style={styles.input}
+              value={person.dob}
+              onChangeText={(text) => {
+                const newPersons = [...contactPersons];
+                newPersons[index].dob = text;
+                setContactPersons(newPersons);
+              }}
+              placeholder="DOB (YYYY-MM-DD)"
+            />
             {contactPersons.length > 1 && (
               <TouchableOpacity
                 onPress={() => removeContactPerson(index)}
@@ -481,7 +520,8 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   contactRow: {
-    marginBottom: 10,
+    marginBottom: 16,
+    gap: 8,
   },
   addButton: {
     flexDirection: 'row',

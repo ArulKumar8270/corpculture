@@ -24,9 +24,11 @@ const App = () => {
           const { user, token } = JSON.parse(authData);
           store.dispatch(setAuth({ user, token }));
           
-          // Fetch user permissions
+          // Fetch permissions after a short delay so network stack is ready post-reload
           if (user._id) {
-            store.dispatch(fetchUserPermissions(user._id) as any);
+            setTimeout(() => {
+              store.dispatch(fetchUserPermissions(user._id) as any);
+            }, 400);
           }
           if (user.role === 1 || user.role === 3) {
             setupPushNotificationsForUser().catch((err) =>

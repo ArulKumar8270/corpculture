@@ -23,6 +23,7 @@ import { getCompanyShippingDefaults } from '../../utils/companyShipping';
 import { getApiBaseUrl } from '../../services/api';
 import { computeOrderAmountFromItems } from '../../utils/orderAmountUtil';
 import * as WebBrowser from 'expo-web-browser';
+import QRCode from 'react-native-qrcode-svg';
 
 // States data
 const states = [
@@ -86,6 +87,7 @@ const ShippingScreen = () => {
   const [paying, setPaying] = useState(false);
   const [pendingHdfcOrderId, setPendingHdfcOrderId] = useState<string | null>(null);
   const [hdfcPaymentUrl, setHdfcPaymentUrl] = useState<string | null>(null);
+  const [upiLink, setUpiLink] = useState<string | null>(null);
   const [paymentStatusMessage, setPaymentStatusMessage] = useState('');
   const lastAppliedCompanyRef = useRef<string | null>(null);
   const pollCancelledRef = useRef(false);
@@ -112,10 +114,16 @@ const ShippingScreen = () => {
     try {
       const storedOrderId = (await AsyncStorage.getItem('hdfcOrderId'))?.trim();
       const storedPayUrl = (await AsyncStorage.getItem('hdfcPaymentUrl'))?.trim();
+      const storedUpi = (await AsyncStorage.getItem('hdfcUpiLink'))?.trim();
       if (storedOrderId) {
         setPendingHdfcOrderId(storedOrderId);
         setHdfcPaymentUrl(storedPayUrl || null);
-        setPaymentStatusMessage('You have a payment in progress. Approve UPI in PhonePe/GPay, then tap Check Payment Status.');
+        setUpiLink(storedUpi || null);
+        setPaymentStatusMessage(
+          storedUpi
+            ? 'Scan the QR with any UPI app, then approve the request.'
+            : 'You have a payment in progress. Approve UPI in PhonePe/GPay, then tap Check Payment Status.'
+        );
       }
     } catch (error) {
       console.error('Error loading pending payment:', error);
@@ -327,9 +335,13 @@ const ShippingScreen = () => {
         return { ...data, paid: true };
       }
       if (!data?.pending) return data;
+      if (data?.upiLink) {
+        setUpiLink(data.upiLink);
+        await AsyncStorage.setItem('hdfcUpiLink', data.upiLink);
+      }
       if (data?.awaitingUpi) {
         setPaymentStatusMessage(
-          'Waiting for UPI approval. Open PhonePe/GPay and approve the request.'
+          'Scan the QR or approve the request in PhonePe, GPay, or any UPI app.'
         );
       }
       await new Promise((resolve) => setTimeout(resolve, 3000));
@@ -358,9 +370,11 @@ const ShippingScreen = () => {
   const clearPendingPayment = async () => {
     setPendingHdfcOrderId(null);
     setHdfcPaymentUrl(null);
+    setUpiLink(null);
     setPaymentStatusMessage('');
     await AsyncStorage.removeItem('hdfcOrderId');
     await AsyncStorage.removeItem('hdfcPaymentUrl');
+    await AsyncStorage.removeItem('hdfcUpiLink');
   };
 
   const handlePaymentSuccess = async (orderId: string, receipt?: any, order?: any) => {
@@ -395,7 +409,7 @@ const ShippingScreen = () => {
         setPendingHdfcOrderId(hdfcOrderId);
         setPaymentStatusMessage(
           result?.awaitingUpi
-            ? 'Waiting for UPI approval. Approve in PhonePe/GPay, then tap Check Payment Status.'
+            ? 'Scan the QR or approve the request in your UPI app, then tap Check Payment Status.'
             : 'Payment is still processing. Tap Check Payment Status to try again.'
         );
         if (!options.silent) {
@@ -489,13 +503,15 @@ const ShippingScreen = () => {
 
       await AsyncStorage.setItem('hdfcOrderId', data.hdfcOrderId);
       await AsyncStorage.setItem('hdfcPaymentUrl', payUrl);
+      await AsyncStorage.removeItem('hdfcUpiLink');
+      setUpiLink(null);
       setPendingHdfcOrderId(data.hdfcOrderId);
       setHdfcPaymentUrl(payUrl);
-      setPaymentStatusMessage('Complete payment in your browser or UPI app.');
+      setPaymentStatusMessage('Choose card, net banking, UPI, or QR on the payment page.');
       Toast.show({
         type: 'info',
-        text1: 'Complete UPI in your app',
-        text2: 'Approve the UPI request in PhonePe/GPay. Return here to confirm payment.',
+        text1: 'Complete payment',
+        text2: 'Card, net banking, UPI, and QR are on the bank page.',
       });
       await openHdfcPaymentPage(payUrl);
 
@@ -786,6 +802,14 @@ const ShippingScreen = () => {
             {!!paymentStatusMessage && (
               <Text style={styles.pendingPaymentMessage}>{paymentStatusMessage}</Text>
             )}
+            {!!upiLink && (
+              <View style={styles.qrWrap}>
+                <QRCode value={upiLink} size={200} />
+                <TouchableOpacity onPress={() => Linking.openURL(upiLink)}>
+                  <Text style={styles.reopenPaymentButtonText}>Open UPI app</Text>
+                </TouchableOpacity>
+              </View>
+            )}
             <TouchableOpacity
               style={[styles.resumePaymentButton, paying && styles.paymentButtonDisabled]}
               onPress={handleCheckPaymentStatus}
@@ -1051,6 +1075,14 @@ const styles = StyleSheet.create({
     color: '#6b4c00',
     marginBottom: 12,
     lineHeight: 18,
+  },
+  qrWrap: {
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 12,
+    gap: 12,
   },
   resumePaymentButton: {
     backgroundColor: '#019ee3',

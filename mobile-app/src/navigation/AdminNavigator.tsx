@@ -23,7 +23,6 @@ import OrderUpdateScreen from '../screens/Admin/OrderUpdateScreen';
 
 // Service Management
 import ServiceInvoiceListScreen from '../screens/Admin/ServiceInvoiceListScreen';
-import ServiceQuotationListScreen from '../screens/Admin/ServiceQuotationListScreen';
 import ServiceProductListScreen from '../screens/Admin/ServiceProductListScreen';
 import ServiceEnquiriesScreen from '../screens/Admin/ServiceEnquiriesScreen';
 import AddServiceProductScreen from '../screens/Admin/AddServiceProductScreen';
@@ -34,7 +33,6 @@ import ServiceReportsScreen from '../screens/Admin/ServiceReportsScreen';
 import RentalProductListScreen from '../screens/Admin/RentalProductListScreen';
 import RentalInvoiceListScreen from '../screens/Rental/RentalInvoiceListScreen';
 import RentalInvoiceDetailScreen from '../screens/Rental/RentalInvoiceDetailScreen';
-import RentalQuotationListScreen from '../screens/Rental/RentalQuotationListScreen';
 
 // Vendor Management
 import VendorListScreen from '../screens/Admin/VendorListScreen';
@@ -55,6 +53,8 @@ import UserManagementScreen from '../screens/Admin/UserManagementScreen';
 import GSTManagementScreen from '../screens/Admin/GSTManagementScreen';
 import CompanyListScreen from '../screens/Admin/CompanyListScreen';
 import OldInvoicesListScreen from '../screens/Admin/OldInvoicesListScreen';
+import OldInvoiceUploadScreen from '../screens/Admin/OldInvoiceUploadScreen';
+import OldInvoiceDetailScreen from '../screens/Admin/OldInvoiceDetailScreen';
 import MenuSettingScreen from '../screens/Admin/MenuSettingScreen';
 import AddCompanyScreen from '../screens/Admin/AddCompanyScreen';
 import AdminPayslipListScreen from '../screens/Admin/AdminPayslipListScreen';
@@ -184,7 +184,12 @@ const ServiceStack = () => (
     <Stack.Screen name="AddServiceProduct" component={AddServiceProductScreen} options={{ title: 'Add/Edit Product', headerShown: true }} />
     <Stack.Screen name="ServiceInvoiceList" component={ServiceInvoiceListScreen} options={{ title: 'Service Invoices', headerShown: true }} />
     <Stack.Screen name="AddServiceInvoice" component={AddServiceInvoiceScreen} options={{ title: 'Add/Edit Invoice', headerShown: true }} />
-    <Stack.Screen name="ServiceQuotationList" component={ServiceQuotationListScreen} options={{ title: 'Service Quotations', headerShown: true }} />
+    <Stack.Screen
+      name="ServiceQuotationList"
+      component={ServiceInvoiceListScreen}
+      initialParams={{ invoiceType: 'quotation' }}
+      options={{ title: 'Service Quotations', headerShown: true }}
+    />
     <Stack.Screen name="AddServiceQuotation" component={AddServiceInvoiceScreen} options={{ title: 'Add/Edit Quotation', headerShown: true }} />
     <Stack.Screen name="ServiceReports" component={ServiceReportsScreen} options={{ title: 'Service Reports', headerShown: true }} />
     <Stack.Screen
@@ -234,7 +239,12 @@ const RentalStack = () => (
     <Stack.Screen name="RentalInvoiceDetail" component={RentalInvoiceDetailScreen} options={{ title: 'Rental Invoice Details' }} />
     <Stack.Screen name="AddRentalInvoice" component={AddRentalInvoiceScreen} options={{ title: 'Add/Edit Rental Invoice' }} />
     <Stack.Screen name="RentalEnquiries" component={RentalEnquiriesScreen} options={{ title: 'Rental Enquiries' }} />
-    <Stack.Screen name="RentalQuotationList" component={RentalQuotationListScreen} options={{ title: 'Rental Quotations' }} />
+    <Stack.Screen
+      name="RentalQuotationList"
+      component={RentalInvoiceListScreen}
+      initialParams={{ invoiceType: 'quotation' }}
+      options={{ title: 'Rental Quotations' }}
+    />
     <Stack.Screen name="RentalReports" component={RentalReportsScreen} options={{ title: 'Rental Reports' }} />
     <Stack.Screen
       name="RentalGatePass"
@@ -331,6 +341,8 @@ const SettingsStack = () => (
     <Stack.Screen name="CompanyList" component={CompanyListScreen} options={{ title: 'Companies' }} />
     <Stack.Screen name="AddCompany" component={AddCompanyScreen} options={{ title: 'Add/Edit Company' }} />
     <Stack.Screen name="OldInvoicesList" component={OldInvoicesListScreen} options={{ title: 'Old Invoices' }} />
+    <Stack.Screen name="OldInvoiceUpload" component={OldInvoiceUploadScreen} options={{ title: 'Upload Old Invoices' }} />
+    <Stack.Screen name="OldInvoiceDetail" component={OldInvoiceDetailScreen} options={{ title: 'Invoice Details' }} />
     <Stack.Screen name="MenuSettings" component={MenuSettingScreen} options={{ title: 'Menu Settings' }} />
     <Stack.Screen name="CreditSettings" component={CreditManagementScreen} options={{ title: 'Credit Management' }} />
     <Stack.Screen name="GiftSettings" component={GiftSettingsScreen} options={{ title: 'Gift Settings' }} />
@@ -606,6 +618,16 @@ const AdminNavigator = () => {
         component={OldInvoicesListScreen}
         options={{ headerShown: true }}
       />
+      <Drawer.Screen
+        name="OldInvoiceUpload"
+        component={OldInvoiceUploadScreen}
+        options={{ headerShown: true, title: 'Upload Old Invoices' }}
+      />
+      <Drawer.Screen
+        name="OldInvoiceDetail"
+        component={OldInvoiceDetailScreen}
+        options={{ headerShown: true, title: 'Invoice Details' }}
+      />
       
       {/* Service Sub-screens - Added as direct Drawer.Screen entries for reliable navigation */}
       <Drawer.Screen 
@@ -635,8 +657,9 @@ const AdminNavigator = () => {
       />
       <Drawer.Screen 
         name="ServiceQuotationList" 
-        component={ServiceQuotationListScreen}
-        options={{ headerShown: true }}
+        component={ServiceInvoiceListScreen}
+        initialParams={{ invoiceType: 'quotation' }}
+        options={{ headerShown: true, title: 'Service Quotations' }}
       />
       <Drawer.Screen 
         name="AddServiceQuotation" 
@@ -647,6 +670,24 @@ const AdminNavigator = () => {
         name="ServiceReports" 
         component={ServiceReportsScreen}
         options={{ headerShown: true }}
+      />
+      <Drawer.Screen
+        name="ServiceGatePass"
+        component={ServiceReportsScreen}
+        initialParams={{ reportTypeKey: 'Service_Gate_Pass', screenTitle: 'Gate Pass' }}
+        options={{ headerShown: true, title: 'Gate Pass' }}
+      />
+      <Drawer.Screen
+        name="ServiceDeliveryChallan"
+        component={ServiceReportsScreen}
+        initialParams={{ reportTypeKey: 'Service_Delivery_Challan', screenTitle: 'Delivery Challan (DC Copy)' }}
+        options={{ headerShown: true, title: 'Delivery Challan (DC Copy)' }}
+      />
+      <Drawer.Screen
+        name="ServiceReturnableChallan"
+        component={ServiceReportsScreen}
+        initialParams={{ reportTypeKey: 'Service_Returnable_Challan', screenTitle: 'Returnable Challan' }}
+        options={{ headerShown: true, title: 'Returnable Challan' }}
       />
       <Drawer.Screen 
         name="AddServiceReport" 
@@ -687,13 +728,32 @@ const AdminNavigator = () => {
       />
       <Drawer.Screen 
         name="RentalQuotationList" 
-        component={RentalQuotationListScreen}
-        options={{ headerShown: true }}
+        component={RentalInvoiceListScreen}
+        initialParams={{ invoiceType: 'quotation' }}
+        options={{ headerShown: true, title: 'Rental Quotations' }}
       />
       <Drawer.Screen 
         name="RentalReports" 
         component={RentalReportsScreen}
         options={{ headerShown: true }}
+      />
+      <Drawer.Screen
+        name="RentalGatePass"
+        component={RentalReportsScreen}
+        initialParams={{ reportTypeKey: 'Rental_Gate_Pass', screenTitle: 'Gate Pass' }}
+        options={{ headerShown: true, title: 'Gate Pass' }}
+      />
+      <Drawer.Screen
+        name="RentalDeliveryChallan"
+        component={RentalReportsScreen}
+        initialParams={{ reportTypeKey: 'Rental_Delivery_Challan', screenTitle: 'Delivery Challan (DC Copy)' }}
+        options={{ headerShown: true, title: 'Delivery Challan (DC Copy)' }}
+      />
+      <Drawer.Screen
+        name="RentalReturnableChallan"
+        component={RentalReportsScreen}
+        initialParams={{ reportTypeKey: 'Rental_Returnable_Challan', screenTitle: 'Returnable Challan' }}
+        options={{ headerShown: true, title: 'Returnable Challan' }}
       />
       <Drawer.Screen
         name="AddRentalReport"

@@ -53,6 +53,10 @@ const OrderDetails = () => {
     const shippingInfo = orderDetails?.shippingInfo;
     const createdAt = orderDetails?.createdAt;
     const orderStatus = orderDetails?.orderStatus;
+    const paymentStatus = orderDetails?.paymentStatus;
+    const paymentMethod = orderDetails?.paymentMethod;
+    const paymentNotReceived =
+        paymentMethod === "online" && paymentStatus && paymentStatus !== "Paid";
 
     return (
         <>
@@ -192,6 +196,16 @@ const OrderDetails = () => {
                                         </div>
 
                                         <div className="flex flex-col w-full sm:w-1/2">
+                                            {paymentNotReceived ? (
+                                                <div className="flex flex-col items-start justify-center gap-2 px-4 py-6">
+                                                    <p className="text-lg font-bold text-red-600">
+                                                        Payment not received
+                                                    </p>
+                                                    <p className="text-sm text-gray-600">
+                                                        This order is not confirmed. No amount was captured.
+                                                    </p>
+                                                </div>
+                                            ) : (
                                             <Tracker
                                                 orderOn={createdAt}
                                                 activeStep={
@@ -206,6 +220,7 @@ const OrderDetails = () => {
                                                                 : 0
                                                 }
                                             />
+                                            )}
                                         </div>
                                     </div>
                                 );

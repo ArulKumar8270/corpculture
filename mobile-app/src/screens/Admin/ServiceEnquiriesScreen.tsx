@@ -122,7 +122,9 @@ const ServiceEnquiriesScreen = () => {
   const tabCounts = React.useMemo(
     () => ({
       new: baseFiltered.filter((e: any) => !e.employeeId).length,
-      assigned: baseFiltered.filter((e: any) => !!e.employeeId && e.status !== 'Cancelled').length,
+      assigned: baseFiltered.filter(
+        (e: any) => !!e.employeeId && e.status !== 'Cancelled' && e.status !== 'Completed'
+      ).length,
       w_u: baseFiltered.filter((e: any) => e.status === 'Cancelled').length,
       pending: baseFiltered.filter((e: any) => e.status === 'Pending').length,
       inProgress: baseFiltered.filter((e: any) => e.status === 'In Progress').length,
@@ -138,7 +140,9 @@ const ServiceEnquiriesScreen = () => {
         list = baseFiltered.filter((e: any) => !e.employeeId);
         break;
       case 'assigned':
-        list = baseFiltered.filter((e: any) => !!e.employeeId && e.status !== 'Cancelled');
+        list = baseFiltered.filter(
+          (e: any) => !!e.employeeId && e.status !== 'Cancelled' && e.status !== 'Completed'
+        );
         break;
       case 'w_u':
         list = baseFiltered.filter((e: any) => e.status === 'Cancelled');
@@ -413,7 +417,7 @@ const ServiceEnquiriesScreen = () => {
         (navigation as any).navigate('AddServiceReport', {
           employeeName,
           employeeId, // Pass employee ID for the payload
-          reportType: 'service',
+          reportType: 'Service_Report',
           serviceId: service._id,
           companyId: companyIdStr || undefined,
           companyName: service?.companyName,
@@ -1361,14 +1365,19 @@ const styles = StyleSheet.create({
   modalItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 15,
+    paddingVertical: 15,
+    paddingHorizontal: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
   },
   modalItemText: {
+    flex: 1,
+    flexShrink: 1,
     fontSize: 16,
-    marginLeft: 15,
+    marginLeft: 12,
+    marginRight: 4,
     color: '#333',
+    includeFontPadding: false,
   },
   modalCancel: {
     borderBottomWidth: 0,

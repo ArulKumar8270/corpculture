@@ -30,7 +30,7 @@ const EmployeeDashboardScreen = () => {
 
   const isAdmin = user?.role === 1 || Number(user?.role) === 1;
 
-  const navigateToScreen = (screen: string) => {
+  const navigateToScreen = (screen: string, params?: object) => {
     // Map of nested screens to their parent stack
     const nestedScreens: { [key: string]: string } = {
       'CategoryManagement': 'Settings',
@@ -54,11 +54,20 @@ const EmployeeDashboardScreen = () => {
       'ServiceInvoiceList': 'Services',
       'ServiceQuotationList': 'Services',
       'ServiceReports': 'Services',
+      'ServiceGatePass': 'Services',
+      'ServiceDeliveryChallan': 'Services',
+      'ServiceReturnableChallan': 'Services',
+      'ServicePartners': 'Services',
+      'AddServiceReport': 'Services',
       'RentalEnquiries': 'Rentals',
       'RentalProductList': 'Rentals',
       'RentalInvoiceList': 'Rentals',
       'RentalQuotationList': 'Rentals',
       'RentalReports': 'Rentals',
+      'RentalGatePass': 'Rentals',
+      'RentalDeliveryChallan': 'Rentals',
+      'RentalReturnableChallan': 'Rentals',
+      'AddRentalReport': 'Rentals',
       'RentalPartners': 'Rentals',
       'Address': 'Profile',
       'PanCard': 'Profile',
@@ -100,15 +109,16 @@ const EmployeeDashboardScreen = () => {
       // Navigate to parent stack first, then to nested screen
       (navigation as any).navigate(parentStack, {
         screen: screen,
+        params: params || {},
       });
     } else if (directScreens[screen]) {
       // Navigate to drawer screen, which will show the stack with initial screen
       const { stack } = directScreens[screen];
-      (navigation as any).navigate(stack);
+      (navigation as any).navigate(stack, params || {});
     } else {
       // Try direct navigation as fallback
       try {
-        (navigation as any).navigate(screen);
+        (navigation as any).navigate(screen, params || {});
       } catch (error) {
         console.error(`Navigation error for screen: ${screen}`, error);
       }
@@ -210,6 +220,30 @@ const EmployeeDashboardScreen = () => {
       color: '#795548',
     },
     {
+      id: 'serviceGatePass',
+      title: 'Gate Pass',
+      icon: 'badge',
+      screen: 'ServiceGatePass',
+      permissionKey: 'serviceGatePass',
+      color: '#5C6BC0',
+    },
+    {
+      id: 'serviceDeliveryChallan',
+      title: 'Delivery Challan (DC Copy)',
+      icon: 'local-shipping',
+      screen: 'ServiceDeliveryChallan',
+      permissionKey: 'serviceDeliveryChallan',
+      color: '#26A69A',
+    },
+    {
+      id: 'serviceReturnableChallan',
+      title: 'Returnable Challan',
+      icon: 'assignment-return',
+      screen: 'ServiceReturnableChallan',
+      permissionKey: 'serviceReturnableChallan',
+      color: '#8D6E63',
+    },
+    {
       id: 'servicePartners',
       title: 'Partners',
       icon: 'people',
@@ -260,6 +294,30 @@ const EmployeeDashboardScreen = () => {
       screen: 'RentalReports',
       permissionKey: 'rentalReport',
       color: '#F44336',
+    },
+    {
+      id: 'rentalGatePass',
+      title: 'Gate Pass',
+      icon: 'badge',
+      screen: 'RentalGatePass',
+      permissionKey: 'rentalGatePass',
+      color: '#5C6BC0',
+    },
+    {
+      id: 'rentalDeliveryChallan',
+      title: 'Delivery Challan (DC Copy)',
+      icon: 'local-shipping',
+      screen: 'RentalDeliveryChallan',
+      permissionKey: 'rentalDeliveryChallan',
+      color: '#26A69A',
+    },
+    {
+      id: 'rentalReturnableChallan',
+      title: 'Returnable Challan',
+      icon: 'assignment-return',
+      screen: 'RentalReturnableChallan',
+      permissionKey: 'rentalReturnableChallan',
+      color: '#8D6E63',
     },
     {
       id: 'rentalPartners',
@@ -420,7 +478,35 @@ const EmployeeDashboardScreen = () => {
       <TouchableOpacity
         key={item.id}
         style={[styles.menuCard, { borderLeftColor: item.color || '#019ee3' }]}
-        onPress={() => navigateToScreen(item.screen)}
+        onPress={() => {
+          const reportScreenParams: Record<string, { reportTypeKey: string; screenTitle: string }> = {
+            ServiceGatePass: { reportTypeKey: 'Service_Gate_Pass', screenTitle: 'Gate Pass' },
+            ServiceDeliveryChallan: {
+              reportTypeKey: 'Service_Delivery_Challan',
+              screenTitle: 'Delivery Challan (DC Copy)',
+            },
+            ServiceReturnableChallan: {
+              reportTypeKey: 'Service_Returnable_Challan',
+              screenTitle: 'Returnable Challan',
+            },
+            RentalGatePass: { reportTypeKey: 'Rental_Gate_Pass', screenTitle: 'Gate Pass' },
+            RentalDeliveryChallan: {
+              reportTypeKey: 'Rental_Delivery_Challan',
+              screenTitle: 'Delivery Challan (DC Copy)',
+            },
+            RentalReturnableChallan: {
+              reportTypeKey: 'Rental_Returnable_Challan',
+              screenTitle: 'Returnable Challan',
+            },
+          };
+          const params =
+            item.screen === 'ServicePartners'
+              ? { commissionFrom: 'Service' }
+              : item.screen === 'RentalPartners'
+                ? { commissionFrom: 'Rental' }
+                : reportScreenParams[item.screen];
+          navigateToScreen(item.screen, params);
+        }}
       >
         <View style={[styles.iconContainer, { backgroundColor: `${item.color || '#019ee3'}20` }]}>
           <Icon name={item.icon as any} size={24} color={item.color || '#019ee3'} />

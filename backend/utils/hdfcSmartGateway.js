@@ -19,8 +19,8 @@ const PENDING_STATUSES = new Set([
 
 export const getHdfcConfig = () => {
     const apiKey = String(process.env.HDFC_API_KEY || "").trim();
-    const baseUrl = String(process.env.HDFC_SMARTGATEWAY_BASE_URL || "https://smartgateway.hdfcuat.bank.in").replace(/\/$/, "");
-    const isUat = baseUrl.includes("hdfcuat");
+    const baseUrl = String(process.env.HDFC_SMARTGATEWAY_BASE_URL || "https://smartgateway.hdfc.bank.in").replace(/\/$/, "");
+    const isUat = baseUrl.includes("hdfc");
     const merchantId = String(process.env.HDFC_MERCHANT_ID || "").trim() || (isUat ? "hdfcmaster" : "");
     const paymentPageClientId = String(
         process.env.HDFC_PAYMENT_PAGE_CLIENT_ID || (isUat ? "hdfcmaster" : merchantId)
@@ -112,6 +112,34 @@ const parseHdfcResponse = async (response) => {
         throw error;
     }
     return json;
+};
+
+/** Start a UPI QR / intent so the shopper gets a code to scan and a request in their UPI app. */
+export const createHdfcUpiQr = async ({ orderId, customerId }) => {
+    const config = assertHdfcConfigured();
+    const body = new URLSearchParams({
+        order_id: orderId,
+        merchant_id: config.merchantId,
+        payment_method_type: "UPI",
+        payment_method: "UPI_QR",
+        txn_type: "UPI_QR",
+        redirect_after_payment: "true",
+        format: "json",
+        sdk_params: "true",
+    });
+    const response = await fetch(`${config.baseUrl}/txns`, {
+        method: "POST",
+        headers: hdfcHeaders(config, customerId, {
+            "Content-Type": "application/x-www-form-urlencoded",
+        }),
+        body,
+    });
+    return parseHdfcResponse(response);
+};
+
+export const upiIntentFromTxn = (txn) => {
+    const url = String(txn?.payment?.sdk_params?.pgIntentUrl || "").trim();
+    return url.startsWith("upi:") ? url : "";
 };
 
 export const createHdfcSession = async ({ orderId, amount, customerId, customerEmail, customerPhone, firstName, lastName, returnUrl, description }) => {
@@ -249,31 +277,38 @@ const isBlankRef = (value) => {
     return !ref || ref === "NA" || ref === "N/A" || ref === "NULL" || ref === "0" || ref === "UNDEFINED";
 };
 
+const mentionsDummy = (value) => String(value || "").toUpperCase().includes("DUMMY");
+
 const isDummyHdfcOrder = (order) => {
     if (order?.dummy === true || order?.is_dummy === true || order?.dummy_order === true) return true;
-    const flags = [order?.order_type, order?.source, order?.product_id, order?.txn_detail?.gateway];
-    return flags.some((value) => String(value || "").toUpperCase().includes("DUMMY"));
+    const flags = [
+        order?.order_type,
+        order?.source,
+        order?.product_id,
+        order?.txn_detail?.gateway,
+        order?.txn_id,
+        order?.txn_detail?.txn_id,
+        order?.payment_gateway_response?.epg_txn_id,
+        order?.payment_gateway_response?.rrn,
+        order?.payment_gateway_response?.auth_id_code,
+    ];
+    return flags.some(mentionsDummy);
 };
 
 const hasValidBankRef = (order) => {
     const rrn = order?.payment_gateway_response?.rrn || order?.txn_detail?.rrn;
     const epg = order?.payment_gateway_response?.epg_txn_id;
     const authId = order?.payment_gateway_response?.auth_id_code;
-    return !isBlankRef(rrn) || !isBlankRef(epg) || !isBlankRef(authId);
+    return [rrn, epg, authId].some((value) => !isBlankRef(value) && !mentionsDummy(value));
 };
 
-/** Only fulfill after a real capture. On UAT, dummy CHARGED responses may fulfill when allowUatDummy is on. */
+/** A real capture only. Test-gateway DUMMY charges are not payment. */
 export const isHdfcOrderPaid = (order) => {
+    if (isDummyHdfcOrder(order)) return false;
     const status = String(order?.status || "").toUpperCase();
     if (!SUCCESS_STATUSES.has(status)) return false;
     const txnStatus = String(order?.txn_detail?.status || "").toUpperCase();
     if (txnStatus && !SUCCESS_STATUSES.has(txnStatus)) return false;
-
-    const { allowUatDummy } = getHdfcConfig();
-    if (allowUatDummy && isDummyHdfcOrder(order)) {
-        return true;
-    }
-    if (isDummyHdfcOrder(order)) return false;
 
     const method = String(order?.payment_method_type || order?.payment_method || "").toUpperCase();
     const isUpi =
@@ -281,11 +316,7 @@ export const isHdfcOrderPaid = (order) => {
         String(order?.txn_flow_type || "").toUpperCase().includes("COLLECT") ||
         String(order?.txn_flow_type || "").toUpperCase().includes("INTENT");
 
-    if (isUpi || !method) {
-        // UAT often returns CHARGED without a bank RRN; allow fulfillment there.
-        if (allowUatDummy) return true;
-        return hasValidBankRef(order);
-    }
+    if (isUpi || !method) return hasValidBankRef(order);
     return true;
 };
 

@@ -125,10 +125,10 @@ const ServiceInvoiceListScreen = () => {
   const [pendingAmount, setPendingAmount] = useState(0);
   const [companyPendingInvoices, setCompanyPendingInvoices] = useState<any[]>([]);
   const [loadingPendingInvoices, setLoadingPendingInvoices] = useState(false);
-  const [selectedPendingInvoiceId, setSelectedPendingInvoiceId] = useState<string | null>(null);
+  const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<string[]>([]);
   const [modeOfPaymentPickerVisible, setModeOfPaymentPickerVisible] = useState(false);
   const [amountTypePickerVisible, setAmountTypePickerVisible] = useState(false);
-  const [pendingInvoicePickerVisible, setPendingInvoicePickerVisible] = useState(false);
+  const [savingPayment, setSavingPayment] = useState(false);
   const [filterServiceTitleVisible, setFilterServiceTitleVisible] = useState(false);
   const [filterEmployeeVisible, setFilterEmployeeVisible] = useState(false);
   const [filterCompanyVisible, setFilterCompanyVisible] = useState(false);
@@ -593,7 +593,7 @@ const ServiceInvoiceListScreen = () => {
       grandTotal: invoice.grandTotal || 0,
       paymentContactEmails: invoicePaymentEmailsFromRecord(invoice),
     });
-    setSelectedPendingInvoiceId(null);
+    setSelectedInvoiceIds([]);
 
     if (initialPaymentAmount > 0 && initialPaymentAmount < grand) {
       setPendingAmount(grand - initialPaymentAmount);
@@ -612,8 +612,31 @@ const ServiceInvoiceListScreen = () => {
     setPaymentModalVisible(true);
   };
 
+  const selectedAllocatedTotal =
+    companyPendingInvoices
+      ?.filter((inv) => selectedInvoiceIds.includes(inv._id))
+      .reduce((sum, inv) => sum + Number(inv?.grandTotal || 0), 0) || 0;
+  const remainingToAllocate = Math.max(0, (balanceAmount || 0) - selectedAllocatedTotal);
+
+  const togglePendingInvoiceSelection = (pendingInv: any) => {
+    const id = pendingInv._id;
+    const amount = Number(pendingInv?.grandTotal || 0);
+    setSelectedInvoiceIds((prev) => {
+      if (prev.includes(id)) {
+        return prev.filter((x) => x !== id);
+      }
+      const currentTotal =
+        companyPendingInvoices
+          ?.filter((inv) => prev.includes(inv._id))
+          .reduce((s, inv) => s + Number(inv?.grandTotal || 0), 0) || 0;
+      if (currentTotal + amount <= (balanceAmount || 0)) return [...prev, id];
+      return prev;
+    });
+  };
+
   const handlePaymentAmountChange = async (value: string) => {
     setPaymentForm({ ...paymentForm, paymentAmount: value });
+    setSelectedInvoiceIds([]);
     const amount = parseFloat(value) || 0;
 
     if (amount < selectedInvoice?.grandTotal) {
@@ -621,7 +644,6 @@ const ServiceInvoiceListScreen = () => {
       setPendingAmount(pending);
       setBalanceAmount(0);
       setCompanyPendingInvoices([]);
-      setSelectedPendingInvoiceId(null);
     } else {
       const balance = amount - selectedInvoice?.grandTotal;
       setBalanceAmount(balance);
@@ -631,67 +653,143 @@ const ServiceInvoiceListScreen = () => {
         await fetchCompanyPendingInvoices(selectedInvoice);
       } else {
         setCompanyPendingInvoices([]);
-        setSelectedPendingInvoiceId(null);
       }
     }
   };
 
-  const handleSavePaymentDetails = async (balanceAmountParam?: number, tsdBalance?: number) => {
+  const buildServicePaymentPayload = (paymentAmount: number, isFullPayment = false) => {
+    const payEmails = normalizePaymentContactPayload(paymentForm.paymentContactEmails);
+    const payload: any = {
+      modeOfPayment: paymentForm.modeOfPayment,
+      bankName: paymentForm.bankName,
+      transactionDetails: paymentForm.transactionDetails,
+      chequeDate: paymentForm.chequeDate,
+      transferDate: paymentForm.transferDate,
+      companyNamePayment: paymentForm.companyNamePayment,
+      otherPaymentMode: paymentForm.otherPaymentMode,
+      paymentAmountType: paymentForm.paymentAmountType,
+      paymentAmount: Number(paymentAmount),
+      paymentContactEmails: payEmails.paymentContactEmails,
+      paymentContactEmail: payEmails.paymentContactEmail,
+      tdsAmount: 0,
+      pendingAmount: 0,
+      status: isFullPayment ? 'Paid' : 'Unpaid',
+    };
+    if (paymentForm.paymentAmountType === 'TDS') {
+      payload.tdsAmount = pendingAmount || 0;
+    } else if (paymentForm.paymentAmountType === 'Pending') {
+      payload.pendingAmount = pendingAmount || 0;
+    }
+    return payload;
+  };
+
+  const handleSavePaymentDetails = async (
+    targetInvoiceIdArg?: string,
+    amountArg?: number
+  ) => {
     if (!selectedInvoice) return;
 
-    try {
-      const paymentAmount = parseFloat(paymentForm.paymentAmount) || 0;
-      const balance = balanceAmountParam !== undefined ? balanceAmountParam : balanceAmount;
-      
-      const payEmails = normalizePaymentContactPayload(paymentForm.paymentContactEmails);
-      const payload: any = {
-        modeOfPayment: paymentForm.modeOfPayment,
-        bankName: paymentForm.bankName,
-        transactionDetails: paymentForm.transactionDetails,
-        chequeDate: paymentForm.chequeDate,
-        transferDate: paymentForm.transferDate,
-        companyNamePayment: paymentForm.companyNamePayment,
-        otherPaymentMode: paymentForm.otherPaymentMode,
-        paymentAmountType: paymentForm.paymentAmountType,
-        paymentAmount: paymentForm?.paymentAmount ? parseFloat(paymentForm.paymentAmount) : 0,
-        paymentContactEmails: payEmails.paymentContactEmails,
-        paymentContactEmail: payEmails.paymentContactEmail,
-        tdsAmount: 0, // Default to 0, will be updated if type is TDS
-        pendingAmount: 0, // Default to 0, will be updated if type is Pending
-        status:
-          balance >= paymentForm?.grandTotal ||
-          paymentAmount >= paymentForm?.grandTotal ||
-          paymentForm.paymentAmountType === 'TDS'
-            ? 'Paid'
-            : 'Unpaid',
-      };
+    const isMultiSave = typeof targetInvoiceIdArg === 'string' && amountArg != null;
 
-      // Conditionally set tdsAmount or pendingAmount based on selected type
-      if (paymentForm.paymentAmountType === 'TDS') {
-        payload.tdsAmount = pendingAmount || 0;
-      } else if (paymentForm.paymentAmountType === 'Pending') {
-        payload.pendingAmount = pendingAmount || 0;
+    try {
+      if (isMultiSave) {
+        const pendingInv = companyPendingInvoices?.find((i) => i._id === targetInvoiceIdArg);
+        const payload = buildServicePaymentPayload(
+          amountArg as number,
+          (amountArg as number) >= Number(pendingInv?.grandTotal || 0)
+        );
+        await axios.put(
+          `${getApiBaseUrl()}/service-invoice/update/${targetInvoiceIdArg}`,
+          payload,
+          { headers: { Authorization: token || '' } }
+        );
+        return;
       }
 
-      const invoiceId = selectedPendingInvoiceId || selectedInvoice._id;
-      const res = await axios.put(
-        `${getApiBaseUrl()}/service-invoice/update/${invoiceId}`,
-        payload,
-        {
-          headers: {
-            Authorization: token || '',
-          },
-        }
+      setSavingPayment(true);
+
+      const gt = Number(paymentForm?.grandTotal) || Number(selectedInvoice?.grandTotal) || 0;
+      const payNum = Number(paymentForm?.paymentAmount) || 0;
+      const covers = payNum + 1e-6 >= gt;
+      const currentInvoicePayment = covers ? gt : payNum;
+      const isFullPayment = covers || paymentForm.paymentAmountType === 'TDS';
+      const currentPayload = buildServicePaymentPayload(currentInvoicePayment, isFullPayment);
+
+      await axios.put(
+        `${getApiBaseUrl()}/service-invoice/update/${selectedInvoice._id}`,
+        currentPayload,
+        { headers: { Authorization: token || '' } }
       );
 
-      if (res.data?.success) {
+      for (const invId of selectedInvoiceIds) {
+        const pendingInv = companyPendingInvoices?.find((i) => i._id === invId);
+        const amt = Number(pendingInv?.grandTotal || 0);
+        if (amt <= 0) continue;
+        await handleSavePaymentDetails(invId, amt);
+      }
+
+      const allocatedInvoices = (selectedInvoiceIds || [])
+        .map((invId) => {
+          const inv = companyPendingInvoices?.find((i) => i._id === invId);
+          return inv
+            ? {
+                invoiceId: inv._id,
+                amount: Number(inv?.grandTotal || 0),
+                invoiceDate: inv?.invoiceDate,
+                grandTotal: inv?.grandTotal,
+              }
+            : null;
+        })
+        .filter(Boolean);
+
+      const payEmails = normalizePaymentContactPayload(paymentForm.paymentContactEmails);
+      const n8nPayload = {
+        invoiceId: selectedInvoice._id,
+        invoice: {
+          _id: selectedInvoice._id,
+          grandTotal: selectedInvoice.grandTotal,
+          invoiceDate: selectedInvoice.invoiceDate,
+          companyId: selectedInvoice.companyId,
+          invoiceNumber: selectedInvoice.invoiceNumber,
+        },
+        payment: {
+          modeOfPayment: paymentForm.modeOfPayment,
+          paymentAmount: payNum,
+          bankName: paymentForm.bankName,
+          transactionDetails: paymentForm.transactionDetails,
+          chequeDate: paymentForm.chequeDate,
+          transferDate: paymentForm.transferDate,
+          companyNamePayment: paymentForm.companyNamePayment,
+          paymentContactEmails: payEmails.paymentContactEmails,
+          otherPaymentMode: paymentForm.otherPaymentMode,
+          paymentAmountType: paymentForm.paymentAmountType,
+          currentInvoicePayment,
+        },
+        allocatedToInvoices: allocatedInvoices,
+      };
+
+      setPaymentModalVisible(false);
+      setSelectedInvoiceIds([]);
+      fetchInvoices();
+
+      try {
+        await axios.post(
+          'https://n8n.nicknameinfo.net/webhook/fb83e945-2e49-4a73-acce-fd08632ef1a8',
+          n8nPayload,
+          { timeout: 30000 }
+        );
         Toast.show({
           type: 'success',
           text1: 'Success',
-          text2: res.data.message || 'Payment details updated successfully!',
+          text2: 'Payment updated (ack sent).',
         });
-        setPaymentModalVisible(false);
-        fetchInvoices();
+      } catch (webhookError: any) {
+        console.error('n8n webhook error:', webhookError);
+        Toast.show({
+          type: 'error',
+          text1: 'Payment updated',
+          text2: webhookError?.message || 'Payment updated, but ack failed.',
+        });
       }
     } catch (error: any) {
       Toast.show({
@@ -699,6 +797,8 @@ const ServiceInvoiceListScreen = () => {
         text1: 'Error',
         text2: error.response?.data?.message || 'Failed to update payment details',
       });
+    } finally {
+      if (!isMultiSave) setSavingPayment(false);
     }
   };
 
@@ -1547,40 +1647,82 @@ const ServiceInvoiceListScreen = () => {
               />
             </View>
 
-            {/* Balance Amount Display */}
+            {/* Balance Amount Display + multi-select pending invoices */}
             {(loadingPendingInvoices || (balanceAmount > 0 && companyPendingInvoices.length > 0)) && (
               <>
                 {balanceAmount > 0 && (
-                  <Text style={styles.balanceText}>
-                    Previous Invoice Balance - Rs {balanceAmount.toFixed(2)}
-                  </Text>
+                  <>
+                    <Text style={styles.balanceText}>
+                      Previous Invoice Balance - Rs {balanceAmount.toFixed(2)}
+                    </Text>
+                    {!loadingPendingInvoices && (
+                      <>
+                        <Text style={styles.allocateMetaText}>
+                          Allocated to selected invoices - Rs {selectedAllocatedTotal.toFixed(2)}
+                        </Text>
+                        {remainingToAllocate > 0 && (
+                          <Text style={styles.allocateHintText}>
+                            Remaining to allocate - Rs {remainingToAllocate.toFixed(2)} (select more
+                            invoices so total equals balance)
+                          </Text>
+                        )}
+                        {remainingToAllocate === 0 && selectedInvoiceIds.length > 0 && (
+                          <Text style={styles.allocateDoneText}>Amount fully allocated.</Text>
+                        )}
+                      </>
+                    )}
+                  </>
                 )}
                 <View style={styles.modalInputGroup}>
-                  <Text style={styles.modalLabel}>Select Pending Invoice</Text>
+                  <Text style={styles.modalLabel}>Select Pending Invoices</Text>
                   {loadingPendingInvoices ? (
-                    <View style={[styles.pickerButton, { justifyContent: 'center', flexDirection: 'row', gap: 8 }]}>
+                    <View
+                      style={[
+                        styles.pickerButton,
+                        { justifyContent: 'center', flexDirection: 'row', gap: 8 },
+                      ]}
+                    >
                       <ActivityIndicator size="small" color="#007AFF" />
                       <Text style={styles.pickerButtonText}>Loading pending invoices...</Text>
                     </View>
                   ) : (
-                    <TouchableOpacity
-                      style={styles.pickerButton}
-                      onPress={() => setPendingInvoicePickerVisible(true)}
-                    >
-                      <Text style={styles.pickerButtonText}>
-                        {selectedPendingInvoiceId
-                          ? (() => {
-                              const selectedInv = companyPendingInvoices.find(
-                                (inv) => inv._id === selectedPendingInvoiceId
-                              );
-                              return selectedInv
-                                ? `${new Date(selectedInv.invoiceDate).toLocaleDateString()} - Rs ${selectedInv.grandTotal?.toFixed(2) || '0.00'}`
-                                : 'Select Invoice';
-                            })()
-                          : '--select Invoice--'}
-                      </Text>
-                      <Icon name="arrow-drop-down" size={24} color="#666" />
-                    </TouchableOpacity>
+                    <View style={styles.pendingInvoiceList}>
+                      {companyPendingInvoices
+                        .filter((pendingInv) => pendingInv._id !== selectedInvoice?._id)
+                        .map((pendingInv) => {
+                          const invAmount = Number(pendingInv?.grandTotal || 0);
+                          const isSelected = selectedInvoiceIds.includes(pendingInv._id);
+                          const canSelect = invAmount <= remainingToAllocate || isSelected;
+                          return (
+                            <TouchableOpacity
+                              key={pendingInv._id}
+                              style={[
+                                styles.pendingInvoiceRow,
+                                isSelected && styles.pendingInvoiceRowSelected,
+                                !canSelect && styles.pendingInvoiceRowDisabled,
+                              ]}
+                              disabled={!canSelect}
+                              onPress={() => togglePendingInvoiceSelection(pendingInv)}
+                              activeOpacity={0.7}
+                            >
+                              <Icon
+                                name={isSelected ? 'check-box' : 'check-box-outline-blank'}
+                                size={22}
+                                color={!canSelect ? '#ccc' : isSelected ? '#019ee3' : '#999'}
+                              />
+                              <Text style={styles.pendingInvoiceRowText}>
+                                {new Date(pendingInv.invoiceDate).toLocaleDateString()} - Rs{' '}
+                                {pendingInv?.grandTotal?.toFixed?.(2) ?? pendingInv?.grandTotal}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      {companyPendingInvoices.filter(
+                        (inv) => inv._id !== selectedInvoice?._id
+                      ).length === 0 && (
+                        <Text style={styles.pickerEmptyText}>No pending invoices</Text>
+                      )}
+                    </View>
                   )}
                 </View>
               </>
@@ -1606,76 +1748,27 @@ const ServiceInvoiceListScreen = () => {
             <View style={styles.modalActions}>
               <TouchableOpacity
                 style={[styles.modalButton, styles.modalCancelButton]}
-                onPress={() => setPaymentModalVisible(false)}
+                onPress={() => {
+                  setPaymentModalVisible(false);
+                  setSelectedInvoiceIds([]);
+                }}
               >
                 <Text style={styles.modalCancelButtonText}>Close</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.modalButton, styles.modalSaveButton]}
-                onPress={() => {
-                  handleSavePaymentDetails();
-                  if (balanceAmount > 0) {
-                    setTimeout(() => {
-                      handleSavePaymentDetails(balanceAmount);
-                    }, 1000);
-                  }
-                }}
+                onPress={() => handleSavePaymentDetails()}
+                disabled={savingPayment}
               >
-                <Text style={styles.modalSaveButtonText}>Save Changes</Text>
+                {savingPayment ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.modalSaveButtonText}>Save Changes</Text>
+                )}
               </TouchableOpacity>
             </View>
           </ScrollView>
         </View>
-      </Modal>
-
-      {/* Pending Invoice Picker Modal */}
-      <Modal
-        visible={pendingInvoicePickerVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setPendingInvoicePickerVisible(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setPendingInvoicePickerVisible(false)}
-        >
-          <View style={styles.pickerModalContent} onStartShouldSetResponder={() => true}>
-            <Text style={styles.pickerModalTitle}>Select Pending Invoice</Text>
-            <FlatList
-              data={companyPendingInvoices.filter(
-                (inv) => inv._id !== selectedInvoice?._id
-              )}
-              keyExtractor={(item) => item._id}
-              keyboardShouldPersistTaps="handled"
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.pickerOption}
-                  onPress={() => {
-                    setSelectedPendingInvoiceId(item._id);
-                    setPendingInvoicePickerVisible(false);
-                  }}
-                >
-                  <Text style={styles.pickerOptionText}>
-                    {new Date(item.invoiceDate).toLocaleDateString()} - Rs{' '}
-                    {item.grandTotal?.toFixed(2) || '0.00'}
-                  </Text>
-                </TouchableOpacity>
-              )}
-              ListEmptyComponent={
-                <View style={styles.pickerEmptyContainer}>
-                  <Text style={styles.pickerEmptyText}>No pending invoices</Text>
-                </View>
-              }
-            />
-            <TouchableOpacity
-              style={[styles.modalButton, styles.modalCancelButton]}
-              onPress={() => setPendingInvoicePickerVisible(false)}
-            >
-              <Text style={styles.modalCancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
       </Modal>
 
       {/* Mode Of Payment Picker Modal */}
@@ -2471,6 +2564,49 @@ const styles = StyleSheet.create({
     color: '#FF3B30',
     marginBottom: 10,
     fontWeight: '600',
+  },
+  allocateMetaText: {
+    fontSize: 13,
+    color: '#333',
+    marginBottom: 6,
+    fontWeight: '600',
+  },
+  allocateHintText: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 6,
+  },
+  allocateDoneText: {
+    fontSize: 12,
+    color: 'green',
+    marginBottom: 6,
+  },
+  pendingInvoiceList: {
+    maxHeight: 220,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    padding: 8,
+    minHeight: 56,
+  },
+  pendingInvoiceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+  },
+  pendingInvoiceRowSelected: {
+    backgroundColor: '#e6f7ff',
+  },
+  pendingInvoiceRowDisabled: {
+    opacity: 0.45,
+  },
+  pendingInvoiceRowText: {
+    fontSize: 14,
+    color: '#333',
+    flex: 1,
   },
   modalActions: {
     flexDirection: 'row',

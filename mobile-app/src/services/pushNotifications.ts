@@ -1,6 +1,6 @@
 import { AppState, Platform } from 'react-native';
+import { isRunningInExpoGo } from 'expo';
 import * as Device from 'expo-device';
-import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CommonActions } from '@react-navigation/native';
@@ -23,22 +23,46 @@ export type AssignmentNotificationType =
 
 const PUSH_TOKEN_STORAGE_KEY = 'expoPushToken';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+/**
+ * Importing expo-notifications on Android Expo Go throws at module load
+ * (DevicePushTokenAutoRegistration → addPushTokenListener). Never require it there.
+ */
+const notificationsUnsupportedInExpoGo =
+  isRunningInExpoGo() && Platform.OS === 'android';
+
+type NotificationsModule = typeof import('expo-notifications');
+
+let Notifications: NotificationsModule | null = null;
+
+function getNotifications(): NotificationsModule | null {
+  if (notificationsUnsupportedInExpoGo) return null;
+  if (!Notifications) {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    Notifications = require('expo-notifications') as NotificationsModule;
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+        shouldShowBanner: true,
+        shouldShowList: true,
+      }),
+    });
+  }
+  return Notifications;
+}
+
+function canUseRemotePush(): boolean {
+  return !notificationsUnsupportedInExpoGo;
+}
 
 async function ensureAndroidChannel() {
-  if (Platform.OS !== 'android') return;
+  const notifications = getNotifications();
+  if (!notifications || Platform.OS !== 'android') return;
 
-  await Notifications.setNotificationChannelAsync('assignments', {
+  await notifications.setNotificationChannelAsync('assignments', {
     name: 'Assignments',
-    importance: Notifications.AndroidImportance.HIGH,
+    importance: notifications.AndroidImportance.HIGH,
     vibrationPattern: [0, 250, 250, 250],
     lightColor: '#019ee3',
     sound: 'default',
@@ -46,6 +70,14 @@ async function ensureAndroidChannel() {
 }
 
 export async function registerForPushNotificationsAsync(): Promise<string | null> {
+  const notifications = getNotifications();
+  if (!notifications) {
+    console.log(
+      'Skipping Expo push token in Expo Go. Use a development build for remote notifications.'
+    );
+    return null;
+  }
+
   if (!Device.isDevice) {
     console.log('Push notifications require a physical device');
     return null;
@@ -53,11 +85,11 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
 
   await ensureAndroidChannel();
 
-  const { status: existingStatus } = await Notifications.getPermissionsAsync();
+  const { status: existingStatus } = await notifications.getPermissionsAsync();
   let finalStatus = existingStatus;
 
   if (existingStatus !== 'granted') {
-    const { status } = await Notifications.requestPermissionsAsync();
+    const { status } = await notifications.requestPermissionsAsync();
     finalStatus = status;
   }
 
@@ -75,7 +107,7 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
     return null;
   }
 
-  const tokenResponse = await Notifications.getExpoPushTokenAsync({ projectId });
+  const tokenResponse = await notifications.getExpoPushTokenAsync({ projectId });
   return tokenResponse.data;
 }
 
@@ -92,6 +124,8 @@ export async function unregisterPushTokenFromServer(pushToken: string): Promise<
 }
 
 export async function setupPushNotificationsForUser(): Promise<void> {
+  if (!canUseRemotePush()) return;
+
   try {
     const pushToken = await registerForPushNotificationsAsync();
     if (!pushToken) return;
@@ -185,9 +219,12 @@ export async function presentDocumentSentNotification(
   screen: string,
   entityId?: string
 ): Promise<void> {
+  const notifications = getNotifications();
+  if (!notifications) return;
+
   try {
     await ensureAndroidChannel();
-    await Notifications.scheduleNotificationAsync({
+    await notifications.scheduleNotificationAsync({
       content: {
         title: `${docTitle} sent`,
         body: `${docTitle} sent successfully.`,
@@ -221,7 +258,14 @@ export function navigateFromNotification(
 }
 
 export function subscribeToNotificationResponses(navigationRef: RootNavigationRef) {
-  const handleResponse = (response: Notifications.NotificationResponse) => {
+  const notifications = getNotifications();
+  if (!notifications) {
+    return () => undefined;
+  }
+
+  const handleResponse = (
+    response: import('expo-notifications').NotificationResponse
+  ) => {
     const data = response.notification.request.content.data as Record<string, unknown>;
     const screen = getScreenFromNotificationData(data);
     if (!screen) return;
@@ -231,9 +275,9 @@ export function subscribeToNotificationResponses(navigationRef: RootNavigationRe
     navigateFromNotification(navigationRef, screen, params);
   };
 
-  const subscription = Notifications.addNotificationResponseReceivedListener(handleResponse);
+  const subscription = notifications.addNotificationResponseReceivedListener(handleResponse);
 
-  Notifications.getLastNotificationResponseAsync().then((response) => {
+  notifications.getLastNotificationResponseAsync().then((response) => {
     if (response) {
       handleResponse(response);
     }
@@ -245,7 +289,12 @@ export function subscribeToNotificationResponses(navigationRef: RootNavigationRe
 export function subscribeToForegroundNotifications(
   onNotification: (title: string, body: string) => void
 ) {
-  const subscription = Notifications.addNotificationReceivedListener((notification) => {
+  const notifications = getNotifications();
+  if (!notifications) {
+    return () => undefined;
+  }
+
+  const subscription = notifications.addNotificationReceivedListener((notification) => {
     const title = notification.request.content.title || 'New assignment';
     const body = notification.request.content.body || '';
     onNotification(title, body);
@@ -259,7 +308,7 @@ export function subscribeToAppStatePushRefresh(
   enabled: boolean,
   onRefresh: () => void
 ) {
-  if (!enabled) return () => undefined;
+  if (!enabled || !canUseRemotePush()) return () => undefined;
 
   const subscription = AppState.addEventListener('change', (nextState) => {
     if (nextState === 'active') {

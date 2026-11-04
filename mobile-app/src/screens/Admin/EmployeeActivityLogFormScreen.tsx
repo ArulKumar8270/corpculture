@@ -32,6 +32,72 @@ const CALL_TYPES = [
   'BILL SIGNATURE',
 ];
 
+type AddressOption = {
+  _id: string;
+  companyId: string;
+  companyName: string;
+  addressLine: string;
+  pincode: string;
+  label: string;
+};
+
+/** Address rows for a company (delivery addresses, else billing). */
+const getAddressOptionsForCompany = (company: any): AddressOption[] => {
+  if (!company) return [];
+  const opts: AddressOption[] = [];
+  const deliveries = Array.isArray(company.serviceDeliveryAddresses)
+    ? company.serviceDeliveryAddresses
+    : [];
+  if (deliveries.length > 0) {
+    deliveries.forEach((addr: any, idx: number) => {
+      const addrLine = (addr?.address || '').trim();
+      if (!addrLine) return;
+      opts.push({
+        _id: `${company._id}_addr_${idx}`,
+        companyId: company._id,
+        companyName: company.companyName || '',
+        addressLine: addrLine,
+        pincode: addr?.pincode || '',
+        label: `${addrLine}${addr?.pincode ? ` (${addr.pincode})` : ''}`,
+      });
+    });
+  } else {
+    const bill = (company.billingAddress || '').trim();
+    if (bill) {
+      opts.push({
+        _id: `${company._id}_billing`,
+        companyId: company._id,
+        companyName: company.companyName || '',
+        addressLine: bill,
+        pincode: company.pincode ? String(company.pincode) : '',
+        label: `${bill}${company.pincode ? ` (${company.pincode})` : ''}`,
+      });
+    }
+  }
+  return opts;
+};
+
+const matchAddressOption = (
+  options: AddressOption[],
+  addressLine?: string,
+  pincode?: string
+): AddressOption | null => {
+  if (!options.length) return null;
+  const line = (addressLine || '').trim();
+  const pin = (pincode || '').trim();
+  if (line) {
+    const exact = options.find(
+      (o) =>
+        o.addressLine.trim() === line &&
+        (!pin || String(o.pincode || '').trim() === pin)
+    );
+    if (exact) return exact;
+    const byLine = options.find((o) => o.addressLine.trim() === line);
+    if (byLine) return byLine;
+  }
+  return options[0] || null;
+};
+
 const EmployeeActivityLogFormScreen = () => {
   const { token, user } = useSelector((state: RootState) => state.auth);
   const isAdmin = user?.role === 1 || Number(user?.role) === 1;
@@ -45,7 +111,10 @@ const EmployeeActivityLogFormScreen = () => {
   const [loadingCompanies, setLoadingCompanies] = useState(true);
   const [fromCompany, setFromCompany] = useState<any>(null);
   const [toCompany, setToCompany] = useState<any>(null);
+  const [fromAddress, setFromAddress] = useState<AddressOption | null>(null);
+  const [toAddress, setToAddress] = useState<AddressOption | null>(null);
   const [companyPicker, setCompanyPicker] = useState<'from' | 'to' | null>(null);
+  const [addressPicker, setAddressPicker] = useState<'from' | 'to' | null>(null);
   const [companySearch, setCompanySearch] = useState('');
   const [petrolPricePerKm, setPetrolPricePerKm] = useState(0);
 
@@ -71,6 +140,22 @@ const EmployeeActivityLogFormScreen = () => {
     });
     return map;
   }, [companies]);
+
+  const fromAddressOptions = useMemo(() => {
+    const opts = getAddressOptionsForCompany(fromCompany);
+    if (fromAddress && !opts.find((o) => o._id === fromAddress._id)) {
+      return [fromAddress, ...opts];
+    }
+    return opts;
+  }, [fromCompany, fromAddress]);
+
+  const toAddressOptions = useMemo(() => {
+    const opts = getAddressOptionsForCompany(toCompany);
+    if (toAddress && !opts.find((o) => o._id === toAddress._id)) {
+      return [toAddress, ...opts];
+    }
+    return opts;
+  }, [toCompany, toAddress]);
 
   useFocusEffect(
     useCallback(() => {
@@ -175,20 +260,48 @@ const EmployeeActivityLogFormScreen = () => {
       setEditLogRaw(log);
       const fromId = (log.fromCompany?._id || log.fromCompany)?.toString();
       const toId = (log.toCompany?._id || log.toCompany)?.toString();
-      setFromCompany(
-        fromId
-          ? companiesById[fromId] || { _id: fromId, companyName: log.fromCompanyName || '—' }
-          : log.fromCompanyName
-            ? { _id: 'from_legacy', companyName: log.fromCompanyName }
-            : null
+      const fromCo = fromId
+        ? companiesById[fromId] || { _id: fromId, companyName: log.fromCompanyName || '—' }
+        : log.fromCompanyName
+          ? { _id: 'from_legacy', companyName: log.fromCompanyName }
+          : null;
+      const toCo = toId
+        ? companiesById[toId] || { _id: toId, companyName: log.toCompanyName || '—' }
+        : log.toCompanyName
+          ? { _id: 'to_legacy', companyName: log.toCompanyName }
+          : null;
+      setFromCompany(fromCo);
+      setToCompany(toCo);
+
+      const fromOpts = getAddressOptionsForCompany(fromCo);
+      const toOpts = getAddressOptionsForCompany(toCo);
+      setFromAddress(
+        matchAddressOption(fromOpts, log.fromAddressLine, log.fromPincode) ||
+          (log.fromAddressLine
+            ? {
+                _id: 'from_legacy_addr',
+                companyId: fromId || '',
+                companyName: log.fromCompanyName || '',
+                addressLine: String(log.fromAddressLine),
+                pincode: log.fromPincode ? String(log.fromPincode) : '',
+                label: `${log.fromAddressLine}${log.fromPincode ? ` (${log.fromPincode})` : ''}`,
+              }
+            : null)
       );
-      setToCompany(
-        toId
-          ? companiesById[toId] || { _id: toId, companyName: log.toCompanyName || '—' }
-          : log.toCompanyName
-            ? { _id: 'to_legacy', companyName: log.toCompanyName }
-            : null
+      setToAddress(
+        matchAddressOption(toOpts, log.toAddressLine, log.toPincode) ||
+          (log.toAddressLine
+            ? {
+                _id: 'to_legacy_addr',
+                companyId: toId || '',
+                companyName: log.toCompanyName || '',
+                addressLine: String(log.toAddressLine),
+                pincode: log.toPincode ? String(log.toPincode) : '',
+                label: `${log.toAddressLine}${log.toPincode ? ` (${log.toPincode})` : ''}`,
+              }
+            : null)
       );
+
       setForm((prev) => ({
         ...prev,
         date: log?.date ? new Date(log.date).toISOString().split('T')[0] : prev.date,
@@ -221,6 +334,8 @@ const EmployeeActivityLogFormScreen = () => {
     const c = companiesById[String(preselectedFromCompanyId)];
     if (c?._id) {
       setFromCompany(c);
+      const opts = getAddressOptionsForCompany(c);
+      setFromAddress(opts[0] || null);
     }
   }, [isEdit, preselectedFromCompanyId, companiesById]);
 
@@ -253,6 +368,10 @@ const EmployeeActivityLogFormScreen = () => {
       Toast.show({ type: 'error', text1: 'Please select both From Company and To Company' });
       return;
     }
+    if (!fromAddress || !toAddress) {
+      Toast.show({ type: 'error', text1: 'Please select From and To addresses' });
+      return;
+    }
     const fromCompanyId = normalizeMongoId(fromCompany._id);
     const toCompanyId = normalizeMongoId(toCompany._id);
     if (!fromCompanyId || !toCompanyId) {
@@ -269,12 +388,12 @@ const EmployeeActivityLogFormScreen = () => {
         date: form.date,
         fromCompany: fromCompanyId,
         fromCompanyName: fromCompany.companyName || '',
-        fromAddressLine: (fromCompany.billingAddress || '').trim() || undefined,
-        fromPincode: fromCompany.pincode ? String(fromCompany.pincode) : undefined,
+        fromAddressLine: (fromAddress.addressLine || '').trim() || undefined,
+        fromPincode: fromAddress.pincode ? String(fromAddress.pincode) : undefined,
         toCompany: toCompanyId,
         toCompanyName: toCompany.companyName || '',
-        toAddressLine: (toCompany.billingAddress || '').trim() || undefined,
-        toPincode: toCompany.pincode ? String(toCompany.pincode) : undefined,
+        toAddressLine: (toAddress.addressLine || '').trim() || undefined,
+        toPincode: toAddress.pincode ? String(toAddress.pincode) : undefined,
         km: form.km ? Number(form.km) : 0,
         petrolAmount: petrolAmountForPayload(),
         inTime: form.inTime || undefined,
@@ -307,6 +426,8 @@ const EmployeeActivityLogFormScreen = () => {
           });
           setFromCompany(null);
           setToCompany(null);
+          setFromAddress(null);
+          setToAddress(null);
         }
       } else {
         Toast.show({ type: 'error', text1: data?.message || 'Failed to create petrol form' });
@@ -322,10 +443,22 @@ const EmployeeActivityLogFormScreen = () => {
   };
 
   const selectCompany = (company: any) => {
-    if (companyPicker === 'from') setFromCompany(company);
-    else if (companyPicker === 'to') setToCompany(company);
+    const opts = getAddressOptionsForCompany(company);
+    if (companyPicker === 'from') {
+      setFromCompany(company);
+      setFromAddress(opts[0] || null);
+    } else if (companyPicker === 'to') {
+      setToCompany(company);
+      setToAddress(opts[0] || null);
+    }
     setCompanyPicker(null);
     setCompanySearch('');
+  };
+
+  const selectAddress = (addr: AddressOption) => {
+    if (addressPicker === 'from') setFromAddress(addr);
+    else if (addressPicker === 'to') setToAddress(addr);
+    setAddressPicker(null);
   };
 
   const openCompanyPicker = (which: 'from' | 'to') => {
@@ -372,6 +505,21 @@ const EmployeeActivityLogFormScreen = () => {
           <Icon name="arrow-drop-down" size={24} color="#666" />
         </TouchableOpacity>
 
+        <Text style={styles.label}>From Address *</Text>
+        <TouchableOpacity
+          style={[styles.pickerButton, !fromCompany && styles.pickerDisabled]}
+          onPress={() => fromCompany && setAddressPicker('from')}
+          disabled={!fromCompany}
+        >
+          <Text
+            style={fromAddress ? styles.pickerText : styles.pickerPlaceholder}
+            numberOfLines={2}
+          >
+            {fromAddress?.label || (fromCompany ? 'Select address' : 'Select company first')}
+          </Text>
+          <Icon name="arrow-drop-down" size={24} color="#666" />
+        </TouchableOpacity>
+
         <Text style={styles.label}>To Company *</Text>
         <TouchableOpacity
           style={styles.pickerButton}
@@ -379,6 +527,21 @@ const EmployeeActivityLogFormScreen = () => {
         >
           <Text style={toCompany ? styles.pickerText : styles.pickerPlaceholder}>
             {toCompany?.companyName || 'Select company'}
+          </Text>
+          <Icon name="arrow-drop-down" size={24} color="#666" />
+        </TouchableOpacity>
+
+        <Text style={styles.label}>To Address *</Text>
+        <TouchableOpacity
+          style={[styles.pickerButton, !toCompany && styles.pickerDisabled]}
+          onPress={() => toCompany && setAddressPicker('to')}
+          disabled={!toCompany}
+        >
+          <Text
+            style={toAddress ? styles.pickerText : styles.pickerPlaceholder}
+            numberOfLines={2}
+          >
+            {toAddress?.label || (toCompany ? 'Select address' : 'Select company first')}
           </Text>
           <Icon name="arrow-drop-down" size={24} color="#666" />
         </TouchableOpacity>
@@ -523,6 +686,44 @@ const EmployeeActivityLogFormScreen = () => {
           </View>
         </View>
       </Modal>
+
+      <Modal
+        visible={!!addressPicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAddressPicker(null)}
+      >
+        <View style={styles.modalRoot}>
+          <Pressable style={styles.modalBackdrop} onPress={() => setAddressPicker(null)} />
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>
+              {addressPicker === 'from' ? 'From address' : 'To address'}
+            </Text>
+            <FlatList
+              data={addressPicker === 'from' ? fromAddressOptions : toAddressOptions}
+              keyExtractor={(item) => item._id}
+              style={styles.modalListScroll}
+              keyboardShouldPersistTaps="handled"
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.modalItem}
+                  onPress={() => selectAddress(item)}
+                >
+                  <Text style={styles.modalItemText} numberOfLines={3}>
+                    {item.label}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              ListEmptyComponent={
+                <Text style={styles.modalEmpty}>No addresses available for this company.</Text>
+              }
+            />
+            <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setAddressPicker(null)}>
+              <Text style={styles.cancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 };
@@ -554,8 +755,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     backgroundColor: '#fff',
   },
-  pickerText: { fontSize: 16, color: '#333' },
-  pickerPlaceholder: { fontSize: 16, color: '#999' },
+  pickerDisabled: { opacity: 0.6 },
+  pickerText: { fontSize: 16, color: '#333', flex: 1, marginRight: 8 },
+  pickerPlaceholder: { fontSize: 16, color: '#999', flex: 1, marginRight: 8 },
   modalRoot: {
     flex: 1,
     justifyContent: 'center',

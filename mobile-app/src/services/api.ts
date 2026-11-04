@@ -40,6 +40,43 @@ const api = axios.create({
   },
 });
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const isRetryableNetworkError = (error: any) => {
+  if (!error) return false;
+  if (error.response) return false; // got an HTTP response — don't retry as network
+  const code = String(error.code || '');
+  const message = String(error.message || '').toLowerCase();
+  return (
+    code === 'ECONNABORTED' ||
+    code === 'ERR_NETWORK' ||
+    code === 'NETWORK_ERROR' ||
+    message.includes('network error') ||
+    message.includes('timeout')
+  );
+};
+
+/** Retry transient mobile network failures (common right after app reload). */
+export const withNetworkRetry = async <T>(
+  request: () => Promise<T>,
+  retries = 2,
+  delayMs = 700
+): Promise<T> => {
+  let lastError: any;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await request();
+    } catch (error: any) {
+      lastError = error;
+      if (!isRetryableNetworkError(error) || attempt === retries) {
+        throw error;
+      }
+      await sleep(delayMs * (attempt + 1));
+    }
+  }
+  throw lastError;
+};
+
 // Request interceptor for auth token
 api.interceptors.request.use(
   async (config) => {
@@ -113,11 +150,13 @@ const getData = async <T>(
     return sampleData;
   }
   try {
-    return await apiCall();
-  } catch (error) {
-    console.warn('API call failed, using sample data:', error);
-    await delay(delayMs);
-    return sampleData;
+    return await withNetworkRetry(apiCall);
+  } catch (error: any) {
+    const status = error?.response?.status;
+    const url = `${error?.config?.baseURL || API_BASE_URL || ''}${error?.config?.url || ''}`;
+    // Never silently replace a real API failure with sample data — that hides broken routes.
+    console.warn('API call failed:', { status, url, message: error?.message });
+    throw error;
   }
 };
 
@@ -193,7 +232,7 @@ export const authService = {
 export const productService = {
   getProducts: async (params?: any) => {
     return getData(
-      () => api.get('/product', { params }),
+      () => api.get('/product/filtered-products', { params }),
       { data: { products: sampleData.sampleProducts } } as any,
       800
     );
@@ -209,7 +248,7 @@ export const productService = {
 
   searchProducts: async (query: string) => {
     return getData(
-      () => api.get('/product/search', { params: { q: query } }),
+      () => api.get(`/product/search/${encodeURIComponent(query)}`),
       { data: { products: sampleData.sampleProducts } } as any,
       500
     );
@@ -220,7 +259,7 @@ export const productService = {
 export const companyService = {
   getCompanies: async () => {
     return getData(
-      () => api.get('/company'),
+      () => api.get(`/company/all?${companyAllPickerQuery}`),
       { data: { companies: sampleData.sampleCompanies } } as any,
       800
     );
@@ -228,7 +267,7 @@ export const companyService = {
 
   getCompany: async (id: string) => {
     return getData(
-      () => api.get(`/company/${id}`),
+      () => api.get(`/company/get/${id}`),
       { data: { company: sampleData.sampleCompanies[0] } } as any,
       500
     );
@@ -255,7 +294,7 @@ export const orderService = {
 
   getOrder: async (id: string) => {
     return getData(
-      () => api.get(`/user/orders/${id}`),
+      () => api.get('/user/order-detail', { params: { orderId: id } }),
       { data: { order: sampleData.sampleOrders[0] } } as any,
       500
     );
@@ -263,7 +302,7 @@ export const orderService = {
 
   createOrder: async (data: any) => {
     return getData(
-      () => api.post('/order/create', data),
+      () => api.post('/user/create-order', data),
       { data: { order: { ...data, _id: Date.now().toString() } } } as any,
       1000
     );
@@ -301,7 +340,7 @@ export const serviceEnquiryService = {
 export const rentalService = {
   getEnquiries: async () => {
     return getData(
-      () => api.get('/rental'),
+      () => api.get('/rental/all'),
       { data: { enquiries: sampleData.sampleRentalEnquiries } } as any,
       800
     );
@@ -326,9 +365,9 @@ export const rentalService = {
 
 // Service Invoice Service
 export const serviceInvoiceService = {
-  getInvoices: async () => {
+  getInvoices: async (filters: any = {}) => {
     return getData(
-      () => api.get('/service-invoice'),
+      () => api.post('/service-invoice/all', filters),
       { data: { invoices: sampleData.sampleServiceInvoices } } as any,
       800
     );
@@ -336,7 +375,7 @@ export const serviceInvoiceService = {
 
   getInvoice: async (id: string) => {
     return getData(
-      () => api.get(`/service-invoice/${id}`),
+      () => api.get(`/service-invoice/get/${id}`),
       { data: { invoice: sampleData.sampleServiceInvoices[0] } } as any,
       500
     );
@@ -355,9 +394,9 @@ export const serviceInvoiceService = {
 
 // Rental Invoice Service
 export const rentalInvoiceService = {
-  getInvoices: async () => {
+  getInvoices: async (filters: any = {}) => {
     return getData(
-      () => api.get('/rental-payment'),
+      () => api.post('/rental-payment/all', filters),
       { data: { invoices: sampleData.sampleRentalInvoices } } as any,
       800
     );
@@ -384,17 +423,23 @@ export const rentalInvoiceService = {
 
 // Admin Service
 export const adminService = {
+  /** Backend has no /admin/dashboard-stats route; keep a local no-op payload. */
   getDashboardStats: async () => {
-    return getData(
-      () => api.get('/admin/dashboard-stats'),
-      { data: { stats: sampleData.sampleDashboardStats } } as any,
-      800
-    );
+    return {
+      data: {
+        stats: {
+          totalServices: 0,
+          totalInvoices: 0,
+          totalRevenue: 0,
+          pendingApprovals: 0,
+        },
+      },
+    } as any;
   },
 
   getEmployees: async () => {
     return getData(
-      () => api.get('/employee'),
+      () => api.get('/employee/all'),
       { data: { employees: sampleData.sampleEmployees } } as any,
       800
     );
@@ -434,7 +479,7 @@ export const adminService = {
 
   getCommission: async () => {
     return getData(
-      () => api.get('/commission'),
+      () => api.get('/commissions'),
       { data: { commission: sampleData.sampleCommission } } as any,
       800
     );
@@ -442,7 +487,7 @@ export const adminService = {
 
   createCommission: async (data: any) => {
     return getData(
-      () => api.post('/commission/create', data),
+      () => api.post('/commissions', data),
       { data: { commission: { ...data, _id: Date.now().toString() } } } as any,
       1000
     );
@@ -450,7 +495,7 @@ export const adminService = {
 
   updateCommission: async (id: string, data: any) => {
     return getData(
-      () => api.put(`/commission/update/${id}`, data),
+      () => api.put(`/commissions/${id}`, data),
       { data: { commission: { ...data, _id: id } } } as any,
       1000
     );
@@ -458,7 +503,7 @@ export const adminService = {
 
   getAllOrders: async () => {
     return getData(
-      () => api.get('/order/all'),
+      () => api.get('/user/admin-orders'),
       { data: { orders: sampleData.sampleOrders } } as any,
       800
     );
@@ -466,7 +511,7 @@ export const adminService = {
 
   getOrder: async (id: string) => {
     return getData(
-      () => api.get(`/order/${id}`),
+      () => api.get('/user/admin-order-detail', { params: { orderId: id } }),
       { data: { order: sampleData.sampleOrders[0] } } as any,
       500
     );
@@ -474,7 +519,7 @@ export const adminService = {
 
   updateOrder: async (id: string, data: any) => {
     return getData(
-      () => api.put(`/order/update/${id}`, data),
+      () => api.patch('/user/update/order-status', { orderId: id, ...data }),
       { data: { order: { ...data, _id: id } } } as any,
       1000
     );
@@ -482,7 +527,7 @@ export const adminService = {
 
   assignOrder: async (data: any) => {
     return getData(
-      () => api.post('/order/assign', data),
+      () => api.patch('/user/update/aassign-orders', data),
       { data: { success: true } } as any,
       1000
     );
@@ -509,7 +554,7 @@ export const adminService = {
 export const productManagementService = {
   getAllProducts: async () => {
     return getData(
-      () => api.get('/product/all'),
+      () => api.get('/product/seller-product'),
       { data: { products: sampleData.sampleProducts } } as any,
       800
     );
@@ -517,7 +562,7 @@ export const productManagementService = {
 
   createProduct: async (data: FormData) => {
     return getData(
-      () => api.post('/product/create', data, {
+      () => api.post('/product/new-product', data, {
         headers: { 'Content-Type': 'multipart/form-data' },
       }),
       { data: { product: { _id: Date.now().toString() } } } as any,
@@ -527,7 +572,7 @@ export const productManagementService = {
 
   updateProduct: async (id: string, data: FormData) => {
     return getData(
-      () => api.put(`/product/update/${id}`, data, {
+      () => api.patch(`/product/update/${id}`, data, {
         headers: { 'Content-Type': 'multipart/form-data' },
       }),
       { data: { product: { _id: id } } } as any,
@@ -537,7 +582,7 @@ export const productManagementService = {
 
   deleteProduct: async (id: string) => {
     return getData(
-      () => api.delete(`/product/delete/${id}`),
+      () => api.post('/product/delete-product', { id }),
       { data: { success: true } } as any,
       500
     );
@@ -545,7 +590,7 @@ export const productManagementService = {
 
   getFilteredProducts: async (params: any) => {
     return getData(
-      () => api.get('/product/filtered', { params }),
+      () => api.get('/product/filtered-products', { params }),
       { data: { products: sampleData.sampleProducts } } as any,
       800
     );
@@ -599,7 +644,7 @@ export const userService = {
 
   updateDetails: async (data: any) => {
     return getData(
-      () => api.put('/user/update-details', data),
+      () => api.post('/auth/update-details', data),
       { data: { user: { ...data } } } as any,
       1000
     );
@@ -620,7 +665,7 @@ export const userService = {
 export const serviceProductService = {
   getAll: async () => {
     return getData(
-      () => api.get('/service-product'),
+      () => api.get('/service-products'),
       { data: { products: [] } } as any,
       800
     );
@@ -628,7 +673,7 @@ export const serviceProductService = {
 
   create: async (data: any) => {
     return getData(
-      () => api.post('/service-product/create', data),
+      () => api.post('/service-products', data),
       { data: { product: { ...data, _id: Date.now().toString() } } } as any,
       1000
     );
@@ -636,7 +681,7 @@ export const serviceProductService = {
 
   update: async (id: string, data: any) => {
     return getData(
-      () => api.put(`/service-product/update/${id}`, data),
+      () => api.put(`/service-products/${id}`, data),
       { data: { product: { ...data, _id: id } } } as any,
       1000
     );
@@ -644,7 +689,7 @@ export const serviceProductService = {
 
   delete: async (id: string) => {
     return getData(
-      () => api.delete(`/service-product/delete/${id}`),
+      () => api.delete(`/service-products/${id}`),
       { data: { success: true } } as any,
       500
     );
@@ -713,7 +758,7 @@ export const serviceQuotationService = {
 export const serviceReportService = {
   getAll: async () => {
     return getData(
-      () => api.get('/report/service'),
+      () => api.get('/report/Service_Report'),
       { data: { reports: [] } } as any,
       800
     );
@@ -721,7 +766,7 @@ export const serviceReportService = {
 
   create: async (data: any) => {
     return getData(
-      () => api.post('/report/create', data),
+      () => api.post('/report', data),
       { data: { report: { ...data, _id: Date.now().toString() } } } as any,
       1000
     );
@@ -729,7 +774,7 @@ export const serviceReportService = {
 
   update: async (id: string, data: any) => {
     return getData(
-      () => api.put(`/report/update/${id}`, data),
+      () => api.put(`/report/${id}`, data),
       { data: { report: { ...data, _id: id } } } as any,
       1000
     );
@@ -737,7 +782,7 @@ export const serviceReportService = {
 
   delete: async (id: string) => {
     return getData(
-      () => api.delete(`/report/delete/${id}`),
+      () => api.delete(`/report/${id}`),
       { data: { success: true } } as any,
       500
     );
@@ -758,7 +803,7 @@ export const rentalServiceEnhanced = {
 
   getRental: async (id: string) => {
     return getData(
-      () => api.get(`/rental/${id}`),
+      () => api.get(`/rental/get/${id}`),
       { data: { rental: {} } } as any,
       500
     );
@@ -785,7 +830,7 @@ export const rentalServiceEnhanced = {
 export const rentalProductService = {
   getAll: async () => {
     return getData(
-      () => api.get('/rental-product'),
+      () => api.get('/rental-products'),
       { data: { products: sampleData.sampleRentalProducts } } as any,
       800
     );
@@ -793,7 +838,7 @@ export const rentalProductService = {
 
   create: async (data: any) => {
     return getData(
-      () => api.post('/rental-product/create', data),
+      () => api.post('/rental-products', data),
       { data: { product: { ...data, _id: Date.now().toString() } } } as any,
       1000
     );
@@ -801,7 +846,7 @@ export const rentalProductService = {
 
   update: async (id: string, data: any) => {
     return getData(
-      () => api.put(`/rental-product/update/${id}`, data),
+      () => api.put(`/rental-products/${id}`, data),
       { data: { product: { ...data, _id: id } } } as any,
       1000
     );
@@ -809,7 +854,7 @@ export const rentalProductService = {
 
   delete: async (id: string) => {
     return getData(
-      () => api.delete(`/rental-product/delete/${id}`),
+      () => api.delete(`/rental-products/${id}`),
       { data: { success: true } } as any,
       500
     );
@@ -841,7 +886,7 @@ export const rentalInvoiceServiceEnhanced = {
 export const vendorService = {
   getAll: async () => {
     return getData(
-      () => api.get('/vendor'),
+      () => api.get('/vendors'),
       { data: { vendors: [] } } as any,
       800
     );
@@ -849,7 +894,7 @@ export const vendorService = {
 
   get: async (id: string) => {
     return getData(
-      () => api.get(`/vendor/${id}`),
+      () => api.get(`/vendors/${id}`),
       { data: { vendor: {} } } as any,
       500
     );
@@ -857,7 +902,7 @@ export const vendorService = {
 
   create: async (data: any) => {
     return getData(
-      () => api.post('/vendor/create', data),
+      () => api.post('/vendors', data),
       { data: { vendor: { ...data, _id: Date.now().toString() } } } as any,
       1000
     );
@@ -865,7 +910,7 @@ export const vendorService = {
 
   update: async (id: string, data: any) => {
     return getData(
-      () => api.put(`/vendor/update/${id}`, data),
+      () => api.put(`/vendors/${id}`, data),
       { data: { vendor: { ...data, _id: id } } } as any,
       1000
     );
@@ -873,7 +918,7 @@ export const vendorService = {
 
   delete: async (id: string) => {
     return getData(
-      () => api.delete(`/vendor/delete/${id}`),
+      () => api.delete(`/vendors/${id}`),
       { data: { success: true } } as any,
       500
     );
@@ -884,7 +929,7 @@ export const vendorService = {
 export const vendorProductService = {
   getAll: async () => {
     return getData(
-      () => api.get('/vendor-product'),
+      () => api.get('/vendor-products'),
       { data: { products: [] } } as any,
       800
     );
@@ -892,7 +937,7 @@ export const vendorProductService = {
 
   create: async (data: any) => {
     return getData(
-      () => api.post('/vendor-product/create', data),
+      () => api.post('/vendor-products', data),
       { data: { product: { ...data, _id: Date.now().toString() } } } as any,
       1000
     );
@@ -900,7 +945,7 @@ export const vendorProductService = {
 
   update: async (id: string, data: any) => {
     return getData(
-      () => api.put(`/vendor-product/update/${id}`, data),
+      () => api.put(`/vendor-products/${id}`, data),
       { data: { product: { ...data, _id: id } } } as any,
       1000
     );
@@ -908,7 +953,7 @@ export const vendorProductService = {
 
   delete: async (id: string) => {
     return getData(
-      () => api.delete(`/vendor-product/delete/${id}`),
+      () => api.delete(`/vendor-products/${id}`),
       { data: { success: true } } as any,
       500
     );
@@ -935,7 +980,7 @@ export const purchaseService = {
 
   create: async (data: any) => {
     return getData(
-      () => api.post('/purchases/create', data),
+      () => api.post('/purchases', data),
       { data: { purchase: { ...data, _id: Date.now().toString() } } } as any,
       1000
     );
@@ -983,7 +1028,7 @@ export const gstService = {
 
   create: async (data: any) => {
     return getData(
-      () => api.post('/gst/create', data),
+      () => api.post('/gst', data),
       { data: { gst: { ...data, _id: Date.now().toString() } } } as any,
       1000
     );
@@ -991,7 +1036,7 @@ export const gstService = {
 
   update: async (id: string, data: any) => {
     return getData(
-      () => api.put(`/gst/update/${id}`, data),
+      () => api.put(`/gst/${id}`, data),
       { data: { gst: { ...data, _id: id } } } as any,
       1000
     );
@@ -999,7 +1044,7 @@ export const gstService = {
 
   delete: async (id: string) => {
     return getData(
-      () => api.delete(`/gst/delete/${id}`),
+      () => api.delete(`/gst/${id}`),
       { data: { success: true } } as any,
       500
     );

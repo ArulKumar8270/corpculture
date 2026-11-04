@@ -76,7 +76,7 @@ const ProductManagementScreen = () => {
           timeout: 30000,
         }
       );
-      if (response.status === 201) {
+      if (response.status === 200 || response.status === 201) {
         setProducts(response.data.products || []);
       }
     } catch (error: any) {

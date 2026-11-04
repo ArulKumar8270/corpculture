@@ -396,27 +396,82 @@ const ServiceReportsScreen = () => {
 
   const handleUploadReport = async (report: any) => {
     try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission Required', 'Please grant permission to access your media library');
-        return;
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: (ImagePicker as any).MediaType?.All
-          || [(ImagePicker as any).MediaType?.Images, (ImagePicker as any).MediaType?.Videos].filter(Boolean)
-          || 'images',
-        allowsEditing: false,
-        quality: 0.8,
-        allowsMultipleSelection: false,
+      Alert.alert('Upload File', 'Choose file type', [
+        {
+          text: 'Photo / Image',
+          onPress: async () => {
+            try {
+              const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+              if (status !== 'granted') {
+                Alert.alert('Permission Required', 'Please grant permission to access your media library');
+                return;
+              }
+              const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: (ImagePicker as any).MediaType?.Images
+                  || [(ImagePicker as any).MediaType?.Images].filter(Boolean)
+                  || 'images',
+                allowsEditing: false,
+                quality: 0.8,
+                allowsMultipleSelection: false,
+              });
+              if (result.canceled || !result.assets?.length) return;
+              await uploadReportAsset(report, result.assets[0]);
+            } catch (error: any) {
+              Toast.show({
+                type: 'error',
+                text1: 'Error',
+                text2: error.response?.data?.message || error.message || 'Failed to upload report',
+              });
+            }
+          },
+        },
+        {
+          text: 'PDF / Document',
+          onPress: async () => {
+            try {
+              const DocumentPicker = await import('expo-document-picker');
+              const result = await DocumentPicker.getDocumentAsync({
+                type: ['application/pdf', 'image/*'],
+                multiple: false,
+                copyToCacheDirectory: true,
+              });
+              if (result.canceled || !result.assets?.length) return;
+              const asset = result.assets[0];
+              await uploadReportAsset(report, {
+                uri: asset.uri,
+                mimeType: asset.mimeType || 'application/pdf',
+                name: asset.name,
+              });
+            } catch (error: any) {
+              Toast.show({
+                type: 'error',
+                text1: 'Error',
+                text2: error.response?.data?.message || error.message || 'Failed to upload report',
+              });
+            }
+          },
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ]);
+    } catch (error: any) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: error.message || 'Failed to upload report',
       });
+    }
+  };
 
-      if (result.canceled || !result.assets?.length) return;
-
-      const asset = result.assets[0];
-      setUploadingReportId(report._id);
-
-      const fileExtension = asset.uri.split('.').pop()?.toLowerCase() || 'jpg';
+  const uploadReportAsset = async (
+    report: any,
+    asset: { uri: string; mimeType?: string; name?: string }
+  ) => {
+    setUploadingReportId(report._id);
+    try {
+      const fileExtension =
+        asset.name?.split('.').pop()?.toLowerCase() ||
+        asset.uri.split('.').pop()?.toLowerCase() ||
+        'jpg';
       let mimeType = asset.mimeType || 'image/jpeg';
       if (!asset.mimeType && fileExtension === 'pdf') mimeType = 'application/pdf';
       if (!asset.mimeType && fileExtension === 'png') mimeType = 'image/png';
@@ -425,7 +480,7 @@ const ServiceReportsScreen = () => {
       formData.append('file', {
         uri: asset.uri,
         type: mimeType,
-        name: `report_${report._id}_${Date.now()}.${fileExtension}`,
+        name: asset.name || `report_${report._id}_${Date.now()}.${fileExtension}`,
       } as any);
 
       const uploadRes = await axios.post(`${getApiBaseUrl()}/auth/upload-file`, formData, {
@@ -571,23 +626,23 @@ const ServiceReportsScreen = () => {
         <View style={styles.actionButtons}>
           {!isTrashView(viewMode) && (
             <>
-              {hasPermission(docPermissionKey, 'edit') && (
-                <>
-                  <TouchableOpacity
-                    style={[styles.actionButton, styles.editButton]}
-                    onPress={() => handleEdit(item)}
-                  >
-                    <Icon name="edit" size={18} color="#007AFF" />
-                    <Text style={styles.actionButtonText}>Edit</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.actionButton, styles.deleteButton]}
-                    onPress={() => handleDelete(item._id)}
-                  >
-                    <Icon name="delete" size={18} color="#FF3B30" />
-                    <Text style={[styles.actionButtonText, styles.deleteButtonText]}>Trash</Text>
-                  </TouchableOpacity>
-                </>
+              {(hasPermission(docPermissionKey, 'edit') || user?.role === 1) && (
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.editButton]}
+                  onPress={() => handleEdit(item)}
+                >
+                  <Icon name="edit" size={18} color="#007AFF" />
+                  <Text style={styles.actionButtonText}>Edit</Text>
+                </TouchableOpacity>
+              )}
+              {(hasPermission(docPermissionKey, 'delete') || user?.role === 1) && (
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.deleteButton]}
+                  onPress={() => handleDelete(item._id)}
+                >
+                  <Icon name="delete" size={18} color="#FF3B30" />
+                  <Text style={[styles.actionButtonText, styles.deleteButtonText]}>Trash</Text>
+                </TouchableOpacity>
               )}
               <TouchableOpacity
                 style={[styles.actionButton, styles.sendButton]}
@@ -792,7 +847,7 @@ const ServiceReportsScreen = () => {
             onPress={() =>
               (navigation as any).navigate('AddServiceReport', {
                 reportType: reportTypeKey,
-                reportFor: 'service',
+                reportFor: reportTypeKey,
               })
             }
           >

@@ -34,7 +34,6 @@ import ServiceProductListScreen from '../screens/Admin/ServiceProductListScreen'
 import AddServiceProductScreen from '../screens/Admin/AddServiceProductScreen';
 import ServiceInvoiceListScreen from '../screens/Admin/ServiceInvoiceListScreen';
 import AddServiceInvoiceScreen from '../screens/Admin/AddServiceInvoiceScreen';
-import ServiceQuotationListScreen from '../screens/Admin/ServiceQuotationListScreen';
 import ServiceReportsScreen from '../screens/Admin/ServiceReportsScreen';
 import AddServiceReportScreen from '../screens/Admin/AddServiceReportScreen';
 
@@ -49,7 +48,6 @@ import AddRentalProductScreen from '../screens/Admin/AddRentalProductScreen';
 import RentalInvoiceListScreen from '../screens/Rental/RentalInvoiceListScreen';
 import AddRentalInvoiceScreen from '../screens/Admin/AddRentalInvoiceScreen';
 import RentalEnquiriesScreen from '../screens/Admin/RentalEnquiriesScreen';
-import RentalQuotationListScreen from '../screens/Rental/RentalQuotationListScreen';
 
 // Vendor Management
 import VendorListScreen from '../screens/Admin/VendorListScreen';
@@ -91,9 +89,13 @@ import ServiceEnquiriesReportScreen from '../screens/Admin/Reports/ServiceEnquir
 import ServiceInvoicesReportScreen from '../screens/Admin/Reports/ServiceInvoicesReportScreen';
 import ServiceReportsReportScreen from '../screens/Admin/Reports/ServiceReportsReportScreen';
 import EmployeeListScreen from '../screens/Admin/EmployeeListScreen';
+import AddEmployeeScreen from '../screens/Admin/AddEmployeeScreen';
+import EmployeeDetailsScreen from '../screens/Admin/EmployeeDetailsScreen';
 import ActivityLogReportScreen from '../screens/Admin/Reports/ActivityLogReportScreen';
 import LeaveReportScreen from '../screens/Admin/Reports/LeaveReportScreen';
 import EmployeeBenefitsReportScreen from '../screens/Admin/Reports/EmployeeBenefitsReportScreen';
+import OldInvoiceUploadScreen from '../screens/Admin/OldInvoiceUploadScreen';
+import OldInvoiceDetailScreen from '../screens/Admin/OldInvoiceDetailScreen';
 
 const Drawer = createDrawerNavigator();
 const Stack = createStackNavigator();
@@ -163,7 +165,12 @@ const ServiceStack = () => (
     <Stack.Screen name="AddServiceProduct" component={AddServiceProductScreen} options={{ title: 'Add/Edit Product', headerShown: true }} />
     <Stack.Screen name="ServiceInvoiceList" component={ServiceInvoiceListScreen} options={{ title: 'Service Invoices', headerShown: true }} />
     <Stack.Screen name="AddServiceInvoice" component={AddServiceInvoiceScreen} options={{ title: 'Add/Edit Invoice', headerShown: true }} />
-    <Stack.Screen name="ServiceQuotationList" component={ServiceQuotationListScreen} options={{ title: 'Service Quotations', headerShown: true }} />
+    <Stack.Screen
+      name="ServiceQuotationList"
+      component={ServiceInvoiceListScreen}
+      initialParams={{ invoiceType: 'quotation' }}
+      options={{ title: 'Service Quotations', headerShown: true }}
+    />
     <Stack.Screen name="AddServiceQuotation" component={AddServiceInvoiceScreen} options={{ title: 'Add/Edit Quotation', headerShown: true }} />
     <Stack.Screen name="ServiceReports" component={ServiceReportsScreen} options={{ title: 'Service Reports', headerShown: true }} />
     <Stack.Screen
@@ -211,7 +218,12 @@ const RentalStack = () => (
     <Stack.Screen name="RentalInvoiceList" component={RentalInvoiceListScreen} options={{ title: 'Rental Invoices' }} />
     <Stack.Screen name="AddRentalInvoice" component={AddRentalInvoiceScreen} options={{ title: 'Add/Edit Rental Invoice' }} />
     <Stack.Screen name="RentalEnquiries" component={RentalEnquiriesScreen} options={{ title: 'Rental Enquiries' }} />
-    <Stack.Screen name="RentalQuotationList" component={RentalQuotationListScreen} options={{ title: 'Rental Quotations' }} />
+    <Stack.Screen
+      name="RentalQuotationList"
+      component={RentalInvoiceListScreen}
+      initialParams={{ invoiceType: 'quotation' }}
+      options={{ title: 'Rental Quotations' }}
+    />
     <Stack.Screen name="RentalReports" component={RentalReportsScreen} options={{ title: 'Rental Reports' }} />
     <Stack.Screen
       name="RentalGatePass"
@@ -305,6 +317,8 @@ const SettingsStack = () => (
     <Stack.Screen name="CompanyList" component={CompanyListScreen} options={{ title: 'Companies' }} />
     <Stack.Screen name="AddCompany" component={AddCompanyScreen} options={{ title: 'Add/Edit Company' }} />
     <Stack.Screen name="OldInvoicesList" component={OldInvoicesListScreen} options={{ title: 'Old Invoices' }} />
+    <Stack.Screen name="OldInvoiceUpload" component={OldInvoiceUploadScreen} options={{ title: 'Upload Old Invoices' }} />
+    <Stack.Screen name="OldInvoiceDetail" component={OldInvoiceDetailScreen} options={{ title: 'Invoice Details' }} />
     <Stack.Screen name="MenuSettings" component={MenuSettingScreen} options={{ title: 'Menu Settings' }} />
     <Stack.Screen name="CreditSettings" component={CreditManagementScreen} options={{ title: 'Credit Management' }} />
     <Stack.Screen name="GiftSettings" component={GiftSettingsScreen} options={{ title: 'Gift Settings' }} />
@@ -380,6 +394,8 @@ const ReportsStack = () => (
     <Stack.Screen name="ServiceInvoicesReport" component={ServiceInvoicesReportScreen} options={{ title: 'Service Invoices Report' }} />
     <Stack.Screen name="ServiceReportsReport" component={ServiceReportsReportScreen} options={{ title: 'Service Reports Report' }} />
     <Stack.Screen name="EmployeeList" component={EmployeeListScreen} options={{ title: 'Employees' }} />
+    <Stack.Screen name="AddEmployee" component={AddEmployeeScreen} options={{ title: 'Add/Edit Employee' }} />
+    <Stack.Screen name="EmployeeDetails" component={EmployeeDetailsScreen} options={{ title: 'Employee Details' }} />
     <Stack.Screen name="ActivityLogReport" component={ActivityLogReportScreen} options={{ title: 'Petrol Form Report' }} />
     <Stack.Screen name="LeaveReport" component={LeaveReportScreen} options={{ title: 'Leave Report' }} />
     <Stack.Screen name="EmployeeBenefitsReport" component={EmployeeBenefitsReportScreen} options={{ title: 'Employee Benefits' }} />

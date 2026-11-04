@@ -95,10 +95,16 @@ const AddRentalReportScreen = () => {
   const [companies, setCompanies] = useState<any[]>([]);
   const [branches, setBranches] = useState<string[]>([]);
   const [availableProducts, setAvailableProducts] = useState<any[]>([]);
+  const [contactPersons, setContactPersons] = useState<Array<{ name: string; email: string; mobile: string }>>([]);
+  const [sendDetailsTo, setSendDetailsTo] = useState<Array<{ name: string; email: string; mobile: string }>>([]);
+  const [sendToPickerVisible, setSendToPickerVisible] = useState(false);
   const [companyPickerVisible, setCompanyPickerVisible] = useState(false);
   const [branchPickerVisible, setBranchPickerVisible] = useState(false);
   const [productPickerVisible, setProductPickerVisible] = useState(false);
+  const [productSearch, setProductSearch] = useState('');
   const [contentScopePickerVisible, setContentScopePickerVisible] = useState(false);
+
+  const companyLocked = !!(paramCompanyId || isEditMode);
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -130,6 +136,7 @@ const AddRentalReportScreen = () => {
   useFocusEffect(
     useCallback(() => {
       applyCompanyFromRouteParams();
+      if (isEditMode) return;
       setFormData((prev) => {
         if (prev.reportType === resolvedReportType && prev.reportFor === payloadReportFor) {
           return prev;
@@ -140,7 +147,7 @@ const AddRentalReportScreen = () => {
           reportFor: payloadReportFor,
         };
       });
-    }, [applyCompanyFromRouteParams, resolvedReportType, payloadReportFor])
+    }, [applyCompanyFromRouteParams, resolvedReportType, payloadReportFor, isEditMode])
   );
 
   useEffect(() => {
@@ -149,8 +156,30 @@ const AddRentalReportScreen = () => {
     } else {
       setBranches([]);
       setAvailableProducts([]);
+      setContactPersons([]);
     }
   }, [formData.company, token]);
+
+  const contactKey = (c: { name?: string; email?: string; mobile?: string }) => {
+    const email = String(c?.email || '').trim().toLowerCase();
+    if (email) return `e:${email}`;
+    const mobile = String(c?.mobile || '').trim();
+    if (mobile) return `m:${mobile}`;
+    return `n:${String(c?.name || '').trim().toLowerCase()}`;
+  };
+
+  const isContactSelected = (c: { name?: string; email?: string; mobile?: string }) =>
+    sendDetailsTo.some((s) => contactKey(s) === contactKey(c));
+
+  const toggleSendToContact = (c: { name: string; email: string; mobile: string }) => {
+    setSendDetailsTo((prev) => {
+      const key = contactKey(c);
+      if (prev.some((s) => contactKey(s) === key)) {
+        return prev.filter((s) => contactKey(s) !== key);
+      }
+      return [...prev, { name: c.name, email: c.email, mobile: c.mobile }];
+    });
+  };
 
   const fetchInitialData = async () => {
     try {
@@ -170,9 +199,14 @@ const AddRentalReportScreen = () => {
         );
         if (reportResponse.data.success) {
           const fetchedReport = reportResponse.data.report;
+          const editReportType = resolveRentalReportType(
+            fetchedReport.reportType || fetchedReport.reportFor || reportTypeParam
+          );
+          const editReportFor =
+            fetchedReport.reportFor || getRentalPayloadReportFor(editReportType);
           setFormData({
-            reportType: resolvedReportType,
-            reportFor: payloadReportFor,
+            reportType: editReportType,
+            reportFor: editReportFor,
             company: fetchedReport.company?._id || '',
             problemReport: fetchedReport.problemReport || '',
             remarksPendingWorks: fetchedReport.remarksPendingWorks || '',
@@ -186,6 +220,15 @@ const AddRentalReportScreen = () => {
             materialDescription: '',
             materialAccessService: '',
           });
+          setSendDetailsTo(
+            Array.isArray(fetchedReport.sendDetailsTo)
+              ? fetchedReport.sendDetailsTo.map((c: any) => ({
+                  name: c?.name || '',
+                  email: c?.email || '',
+                  mobile: c?.mobile || '',
+                }))
+              : []
+          );
           if (Array.isArray(fetchedReport.materialGroups) && fetchedReport.materialGroups.length > 0) {
             setMaterialGroups(
               fetchedReport.materialGroups.map((group: any) => ({
@@ -241,9 +284,18 @@ const AddRentalReportScreen = () => {
           }
         });
         setBranches(Array.from(extractedBranches));
+        const contacts = (companyData.company.contactPersons || [])
+          .map((cp: any) => ({
+            name: cp?.name || '',
+            email: cp?.email || '',
+            mobile: cp?.mobile || '',
+          }))
+          .filter((x: any) => x.name && (x.email || x.mobile));
+        setContactPersons(contacts);
       }
     } catch (error) {
       console.error('Error fetching company details:', error);
+      setContactPersons([]);
     }
 
     try {
@@ -289,6 +341,7 @@ const AddRentalReportScreen = () => {
       setMaterialGroups([]);
       setSelectedGroupIndex(null);
       setEditingProductId(null);
+      setSendDetailsTo([]);
     } else {
       setFormData((prev) => ({ ...prev, [field]: value }));
     }
@@ -492,7 +545,7 @@ const AddRentalReportScreen = () => {
       Toast.show({
         type: 'error',
         text1: 'Error',
-        text2: 'Please enter a problem report',
+        text2: `Please enter ${getDocumentTitle(resolvedReportType) === 'Report' ? 'problem report' : 'details / notes'}`,
       });
       return;
     }
@@ -500,7 +553,7 @@ const AddRentalReportScreen = () => {
       Toast.show({
         type: 'error',
         text1: 'Error',
-        text2: 'Please select a branch',
+        text2: 'Please select or enter a branch',
       });
       return;
     }
@@ -530,16 +583,16 @@ const AddRentalReportScreen = () => {
 
       const payload = {
         serviceId: rentalId,
-        reportType: resolvedReportType,
+        reportType: formData.reportType || resolvedReportType,
         company: formData.company,
         problemReport: formData.problemReport,
         remarksPendingWorks: formData.remarksPendingWorks,
-        modelNo: formData.modelNo,
         branch: formData.branch,
         reference: formData.reference,
         contentScope: formData.contentScope || undefined,
         assignedTo: employeeId || user?._id,
-        reportFor: payloadReportFor,
+        reportFor: formData.reportFor || payloadReportFor,
+        sendDetailsTo,
         materialGroups: cleanedMaterialGroups,
       };
 
@@ -563,7 +616,14 @@ const AddRentalReportScreen = () => {
           text1: 'Success',
           text2: getDocumentSuccessMessage(resolvedReportType, reportId ? 'updated' : 'submitted'),
         });
-        (navigation as any).navigate(getRentalListScreen(resolvedReportType));
+        const listScreen = getRentalListScreen(resolvedReportType);
+        try {
+          (navigation as any).navigate(listScreen);
+        } catch {
+          if ((navigation as any).canGoBack?.()) {
+            (navigation as any).goBack();
+          }
+        }
       } else {
         Toast.show({
           type: 'error',
@@ -608,23 +668,53 @@ const AddRentalReportScreen = () => {
       <View style={styles.form}>
         <Text style={styles.label}>Company *</Text>
         <TouchableOpacity
-          style={styles.pickerButton}
-          onPress={() => setCompanyPickerVisible(true)}
+          style={[styles.pickerButton, companyLocked && styles.disabledPicker]}
+          onPress={() => {
+            if (!companyLocked) setCompanyPickerVisible(true);
+          }}
+          disabled={companyLocked}
         >
-          <Text style={styles.pickerButtonText}>
+          <Text style={[styles.pickerButtonText, companyLocked && styles.disabledText]}>
             {formData.company
-              ? companies.find((c) => c._id === formData.company)?.companyName || 'Select Company'
+              ? companies.find((c) => String(c._id) === String(formData.company))?.companyName || 'Select Company'
               : 'Select Company'}
+          </Text>
+          {!companyLocked && <Icon name="arrow-drop-down" size={24} color="#666" />}
+        </TouchableOpacity>
+
+        <Text style={styles.label}>Send To</Text>
+        <TouchableOpacity
+          style={[styles.pickerButton, !formData.company && styles.disabledPicker]}
+          onPress={() => formData.company && setSendToPickerVisible(true)}
+          disabled={!formData.company}
+        >
+          <Text style={[styles.pickerButtonText, !formData.company && styles.disabledText]} numberOfLines={2}>
+            {sendDetailsTo.length > 0
+              ? sendDetailsTo
+                  .map((c) => `${c.name}${c.email ? ` (${c.email})` : c.mobile ? ` (${c.mobile})` : ''}`)
+                  .join(', ')
+              : formData.company
+                ? 'Select contact persons'
+                : 'Select company first'}
           </Text>
           <Icon name="arrow-drop-down" size={24} color="#666" />
         </TouchableOpacity>
+        {sendDetailsTo.length > 0 && (
+          <Text style={styles.helperText}>Emails will be stored for sending.</Text>
+        )}
 
-        <Text style={styles.label}>Problem Report</Text>
+        <Text style={styles.label}>
+          {getDocumentTitle(resolvedReportType) === 'Report' ? 'Problem Report *' : 'Details / Notes *'}
+        </Text>
         <TextInput
           style={[styles.input, styles.textArea]}
           value={formData.problemReport}
           onChangeText={(text) => handleChange('problemReport', text)}
-          placeholder="Enter Problem Report"
+          placeholder={
+            getDocumentTitle(resolvedReportType) === 'Report'
+              ? 'Enter Problem Report'
+              : 'Enter details / notes'
+          }
           multiline
           numberOfLines={2}
         />
@@ -639,14 +729,6 @@ const AddRentalReportScreen = () => {
           numberOfLines={2}
         />
 
-        <Text style={styles.label}>Model No</Text>
-        <TextInput
-          style={styles.input}
-          value={formData.modelNo}
-          onChangeText={(text) => handleChange('modelNo', text)}
-          placeholder="Enter Model No"
-        />
-
         <Text style={styles.label}>Branch *</Text>
         <TouchableOpacity
           style={styles.pickerButton}
@@ -658,6 +740,13 @@ const AddRentalReportScreen = () => {
           </Text>
           <Icon name="arrow-drop-down" size={24} color="#666" />
         </TouchableOpacity>
+        <TextInput
+          style={[styles.input, { marginTop: 8 }]}
+          value={formData.branch}
+          onChangeText={(text) => handleChange('branch', text)}
+          placeholder="Or type branch / address"
+          editable={!!formData.company}
+        />
 
         {showsContentScopeField(formData.reportType || resolvedReportType) && (
           <>
@@ -738,17 +827,22 @@ const AddRentalReportScreen = () => {
             <Text style={styles.label}>Select Product</Text>
             <TouchableOpacity
               style={styles.pickerButton}
-              onPress={() => setProductPickerVisible(true)}
+              onPress={() => {
+                setProductSearch('');
+                setProductPickerVisible(true);
+              }}
               disabled={editingProductId !== null}
             >
               <Text style={styles.pickerButtonText}>
                 {formData.materialProductName
                   ? (() => {
-                      const selected = availableProducts.find((p) => p._id === formData.materialProductName);
+                      const selected = availableProducts.find(
+                        (p) => String(p._id) === String(formData.materialProductName)
+                      );
                       if (!selected) return 'Select Product';
                       return extractProductName(selected);
                     })()
-                  : 'Select Product'}
+                  : 'Search / Select Product'}
               </Text>
               <Icon name="arrow-drop-down" size={24} color="#666" />
             </TouchableOpacity>
@@ -922,6 +1016,57 @@ const AddRentalReportScreen = () => {
         </TouchableOpacity>
       </Modal>
 
+      {/* Send To Picker Modal */}
+      <Modal
+        visible={sendToPickerVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setSendToPickerVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setSendToPickerVisible(false)}
+        >
+          <View style={styles.pickerModal}>
+            <Text style={styles.pickerModalTitle}>Send To</Text>
+            {contactPersons.length === 0 ? (
+              <Text style={styles.emptyContactsText}>No contact persons for this company</Text>
+            ) : (
+              <FlatList
+                data={contactPersons}
+                keyExtractor={(item, index) => `${contactKey(item)}-${index}`}
+                renderItem={({ item }) => {
+                  const selected = isContactSelected(item);
+                  return (
+                    <TouchableOpacity
+                      style={[styles.pickerOption, selected && styles.pickerOptionSelected]}
+                      onPress={() => toggleSendToContact(item)}
+                    >
+                      <Icon
+                        name={selected ? 'check-box' : 'check-box-outline-blank'}
+                        size={22}
+                        color={selected ? '#019ee3' : '#999'}
+                      />
+                      <Text style={styles.pickerOptionText}>
+                        {item.name}
+                        {item.email ? ` (${item.email})` : item.mobile ? ` (${item.mobile})` : ''}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                }}
+              />
+            )}
+            <TouchableOpacity
+              style={styles.modalCloseButton}
+              onPress={() => setSendToPickerVisible(false)}
+            >
+              <Text style={styles.modalCloseButtonText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
       {/* Branch Picker Modal */}
       <Modal
         visible={branchPickerVisible}
@@ -1023,11 +1168,25 @@ const AddRentalReportScreen = () => {
           activeOpacity={1}
           onPress={() => setProductPickerVisible(false)}
         >
-          <View style={styles.pickerModal}>
+          <View style={styles.pickerModal} onStartShouldSetResponder={() => true}>
             <Text style={styles.pickerModalTitle}>Select Product</Text>
+            <TextInput
+              style={[styles.input, { marginBottom: 10 }]}
+              value={productSearch}
+              onChangeText={setProductSearch}
+              placeholder="Search product..."
+              autoCorrect={false}
+              clearButtonMode="while-editing"
+            />
             <FlatList
-              data={availableProducts}
+              data={availableProducts.filter((item) => {
+                if (!productSearch.trim()) return true;
+                return extractProductName(item)
+                  .toLowerCase()
+                  .includes(productSearch.trim().toLowerCase());
+              })}
               keyExtractor={(item) => item?._id || String(item)}
+              keyboardShouldPersistTaps="handled"
               ListHeaderComponent={
                 <TouchableOpacity
                   style={styles.pickerOption}
@@ -1041,22 +1200,22 @@ const AddRentalReportScreen = () => {
               }
               ListEmptyComponent={
                 <Text style={styles.pickerOptionText}>
-                  {formData.company ? 'No products found' : 'Select a company first'}
+                  {!formData.company
+                    ? 'Select a company first'
+                    : productSearch.trim()
+                      ? 'No matching products'
+                      : 'No products found'}
                 </Text>
               }
               renderItem={({ item }) => {
                 if (!item || typeof item !== 'object') {
                   return null;
                 }
-                const productName =
-                  (typeof item.productName === 'string' && item.productName) ||
-                  item.modelName ||
-                  item.name ||
-                  'Unknown Product';
                 const productId = item._id;
                 if (!productId) {
                   return null;
                 }
+                const productName = extractProductName(item);
                 return (
                   <TouchableOpacity
                     style={styles.pickerOption}
@@ -1065,7 +1224,7 @@ const AddRentalReportScreen = () => {
                       setProductPickerVisible(false);
                     }}
                   >
-                    <Text style={styles.pickerOptionText}>{String(productName)}</Text>
+                    <Text style={styles.pickerOptionText}>{productName}</Text>
                   </TouchableOpacity>
                 );
               }}
@@ -1150,6 +1309,23 @@ const styles = StyleSheet.create({
   },
   disabledText: {
     color: '#999',
+  },
+  disabledPicker: {
+    backgroundColor: '#f0f0f0',
+  },
+  helperText: {
+    fontSize: 12,
+    color: '#888',
+    marginTop: -8,
+    marginBottom: 12,
+  },
+  emptyContactsText: {
+    padding: 16,
+    color: '#666',
+    textAlign: 'center',
+  },
+  pickerOptionSelected: {
+    backgroundColor: '#e8f6fc',
   },
   sectionTitle: {
     fontSize: 18,
@@ -1321,10 +1497,14 @@ const styles = StyleSheet.create({
     padding: 15,
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   pickerOptionText: {
     fontSize: 16,
     color: '#333',
+    flex: 1,
   },
   modalCloseButton: {
     backgroundColor: '#e0e0e0',

@@ -43,9 +43,15 @@ const AddEmployeeScreen = () => {
     idCradNo: '',
     department: '',
     salary: '',
+    bikeAllowance: '',
     orderPriceFrom: '',
     orderPriceTo: '',
     image: '',
+    parentName: '',
+    parentPhone: '',
+    parentAddress: '',
+    parentRelation: '',
+    idProof: '',
   });
   const [newPincode, setNewPincode] = useState('');
 
@@ -143,9 +149,15 @@ const AddEmployeeScreen = () => {
                 data.employee.department?._id || data.employee.department || ''
               ),
           salary: data.employee.salary?.toString() || '',
+          bikeAllowance: data.employee.bikeAllowance?.toString() ?? '',
           orderPriceFrom: data.employee.orderPriceFrom?.toString() || '',
           orderPriceTo: data.employee.orderPriceTo?.toString() || '',
           image: data.employee.image || '',
+          parentName: data.employee.parentName || '',
+          parentPhone: data.employee.parentPhone || '',
+          parentAddress: data.employee.parentAddress || '',
+          parentRelation: data.employee.parentRelation || '',
+          idProof: data.employee.idProof || '',
         });
       }
     } catch (error: any) {
@@ -153,6 +165,66 @@ const AddEmployeeScreen = () => {
         type: 'error',
         text1: 'Error',
         text2: error.response?.data?.message || 'Failed to load employee data',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const uploadFileToApi = async (
+    asset: { uri: string; name?: string; type?: string },
+    field: 'image' | 'idProof',
+    successMsg: string
+  ) => {
+    const filename = asset.name || asset.uri.split('/').pop() || 'file';
+    const match = /\.(\w+)$/.exec(filename);
+    const type =
+      asset.type ||
+      (match
+        ? match[1].toLowerCase() === 'pdf'
+          ? 'application/pdf'
+          : `image/${match[1]}`
+        : 'image/jpeg');
+
+    const formDataUpload = new FormData();
+    formDataUpload.append('file', {
+      uri: asset.uri,
+      name: filename,
+      type,
+    } as any);
+
+    setLoading(true);
+    try {
+      const response = await axios.post(
+        `${getApiBaseUrl()}/auth/upload-file`,
+        formDataUpload,
+        {
+          headers: {
+            Authorization: token || '',
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      );
+
+      if (response.data?.success && response.data?.fileUrl) {
+        setFormData((prev) => ({ ...prev, [field]: response.data.fileUrl }));
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: successMsg,
+        });
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: `Failed to upload ${field === 'image' ? 'image' : 'ID proof'}`,
+        });
+      }
+    } catch (error: any) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: error.response?.data?.message || 'Error uploading file',
       });
     } finally {
       setLoading(false);
@@ -176,59 +248,75 @@ const AddEmployeeScreen = () => {
 
       if (!result.canceled && result.assets[0]) {
         const uri = result.assets[0].uri;
-        const filename = uri.split('/').pop();
-        const match = /\.(\w+)$/.exec(filename || '');
-        const type = match ? `image/${match[1]}` : 'image/jpeg';
-
-        const formDataUpload = new FormData();
-        formDataUpload.append('file', {
-          uri,
-          name: filename,
-          type,
-        } as any);
-
-        setLoading(true);
-        try {
-          const response = await axios.post(
-            `${getApiBaseUrl()}/auth/upload-file`,
-            formDataUpload,
-            {
-              headers: {
-                Authorization: token || '',
-                'Content-Type': 'multipart/form-data',
-              },
-            }
-          );
-
-          if (response.data?.success && response.data?.fileUrl) {
-            setFormData({ ...formData, image: response.data.fileUrl });
-            Toast.show({
-              type: 'success',
-              text1: 'Success',
-              text2: 'Image uploaded successfully',
-            });
-          } else {
-            Toast.show({
-              type: 'error',
-              text1: 'Error',
-              text2: 'Failed to upload image',
-            });
-          }
-        } catch (error: any) {
-          Toast.show({
-            type: 'error',
-            text1: 'Error',
-            text2: error.response?.data?.message || 'Error uploading image',
-          });
-        } finally {
-          setLoading(false);
-        }
+        await uploadFileToApi(
+          { uri, name: uri.split('/').pop() },
+          'image',
+          'Image uploaded successfully'
+        );
       }
     } catch (error: any) {
       Toast.show({
         type: 'error',
         text1: 'Error',
         text2: 'Failed to pick image',
+      });
+    }
+  };
+
+  const handleIdProofUpload = async () => {
+    try {
+      Alert.alert('Upload ID Proof', 'Choose file type', [
+        {
+          text: 'Photo',
+          onPress: async () => {
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (status !== 'granted') {
+              Alert.alert('Permission Denied', 'Permission to access camera roll is required!');
+              return;
+            }
+            const result = await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+              quality: 0.8,
+            });
+            if (!result.canceled && result.assets[0]) {
+              const uri = result.assets[0].uri;
+              await uploadFileToApi(
+                { uri, name: uri.split('/').pop() },
+                'idProof',
+                'ID Proof uploaded successfully'
+              );
+            }
+          },
+        },
+        {
+          text: 'PDF / Document',
+          onPress: async () => {
+            const DocumentPicker = await import('expo-document-picker');
+            const result = await DocumentPicker.getDocumentAsync({
+              type: ['application/pdf', 'image/*'],
+              multiple: false,
+              copyToCacheDirectory: true,
+            });
+            if (result.canceled || !result.assets?.length) return;
+            const asset = result.assets[0];
+            await uploadFileToApi(
+              {
+                uri: asset.uri,
+                name: asset.name,
+                type: asset.mimeType || undefined,
+              },
+              'idProof',
+              'ID Proof uploaded successfully'
+            );
+          },
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ]);
+    } catch (error: any) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Failed to pick ID proof',
       });
     }
   };
@@ -273,9 +361,15 @@ const AddEmployeeScreen = () => {
       : [],
     department: formData.department ? [formData.department] : [],
     salary: formData.salary ? Number(formData.salary) : undefined,
+    bikeAllowance: formData.bikeAllowance ? Number(formData.bikeAllowance) : 0,
     orderPriceFrom: formData.orderPriceFrom ? Number(formData.orderPriceFrom) : 0,
     orderPriceTo: formData.orderPriceTo ? Number(formData.orderPriceTo) : 0,
     image: formData.image || undefined,
+    parentName: formData.parentName || undefined,
+    parentPhone: formData.parentPhone || undefined,
+    parentAddress: formData.parentAddress || undefined,
+    parentRelation: formData.parentRelation || undefined,
+    idProof: formData.idProof || undefined,
   });
 
   const handleSubmit = async () => {
@@ -533,6 +627,15 @@ const AddEmployeeScreen = () => {
           />
         </View>
 
+        <Text style={styles.label}>Bike Allowance</Text>
+        <TextInput
+          style={styles.input}
+          value={formData.bikeAllowance}
+          onChangeText={(text) => setFormData({ ...formData, bikeAllowance: text.replace(/[^0-9.]/g, '') })}
+          placeholder="Enter bike allowance"
+          keyboardType="numeric"
+        />
+
         <Text style={styles.label}>Employee Photo</Text>
         <View style={styles.imageContainer}>
           {formData.image ? (
@@ -562,6 +665,68 @@ const AddEmployeeScreen = () => {
           </TouchableOpacity>
         </View>
         <Text style={styles.imageHint}>Supported formats: JPG, PNG (Max 5MB)</Text>
+
+        <Text style={styles.label}>ID Proof Document</Text>
+        <View style={styles.imageContainer}>
+          {formData.idProof ? (
+            <View style={styles.idProofPreview}>
+              <Icon name="description" size={28} color="#019ee3" />
+              <Text style={styles.idProofText} numberOfLines={1}>
+                ID Proof uploaded
+              </Text>
+              <TouchableOpacity
+                style={styles.removeImageButton}
+                onPress={() => setFormData({ ...formData, idProof: '' })}
+              >
+                <Icon name="close" size={20} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          ) : null}
+          <TouchableOpacity
+            style={styles.uploadButton}
+            onPress={handleIdProofUpload}
+            disabled={loading}
+          >
+            <Icon name="upload-file" size={20} color="#019ee3" />
+            <Text style={styles.uploadButtonText}>
+              {formData.idProof ? 'Change ID Proof' : 'Upload ID Proof'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+        <Text style={styles.imageHint}>Supported formats: PDF, JPG, PNG (Max 5MB)</Text>
+
+        <Text style={styles.sectionTitle}>Parent/Guardian Details</Text>
+        <Text style={styles.label}>Parent/Guardian Name</Text>
+        <TextInput
+          style={styles.input}
+          value={formData.parentName}
+          onChangeText={(text) => setFormData({ ...formData, parentName: text })}
+          placeholder="Enter parent/guardian name"
+        />
+        <Text style={styles.label}>Parent/Guardian Phone</Text>
+        <TextInput
+          style={styles.input}
+          value={formData.parentPhone}
+          onChangeText={(text) => setFormData({ ...formData, parentPhone: text })}
+          placeholder="Enter parent/guardian phone"
+          keyboardType="phone-pad"
+        />
+        <Text style={styles.label}>Parent/Guardian Relation</Text>
+        <TextInput
+          style={styles.input}
+          value={formData.parentRelation}
+          onChangeText={(text) => setFormData({ ...formData, parentRelation: text })}
+          placeholder="e.g., Father, Mother, Guardian"
+        />
+        <Text style={styles.label}>Parent/Guardian Address</Text>
+        <TextInput
+          style={[styles.input, styles.textArea]}
+          value={formData.parentAddress}
+          onChangeText={(text) => setFormData({ ...formData, parentAddress: text })}
+          placeholder="Enter parent/guardian address"
+          multiline
+          numberOfLines={3}
+        />
 
         <TouchableOpacity
           style={[styles.button, loading && styles.buttonDisabled]}
@@ -686,6 +851,30 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: 8,
     marginTop: 12,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#019ee3',
+    marginTop: 24,
+    marginBottom: 4,
+  },
+  idProofPreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#e8f4fc',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginRight: 12,
+    position: 'relative',
+    maxWidth: 160,
+    gap: 6,
+  },
+  idProofText: {
+    fontSize: 12,
+    color: '#019ee3',
+    flexShrink: 1,
   },
   input: {
     backgroundColor: '#fff',

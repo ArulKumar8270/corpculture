@@ -33,7 +33,12 @@ export const fetchUserPermissions = createAsyncThunk(
       const response = await permissionService.getUserPermissions(userId);
       return response.data.permissions || [];
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to fetch permissions');
+      const message =
+        error.response?.data?.message ||
+        (error.message === 'Network Error'
+          ? 'Network error loading permissions. Pull to refresh or reopen the app.'
+          : 'Failed to fetch permissions');
+      return rejectWithValue(message);
     }
   }
 );
